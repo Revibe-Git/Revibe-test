@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -9,114 +8,111 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-```
-:root {
-  --black: #0a0a0a;
-  --white: #f5f5f0;
-  --lime: #c8f135;
-  --grey: #1a1a1a;
-}
+    :root {
+      --black: #0a0a0a;
+      --white: #f5f5f0;
+      --lime: #c8f135;
+      --grey: #1a1a1a;
+    }
 
-body {
-  background: var(--black);
-  color: var(--white);
-  font-family: 'DM Sans', sans-serif;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
+    body {
+      background: var(--black);
+      color: var(--white);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
 
-.bg-grid {
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(200,241,53,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(200,241,53,0.04) 1px, transparent 1px);
-  background-size: 60px 60px;
-  pointer-events: none;
-}
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(200,241,53,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(200,241,53,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+    }
 
-.container {
-  position: relative;
-  text-align: center;
-  padding: 2rem;
-  animation: fadeUp 0.8s ease both;
-}
+    .container {
+      position: relative;
+      text-align: center;
+      padding: 2rem;
+      animation: fadeUp 0.8s ease both;
+    }
 
-.tag {
-  display: inline-block;
-  background: var(--lime);
-  color: var(--black);
-  font-family: 'DM Sans', sans-serif;
-  font-weight: 500;
-  font-size: 0.7rem;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  padding: 0.35rem 0.9rem;
-  border-radius: 999px;
-  margin-bottom: 2rem;
-  animation: fadeUp 0.8s ease 0.1s both;
-}
+    .tag {
+      display: inline-block;
+      background: var(--lime);
+      color: var(--black);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      margin-bottom: 2rem;
+      animation: fadeUp 0.8s ease 0.1s both;
+    }
 
-h1 {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: clamp(5rem, 18vw, 14rem);
-  line-height: 0.9;
-  letter-spacing: 0.02em;
-  color: var(--white);
-  animation: fadeUp 0.8s ease 0.2s both;
-}
+    h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(5rem, 18vw, 14rem);
+      line-height: 0.9;
+      letter-spacing: 0.02em;
+      color: var(--lime);
+      animation: fadeUp 0.8s ease 0.2s both;
+    }
 
-h1 span {
-  color: var(--lime);
-}
+    h1 span {
+      color: var(--lime);
+    }
 
-.subtitle {
-  margin-top: 1.5rem;
-  font-size: 0.95rem;
-  font-weight: 300;
-  color: rgba(245,245,240,0.5);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  animation: fadeUp 0.8s ease 0.3s both;
-}
+    .subtitle {
+      margin-top: 1.5rem;
+      font-size: 0.95rem;
+      font-weight: 300;
+      color: rgba(245,245,240,0.5);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      animation: fadeUp 0.8s ease 0.3s both;
+    }
 
-.status {
-  margin-top: 3rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.6rem;
-  background: var(--grey);
-  border: 1px solid rgba(200,241,53,0.2);
-  border-radius: 999px;
-  padding: 0.5rem 1.2rem;
-  font-size: 0.8rem;
-  color: rgba(245,245,240,0.6);
-  animation: fadeUp 0.8s ease 0.4s both;
-}
+    .status {
+      margin-top: 3rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: var(--grey);
+      border: 1px solid rgba(200,241,53,0.2);
+      border-radius: 999px;
+      padding: 0.5rem 1.2rem;
+      font-size: 0.8rem;
+      color: rgba(245,245,240,0.6);
+      animation: fadeUp 0.8s ease 0.4s both;
+    }
 
-.dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--lime);
-  animation: pulse 2s infinite;
-}
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--lime);
+      animation: pulse 2s infinite;
+    }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.8); }
-}
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
 
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-```
-
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
