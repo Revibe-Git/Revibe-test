@@ -2033,7 +2033,7 @@ function StaffPage({staff,openProfile,setModal}){
 
   const filtered=staff.filter(s=>{
     if(fDisc!=='all'&&s.discipline!==fDisc)return false;
-    if(fSite!=='all'&&s.site!==fSite)return false;
+    if(fSite!=='all'&&!(Array.isArray(s.site)?s.site.includes(fSite):s.site===fSite))return false;
     if(fTrack!=='all'&&!(s.tracks&&s.tracks.includes(fTrack)))return false;
     if(search&&!s.name.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
@@ -2069,7 +2069,7 @@ function StaffPage({staff,openProfile,setModal}){
                 <tr key={s.id} onClick={()=>openProfile(s.id)}>
                   <td><div className="flex aic g8"><Av name={s.name} sz="sm"/><div><div className="sm fw5">{s.name}</div><div className="muted" style={{marginTop:2}}>{Array.isArray(s.role)?s.role.join(', '):s.role}</div></div></div></td>
                   <td><DBadge d={s.discipline}/></td>
-                  <td><span className="muted xs">{s.site}</span></td>
+                  <td><span className="muted xs">{Array.isArray(s.site)?s.site.join(', '):s.site}</span></td>
                   <td><div className="flex aic g4">{s.tracks&&s.tracks.length>0?s.tracks.map(t=><TrackBadge key={t} t={t}/>):<span className="muted xs">—</span>}</div></td>
                   <td>{s.roadmap?<span className="badge b-quarterly">{s.roadmap}</span>:<span className="muted xs">—</span>}</td>
                   <td style={{minWidth:120}}>{sc!==null?<ScoreBar score={sc}/>:<span className="muted xs">Not scored</span>}</td>
@@ -2338,7 +2338,7 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff})
                 <DBadge d={staff.discipline}/>
                 <span className="muted">{Array.isArray(staff.role)?staff.role.join(', '):staff.role}</span>
                 <span className="muted">·</span>
-                <span className="muted">{staff.site}</span>
+                <span className="muted">{Array.isArray(staff.site)?staff.site.join(', '):staff.site}</span>
                 {staff.roadmap&&<span className="badge b-quarterly">{staff.roadmap}</span>}
                 {staff.archetype&&<span className="badge b-weekly">{staff.archetype}</span>}
               </div>
@@ -2626,10 +2626,11 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff})
 
 /* ══ ADD STAFF ══ */
 function AddStaffModal({onClose,onSave}){
-  const[f,setF]=useState({name:'',email:'',discipline:'pt',role:[],site:'Markham',roadmap:'',archetype:'',tracks:['clinical'],notes:''});
+  const[f,setF]=useState({name:'',email:'',discipline:'pt',role:[],site:['Markham'],roadmap:'',archetype:'',tracks:['clinical'],notes:''});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const toggleTrack=t=>setF(p=>({...p,tracks:p.tracks.includes(t)?p.tracks.filter(x=>x!==t):[...p.tracks,t]}));
   const toggleRole=r=>setF(p=>({...p,role:p.role.includes(r)?p.role.filter(x=>x!==r):[...p.role,r]}));
+  const toggleSite=s=>setF(p=>({...p,site:p.site.includes(s)?p.site.filter(x=>x!==s):[...p.site,s]}));
   return(
     <div className="overlay" onClick={onClose}>
       <div className="modal" style={{maxWidth:500}} onClick={e=>e.stopPropagation()}>
@@ -2641,7 +2642,7 @@ function AddStaffModal({onClose,onSave}){
             <div className="fg full"><label>Email (revibeto.com)</label><input value={f.email||''} onChange={e=>set('email',e.target.value)} placeholder="firstname@revibeto.com"/></div>
             <div className="fg"><label>Discipline</label><select value={f.discipline} onChange={e=>set('discipline',e.target.value)}>{DISC.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
         <div className="fg full"><label>Role / Title</label><div className="flex aic g6" style={{paddingTop:4,flexWrap:"wrap"}}>{ROLES.map(r=><button key={r} type="button" style={{padding:"4px 10px",borderRadius:20,border:"1px solid",fontSize:12,cursor:"pointer",background:f.role.includes(r)?"var(--go)":"transparent",borderColor:f.role.includes(r)?"var(--lime)":"var(--border2)",color:f.role.includes(r)?"var(--lime)":"var(--gray)"}} onClick={()=>toggleRole(r)}>{r}</button>)}</div></div>
-            <div className="fg"><label>Site</label><select value={f.site} onChange={e=>set('site',e.target.value)}>{SITES.map(s=><option key={s}>{s}</option>)}</select></div>
+        <div className="fg full"><label>Location(s)</label><div className="flex aic g6" style={{paddingTop:4,flexWrap:"wrap"}}>{SITES.map(s=><button key={s} type="button" style={{padding:"4px 10px",borderRadius:20,border:"1px solid",fontSize:12,cursor:"pointer",background:f.site.includes(s)?"var(--go)":"transparent",borderColor:f.site.includes(s)?"var(--lime)":"var(--border2)",color:f.site.includes(s)?"var(--lime)":"var(--gray)"}} onClick={()=>toggleSite(s)}>{s}</button>)}</div></div>
             <div className="fg"><label>Roadmap Phase</label><select value={f.roadmap} onChange={e=>set('roadmap',e.target.value)}><option value="">—</option><option>L1→L2</option><option>L2→L3</option><option>L3→L4</option></select></div>
             <div className="fg full"><label>Rubric Tracks</label>
               <div className="flex aic g6" style={{paddingTop:4}}>
@@ -4306,10 +4307,11 @@ function getBandLabel(v){
 
 function ProfileEditTab({staff,setStaff}){
   const[editing,setEditing]=useState(false);
-  const[f,setF]=useState({name:staff.name||'',email:staff.email||'',discipline:staff.discipline||'pt',role:Array.isArray(staff.role)?staff.role:(staff.role?[staff.role]:[]),site:staff.site||'Markham',roadmap:staff.roadmap||'',archetype:staff.archetype||'',notes:staff.notes||'',reflection:staff.reflection||'',tracks:staff.tracks||[]});
+  const[f,setF]=useState({name:staff.name||'',email:staff.email||'',discipline:staff.discipline||'pt',role:Array.isArray(staff.role)?staff.role:(staff.role?[staff.role]:[]),site:Array.isArray(staff.site)?staff.site:(staff.site?[staff.site]:[]),roadmap:staff.roadmap||'',archetype:staff.archetype||'',notes:staff.notes||'',reflection:staff.reflection||'',tracks:staff.tracks||[]});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const toggleTrack=t=>setF(p=>({...p,tracks:p.tracks.includes(t)?p.tracks.filter(x=>x!==t):[...p.tracks,t]}));
   const toggleRole=r=>setF(p=>({...p,role:p.role.includes(r)?p.role.filter(x=>x!==r):[...p.role,r]}));
+  const toggleSite=s=>setF(p=>({...p,site:p.site.includes(s)?p.site.filter(x=>x!==s):[...p.site,s]}));
   const save=()=>{setStaff(prev=>prev.map(s=>s.id===staff.id?{...s,...f}:s));setEditing(false);};
 
   if(!editing)return(
@@ -4320,7 +4322,7 @@ function ProfileEditTab({staff,setStaff}){
       {staff.notes&&<div className="hb hb-gray mb14"><div style={{fontSize:8,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',marginBottom:5}}>Profile Summary</div><div className="sm" style={{lineHeight:1.65}}>{staff.notes}</div></div>}
       {staff.reflection&&staff.reflection.length>20&&<div className="note-item mb14"><div className="note-date">Latest G&D Reflection</div><div className="sm" style={{lineHeight:1.6}}>{staff.reflection}</div></div>}
       <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'12px 16px'}}>
-        {[['Name',staff.name],['Email',staff.email||'—'],['Discipline',DISC.find(d=>d.id===staff.discipline)?.label||staff.discipline],['Role',Array.isArray(staff.role)?staff.role.join(', '):(staff.role||'—')],['Site',staff.site||'—'],['Roadmap',staff.roadmap||'—'],['Archetype',staff.archetype||'—']].map(([k,v])=>(
+        {[['Name',staff.name],['Email',staff.email||'—'],['Discipline',DISC.find(d=>d.id===staff.discipline)?.label||staff.discipline],['Role',Array.isArray(staff.role)?staff.role.join(', '):(staff.role||'—')],['Site',Array.isArray(staff.site)?staff.site.join(', '):(staff.site||'—')],['Roadmap',staff.roadmap||'—'],['Archetype',staff.archetype||'—']].map(([k,v])=>(
           <div key={k} style={{display:'flex',alignItems:'center',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
             <span style={{fontSize:12,color:'#999',minWidth:100}}>{k}</span>
             <span style={{fontSize:12,color:'var(--text)'}}>{v}</span>
@@ -4342,7 +4344,7 @@ function ProfileEditTab({staff,setStaff}){
         <div className="fg full"><label>Email (revibeto.com)</label><input value={f.email||''} onChange={e=>set('email',e.target.value)} placeholder="firstname@revibeto.com"/></div>
         <div className="fg"><label>Discipline</label><select value={f.discipline} onChange={e=>set('discipline',e.target.value)}>{DISC.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
         <div className="fg full"><label>Role / Title</label><div className="flex aic g6" style={{paddingTop:4,flexWrap:"wrap"}}>{ROLES.map(r=><button key={r} type="button" style={{padding:"4px 10px",borderRadius:20,border:"1px solid",fontSize:12,cursor:"pointer",background:f.role.includes(r)?"var(--go)":"transparent",borderColor:f.role.includes(r)?"var(--lime)":"var(--border2)",color:f.role.includes(r)?"var(--lime)":"var(--gray)"}} onClick={()=>toggleRole(r)}>{r}</button>)}</div></div>
-        <div className="fg"><label>Site</label><select value={f.site} onChange={e=>set('site',e.target.value)}>{SITES.map(s=><option key={s}>{s}</option>)}</select></div>
+        <div className="fg full"><label>Location(s)</label><div className="flex aic g6" style={{paddingTop:4,flexWrap:"wrap"}}>{SITES.map(s=><button key={s} type="button" style={{padding:"4px 10px",borderRadius:20,border:"1px solid",fontSize:12,cursor:"pointer",background:f.site.includes(s)?"var(--go)":"transparent",borderColor:f.site.includes(s)?"var(--lime)":"var(--border2)",color:f.site.includes(s)?"var(--lime)":"var(--gray)"}} onClick={()=>toggleSite(s)}>{s}</button>)}</div></div>
         <div className="fg"><label>Roadmap Phase</label><select value={f.roadmap} onChange={e=>set('roadmap',e.target.value)}><option value="">—</option><option>L1→L2</option><option>L2→L3</option><option>L3→L4</option></select></div>
         <div className="fg"><label>Archetype</label><input value={f.archetype} onChange={e=>set('archetype',e.target.value)} placeholder="Anchor / Builder / Mentor…"/></div>
         <div className="fg full"><label>Rubric Tracks</label>
@@ -5456,7 +5458,7 @@ function ScheduleMeetingModal({onClose, onSave, staff, existing}){
                         </div>
                         <div>
                           <div style={{fontSize:12,color:'var(--text)',fontWeight:500}}>{s.name}</div>
-                          <div style={{fontSize:12,color:'#999'}}>{DISC.find(d=>d.id===s.discipline)?.label} · {s.site}</div>
+                          <div style={{fontSize:12,color:'#999'}}>{DISC.find(d=>d.id===s.discipline)?.label} · {Array.isArray(s.site)?s.site.join(', '):s.site}</div>
                         </div>
                       </div>
                     );
