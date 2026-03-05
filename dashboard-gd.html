@@ -1785,12 +1785,12 @@ const fmtSz=b=>b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFix
 /* ── Supabase client ── */
 const SUPA_URL='https://ekjzbdvvxvylembmrphv.supabase.co';
 const SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVranpiZHZ2eHZ5bGVtYm1ycGh2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3Mjk4OTcsImV4cCI6MjA4ODMwNTg5N30.i5grkD0Hu6lngR-aBopYe_SOyWpAwkPTTWG7kW6JExQ';
-const sb=supabase.createClient(SUPA_URL,SUPA_KEY);
+const sb=(typeof supabase!=='undefined'&&supabase.createClient)?supabase.createClient(SUPA_URL,SUPA_KEY):null;
 
 /* ── Supabase data helpers ── */
-const dbGet=async(table,fallback=[])=>{try{const{data,error}=await sb.from(table).select('*');if(error||!data||data.length===0)return fallback;return data;}catch{return fallback;}};
-const dbUpsert=async(table,rows)=>{try{await sb.from(table).upsert(rows,{onConflict:'id'});}catch(e){console.warn('upsert error',table,e);}};
-const dbInsert=async(table,row)=>{try{const{data,error}=await sb.from(table).insert(row).select();if(error)throw error;return data?.[0];}catch(e){console.warn('insert error',table,e);}};
+const dbGet=async(table,fallback=[])=>{if(!sb)return fallback;try{const{data,error}=await sb.from(table).select('*');if(error||!data||data.length===0)return fallback;return data;}catch{return fallback;}};
+const dbUpsert=async(table,rows)=>{if(!sb)return;try{await sb.from(table).upsert(Array.isArray(rows)?rows:[rows],{onConflict:'id'});}catch(e){console.warn('upsert error',table,e);}};
+const dbInsert=async(table,row)=>{if(!sb)return null;try{const{data,error}=await sb.from(table).insert(row).select();if(error)throw error;return data?.[0];}catch(e){console.warn('insert error',table,e);}};
 const dbUpdate=async(table,id,updates)=>{try{await sb.from(table).update(updates).eq('id',id);}catch(e){console.warn('update error',table,e);}};
 const dbDelete=async(table,id)=>{try{await sb.from(table).delete().eq('id',id);}catch(e){console.warn('delete error',table,e);}};
 
@@ -1846,11 +1846,10 @@ function App(){
   useEffect(()=>{
     (async()=>{
       setLoading(true);
-      const[staffData,evalsData,sessData,meetData]=await Promise.all([
+      const[staffData,evalsData,sessData]=await Promise.all([
         dbGet('staff',SEED_STAFF),
         dbGet('evaluations',[]),
         dbGet('education_sessions',[]),
-        dbGet('meetings',[]),
       ]);
       /* normalise field names to match existing UI expectations */
       const normEvals=evalsData.map(e=>({...e,staffId:e.staff_id,track:e.type,mentorId:e.mentor_id}));
@@ -1858,13 +1857,14 @@ function App(){
       setStaff(staffData.length?staffData:SEED_STAFF);
       setEvals(normEvals);
       setSessions(normSess);
-      setMeetings(meetData);
+      /* meetings: localStorage only (no shared DB table needed) */
+      try{const m=localStorage.getItem('rvgd3_meetings');if(m)setMeetings(JSON.parse(m));}catch{};
       setLoading(false);
     })();
   },[]);
 
-  /* ── Persist meetings to Supabase ── */
-  useEffect(()=>{if(!loading&&meetings.length)dbUpsert('meetings',meetings);},[meetings]);
+  /* ── Persist meetings to localStorage ── */
+  useEffect(()=>{if(!loading)try{localStorage.setItem('rvgd3_meetings',JSON.stringify(meetings));}catch{};},[meetings]);
   /* ── Persist staff to Supabase ── */
   useEffect(()=>{if(!loading&&staff.length)dbUpsert('staff',staff);},[staff]);
   /* ── Persist evals to Supabase ── */
