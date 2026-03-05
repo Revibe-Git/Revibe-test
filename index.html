@@ -1867,11 +1867,11 @@ function App(){
   /* ── Persist meetings to localStorage ── */
   useEffect(()=>{if(!loading)try{localStorage.setItem('rvgd3_meetings',JSON.stringify(meetings));}catch{};},[meetings]);
   /* ── Persist staff to Supabase ── */
-  useEffect(()=>{if(!loading&&staff.length)dbUpsert('staff',staff);},[staff]);
+  useEffect(()=>{if(!loading&&staff.length)dbUpsert("staff",staff);},[staff,loading]);
   /* ── Persist evals to Supabase ── */
-  useEffect(()=>{if(!loading&&evals.length){const norm=evals.map(e=>({...e,staff_id:e.staffId||e.staff_id,mentor_id:e.mentorId||e.mentor_id}));dbUpsert('evaluations',norm);}},[evals]);
+  useEffect(()=>{if(!loading&&evals.length){const norm=evals.map(e=>({...e,staff_id:e.staffId||e.staff_id,mentor_id:e.mentorId||e.mentor_id}));dbUpsert("evaluations",norm);}},[evals,loading]);
   /* ── Persist sessions to Supabase ── */
-  useEffect(()=>{if(!loading&&sessions.length){const norm=sessions.map(s=>({...s,mentor_id:s.mentorId||s.mentor_id}));dbUpsert('education_sessions',norm);}},[sessions]);
+  useEffect(()=>{if(!loading&&sessions.length){const norm=sessions.map(s=>({...s,mentor_id:s.mentorId||s.mentor_id}));dbUpsert("education_sessions",norm);}},[sessions,loading]);
 
 
   const openProfile=id=>{setActiveId(id);setModal('profile');};
