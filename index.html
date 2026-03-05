@@ -4307,7 +4307,7 @@ function getBandLabel(v){
 
 function ProfileEditTab({staff,setStaff}){
   const[editing,setEditing]=useState(false);
-  const[f,setF]=useState({name:staff.name||'',email:staff.email||'',discipline:staff.discipline||'pt',role:Array.isArray(staff.role)?staff.role:(staff.role?[staff.role]:[]),site:Array.isArray(staff.site)?staff.site:(staff.site?[staff.site]:[]),roadmap:staff.roadmap||'',archetype:staff.archetype||'',notes:staff.notes||'',reflection:staff.reflection||'',tracks:staff.tracks||[]});
+  const[f,setF]=useState({name:staff.name||'',email:staff.email||'',discipline:staff.discipline||'pt',role:Array.isArray(staff.role)?staff.role.filter(r=>["Therapist","Senior Therapist","Clinical Lead","Lead Educator","Management","GE","GE Manager","Intern / Student"].includes(r)):([]),site:Array.isArray(staff.site)?staff.site:(staff.site?[staff.site]:[]),roadmap:staff.roadmap||'',archetype:staff.archetype||'',notes:staff.notes||'',reflection:staff.reflection||'',tracks:staff.tracks||[]});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const toggleTrack=t=>setF(p=>({...p,tracks:p.tracks.includes(t)?p.tracks.filter(x=>x!==t):[...p.tracks,t]}));
   const toggleRole=r=>setF(p=>({...p,role:p.role.includes(r)?p.role.filter(x=>x!==r):[...p.role,r]}));
