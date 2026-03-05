@@ -2638,7 +2638,7 @@ function AddStaffModal({onClose,onSave}){
             <div className="fg full"><label>Full Name</label><input value={f.name} onChange={e=>set('name',e.target.value)} placeholder="First Last"/></div>
             <div className="fg full"><label>Email (revibeto.com)</label><input value={f.email||''} onChange={e=>set('email',e.target.value)} placeholder="firstname@revibeto.com"/></div>
             <div className="fg"><label>Discipline</label><select value={f.discipline} onChange={e=>set('discipline',e.target.value)}>{DISC.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
-            <div className="fg"><label>Role / Title</label><input value={f.role} onChange={e=>set('role',e.target.value)}/></div>
+            <div className="fg"><label>Role / Title</label><select value={f.role} onChange={e=>set('role',e.target.value)}><option value="">— Select Role —</option><option>Therapist</option><option>Senior Therapist</option><option>Clinical Lead</option><option>Lead Educator</option><option>Management</option><option>GE</option><option>GE Manager</option><option>Intern / Student</option></select></div>
             <div className="fg"><label>Site</label><select value={f.site} onChange={e=>set('site',e.target.value)}>{SITES.map(s=><option key={s}>{s}</option>)}</select></div>
             <div className="fg"><label>Roadmap Phase</label><select value={f.roadmap} onChange={e=>set('roadmap',e.target.value)}><option value="">—</option><option>L1→L2</option><option>L2→L3</option><option>L3→L4</option></select></div>
             <div className="fg full"><label>Rubric Tracks</label>
@@ -4338,7 +4338,7 @@ function ProfileEditTab({staff,setStaff}){
         <div className="fg full"><label>Full Name</label><input value={f.name} onChange={e=>set('name',e.target.value)}/></div>
         <div className="fg full"><label>Email (revibeto.com)</label><input value={f.email||''} onChange={e=>set('email',e.target.value)} placeholder="firstname@revibeto.com"/></div>
         <div className="fg"><label>Discipline</label><select value={f.discipline} onChange={e=>set('discipline',e.target.value)}>{DISC.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
-        <div className="fg"><label>Role / Title</label><input value={f.role} onChange={e=>set('role',e.target.value)}/></div>
+        <div className="fg"><label>Role / Title</label><select value={f.role} onChange={e=>set('role',e.target.value)}><option value="">— Select Role —</option><option>Therapist</option><option>Senior Therapist</option><option>Clinical Lead</option><option>Lead Educator</option><option>Management</option><option>GE</option><option>GE Manager</option><option>Intern / Student</option></select></div>
         <div className="fg"><label>Site</label><select value={f.site} onChange={e=>set('site',e.target.value)}>{SITES.map(s=><option key={s}>{s}</option>)}</select></div>
         <div className="fg"><label>Roadmap Phase</label><select value={f.roadmap} onChange={e=>set('roadmap',e.target.value)}><option value="">—</option><option>L1→L2</option><option>L2→L3</option><option>L3→L4</option></select></div>
         <div className="fg"><label>Archetype</label><input value={f.archetype} onChange={e=>set('archetype',e.target.value)} placeholder="Anchor / Builder / Mentor…"/></div>
