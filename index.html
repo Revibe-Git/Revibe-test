@@ -1939,7 +1939,7 @@ function App(){
         </div>
       </div>
 
-      {modal==='profile'&&activeStaff&&<ProfileModal staff={activeStaff} onClose={()=>setModal(null)} evals={evals} setEvals={setEvals} sessions={sessions} setStaff={setStaff} allStaff={staff}/>}
+      {modal==="profile"&&activeStaff&&<ProfileModal staff={activeStaff} onClose={()=>setModal(null)} onDelete={id=>{setStaff(p=>p.filter(s=>s.id!==id));dbDelete("staff",id);setModal(null);}} evals={evals} setEvals={setEvals} sessions={sessions} setStaff={setStaff} allStaff={staff}/>}
       {modal==='addStaff'&&<AddStaffModal onClose={()=>setModal(null)} onSave={d=>setStaff(p=>[...p,{...d,id:'s'+Date.now(),files:[],tracks:d.tracks||[],scores:{}}])}/>}
       {modal==='addEval'&&<AddEvalModal onClose={()=>setModal(null)} onSave={d=>setEvals(p=>[...p,{...d,id:'e'+Date.now()}])} staff={staff} mentors={MENTORS}/>}
       {modal==='addSess'&&<AddSessModal onClose={()=>setModal(null)} onSave={d=>setSessions(p=>[...p,{...d,id:'se'+Date.now()}])} staff={staff} mentors={MENTORS}/>}
@@ -2290,7 +2290,7 @@ function GapsPage({staff,evals,openProfile}){
 /* ══════════════════════════════════════════════
    PROFILE MODAL
 ══════════════════════════════════════════════ */
-function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff}){
+function ProfileModal({staff,onClose,onDelete,evals,setEvals,sessions,setStaff,allStaff}){
   const[tab,setTab]=useState('profile');
   const[activeTrack,setActiveTrack]=useState(()=>staff.tracks&&staff.tracks.length>0?staff.tracks[0]:'clinical');
   const fileRef=useRef();
@@ -2326,7 +2326,7 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff})
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <div className="modal-stripe"/>
-        <button className="modal-close" onClick={onClose}>✕ Close</button>
+        <button className="modal-close" onClick={onClose}>✕ Close</button><button className="btn btn-sm" style={{position:"absolute",top:14,right:90,background:"rgba(224,82,82,.15)",border:"1px solid #E05252",color:"#E05252",fontSize:12}} onClick={()=>{if(window.confirm("Delete "+staff.name+"? This cannot be undone."))onDelete(staff.id);}}>🗑 Delete Profile</button>
         <div className="modal-body">
 
           {/* HEADER */}
