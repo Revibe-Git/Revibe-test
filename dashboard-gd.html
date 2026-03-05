@@ -4942,7 +4942,6 @@ function LeadershipPage(){
   const[filterStatus,setFilterStatus]=useState('all');
   const save=async(data)=>{setLtData(data);await dbUpsert('leadership',data);};
   const[showAdd,setShowAdd]=useState(false);
-  const save=(data)=>{setLtData(data);try{localStorage.setItem('rvgd3_leadership',JSON.stringify(data));}catch{}};
   const updatePerson=(id,updates)=>{const updated=ltData.map(p=>p.id===id?{...p,...updates}:p);save(updated);if(selectedPerson?.id===id)setSelectedPerson(updated.find(p=>p.id===id));};
   const addPerson=p=>save([...ltData,p]);
   const removePerson=id=>{save(ltData.filter(p=>p.id!==id));setSelectedPerson(null);};
