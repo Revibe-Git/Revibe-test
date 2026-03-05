@@ -1872,7 +1872,6 @@ function App(){
   /* ── Persist sessions to Supabase ── */
   useEffect(()=>{if(!loading&&sessions.length){const norm=sessions.map(s=>({...s,mentor_id:s.mentorId||s.mentor_id}));dbUpsert('education_sessions',norm);}},[sessions]);
 
-  if(loading)return<div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'#111',color:'#CAE8C1',fontFamily:'Barlow,sans-serif',fontSize:18,gap:12}}><div style={{width:20,height:20,border:'2px solid #CAE8C1',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/>Loading Revibe data…</div>;
 
   const openProfile=id=>{setActiveId(id);setModal('profile');};
 
@@ -1887,6 +1886,7 @@ function App(){
   const PAGES={overview:Overview,staff:StaffPage,evals:EvalsPage,education:EduPage,mentors:MentorsPage,gaps:GapsPage,forms:FormsPage,resources:ResourcesPage,leadership:LeadershipPage,schedule:SchedulePage,clinresources:ClinResourcesPage};
   const PageComp=PAGES[page]||Overview;
 
+  if(loading)return<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",background:"#111",color:"#CAE8C1",fontFamily:"Barlow,sans-serif",fontSize:18,gap:12}}><div style={{width:20,height:20,border:"2px solid #CAE8C1",borderTopColor:"transparent",borderRadius:"50%",animation:"spin 0.8s linear infinite"}}/> Loading Revibe data...</div>;
   return(
     <div className="shell">
       <div className="sidebar">
@@ -4940,6 +4940,7 @@ function LeadershipPage(){
   const[selectedPerson,setSelectedPerson]=useState(null);
   const[filterLoc,setFilterLoc]=useState('all');
   const[filterStatus,setFilterStatus]=useState('all');
+  const[filterDisc,setFilterDisc]=useState('all');
   const save=async(data)=>{setLtData(data);await dbUpsert('leadership',data);};
   const[showAdd,setShowAdd]=useState(false);
   const updatePerson=(id,updates)=>{const updated=ltData.map(p=>p.id===id?{...p,...updates}:p);save(updated);if(selectedPerson?.id===id)setSelectedPerson(updated.find(p=>p.id===id));};
