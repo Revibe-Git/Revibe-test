@@ -1790,7 +1790,7 @@ const sb=(typeof supabase!=='undefined'&&supabase.createClient)?supabase.createC
 
 /* ── Supabase data helpers ── */
 const dbGet=async(table,fallback=[])=>{if(!sb)return fallback;try{const{data,error}=await sb.from(table).select('*');if(error||!data||data.length===0)return fallback;return data;}catch{return fallback;}};
-const dbUpsert=async(table,rows)=>{if(!sb)return;try{await sb.from(table).upsert(Array.isArray(rows)?rows:[rows],{onConflict:'id'});}catch(e){console.warn('upsert error',table,e);}};
+const dbUpsert=async(table,rows)=>{if(!sb){console.error("sb is null");return;}try{const res=await sb.from(table).upsert(Array.isArray(rows)?rows:[rows],{onConflict:"id"});console.log("upsert",table,res?.error||"OK");}catch(e){console.error("upsert error",table,e);}};
 const dbInsert=async(table,row)=>{if(!sb)return null;try{const{data,error}=await sb.from(table).insert(row).select();if(error)throw error;return data?.[0];}catch(e){console.warn('insert error',table,e);}};
 const dbUpdate=async(table,id,updates)=>{try{await sb.from(table).update(updates).eq('id',id);}catch(e){console.warn('update error',table,e);}};
 const dbDelete=async(table,id)=>{try{await sb.from(table).delete().eq('id',id);}catch(e){console.warn('delete error',table,e);}};
