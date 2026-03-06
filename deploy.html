@@ -8,279 +8,374 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --black: #0a0a0a; --grey: #141414; --border: #222;
-      --white: #f0f0eb; --muted: rgba(240,240,235,0.4);
-      --lime: #c8f135; --lime-dim: rgba(200,241,53,0.1);
-      --red: #ff4444; --red-dim: rgba(255,68,68,0.1);
-      --green: #44ff88; --green-dim: rgba(68,255,136,0.08);
+      --black: #0a0a0a; --grey: #111; --grey2: #181818;
+      --border: #1e1e1e; --border2: #2a2a2a;
+      --white: #f0f0eb; --muted: rgba(240,240,235,0.38); --muted2: rgba(240,240,235,0.18);
+      --teal: #00c9a7; --teal-dim: rgba(0,201,167,0.1); --teal-border: rgba(0,201,167,0.25); --teal-glow: rgba(0,201,167,0.06);
+      --lime: #CAE8C1; --lime-dim: rgba(202,232,193,0.08); --lime-border: rgba(202,232,193,0.2);
+      --red: #ff5c5c; --red-dim: rgba(255,92,92,0.1);
     }
     body { background: var(--black); color: var(--white); font-family: 'DM Sans', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
 
-    header { display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 2rem; border-bottom: 1px solid var(--border); }
-    .logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: 0.05em; }
-    .logo span { color: var(--lime); }
-    .badge { display: flex; align-items: center; gap: 0.5rem; background: var(--grey); border: 1px solid var(--border); border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.72rem; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
-    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--lime); animation: pulse 2s infinite; }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; border-bottom: 1px solid var(--border); }
+    .logo { font-family: 'Bebas Neue', sans-serif; font-size: 1.5rem; letter-spacing: 0.08em; display: flex; align-items: center; gap: 0.6rem; }
+    .logo-teal { color: var(--teal); }
+    .logo-divider { width: 1px; height: 18px; background: var(--border2); }
+    .logo-sub { font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 300; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+    .badge { display: flex; align-items: center; gap: 0.5rem; background: var(--teal-dim); border: 1px solid var(--teal-border); border-radius: 999px; padding: 0.3rem 0.9rem; font-size: 0.68rem; color: var(--teal); letter-spacing: 0.06em; text-transform: uppercase; }
+    .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--teal); animation: pulse 2s infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
     #setupScreen { flex: 1; display: flex; align-items: center; justify-content: center; padding: 2rem; }
-    .setup-card { background: var(--grey); border: 1px solid var(--border); border-radius: 16px; padding: 2.5rem; max-width: 480px; width: 100%; display: flex; flex-direction: column; gap: 1.25rem; }
-    .setup-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.8rem; letter-spacing: 0.05em; }
-    .setup-title span { color: var(--lime); }
-    .setup-sub { font-size: 0.85rem; font-weight: 300; color: var(--muted); line-height: 1.6; }
-    .setup-sub a { color: var(--lime); text-decoration: none; }
-    .field-label { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; }
+    .setup-card { background: var(--grey); border: 1px solid var(--border2); border-radius: 16px; padding: 2.5rem; max-width: 460px; width: 100%; display: flex; flex-direction: column; gap: 1.2rem; }
+    .setup-title { font-family: 'Bebas Neue', sans-serif; font-size: 2rem; letter-spacing: 0.05em; line-height: 1; }
+    .setup-title span { color: var(--teal); }
+    .setup-sub { font-size: 0.82rem; font-weight: 300; color: var(--muted); line-height: 1.65; }
+    .setup-sub a { color: var(--teal); text-decoration: none; }
+    .field-label { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 0.4rem; }
 
-    input[type="password"], input[type="text"] { background: var(--black); border: 1px solid var(--border); border-radius: 8px; color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 0.88rem; padding: 0.7rem 1rem; width: 100%; outline: none; transition: border-color 0.2s; }
-    input:focus { border-color: rgba(200,241,53,0.4); }
-    input::placeholder { color: var(--muted); }
+    input[type="password"], input[type="text"] { background: var(--black); border: 1px solid var(--border2); border-radius: 8px; color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 0.85rem; padding: 0.65rem 1rem; width: 100%; outline: none; transition: border-color 0.2s; }
+    input:focus { border-color: var(--teal-border); }
+    input::placeholder { color: var(--muted2); }
 
-    #appScreen { flex: 1; display: none; flex-direction: column; }
-    main { flex: 1; display: grid; grid-template-columns: 1fr 1fr; max-width: 1200px; margin: 0 auto; width: 100%; padding: 2rem; gap: 1.5rem; }
-    @media (max-width: 700px) { main { grid-template-columns: 1fr; padding: 1rem; } }
+    #appScreen { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+    main { flex: 1; display: grid; grid-template-columns: 320px 1fr; max-width: 1280px; margin: 0 auto; width: 100%; padding: 1.5rem; gap: 1.25rem; overflow: hidden; }
+    @media (max-width: 800px) { main { grid-template-columns: 1fr; overflow: auto; } }
 
-    .panel { background: var(--grey); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
-    .panel-title { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 0.5rem; }
-    .panel-title::before { content:''; display:block; width:3px; height:3px; border-radius:50%; background:var(--lime); }
+    .panel { background: var(--grey); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.9rem; }
+    .panel-title { font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; justify-content: space-between; }
+    .panel-title-left { display: flex; align-items: center; gap: 0.5rem; }
+    .panel-title-left::before { content:''; display:block; width:3px; height:3px; border-radius:50%; background:var(--teal); }
 
-    .how-it-works { background: var(--black); border: 1px solid var(--border); border-radius: 8px; padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; }
-    .step { display: flex; align-items: flex-start; gap: 0.75rem; font-size: 0.82rem; font-weight: 300; color: var(--muted); line-height: 1.5; }
-    .step-num { background: var(--lime); color: var(--black); font-weight: 500; font-size: 0.7rem; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .repo-list { display: flex; flex-direction: column; gap: 0.35rem; overflow-y: auto; max-height: 280px; }
+    .repo-loading { display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; color: var(--muted); padding: 0.4rem; }
+    .spinner { width: 12px; height: 12px; border: 1.5px solid var(--border2); border-top-color: var(--teal); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .repo-section-label { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted2); padding: 0.2rem 0.1rem 0.1rem; }
 
-    textarea { background: var(--black); border: 1px solid var(--border); border-radius: 8px; color: var(--white); font-family: 'DM Sans', monospace; font-size: 0.82rem; font-weight: 300; line-height: 1.6; padding: 1rem; resize: vertical; min-height: 300px; width: 100%; transition: border-color 0.2s; outline: none; flex: 1; }
-    textarea:focus { border-color: rgba(200,241,53,0.4); }
-    textarea::placeholder { color: var(--muted); }
+    .repo-card { background: var(--black); border: 1px solid var(--border); border-radius: 8px; padding: 0.65rem 0.85rem; cursor: pointer; transition: border-color 0.15s, background 0.15s; display: flex; align-items: center; gap: 0.65rem; }
+    .repo-card:hover { border-color: var(--teal-border); background: var(--teal-glow); }
+    .repo-card.selected { border-color: var(--teal); background: var(--teal-glow); }
+    .repo-card-icon { width: 26px; height: 26px; border-radius: 6px; background: var(--grey2); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; flex-shrink: 0; }
+    .repo-card.selected .repo-card-icon { background: var(--teal-dim); border-color: var(--teal-border); }
+    .repo-card-body { flex: 1; min-width: 0; }
+    .repo-card-name { font-size: 0.8rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .repo-card-meta { font-size: 0.66rem; color: var(--muted); margin-top: 0.08rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .repo-card-check { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.5rem; color: transparent; transition: all 0.15s; }
+    .repo-card.selected .repo-card-check { background: var(--teal); border-color: var(--teal); color: var(--black); }
 
-    .row { display: flex; gap: 0.75rem; align-items: center; }
+    .add-repo-row { display: flex; gap: 0.4rem; }
+    .add-repo-row input { flex: 1; padding: 0.5rem 0.75rem; font-size: 0.78rem; }
+    .btn-add { background: var(--teal-dim); color: var(--teal); border: 1px solid var(--teal-border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.72rem; padding: 0.5rem 0.8rem; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+    .btn-add:hover { background: rgba(0,201,167,0.18); }
 
-    select { background: var(--black); border: 1px solid var(--border); border-radius: 8px; color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 0.82rem; padding: 0.55rem 0.9rem; outline: none; flex: 1; transition: border-color 0.2s; }
-    select:focus { border-color: rgba(200,241,53,0.4); }
+    .deploy-section { display: flex; flex-direction: column; gap: 0.7rem; border-top: 1px solid var(--border); padding-top: 0.85rem; }
+
+    select { background: var(--black); border: 1px solid var(--border2); border-radius: 8px; color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 0.8rem; padding: 0.5rem 0.85rem; outline: none; width: 100%; transition: border-color 0.2s; cursor: pointer; }
+    select:focus { border-color: var(--teal-border); }
     select option { background: #1a1a1a; }
 
-    .input-commit { background: var(--black); border: 1px solid var(--border); border-radius: 8px; color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 0.82rem; padding: 0.55rem 0.9rem; outline: none; flex: 1; transition: border-color 0.2s; }
-    .input-commit:focus { border-color: rgba(200,241,53,0.4); }
-    .input-commit::placeholder { color: var(--muted); }
+    .input-commit { background: var(--black); border: 1px solid var(--border2); border-radius: 8px; color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 0.8rem; padding: 0.5rem 0.85rem; outline: none; width: 100%; transition: border-color 0.2s; }
+    .input-commit:focus { border-color: var(--teal-border); }
+    .input-commit::placeholder { color: var(--muted2); }
 
-    .btn-primary { background: var(--lime); color: var(--black); border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 500; font-size: 0.85rem; padding: 0.65rem 1.4rem; cursor: pointer; transition: opacity 0.2s, transform 0.1s; white-space: nowrap; }
-    .btn-primary:hover { opacity: 0.88; }
+    .live-link { font-size: 0.7rem; color: var(--muted); display: flex; align-items: center; gap: 0.4rem; }
+    .live-link a { color: var(--teal); text-decoration: none; }
+    .live-link a:hover { text-decoration: underline; }
+
+    .btn-primary { background: var(--teal); color: var(--black); border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 500; font-size: 0.85rem; padding: 0.65rem 1.4rem; cursor: pointer; transition: opacity 0.2s, transform 0.1s; white-space: nowrap; }
+    .btn-primary:hover { opacity: 0.85; }
     .btn-primary:active { transform: scale(0.97); }
-    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-secondary { background: transparent; color: var(--white); border: 1px solid var(--border); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.82rem; padding: 0.55rem 1rem; cursor: pointer; transition: border-color 0.2s; }
-    .btn-secondary:hover { border-color: rgba(200,241,53,0.4); }
+    .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+    .btn-secondary { background: transparent; color: var(--white); border: 1px solid var(--border2); border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; padding: 0.5rem 1rem; cursor: pointer; transition: border-color 0.2s; }
+    .btn-secondary:hover { border-color: var(--teal-border); }
+    .btn-setup { background: var(--teal); color: var(--black); border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-weight: 500; font-size: 0.88rem; padding: 0.8rem; cursor: pointer; transition: opacity 0.2s; width: 100%; }
+    .btn-setup:hover { opacity: 0.85; }
 
-    .status-msg { font-size: 0.8rem; padding: 0.6rem 0.9rem; border-radius: 6px; border: 1px solid transparent; display: none; }
-    .status-msg.info { display:block; background: var(--lime-dim); border-color: rgba(200,241,53,0.2); color: var(--lime); }
-    .status-msg.error { display:block; background: var(--red-dim); border-color: rgba(255,68,68,0.2); color: var(--red); }
-    .status-msg.success { display:block; background: var(--green-dim); border-color: rgba(68,255,136,0.2); color: var(--green); }
+    .status-msg { font-size: 0.78rem; padding: 0.55rem 0.85rem; border-radius: 6px; border: 1px solid transparent; display: none; line-height: 1.5; }
+    .status-msg.info { display:block; background: var(--teal-dim); border-color: var(--teal-border); color: var(--teal); }
+    .status-msg.error { display:block; background: var(--red-dim); border-color: rgba(255,92,92,0.25); color: var(--red); }
+    .status-msg.success { display:block; background: var(--teal-dim); border-color: var(--teal-border); color: var(--teal); }
 
-    .log-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 220px; overflow-y: auto; }
-    .log-item { background: var(--black); border: 1px solid var(--border); border-radius: 6px; padding: 0.7rem 0.9rem; font-size: 0.78rem; display: flex; align-items: flex-start; gap: 0.75rem; }
-    .log-icon { font-size: 0.9rem; flex-shrink: 0; margin-top: 1px; }
+    .row { display: flex; gap: 0.6rem; align-items: center; }
+
+    .code-panel { overflow: hidden; }
+    .how-it-works { background: var(--black); border: 1px solid var(--border); border-radius: 8px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.45rem; flex-shrink: 0; }
+    .step { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.76rem; font-weight: 300; color: var(--muted); line-height: 1.5; }
+    .step-num { background: var(--teal); color: var(--black); font-weight: 600; font-size: 0.6rem; border-radius: 50%; width: 15px; height: 15px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+
+    textarea { background: var(--black); border: 1px solid var(--border); border-radius: 8px; color: var(--white); font-family: 'DM Sans', monospace; font-size: 0.8rem; font-weight: 300; line-height: 1.6; padding: 1rem; resize: none; width: 100%; transition: border-color 0.2s; outline: none; flex: 1; min-height: 0; }
+    textarea:focus { border-color: var(--teal-border); }
+    textarea::placeholder { color: var(--muted2); }
+
+    .log-panel { grid-column: 1 / -1; }
+    .log-list { display: flex; flex-direction: column; gap: 0.4rem; max-height: 160px; overflow-y: auto; }
+    .log-item { background: var(--black); border: 1px solid var(--border); border-radius: 6px; padding: 0.55rem 0.85rem; font-size: 0.74rem; display: flex; align-items: flex-start; gap: 0.65rem; }
+    .log-icon { font-size: 0.75rem; flex-shrink: 0; margin-top: 1px; color: var(--teal); }
     .log-body { flex: 1; }
-    .log-title { color: var(--white); font-weight: 500; margin-bottom: 0.15rem; }
-    .log-meta { color: var(--muted); font-size: 0.72rem; }
-    .log-empty { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 1.5rem 0; font-style: italic; }
+    .log-title { color: var(--white); font-weight: 500; margin-bottom: 0.08rem; }
+    .log-meta { color: var(--muted); font-size: 0.66rem; }
+    .log-meta a { color: var(--teal); text-decoration: none; }
+    .log-empty { text-align: center; color: var(--muted); font-size: 0.76rem; padding: 1.2rem 0; font-style: italic; }
 
-    .token-bar { background: var(--grey); border-top: 1px solid var(--border); padding: 0.6rem 2rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: var(--muted); }
-    .token-dot-sm { width: 5px; height: 5px; border-radius: 50%; background: var(--lime); }
-    .btn-signout { background: none; border: none; color: var(--muted); font-size: 0.75rem; cursor: pointer; text-decoration: underline; margin-left: auto; font-family: 'DM Sans', sans-serif; }
+    .token-bar { background: var(--grey); border-top: 1px solid var(--border); padding: 0.55rem 2rem; display: flex; align-items: center; gap: 0.5rem; font-size: 0.7rem; color: var(--muted); }
+    .token-dot-sm { width: 5px; height: 5px; border-radius: 50%; background: var(--teal); flex-shrink: 0; }
+    .btn-signout { background: none; border: none; color: var(--muted); font-size: 0.7rem; cursor: pointer; text-decoration: underline; margin-left: auto; font-family: 'DM Sans', sans-serif; }
     .btn-signout:hover { color: var(--white); }
 
-    ::-webkit-scrollbar { width: 4px; }
+    .btn-refresh { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 0.68rem; font-family: 'DM Sans', sans-serif; display: flex; align-items: center; gap: 0.3rem; padding: 0; transition: color 0.15s; }
+    .btn-refresh:hover { color: var(--teal); }
+    .btn-refresh.spinning svg { animation: spin 0.8s linear infinite; }
+
+    ::-webkit-scrollbar { width: 3px; height: 3px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
   </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">RE<span>VIBE</span> <span style="font-family:'DM Sans';font-size:0.85rem;font-weight:300;color:var(--muted);letter-spacing:0.05em;">Deploy</span></div>
+  <div class="logo">RE<span class="logo-teal">VIBE</span><div class="logo-divider"></div><span class="logo-sub">Deploy</span></div>
   <div class="badge"><div class="dot"></div> Live Pipeline</div>
 </header>
 
-<!-- SETUP SCREEN -->
+<!-- SETUP -->
 <div id="setupScreen">
   <div class="setup-card">
     <div class="setup-title">Connect to <span>GitHub</span></div>
-    <p class="setup-sub">Enter your GitHub Personal Access Token to connect. Stored in your browser session only — never saved to any file or repo.<br><br>
-    Need a new token? <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a> → Generate new token (classic) → check <strong>repo</strong> → copy it here.</p>
+    <p class="setup-sub">Enter your GitHub Personal Access Token. Stored in session only — never saved anywhere.<br><br>
+    Need a token? <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a> → Generate new token (classic) → check <strong>repo</strong> → copy here.</p>
     <div>
       <div class="field-label">GitHub Token</div>
       <input type="password" id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off"/>
     </div>
     <div>
-      <div class="field-label">GitHub Username</div>
+      <div class="field-label">GitHub Username / Org</div>
       <input type="text" id="ownerInput" placeholder="Revibe-Git" value="Revibe-Git"/>
     </div>
-    <div>
-      <div class="field-label">Repository Name</div>
-      <input type="text" id="repoInput" placeholder="Revibe-test" value="Revibe-test"/>
-    </div>
-    <button class="btn-primary" onclick="connect()" style="width:100%;padding:0.8rem;">Connect & Launch →</button>
+    <button class="btn-setup" onclick="connect()">Connect & Launch →</button>
     <div class="status-msg" id="setupStatus"></div>
   </div>
 </div>
 
-<!-- MAIN APP -->
+<!-- APP -->
 <div id="appScreen">
   <main>
-    <!-- LEFT: INSTRUCTIONS + FILE SELECT -->
-    <div class="panel">
-      <div class="panel-title">How It Works</div>
-      <div class="how-it-works">
-        <div class="step"><div class="step-num">1</div>Ask Claude (claude.ai) to update your website code</div>
-        <div class="step"><div class="step-num">2</div>Copy the full HTML it gives you</div>
-        <div class="step"><div class="step-num">3</div>Paste it into the code box on the right</div>
-        <div class="step"><div class="step-num">4</div>Select the file, add an optional commit message, hit Deploy</div>
-        <div class="step"><div class="step-num">5</div>Live on Vercel in ~30 seconds ✦</div>
+    <div class="panel" style="overflow:hidden;">
+      <div class="panel-title">
+        <div class="panel-title-left">Dashboards</div>
+        <button class="btn-refresh" id="refreshBtn" onclick="loadRepos()">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          Refresh
+        </button>
       </div>
 
-      <div>
-        <div class="field-label" style="margin-bottom:0.5rem;">Target File</div>
-        <select id="fileTarget">
-          <option value="index.html">index.html</option>
-        </select>
+      <div class="repo-list" id="repoList">
+        <div class="repo-loading"><div class="spinner"></div> Loading repos…</div>
       </div>
 
-      <div>
-        <div class="field-label" style="margin-bottom:0.5rem;">Commit Message</div>
-        <input type="text" class="input-commit" id="commitMsg" placeholder="e.g. Make logo lime green"/>
+      <div class="add-repo-row">
+        <input type="text" id="newRepoInput" placeholder="Pin a repo manually…"/>
+        <button class="btn-add" onclick="pinRepo()">+ Pin</button>
       </div>
 
-      <div class="status-msg" id="statusMsg"></div>
-
-      <div class="row" style="margin-top:auto;">
-        <button class="btn-primary" id="deployBtn" onclick="deploy()">⬆ Deploy to GitHub</button>
-        <button class="btn-secondary" onclick="clearAll()">Clear</button>
+      <div class="deploy-section">
+        <div>
+          <div class="field-label" style="margin-bottom:0.4rem;">Target File</div>
+          <select id="fileTarget">
+            <option value="index.html">index.html</option>
+            <option value="revibe-gd-dashboard.html">revibe-gd-dashboard.html</option>
+            <option value="revibe-ge-dashboard.html">revibe-ge-dashboard.html</option>
+            <option value="deploy.html">deploy.html</option>
+          </select>
+        </div>
+        <div>
+          <div class="field-label" style="margin-bottom:0.4rem;">Commit Message</div>
+          <input type="text" class="input-commit" id="commitMsg" placeholder="e.g. Update staff profiles"/>
+        </div>
+        <div class="live-link" id="liveLink" style="display:none;">
+          ↗ <a id="liveLinkAnchor" href="#" target="_blank">—</a>
+        </div>
+        <div class="status-msg" id="statusMsg"></div>
+        <div class="row">
+          <button class="btn-primary" id="deployBtn" onclick="deploy()">⬆ Deploy</button>
+          <button class="btn-secondary" onclick="clearAll()">Clear</button>
+        </div>
       </div>
     </div>
 
-    <!-- RIGHT: CODE PASTE BOX -->
-    <div class="panel">
-      <div class="panel-title">Paste Code Here</div>
+    <div class="panel code-panel">
+      <div class="panel-title"><div class="panel-title-left">Paste Code Here</div></div>
+      <div class="how-it-works">
+        <div class="step"><div class="step-num">1</div>Ask Claude to update your dashboard</div>
+        <div class="step"><div class="step-num">2</div>Copy the full HTML it gives you</div>
+        <div class="step"><div class="step-num">3</div>Select dashboard above, paste here, hit Deploy</div>
+        <div class="step"><div class="step-num">4</div>Live on Vercel in ~30 seconds ✦</div>
+      </div>
       <textarea id="codeInput" placeholder="Paste the full HTML code from Claude here…"></textarea>
     </div>
 
-    <!-- LOG -->
-    <div class="panel" style="grid-column: 1 / -1;">
-      <div class="panel-title">Deploy Log</div>
-      <div class="log-list" id="logList">
-        <div class="log-empty">No deploys yet — pipeline ready.</div>
-      </div>
+    <div class="panel log-panel">
+      <div class="panel-title"><div class="panel-title-left">Deploy Log</div></div>
+      <div class="log-list" id="logList"><div class="log-empty">No deploys yet — pipeline ready.</div></div>
     </div>
   </main>
 
   <div class="token-bar">
-    <div class="token-dot-sm"></div> Token active (session only)
+    <div class="token-dot-sm"></div>
+    <span id="tokenOwnerLabel">Connected (session only)</span>
     <button class="btn-signout" onclick="signOut()">Change token</button>
   </div>
 </div>
 
 <script>
-  let GITHUB_TOKEN = '';
-  let GITHUB_OWNER = '';
-  let GITHUB_REPO  = '';
+  let GITHUB_TOKEN = '', GITHUB_OWNER = '', selectedRepo = '', allRepos = [];
+  let pinnedRepos = JSON.parse(sessionStorage.getItem('pinnedRepos') || '[]');
 
-  function connect() {
+  const REPO_META = {
+    'revibe-gd-dashboard':    { label: 'GD Dashboard',      icon: '📊', desc: 'Growth & Development' },
+    'revibe-ge-dashboard':    { label: 'GE Dashboard',      icon: '📞', desc: 'Guest Experience' },
+    'revibe-hiring-dashboard':{ label: 'Hiring Dashboard',  icon: '🧲', desc: 'Talent Pipeline' },
+    'Revibe-test':            { label: 'Deploy Tool',       icon: '🚀', desc: 'This tool · revibe-test.vercel.app' },
+  };
+
+  function getMeta(name) {
+    return REPO_META[name] || { label: name, icon: '📁', desc: name };
+  }
+
+  async function loadRepos() {
+    const btn = document.getElementById('refreshBtn');
+    btn.classList.add('spinning');
+    document.getElementById('repoList').innerHTML = '<div class="repo-loading"><div class="spinner"></div> Fetching repos from GitHub…</div>';
+    try {
+      let repos = [];
+      // Try org first, then user
+      const r1 = await fetch(`https://api.github.com/orgs/${GITHUB_OWNER}/repos?per_page=100&sort=updated`, {
+        headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github.v3+json' }
+      });
+      if (r1.ok) { repos = await r1.json(); }
+      else {
+        const r2 = await fetch(`https://api.github.com/user/repos?per_page=100&sort=updated`, {
+          headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github.v3+json' }
+        });
+        if (r2.ok) repos = await r2.json();
+      }
+      allRepos = repos.map(r => r.name);
+      pinnedRepos.forEach(p => { if (!allRepos.includes(p)) allRepos.unshift(p); });
+      renderRepos();
+    } catch(e) {
+      document.getElementById('repoList').innerHTML = `<div class="repo-loading" style="color:var(--red);">⚠ Could not load repos.</div>`;
+    }
+    btn.classList.remove('spinning');
+  }
+
+  function renderRepos() {
+    const c = document.getElementById('repoList');
+    const known = Object.keys(REPO_META);
+    // Always show all known Revibe repos, merge with detected
+    const merged = [...new Set([...known, ...allRepos])];
+    const top = merged.filter(r => known.includes(r));
+    const rest = merged.filter(r => !known.includes(r)).sort();
+    c.innerHTML = '';
+    if (top.length) {
+      const l = document.createElement('div'); l.className = 'repo-section-label'; l.textContent = 'Revibe Dashboards'; c.appendChild(l);
+      top.forEach(n => c.appendChild(makeCard(n)));
+    }
+    if (rest.length) {
+      const l = document.createElement('div'); l.className = 'repo-section-label'; l.textContent = 'Other Repos'; c.appendChild(l);
+      rest.forEach(n => c.appendChild(makeCard(n)));
+    }
+  }
+
+  function makeCard(name) {
+    const m = getMeta(name);
+    const d = document.createElement('div');
+    d.className = 'repo-card' + (selectedRepo === name ? ' selected' : '');
+    d.onclick = () => selectRepo(name);
+    d.innerHTML = `<div class="repo-card-icon">${m.icon}</div><div class="repo-card-body"><div class="repo-card-name">${m.label}</div><div class="repo-card-meta">${m.desc}</div></div><div class="repo-card-check">✓</div>`;
+    return d;
+  }
+
+  function selectRepo(name) {
+    selectedRepo = name;
+    renderRepos();
+    const url = `https://${name.toLowerCase()}.vercel.app`;
+    document.getElementById('liveLinkAnchor').href = url;
+    document.getElementById('liveLinkAnchor').textContent = url.replace('https://', '');
+    document.getElementById('liveLink').style.display = 'flex';
+  }
+
+  function pinRepo() {
+    const input = document.getElementById('newRepoInput');
+    const name = input.value.trim();
+    if (!name || allRepos.includes(name)) { input.value = ''; return; }
+    pinnedRepos.push(name);
+    sessionStorage.setItem('pinnedRepos', JSON.stringify(pinnedRepos));
+    allRepos.unshift(name);
+    input.value = '';
+    renderRepos();
+  }
+
+  async function connect() {
     const token = document.getElementById('tokenInput').value.trim();
     const owner = document.getElementById('ownerInput').value.trim();
-    const repo  = document.getElementById('repoInput').value.trim();
     const status = document.getElementById('setupStatus');
-    if (!token || !owner || !repo) {
-      status.textContent = 'Please fill in all fields.';
-      status.className = 'status-msg error';
-      return;
-    }
-    GITHUB_TOKEN = token;
-    GITHUB_OWNER = owner;
-    GITHUB_REPO  = repo;
+    if (!token || !owner) { status.textContent = 'Please fill in all fields.'; status.className = 'status-msg error'; return; }
+    GITHUB_TOKEN = token; GITHUB_OWNER = owner;
+    document.getElementById('tokenOwnerLabel').textContent = `Connected as ${owner} · session only`;
     document.getElementById('setupScreen').style.display = 'none';
     document.getElementById('appScreen').style.display = 'flex';
+    await loadRepos();
   }
 
   function signOut() {
-    GITHUB_TOKEN = ''; GITHUB_OWNER = ''; GITHUB_REPO = '';
+    GITHUB_TOKEN = ''; GITHUB_OWNER = ''; selectedRepo = ''; allRepos = [];
     document.getElementById('tokenInput').value = '';
     document.getElementById('setupScreen').style.display = 'flex';
     document.getElementById('appScreen').style.display = 'none';
   }
 
-  function setStatus(msg, type) {
-    const el = document.getElementById('statusMsg');
-    el.textContent = msg;
-    el.className = 'status-msg ' + type;
-  }
-
-  function clearAll() {
-    document.getElementById('codeInput').value = '';
-    document.getElementById('commitMsg').value = '';
-    document.getElementById('statusMsg').className = 'status-msg';
-  }
-
-  async function getCurrentFileSha() {
-    const file = document.getElementById('fileTarget').value;
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${file}`, {
-      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Accept': 'application/vnd.github.v3+json' }
-    });
-    if (!res.ok) throw new Error('Could not fetch file from GitHub. Check your token.');
-    const data = await res.json();
-    return data.sha;
-  }
+  function setStatus(msg, type) { const el = document.getElementById('statusMsg'); el.textContent = msg; el.className = 'status-msg ' + type; }
+  function clearAll() { document.getElementById('codeInput').value = ''; document.getElementById('commitMsg').value = ''; document.getElementById('statusMsg').className = 'status-msg'; }
 
   async function deploy() {
+    if (!selectedRepo) { setStatus('Select a dashboard first.', 'error'); return; }
     const code = document.getElementById('codeInput').value.trim();
     if (!code) { setStatus('Paste your HTML code first.', 'error'); return; }
-
     const btn = document.getElementById('deployBtn');
-    btn.disabled = true;
-    btn.textContent = '⏳ Deploying…';
+    btn.disabled = true; btn.textContent = '⏳ Deploying…';
     setStatus('Pushing to GitHub…', 'info');
-
     const file = document.getElementById('fileTarget').value;
-    const commitMsg = document.getElementById('commitMsg').value.trim() || `Update ${file} via Revibe Deploy`;
-
+    const msg = document.getElementById('commitMsg').value.trim() || `Update ${file} via Revibe Deploy`;
     try {
-      const sha = await getCurrentFileSha();
-      const encoded = btoa(unescape(encodeURIComponent(code)));
-
-      const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${file}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `token ${GITHUB_TOKEN}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ message: commitMsg, content: encoded, sha })
+      const shaRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${selectedRepo}/contents/${file}`, {
+        headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github.v3+json' }
       });
-
+      if (!shaRes.ok) throw new Error(`File "${file}" not found in ${selectedRepo}.`);
+      const sha = (await shaRes.json()).sha;
+      const encoded = btoa(unescape(encodeURIComponent(code)));
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${selectedRepo}/contents/${file}`, {
+        method: 'PUT',
+        headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, content: encoded, sha })
+      });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Push failed.'); }
-
-      setStatus('✓ Deployed! Vercel goes live in ~30 seconds.', 'success');
-      addLog(commitMsg, file);
-      btn.textContent = '⬆ Deploy to GitHub';
-      btn.disabled = false;
-
-    } catch (err) {
-      setStatus('Deploy failed: ' + err.message, 'error');
-      btn.disabled = false;
-      btn.textContent = '⬆ Deploy to GitHub';
-    }
+      setStatus(`✓ ${getMeta(selectedRepo).label} deployed! Vercel goes live in ~30 sec.`, 'success');
+      addLog(msg, file, selectedRepo);
+    } catch(err) { setStatus('Deploy failed: ' + err.message, 'error'); }
+    btn.disabled = false; btn.textContent = '⬆ Deploy';
   }
 
-  function addLog(message, file) {
+  function addLog(message, file, repo) {
     const list = document.getElementById('logList');
     const empty = list.querySelector('.log-empty');
     if (empty) empty.remove();
     const now = new Date();
-    const item = document.createElement('div');
-    item.className = 'log-item';
-    item.innerHTML = `
-      <div class="log-icon">✦</div>
-      <div class="log-body">
-        <div class="log-title">${message}</div>
-        <div class="log-meta">${file} · ${now.toLocaleDateString([],{month:'short',day:'numeric'})} at ${now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} · <a href="https://revibe-test.vercel.app" target="_blank" style="color:var(--lime);text-decoration:none;">View live ↗</a></div>
-      </div>`;
-    list.prepend(item);
+    const url = `https://${repo.toLowerCase()}.vercel.app`;
+    const d = document.createElement('div');
+    d.className = 'log-item';
+    d.innerHTML = `<div class="log-icon">✦</div><div class="log-body"><div class="log-title">${message}</div><div class="log-meta">${getMeta(repo).label} · ${file} · ${now.toLocaleDateString([],{month:'short',day:'numeric'})} at ${now.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})} · <a href="${url}" target="_blank">View live ↗</a></div></div>`;
+    list.prepend(d);
   }
 </script>
 </body>
