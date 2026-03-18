@@ -2294,6 +2294,8 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff})
               <div className="prof-meta">
                 <DBadge d={staff.discipline}/>
                 <span className="muted">{staff.role}</span>
+                {staff.split&&<span style={{marginLeft:6,fontSize:11,background:'rgba(68,204,170,.1)',color:'#44CCAA',border:'1px solid rgba(68,204,170,.2)',borderRadius:3,padding:'1px 7px'}}>{staff.split}% split</span>}
+                {staff.stipend&&<span style={{marginLeft:4,fontSize:11,background:'rgba(244,219,113,.08)',color:'#F4DB71',border:'1px solid rgba(244,219,113,.2)',borderRadius:3,padding:'1px 7px'}}>+Stipend</span>}
                 <span className="muted">·</span>
                 <span className="muted">{staff.site}</span>
                 {staff.roadmap&&<span className="badge b-quarterly">{staff.roadmap}</span>}
@@ -2545,6 +2547,10 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff})
           {/* FILES TAB */}
           {tab==='files'&&(
             <div>
+              <div style={{marginBottom:14,padding:'10px 14px',background:'rgba(68,204,170,.04)',border:'1px solid rgba(68,204,170,.12)',borderRadius:6}}>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA',marginBottom:4}}>Contracts &amp; Agreements</div>
+                <div style={{fontSize:11,color:'#666',lineHeight:1.5}}>Upload signed contracts, G&D agreements, renewals, and offer letters. Files are stored to this therapist's profile permanently.</div>
+              </div>
               <div className={`file-zone mb14`}
                 onDragOver={e=>{e.preventDefault();e.currentTarget.classList.add('drag');}}
                 onDragLeave={e=>e.currentTarget.classList.remove('drag')}
@@ -2552,9 +2558,9 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff})
                 onClick={()=>fileRef.current?.click()}
               >
                 <input ref={fileRef} type="file" multiple onChange={e=>handleFileDrop(e.target.files)}/>
-                <div style={{fontSize:26,marginBottom:7}}>📁</div>
-                <div className="sm fw5" style={{color:'var(--lime)',marginBottom:3}}>Drop files here or click to upload</div>
-                <div className="muted xs">PDFs, Word docs, images, spreadsheets — any file type</div>
+                <div style={{fontSize:26,marginBottom:7}}>📄</div>
+                <div className="sm fw5" style={{color:'var(--lime)',marginBottom:3}}>Drop contracts &amp; files or click to upload</div>
+                <div className="muted xs">PDFs, Word docs, Google Doc exports, images — any file type</div>
               </div>
               {(staff.files||[]).length===0?<div className="empty" style={{padding:22}}><div className="empty-ico">📂</div><p>No files uploaded yet.</p></div>:
               (staff.files||[]).map(f=>{
@@ -4301,7 +4307,9 @@ function getBandLabel(v){
   return{label:'Surface',cls:'band-surface'};
 }
 
-function ProfileEditTab({staff,setStaff}){
+
+        <div className="fg"><label>Split %<span style={{fontSize:10,fontWeight:400,color:'#666',letterSpacing:0,textTransform:'none'}}> — set at yearly G&D</span></label><input value={f.split||''} onChange={e=>set('split',e.target.value)} placeholder="e.g. 45" type="number" min="0" max="100"/></div>
+        <div className="fg"><label>Monthly Stipend</label><label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginTop:5,fontSize:12,color:'#aaa',fontFamily:'Barlow,sans-serif',letterSpacing:'normal',textTransform:'none'}}><input type="checkbox" checked={!!f.stipend} onChange={e=>set('stipend',e.target.checked)} style={{accentColor:'var(--go)'}}/> Receives monthly stipend (clinic leads)</label></div>function ProfileEditTab({staff,setStaff}){
   const[editing,setEditing]=useState(false);
   const[f,setF]=useState({name:staff.name||'',email:staff.email||'',discipline:staff.discipline||'pt',role:staff.role||'',site:staff.site||'Markham',roadmap:staff.roadmap||'',archetype:staff.archetype||'',notes:staff.notes||'',reflection:staff.reflection||'',tracks:staff.tracks||[]});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -4316,7 +4324,7 @@ function ProfileEditTab({staff,setStaff}){
       {staff.notes&&<div className="hb hb-gray mb14"><div style={{fontSize:8,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',marginBottom:5}}>Profile Summary</div><div className="sm" style={{lineHeight:1.65}}>{staff.notes}</div></div>}
       {staff.reflection&&staff.reflection.length>20&&<div className="note-item mb14"><div className="note-date">Latest G&D Reflection</div><div className="sm" style={{lineHeight:1.6}}>{staff.reflection}</div></div>}
       <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'12px 16px'}}>
-        {[['Name',staff.name],['Email',staff.email||'—'],['Discipline',DISC.find(d=>d.id===staff.discipline)?.label||staff.discipline],['Role',staff.role||'—'],['Site',staff.site||'—'],['Roadmap',staff.roadmap||'—'],['Archetype',staff.archetype||'—']].map(([k,v])=>(
+        {[['Name',staff.name],['Email',staff.email||'—'],['Discipline',DISC.find(d=>d.id===staff.discipline)?.label||staff.discipline],['Role',staff.role||'—'],['Site',staff.site||'—'],['Roadmap',staff.roadmap||'—'],['Archetype',staff.archetype||'—'],['Split %',staff.split?(staff.split+'%'):'—'],['Stipend',staff.stipend?'Yes':'No']].map(([k,v])=>(
           <div key={k} style={{display:'flex',alignItems:'center',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
             <span style={{fontSize:12,color:'#999',minWidth:100}}>{k}</span>
             <span style={{fontSize:12,color:'var(--text)'}}>{v}</span>
@@ -6953,46 +6961,30 @@ function GDEditPanel({r, onSave, onCancel, onDelete}){
   const[f,setF]=useState({...r});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const KEYS=[['q1','Q1'],['q2','Q2'],['q3','Q3'],['q4','Q4'],['annual','Annual']];
-
-  const inp={
-    background:'var(--surface)',border:'1px solid var(--border2)',color:'var(--text)',
-    borderRadius:5,padding:'7px 10px',fontSize:12,outline:'none',width:'100%',
-    boxSizing:'border-box',fontFamily:"'Barlow',sans-serif"
+  const inp={background:'var(--surface)',border:'1px solid var(--border2)',color:'var(--text)',borderRadius:5,padding:'7px 10px',fontSize:12,outline:'none',width:'100%',boxSizing:'border-box'};
+  const MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const YEARS=['2024','2025','2026','2027','2028','2029','2030'];
+  const parseParts=(val)=>{
+    if(!val||!/^\d{4}-\d{2}-\d{2}$/.test(val)) return {y:'',m:'',d:''};
+    const[y,m,d]=val.split('-'); return{y,m,d};
   };
-
-  // Validate date format YYYY-MM-DD
-  const isValidDate=(s)=>/^\d{4}-\d{2}-\d{2}$/.test(s);
-
-  // Format helper — accepts YYYY-MM-DD or MM/DD/YYYY or M/D/YYYY
-  const normalizeDate=(s)=>{
-    if(!s) return '';
-    s = s.trim();
-    if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-    // Try MM/DD/YYYY
-    const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if(m) return `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
-    return s;
+  const buildDate=(y,m,d)=>(!y||!m||!d)?'': `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  const setDatePart=(k,part,val)=>{
+    const parts=parseParts(f[k]); parts[part]=val; set(k,buildDate(parts.y,parts.m,parts.d));
   };
-
-  const handleDateBlur=(k,val)=>{
-    const normalized = normalizeDate(val);
-    set(k, normalized);
-  };
+  const sel={...inp,padding:'5px 6px',fontSize:11,flex:1,cursor:'pointer'};
 
   return(
     <div style={{background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:7,overflow:'hidden',position:'sticky',top:20}}>
-      {/* Header */}
       <div style={{padding:'14px 18px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA'}}>Edit Record</div>
         <button className="btn btn-ghost btn-sm" style={{fontSize:11,color:'#444'}} onClick={onCancel}>✕</button>
       </div>
-
       <div style={{padding:'14px 18px',display:'flex',flexDirection:'column',gap:12}}>
-        {/* Name + Site */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
           <div>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:5}}>Name</div>
-            <input value={f.name} onChange={e=>set('name',e.target.value)} style={inp} placeholder="Full name"/>
+            <input value={f.name} onChange={e=>set('name',e.target.value)} style={inp}/>
           </div>
           <div>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:5}}>Site</div>
@@ -7001,14 +6993,11 @@ function GDEditPanel({r, onSave, onCancel, onDelete}){
             </select>
           </div>
         </div>
-
-        {/* Split + Stipend */}
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
           <div>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:5}}>Split %</div>
-            <input value={f.split||''} onChange={e=>set('split',e.target.value)}
-              placeholder="e.g. 45" style={{background:'var(--surface)',border:'1px solid var(--border2)',color:'var(--text)',borderRadius:5,padding:'7px 10px',fontSize:12,outline:'none',width:'100%',boxSizing:'border-box'}}/>
-            <div style={{fontSize:10,color:'#555',marginTop:3}}>Treatment revenue split</div>
+            <input value={f.split||''} onChange={e=>set('split',e.target.value)} placeholder="e.g. 45" style={inp}/>
+            <div style={{fontSize:10,color:'#555',marginTop:3}}>Set at yearly G&D meeting</div>
           </div>
           <div>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:5}}>Monthly Stipend</div>
@@ -7019,44 +7008,44 @@ function GDEditPanel({r, onSave, onCancel, onDelete}){
             <div style={{fontSize:10,color:'#555',marginTop:3}}>Clinic leads only</div>
           </div>
         </div>
-
-        {/* Dates */}
         <div>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:4}}>Meeting Dates</div>
-          <div style={{fontSize:10,color:'#555',marginBottom:8}}>Type date as YYYY-MM-DD (e.g. 2026-04-15)</div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:8}}>Meeting Dates</div>
           <div style={{display:'flex',flexDirection:'column',gap:6}}>
-            {KEYS.map(([k,label])=>(
-              <div key={k} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 10px',
-                background:f['done_'+k]?'rgba(68,204,170,.05)':'var(--surface3)',
-                border:`1px solid ${f['done_'+k]?'rgba(68,204,170,.15)':'var(--border)'}`,borderRadius:5}}>
-                <div style={{width:36,fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1px',color:'#666',textTransform:'uppercase',flexShrink:0}}>{label}</div>
-                <input
-                  value={f[k]||''}
-                  onChange={e=>set(k,e.target.value)}
-                  onBlur={e=>handleDateBlur(k,e.target.value)}
-                  placeholder="YYYY-MM-DD"
-                  style={{...inp,flex:1,padding:'5px 8px',fontSize:12,
-                    borderColor: f[k]&&!isValidDate(f[k])?'rgba(224,82,82,.5)':'var(--border2)',
-                    color: f[k]&&isValidDate(f[k])?'#ddd':f[k]?'#E05252':'#555'}}
-                />
-                <label style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:f['done_'+k]?'#44CCAA':'#666',cursor:'pointer',flexShrink:0,whiteSpace:'nowrap'}}>
-                  <input type="checkbox" checked={!!f['done_'+k]} onChange={e=>set('done_'+k,e.target.checked)} style={{accentColor:'var(--go)',width:13,height:13}}/>
-                  Done
-                </label>
-              </div>
-            ))}
+            {KEYS.map(([k,label])=>{
+              const{y,m,d}=parseParts(f[k]);
+              const done=!!f['done_'+k];
+              return(
+                <div key={k} style={{display:'flex',alignItems:'center',gap:6,padding:'7px 10px',
+                  background:done?'rgba(68,204,170,.05)':'var(--surface3)',
+                  border:`1px solid ${done?'rgba(68,204,170,.15)':'var(--border)'}`,borderRadius:5}}>
+                  <div style={{width:40,fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1px',color:done?'#44CCAA':'#666',textTransform:'uppercase',flexShrink:0}}>{label}</div>
+                  <select value={m||''} onChange={e=>setDatePart(k,'m',e.target.value)} style={sel}>
+                    <option value=''>Month</option>
+                    {MONTHS.map((mn,i)=><option key={i} value={String(i+1).padStart(2,'0')}>{mn}</option>)}
+                  </select>
+                  <select value={d||''} onChange={e=>setDatePart(k,'d',e.target.value)} style={{...sel,maxWidth:68}}>
+                    <option value=''>Day</option>
+                    {Array.from({length:31},(_,i)=><option key={i+1} value={String(i+1).padStart(2,'0')}>{i+1}</option>)}
+                  </select>
+                  <select value={y||''} onChange={e=>setDatePart(k,'y',e.target.value)} style={{...sel,maxWidth:80}}>
+                    <option value=''>Year</option>
+                    {YEARS.map(yr=><option key={yr}>{yr}</option>)}
+                  </select>
+                  <label style={{display:'flex',alignItems:'center',gap:4,fontSize:11,color:done?'#44CCAA':'#555',cursor:'pointer',flexShrink:0}}>
+                    <input type="checkbox" checked={done} onChange={e=>set('done_'+k,e.target.checked)} style={{accentColor:'var(--go)',width:12,height:12}}/>
+                    Done
+                  </label>
+                </div>
+              );
+            })}
           </div>
         </div>
-
-        {/* Notes */}
         <div>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:5}}>Notes</div>
           <textarea value={f.notes||''} onChange={e=>set('notes',e.target.value)}
             style={{...inp,minHeight:55,resize:'vertical',lineHeight:1.6}}
-            placeholder="Unconfirmed dates, special notes..."/>
+            placeholder="Unconfirmed dates, split changes, special notes..."/>
         </div>
-
-        {/* Actions */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',paddingTop:8,borderTop:'1px solid var(--border)'}}>
           <button onClick={()=>{if(confirm('Delete this record?'))onDelete();}}
             style={{background:'rgba(224,82,82,.08)',color:'#E05252',border:'1px solid rgba(224,82,82,.18)',borderRadius:5,padding:'6px 12px',fontSize:11,cursor:'pointer'}}>
