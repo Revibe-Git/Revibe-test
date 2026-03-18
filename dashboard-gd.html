@@ -4305,11 +4305,7 @@ function getBandLabel(v){
   if(n>=7)return{label:'Competent',cls:'band-competent'};
   if(n>=5)return{label:'Transactional',cls:'band-transact'};
   return{label:'Surface',cls:'band-surface'};
-}
-
-
-        <div className="fg"><label>Split %<span style={{fontSize:10,fontWeight:400,color:'#666',letterSpacing:0,textTransform:'none'}}> — set at yearly G&D</span></label><input value={f.split||''} onChange={e=>set('split',e.target.value)} placeholder="e.g. 45" type="number" min="0" max="100"/></div>
-        <div className="fg"><label>Monthly Stipend</label><label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginTop:5,fontSize:12,color:'#aaa',fontFamily:'Barlow,sans-serif',letterSpacing:'normal',textTransform:'none'}}><input type="checkbox" checked={!!f.stipend} onChange={e=>set('stipend',e.target.checked)} style={{accentColor:'var(--go)'}}/> Receives monthly stipend (clinic leads)</label></div>function ProfileEditTab({staff,setStaff}){
+}function ProfileEditTab({staff,setStaff}){
   const[editing,setEditing]=useState(false);
   const[f,setF]=useState({name:staff.name||'',email:staff.email||'',discipline:staff.discipline||'pt',role:staff.role||'',site:staff.site||'Markham',roadmap:staff.roadmap||'',archetype:staff.archetype||'',notes:staff.notes||'',reflection:staff.reflection||'',tracks:staff.tracks||[]});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -4390,6 +4386,8 @@ function getBandLabel(v){
         <div className="fg"><label>Site</label><select value={f.site} onChange={e=>set('site',e.target.value)}>{SITES.map(s=><option key={s}>{s}</option>)}</select></div>
         <div className="fg"><label>Roadmap Phase</label><select value={f.roadmap} onChange={e=>set('roadmap',e.target.value)}><option value="">—</option><option>L1→L2</option><option>L2→L3</option><option>L3→L4</option></select></div>
         <div className="fg"><label>Archetype</label><input value={f.archetype} onChange={e=>set('archetype',e.target.value)} placeholder="Anchor / Builder / Mentor…"/></div>
+        <div className="fg"><label>Split %<span style={{fontSize:10,fontWeight:400,color:'#777',letterSpacing:0,textTransform:'none'}}> — set at yearly G&D</span></label><input value={f.split||''} onChange={e=>set('split',e.target.value)} placeholder="e.g. 45" type="number" min="0" max="100"/></div>
+        <div className="fg"><label>Monthly Stipend</label><label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginTop:5,fontSize:12,color:'#aaa',fontFamily:'Barlow,sans-serif',letterSpacing:'normal',textTransform:'none'}}><input type="checkbox" checked={!!f.stipend} onChange={e=>set('stipend',e.target.checked)} style={{accentColor:'var(--go)'}}/> Receives monthly stipend</label></div>
         <div className="fg full"><label>Rubric Tracks</label>
           <div className="flex aic g6" style={{paddingTop:4}}>{['clinical','spa','sc'].map(t=><button key={t} className={`track-pill tp-${t}${f.tracks.includes(t)?' active':''}`} onClick={()=>toggleTrack(t)}>{TRACK_META[t]?.label}</button>)}</div>
         </div>
