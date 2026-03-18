@@ -6604,33 +6604,33 @@ function NotificationBell({notifs, markRead, markAllRead, setPage}){
 const GD_SEED = [
   // ── MISSISSAUGA ────────────────────────────────────────────────
   { id:'gd_anesto',    name:'Anesto Charles',      site:'Mississauga', flat:false,
-    q1:'2025-01-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2025-12-01', notes:'' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'' },
   { id:'gd_mike',      name:'Mike Ross',            site:'Mississauga', flat:true,
-    q1:'', q2:'2025-04-01', q3:'', q4:'', annual:'', notes:'Flat rate — Q2 only confirmed' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Flat rate' },
   { id:'gd_christine', name:'Christine Barnuevo',   site:'Mississauga', flat:false,
-    q1:'2025-01-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2025-07-01', notes:'Q3 & annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Q3 & Annual dates unconfirmed' },
   { id:'gd_emily',     name:'Emily Wilson',         site:'Mississauga', flat:false,
-    q1:'2025-01-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2025-04-01', notes:'Q2 & annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Q2 & Annual dates unconfirmed' },
   { id:'gd_erica',     name:'Erica Runnalls',       site:'Mississauga', flat:false,
-    q1:'2025-01-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2025-12-01', notes:'Q4 & annual unconfirmed * — not flat rate' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Q4 & Annual unconfirmed — not flat rate' },
   { id:'gd_gauri',     name:'Gauri Khandke',        site:'Mississauga', flat:false,
-    q1:'2025-01-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2026-01-01', notes:'Q1 & annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Q1 & Annual unconfirmed' },
   { id:'gd_jtang',     name:'Jennifer Tang',        site:'Mississauga', flat:false,
-    q1:'2025-01-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2026-01-01', notes:'Q1 & annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Q1 & Annual unconfirmed' },
   { id:'gd_winson',    name:'Winson Cheong',        site:'Mississauga', flat:false,
-    q1:'2025-01-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2025-03-01', notes:'Q1 & annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Q1 & Annual unconfirmed' },
   { id:'gd_kyle',      name:'Kyle Sunga',           site:'Mississauga', flat:false,
-    q1:'2025-02-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2025-07-01', notes:'Annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Annual unconfirmed' },
   { id:'gd_morgan',    name:'Morgan Millard',       site:'Mississauga', flat:false,
     q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Dates not yet set' },
   { id:'gd_rachel',    name:'Rachel Murray',        site:'Mississauga', flat:false,
-    q1:'2025-01-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2026-01-01', notes:'Q1 & annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Q1 & Annual unconfirmed' },
   { id:'gd_scott',     name:'Scott French',         site:'Mississauga', flat:true,
-    q1:'2025-01-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2025-12-01', notes:'Flat rate — Q4 & annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Flat rate — Q4 & Annual unconfirmed' },
   { id:'gd_trevor',    name:'Trevor D\'Souza',      site:'Mississauga', flat:true,
-    q1:'2025-01-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2025-11-01', notes:'Flat rate — Q4 & annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Flat rate — Q4 & Annual unconfirmed' },
   { id:'gd_zeeruk',    name:'Zeeruk Rehman',        site:'Mississauga', flat:true,
-    q1:'2025-01-01', q2:'2025-04-01', q3:'2025-07-01', q4:'2025-10-01', annual:'2025-11-01', notes:'Flat rate — Q4 & annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Flat rate — Q4 & Annual unconfirmed' },
   { id:'gd_lisbeth',   name:'Lisbeth Bitar-Pitano', site:'Mississauga', flat:false,
     q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Dates not yet set' },
   { id:'gd_vincent',   name:'Vincent Nguyen',       site:'Mississauga', flat:false,
@@ -6643,9 +6643,9 @@ const GD_SEED = [
   { id:'gd_freeman',   name:'Xunming (Freeman) Zhang',site:'Markham',   flat:false,
     q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Dates not yet set' },
   { id:'gd_angelii',   name:'Angelii Mercurius Brown',site:'Markham',   flat:true,
-    q1:'2025-03-01', q2:'2025-06-01', q3:'2025-09-01', q4:'2025-12-01', annual:'2025-12-01', notes:'Flat rate — Q4 & annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Flat rate — Q4 & Annual unconfirmed' },
   { id:'gd_joseph',    name:'Joseph De Leon',       site:'Markham',     flat:true,
-    q1:'2025-03-01', q2:'2025-06-01', q3:'2025-09-01', q4:'2025-12-01', annual:'2025-12-01', notes:'Flat rate — Q4 & annual unconfirmed *' },
+    q1:'', q2:'', q3:'', q4:'', annual:'', notes:'Flat rate — Q4 & Annual unconfirmed' },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -6983,7 +6983,7 @@ function GDEditPanel({r, onSave, onCancel, onDelete}){
             {KEYS.map(([k,label])=>(
               <div key={k} style={{display:'flex',alignItems:'center',gap:10,padding:'7px 10px',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5}}>
                 <div style={{width:36,fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1px',color:'#666',textTransform:'uppercase',flexShrink:0}}>{label}</div>
-                <input type="date" value={f[k]||''} onChange={e=>set(k,e.target.value)} style={{...inp,flex:1,padding:'5px 8px',fontSize:11}}/>
+                <input type="date" value={f[k]||''} min="2020-01-01" max="2035-12-31" onChange={e=>set(k,e.target.value)} style={{...inp,flex:1,padding:'5px 8px',fontSize:11}}/>
                 <label style={{display:'flex',alignItems:'center',gap:4,fontSize:10,color:'#666',cursor:'pointer',flexShrink:0,whiteSpace:'nowrap'}}>
                   <input type="checkbox" checked={!!f['done_'+k]} onChange={e=>set('done_'+k,e.target.checked)} style={{accentColor:'var(--go)',width:12,height:12}}/>
                   Done
