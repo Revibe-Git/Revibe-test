@@ -2029,9 +2029,9 @@ function RoleManagerModal({staff,setStaff,onClose}){
   const[search,setSearch]=useState('');
 
   const getRoleVal=(s)=>{
-    if(s.discipline==='mgmt') return 'management';
-    const r=(s.role||'').toLowerCase();
+    const r=(s.access_level||'').toLowerCase();
     if(['management','clinic_lead','lead','admin'].includes(r)) return r==='lead'?'clinic_lead':r;
+    if(s.discipline==='mgmt') return 'management';
     return 'therapist';
   };
 
@@ -2040,12 +2040,10 @@ function RoleManagerModal({staff,setStaff,onClose}){
   const updateRole=async(staffId, newRole)=>{
     setSaving(p=>({...p,[staffId]:true}));
     setSaved(p=>({...p,[staffId]:false}));
-    // Update in Supabase
     if(window.__SB){
-      await window.__SB.from('staff').update({role:newRole}).eq('id',staffId);
+      await window.__SB.from('staff').update({access_level:newRole}).eq('id',staffId);
     }
-    // Update local state
-    setStaff(p=>p.map(s=>s.id===staffId?{...s,role:newRole}:s));
+    setStaff(p=>p.map(s=>s.id===staffId?{...s,access_level:newRole}:s));
     setSaving(p=>({...p,[staffId]:false}));
     setSaved(p=>({...p,[staffId]:true}));
     setTimeout(()=>setSaved(p=>({...p,[staffId]:false})),2000);
@@ -7332,7 +7330,7 @@ ReactDOM.render(<AppWithAuth/>,document.getElementById('root'));
 
   async function loadUserFromSession(session){
     const email = session.user.email;
-    const { data: row, error } = await sb.from('staff').select('id,name,discipline,role').eq('email',email).single();
+    const { data: row, error } = await sb.from('staff').select('id,name,discipline,role,access_level').eq('email',email).single();
     if(error||!row){
       await sb.auth.signOut();
       hideAuthLoading();
@@ -7340,8 +7338,8 @@ ReactDOM.render(<AppWithAuth/>,document.getElementById('root'));
       showLoginError('Your email is not registered in the Revibe system. Contact management.');
       return;
     }
-    const isAdmin = row.discipline==='mgmt' || ['management','clinic_lead','lead','admin'].includes((row.role||'').toLowerCase());
-    window.__RV_USER = { id:row.id, name:row.name, email, discipline:row.discipline, role:row.role||'therapist', isAdmin };
+    const isAdmin = row.discipline==='mgmt' || ['management','clinic_lead','lead','admin'].includes((row.access_level||'').toLowerCase());
+    window.__RV_USER = { id:row.id, name:row.name, email, discipline:row.discipline, role:row.role||'', access_level:row.access_level||'therapist', isAdmin };
     hideAuthLoading();
     hideLogin();
     // Trigger React re-render by dispatching event
