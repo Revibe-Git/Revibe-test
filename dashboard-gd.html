@@ -7,6 +7,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -455,13 +456,116 @@ textarea{resize:vertical;min-height:60px;}
 .lt-ring-score{font-family:'Barlow Condensed',sans-serif;font-size:52px;font-weight:800;line-height:1;}
 .lt-ring-label{font-size:10px;color:#777;font-family:'Barlow Condensed',sans-serif;letter-spacing:2px;text-transform:uppercase;}
 
+/* ── LOGIN SCREEN ─────────────────────────────────── */
+#login-screen{position:fixed;inset:0;z-index:9999;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+#login-screen.hidden{display:none;}
+.login-bg{position:absolute;inset:0;overflow:hidden;}
+.login-orb{position:absolute;border-radius:50%;filter:blur(120px);animation:loginDrift 18s ease-in-out infinite;}
+.login-orb-1{width:600px;height:600px;background:#00584D;opacity:.12;top:-200px;left:-150px;animation-delay:0s;}
+.login-orb-2{width:400px;height:400px;background:#CAE8C1;opacity:.06;bottom:-150px;right:-100px;animation-delay:-9s;}
+.login-orb-3{width:300px;height:300px;background:#007a6b;opacity:.08;top:50%;left:50%;transform:translate(-50%,-50%);animation-delay:-4s;}
+@keyframes loginDrift{0%,100%{transform:translate(0,0) scale(1);}33%{transform:translate(30px,-20px) scale(1.05);}66%{transform:translate(-20px,15px) scale(0.97);}}
+.login-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(202,232,193,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(202,232,193,.03) 1px,transparent 1px);background-size:40px 40px;}
+.login-card-wrap{position:relative;z-index:10;width:100%;max-width:420px;padding:20px;animation:loginFadeUp .6s ease both;}
+@keyframes loginFadeUp{from{opacity:0;transform:translateY(24px);}to{opacity:1;transform:translateY(0);}}
+.login-card{background:rgba(13,13,13,.92);border:1px solid #222;border-radius:12px;overflow:hidden;backdrop-filter:blur(20px);box-shadow:0 40px 80px rgba(0,0,0,.6),0 0 0 1px rgba(202,232,193,.04);}
+.login-stripe{height:3px;background:linear-gradient(90deg,var(--go) 0%,var(--lime) 100%);}
+.login-body{padding:40px 36px 32px;}
+.login-logo-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:28px;}
+.login-logo-wrap img{height:80px;width:auto;object-fit:contain;}
+.login-portal-lbl{margin-top:12px;font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#444;font-weight:600;}
+.login-divider{height:1px;background:linear-gradient(90deg,transparent,#222,transparent);margin:0 0 24px;}
+.login-heading{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;text-align:center;margin-bottom:5px;}
+.login-sub{font-size:12px;color:#555;text-align:center;margin-bottom:24px;line-height:1.6;}
+.btn-google{width:100%;display:flex;align-items:center;justify-content:center;gap:11px;padding:13px 20px;background:#141414;border:1px solid #2a2a2a;border-radius:7px;color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;letter-spacing:.3px;}
+.btn-google:hover{background:#1a1a1a;border-color:#363636;transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.4);}
+.btn-google:active{transform:translateY(0);}
+.btn-google.loading{opacity:.6;pointer-events:none;}
+.login-notice{margin-top:18px;padding:10px 14px;background:var(--lime-dim);border:1px solid var(--lime-b);border-radius:5px;font-size:11px;color:#666;text-align:center;line-height:1.6;}
+.login-notice strong{color:var(--lime);}
+.login-error-msg{margin-top:12px;padding:9px 14px;background:rgba(224,82,82,.08);border:1px solid rgba(224,82,82,.2);border-radius:5px;font-size:11px;color:var(--red);text-align:center;display:none;}
+.login-error-msg.show{display:block;}
+.login-foot{padding:14px 36px 18px;border-top:1px solid #141414;display:flex;align-items:center;justify-content:center;gap:6px;}
+.login-foot-dot{width:4px;height:4px;border-radius:50%;background:var(--go);opacity:.5;}
+.login-foot-txt{font-size:10px;color:#2a2a2a;font-family:'Barlow Condensed',sans-serif;letter-spacing:1.5px;text-transform:uppercase;}
+
+/* ── LOADING OVERLAY ──────────────────────────────── */
+#auth-loading{display:none;position:fixed;inset:0;z-index:10000;background:#000;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+#auth-loading.show{display:flex;}
+.auth-spinner{width:32px;height:32px;border:2px solid #1a1a1a;border-top-color:var(--go);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.auth-loading-txt{font-family:'Barlow Condensed',sans-serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#333;}
+
+/* ── ROLE MGMT MODAL ──────────────────────────────── */
+.role-mgmt-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);transition:background .1s;}
+.role-mgmt-row:last-child{border-bottom:none;}
+.role-mgmt-row:hover{background:#0d0d0d;}
+.role-select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:4px;padding:4px 8px;font-size:11px;font-family:'Barlow',sans-serif;cursor:pointer;outline:none;}
+.role-select:focus{border-color:var(--go);}
+
+/* ── USER CHIP (topbar) ──────────────────────────── */
+.user-chip{display:flex;align-items:center;gap:7px;padding:4px 10px 4px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:border-color .1s;}
+.user-chip:hover{border-color:var(--border2);}
+.user-chip-name{font-size:11px;color:#aaa;font-weight:500;}
+.user-chip-role{font-size:9px;color:#555;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;text-transform:uppercase;}
+.sign-out-btn{font-size:11px;color:#555;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:4px;font-family:'Barlow',sans-serif;}
+.sign-out-btn:hover{color:var(--red);}
+
 </style>
 </head>
 <body>
+
+<!-- ── AUTH LOADING ───────────────────────────────── -->
+<div id="auth-loading">
+  <div class="auth-spinner"></div>
+  <div class="auth-loading-txt">Signing you in…</div>
+</div>
+
+<!-- ── LOGIN SCREEN ───────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-bg">
+    <div class="login-grid"></div>
+    <div class="login-orb login-orb-1"></div>
+    <div class="login-orb login-orb-2"></div>
+    <div class="login-orb login-orb-3"></div>
+  </div>
+  <div class="login-card-wrap">
+    <div class="login-card">
+      <div class="login-stripe"></div>
+      <div class="login-body">
+        <div class="login-logo-wrap">
+          <img id="login-logo-img" src="" alt="Revibe">
+          <div class="login-portal-lbl">Growth &amp; Development Portal</div>
+        </div>
+        <div class="login-divider"></div>
+        <div class="login-heading">Welcome Back</div>
+        <div class="login-sub">Sign in with your Revibe Google account to continue</div>
+        <button class="btn-google" id="googleSignInBtn" onclick="handleGoogleSignIn()">
+          <svg width="18" height="18" viewBox="0 0 18 18">
+            <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+            <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+            <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+            <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/>
+          </svg>
+          Continue with Google
+        </button>
+        <div class="login-error-msg" id="loginErrMsg"></div>
+        <div class="login-notice">Access is limited to <strong>@revibeto.com</strong> accounts only</div>
+      </div>
+      <div class="login-foot">
+        <div class="login-foot-dot"></div>
+        <div class="login-foot-txt">Revibe Wellness · Internal Platform</div>
+        <div class="login-foot-dot"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="root"></div>
 <script type="text/babel">
 
 const LOGO = "data:image/png;base64,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";
+window.__RV_LOGO = LOGO;
 const RUBRIC_SYSTEMS = {
   "clinical": {
     "id": "clinical",
@@ -1817,7 +1921,8 @@ function Stars({n}){return<div style={{display:'flex',gap:3}}>{[1,2,3,4,5].map(i
 /* ══════════════════════════════════════════════
    APP
 ══════════════════════════════════════════════ */
-function App(){
+function App({currentUser}){
+  const cu = currentUser || {name:'Dave',isAdmin:true,role:'management',discipline:'mgmt'};
   const[page,setPage]=useState('overview');
   const[staff,setStaff]=useState(()=>ld('staff',SEED_STAFF));
   const[evals,setEvals]=useState(()=>ld('evals',[]));
@@ -1862,6 +1967,7 @@ function App(){
           <div className="nav-item" onClick={()=>setModal('addStaff')}><span className="nav-icon">+</span>Add Staff</div>
           <div className="nav-item" onClick={()=>setModal('addEval')}><span className="nav-icon">+</span>Log Evaluation</div>
           <div className="nav-item" onClick={()=>setModal('addSess')}><span className="nav-icon">+</span>Log Edu Session</div>
+          {cu.isAdmin&&<div className="nav-item" onClick={()=>setModal('roleManager')}><span className="nav-icon">⚙</span>Manage Roles</div>}
         </div>
         <div className="sidebar-foot">
           <div className="foot-card">
@@ -1882,6 +1988,11 @@ function App(){
           
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
           <NotificationBell notifs={notifs} markRead={markRead} markAllRead={markAllRead} setPage={setPage}/>
+          {cu&&<div className="user-chip">
+            <Av name={cu.name} sz="sm"/>
+            <div><div className="user-chip-name">{cu.name.split(' ')[0]}</div><div className="user-chip-role">{cu.isAdmin?'Admin':'Staff'}</div></div>
+          </div>}
+          <button className="sign-out-btn" onClick={()=>window.handleSignOut&&window.handleSignOut()} title="Sign out">↩</button>
         </div>
       </div>
           <div className="topbar-r">
@@ -1900,6 +2011,107 @@ function App(){
       {modal==='addStaff'&&<AddStaffModal onClose={()=>setModal(null)} onSave={d=>setStaff(p=>[...p,{...d,id:'s'+Date.now(),files:[],tracks:d.tracks||[],scores:{}}])}/>}
       {modal==='addEval'&&<AddEvalModal onClose={()=>setModal(null)} onSave={d=>setEvals(p=>[...p,{...d,id:'e'+Date.now()}])} staff={staff} mentors={MENTORS}/>}
       {modal==='addSess'&&<AddSessModal onClose={()=>setModal(null)} onSave={d=>setSessions(p=>[...p,{...d,id:'se'+Date.now()}])} staff={staff} mentors={MENTORS}/>}
+      {modal==='roleManager'&&cu.isAdmin&&<RoleManagerModal staff={staff} setStaff={setStaff} onClose={()=>setModal(null)}/>}
+    </div>
+  );
+}
+
+/* ══ ROLE MANAGER MODAL ══ */
+const ROLE_OPTIONS=[
+  {value:'therapist',    label:'Therapist',     desc:'Own profile only'},
+  {value:'clinic_lead',  label:'Clinic Lead',   desc:'Full dashboard access'},
+  {value:'management',   label:'Management',    desc:'Full dashboard access'},
+];
+
+function RoleManagerModal({staff,setStaff,onClose}){
+  const[saving,setSaving]=useState({});
+  const[saved,setSaved]=useState({});
+  const[search,setSearch]=useState('');
+
+  const getRoleVal=(s)=>{
+    if(s.discipline==='mgmt') return 'management';
+    const r=(s.role||'').toLowerCase();
+    if(['management','clinic_lead','lead','admin'].includes(r)) return r==='lead'?'clinic_lead':r;
+    return 'therapist';
+  };
+
+  const filtered=staff.filter(s=>s.name.toLowerCase().includes(search.toLowerCase()));
+
+  const updateRole=async(staffId, newRole)=>{
+    setSaving(p=>({...p,[staffId]:true}));
+    setSaved(p=>({...p,[staffId]:false}));
+    // Update in Supabase
+    if(window.__SB){
+      await window.__SB.from('staff').update({role:newRole}).eq('id',staffId);
+    }
+    // Update local state
+    setStaff(p=>p.map(s=>s.id===staffId?{...s,role:newRole}:s));
+    setSaving(p=>({...p,[staffId]:false}));
+    setSaved(p=>({...p,[staffId]:true}));
+    setTimeout(()=>setSaved(p=>({...p,[staffId]:false})),2000);
+  };
+
+  return(
+    <div className="overlay" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
+      <div className="modal" style={{maxWidth:580}}>
+        <div className="modal-stripe"/>
+        <button className="modal-close" onClick={onClose}>✕ Close</button>
+        <div className="modal-body">
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,letterSpacing:'2px',textTransform:'uppercase',marginBottom:4}}>Manage Access Roles</div>
+          <div style={{fontSize:12,color:'#666',marginBottom:16,lineHeight:1.6}}>Set each staff member's access level. Changes save immediately to Supabase.</div>
+
+          {/* Role legend */}
+          <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>
+            {ROLE_OPTIONS.map(r=>(
+              <div key={r.value} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'7px 12px',flex:1,minWidth:140}}>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:700,letterSpacing:'1px',color:'var(--lime)',textTransform:'uppercase',marginBottom:2}}>{r.label}</div>
+                <div style={{fontSize:11,color:'#555'}}>{r.desc}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Search */}
+          <div style={{position:'relative',marginBottom:12}}>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search staff…"
+              style={{background:'var(--surface2)',border:'1px solid var(--border)',color:'var(--text)',borderRadius:5,padding:'7px 10px 7px 30px',fontSize:12,width:'100%',outline:'none'}}/>
+            <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',fontSize:12,color:'#555'}}>🔍</span>
+          </div>
+
+          {/* Staff list */}
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:5,overflow:'hidden',maxHeight:380,overflowY:'auto'}}>
+            {filtered.map((s,i)=>{
+              const currentRole=getRoleVal(s);
+              const isSaving=saving[s.id];
+              const isSaved=saved[s.id];
+              return(
+                <div key={s.id} className="role-mgmt-row">
+                  <Av name={s.name} sz="sm"/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:13,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name}</div>
+                    <div style={{fontSize:11,color:'#555'}}>{s.site||'—'} · {s.discipline?.toUpperCase()}</div>
+                  </div>
+                  <select
+                    className="role-select"
+                    value={currentRole}
+                    disabled={isSaving}
+                    onChange={e=>updateRole(s.id,e.target.value)}
+                  >
+                    {ROLE_OPTIONS.map(r=><option key={r.value} value={r.value}>{r.label}</option>)}
+                  </select>
+                  {isSaving&&<span style={{fontSize:10,color:'#555',minWidth:40}}>Saving…</span>}
+                  {isSaved&&<span style={{fontSize:10,color:'#44ccaa',minWidth:40}}>✓ Saved</span>}
+                  {!isSaving&&!isSaved&&<span style={{minWidth:40}}/>}
+                </div>
+              );
+            })}
+            {filtered.length===0&&<div style={{padding:24,textAlign:'center',color:'var(--text3)',fontSize:12}}>No staff found</div>}
+          </div>
+
+          <div style={{marginTop:14,padding:'10px 14px',background:'var(--lime-dim)',border:'1px solid var(--lime-b)',borderRadius:5,fontSize:11,color:'#666',lineHeight:1.6}}>
+            <strong style={{color:'var(--lime)'}}>Note:</strong> Role changes take effect on the staff member's next login. Management and Clinic Lead roles grant full dashboard access.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -7059,8 +7271,102 @@ function GDEditPanel({r, onSave, onCancel, onDelete}){
   );
 }
 
-ReactDOM.render(<App/>,document.getElementById('root'));
+// ── Auth-aware render ─────────────────────────────
+function AppWithAuth(){
+  const[authUser,setAuthUser]=useState(window.__RV_USER||null);
 
+  useEffect(()=>{
+    const handler=()=>{ if(window.__RV_USER) setAuthUser({...window.__RV_USER}); };
+    window.addEventListener('rv-auth-ready',handler);
+    // In case auth already resolved before React mounted
+    if(window.__RV_USER && !authUser) setAuthUser({...window.__RV_USER});
+    return()=>window.removeEventListener('rv-auth-ready',handler);
+  },[]);
+
+  if(!authUser) return null;
+  return <App currentUser={authUser}/>;
+}
+
+ReactDOM.render(<AppWithAuth/>,document.getElementById('root'));
+
+</script>
+
+<!-- ── Supabase Auth Script ─────────────────────── -->
+<script>
+(function(){
+  const SUPABASE_URL = 'https://ekjzbdvvxvylembmrphv.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_2NpHtgiPTvrqi3bkQiejNw_Ob5dsATN';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  window.__SB = sb;
+
+  // Set login logo from global set by Babel script
+  setTimeout(()=>{
+    const logoEl = document.getElementById('login-logo-img');
+    if(logoEl && window.__RV_LOGO) logoEl.src = window.__RV_LOGO;
+    else if(logoEl) logoEl.style.display='none';
+  }, 500);
+
+  function showLogin(){ document.getElementById('login-screen').classList.remove('hidden'); }
+  function hideLogin(){ document.getElementById('login-screen').classList.add('hidden'); }
+  function showAuthLoading(){ document.getElementById('auth-loading').classList.add('show'); }
+  function hideAuthLoading(){ document.getElementById('auth-loading').classList.remove('show'); }
+  function showLoginError(msg){ const e=document.getElementById('loginErrMsg'); e.textContent=msg; e.classList.add('show'); }
+
+  window.handleGoogleSignIn = async function(){
+    const btn = document.getElementById('googleSignInBtn');
+    btn.classList.add('loading');
+    btn.innerHTML = 'Redirecting…';
+    document.getElementById('loginErrMsg').classList.remove('show');
+    const { error } = await sb.auth.signInWithOAuth({
+      provider:'google',
+      options:{ redirectTo: window.location.origin, queryParams:{ hd:'revibeto.com' } }
+    });
+    if(error){ showLoginError(error.message); btn.classList.remove('loading'); btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z"/></svg> Continue with Google'; }
+  };
+
+  window.handleSignOut = async function(){
+    await sb.auth.signOut();
+    window.__RV_USER = null;
+    window.location.reload();
+  };
+
+  async function loadUserFromSession(session){
+    const email = session.user.email;
+    const { data: row, error } = await sb.from('staff').select('id,name,discipline,role').eq('email',email).single();
+    if(error||!row){
+      await sb.auth.signOut();
+      hideAuthLoading();
+      showLogin();
+      showLoginError('Your email is not registered in the Revibe system. Contact management.');
+      return;
+    }
+    const isAdmin = row.discipline==='mgmt' || ['management','clinic_lead','lead','admin'].includes((row.role||'').toLowerCase());
+    window.__RV_USER = { id:row.id, name:row.name, email, discipline:row.discipline, role:row.role||'therapist', isAdmin };
+    hideAuthLoading();
+    hideLogin();
+    // Trigger React re-render by dispatching event
+    window.dispatchEvent(new Event('rv-auth-ready'));
+  }
+
+  async function init(){
+    const { data:{ session } } = await sb.auth.getSession();
+    if(session){
+      showAuthLoading();
+      await loadUserFromSession(session);
+    } else {
+      showLogin();
+    }
+  }
+
+  sb.auth.onAuthStateChange((event, session)=>{
+    if(event==='SIGNED_IN' && session && !window.__RV_USER){
+      showAuthLoading();
+      loadUserFromSession(session);
+    }
+  });
+
+  init();
+})();
 </script>
 </body>
 </html>
