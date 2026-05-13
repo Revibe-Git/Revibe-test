@@ -209,19 +209,30 @@
   let GITHUB_TOKEN = '', GITHUB_OWNER = '', selectedRepo = '', allRepos = [];
   let pinnedRepos = JSON.parse(sessionStorage.getItem('pinnedRepos') || '[]');
 
-  // ── FIXED: GD Dashboard now points to Revibe-test / dashboard-gd.html ──
   const REPO_META = {
     'Revibe-test':            { label: 'GD Dashboard',      icon: '📊', desc: 'Growth & Development' },
     'revibe-ge-dashboard':    { label: 'GE Dashboard',      icon: '📞', desc: 'Guest Experience' },
     'revibe-hiring-dashboard':{ label: 'Hiring Dashboard',  icon: '🧲', desc: 'Talent Pipeline' },
   };
 
-  // Auto-select correct file when a dashboard is clicked
   const REPO_DEFAULT_FILE = {
     'Revibe-test':            'dashboard-gd.html',
     'revibe-ge-dashboard':    'revibe-ge-dashboard.html',
     'revibe-hiring-dashboard':'index.html',
   };
+
+  // vercel.json content — tells Vercel never to cache HTML files
+  const VERCEL_JSON = JSON.stringify({
+    "headers": [
+      {
+        "source": "/(.*).html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+          { "key": "Surrogate-Control", "value": "no-store" }
+        ]
+      }
+    ]
+  }, null, 2);
 
   function getMeta(name) {
     return REPO_META[name] || { label: name, icon: '📁', desc: name };
@@ -281,11 +292,8 @@
   function selectRepo(name) {
     selectedRepo = name;
     renderRepos();
-    // Auto-select the correct file for this dashboard
     const defaultFile = REPO_DEFAULT_FILE[name];
-    if (defaultFile) {
-      document.getElementById('fileTarget').value = defaultFile;
-    }
+    if (defaultFile) document.getElementById('fileTarget').value = defaultFile;
     const url = `https://${name.toLowerCase()}.vercel.app`;
     document.getElementById('liveLinkAnchor').href = url;
     document.getElementById('liveLinkAnchor').textContent = url.replace('https://', '');
@@ -325,31 +333,46 @@
   function setStatus(msg, type) { const el = document.getElementById('statusMsg'); el.textContent = msg; el.className = 'status-msg ' + type; }
   function clearAll() { document.getElementById('codeInput').value = ''; document.getElementById('commitMsg').value = ''; document.getElementById('statusMsg').className = 'status-msg'; }
 
+  // Push a file to GitHub — creates it if missing, updates if exists
+  async function pushFile(repo, path, content, message) {
+    const encoded = btoa(unescape(encodeURIComponent(content)));
+    // Try to get existing SHA
+    const shaRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${repo}/contents/${path}`, {
+      headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    const body = { message, content: encoded };
+    if (shaRes.ok) body.sha = (await shaRes.json()).sha;
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${repo}/contents/${path}`, {
+      method: 'PUT',
+      headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Push failed'); }
+    return res;
+  }
+
   async function deploy() {
     if (!selectedRepo) { setStatus('Select a dashboard first.', 'error'); return; }
     const code = document.getElementById('codeInput').value.trim();
     if (!code) { setStatus('Paste your HTML code first.', 'error'); return; }
     const btn = document.getElementById('deployBtn');
     btn.disabled = true; btn.textContent = '⏳ Deploying…';
-    setStatus('Pushing to GitHub…', 'info');
     const file = document.getElementById('fileTarget').value;
     const msg = document.getElementById('commitMsg').value.trim() || `Update ${file} via Revibe Deploy`;
     try {
-      const shaRes = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${selectedRepo}/contents/${file}`, {
-        headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github.v3+json' }
-      });
-      if (!shaRes.ok) throw new Error(`File "${file}" not found in ${selectedRepo}.`);
-      const sha = (await shaRes.json()).sha;
-      const encoded = btoa(unescape(encodeURIComponent(code)));
-      const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${selectedRepo}/contents/${file}`, {
-        method: 'PUT',
-        headers: { Authorization: `token ${GITHUB_TOKEN}`, Accept: 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, content: encoded, sha })
-      });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Push failed.'); }
-      setStatus(`✓ ${getMeta(selectedRepo).label} deployed! Vercel goes live in ~30 sec.`, 'success');
+      // 1. Push the HTML file
+      setStatus('Pushing HTML…', 'info');
+      await pushFile(selectedRepo, file, code, msg);
+
+      // 2. Always push vercel.json to disable CDN caching
+      setStatus('Setting cache headers…', 'info');
+      await pushFile(selectedRepo, 'vercel.json', VERCEL_JSON, 'Set no-cache headers for HTML [auto]');
+
+      setStatus(`✓ ${getMeta(selectedRepo).label} deployed! Live in ~30 sec. Refreshes will always show latest.`, 'success');
       addLog(msg, file, selectedRepo);
-    } catch(err) { setStatus('Deploy failed: ' + err.message, 'error'); }
+    } catch(err) {
+      setStatus('Deploy failed: ' + err.message, 'error');
+    }
     btn.disabled = false; btn.textContent = '⬆ Deploy';
   }
 
