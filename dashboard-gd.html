@@ -2362,16 +2362,31 @@ function PerformancePage({staff,perfData,setPerfData}){
     setTimeout(()=>setGvaSaved(false),2000);
   };
 
-  const BarRow=({s,val,max,color,sub,metric})=>(
-    <div className="perf-bar-row" style={{cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
-      <div className="perf-bar-name">{s.name.split(' ')[0]} {s.name.split(' ').slice(-1)[0]}</div>
-      <div className="perf-bar-track"><div className="perf-bar-fill" style={{width:Math.min(100,(val/max)*100)+'%',background:color}}/></div>
-      <div className="flex aic g8">
-        <div className="perf-bar-val" style={{color}}>{sub||val}</div>
-        {(()=>{const t=getTrend(s.id,metric);return t.length>1?<Sparkline values={t.map(d=>d.val)} color={color} width={60} height={20}/>:null;})()}
+  const BarRow=({s,val,max,color,sub,metric})=>{
+    // Show change vs previous period instead of sparkline
+    const trend=getTrend(s.id,metric);
+    let delta=null;
+    if(trend.length>=2){
+      const prev=trend[trend.length-2].val;
+      const curr=trend[trend.length-1].val;
+      if(prev&&curr)delta=Math.round(((curr-prev)/prev)*100);
+    }
+    // Don't show delta if current period is May (partial month) vs full month
+    const latestDate=trend[trend.length-1]?.date||'';
+    const prevDate=trend[trend.length-2]?.date||'';
+    const latestIsPartial=latestDate.startsWith('2026-05'); // May is partial
+    const showDelta=delta!==null&&!latestIsPartial;
+    return(
+      <div className="perf-bar-row" style={{cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+        <div className="perf-bar-name">{s.name.split(' ')[0]} {s.name.split(' ').slice(-1)[0]}</div>
+        <div className="perf-bar-track"><div className="perf-bar-fill" style={{width:Math.min(100,(val/max)*100)+'%',background:color}}/></div>
+        <div className="flex aic g8">
+          <div className="perf-bar-val" style={{color}}>{sub||val}</div>
+          {showDelta&&<span style={{fontSize:10,fontWeight:700,color:delta>=0?'#44CCAA':'#E05252',opacity:0.8}}>{delta>=0?'▲':'▼'}{Math.abs(delta)}%</span>}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return(
     <div>
@@ -2417,6 +2432,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           {periodFilter!=='all'&&(
             <div style={{fontSize:11,color:'var(--lime)',flexShrink:0}}>
               {filteredSnaps.length} snapshot{filteredSnaps.length!==1?'s':''} in period
+              {periodFilter==='2026-05'&&<span style={{color:'#F4DB71',marginLeft:6}}>· May is partial (to date)</span>}
               <button className="btn btn-ghost btn-xs" style={{marginLeft:8,fontSize:10}} onClick={()=>setPeriodFilter('all')}>✕ Clear</button>
             </div>
           )}
@@ -2631,7 +2647,6 @@ function PerformancePage({staff,perfData,setPerfData}){
               <div className="perf-bar-track" style={{height:6}}><div className="perf-bar-fill" style={{width:(s.revenue/maxRev*100)+'%',background:'#CAE8C1'}}/></div>
               <div style={{display:'flex',alignItems:'center',gap:8,minWidth:120,justifyContent:'flex-end'}}>
                 <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(s.revenue)}</span>
-                {(()=>{const t=getTrend(s.id,'revenue');return t.length>1?<Sparkline values={t.map(d=>d.val)} color="#CAE8C1" width={60} height={20}/>:null;})()}
               </div>
             </div>
           )):<div className="empty" style={{padding:40}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue data.</p></div>}</div>
@@ -2652,7 +2667,6 @@ function PerformancePage({staff,perfData,setPerfData}){
                 <div style={{display:'flex',alignItems:'center',gap:8,minWidth:130,justifyContent:'flex-end'}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:c}}>{s.utilization}%</span>
                   <span style={{fontSize:9,background:c+'22',color:c,border:'1px solid '+c+'44',borderRadius:3,padding:'2px 5px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{lbl}</span>
-                  {(()=>{const t=getTrend(s.id,'utilization');return t.length>1?<Sparkline values={t.map(d=>d.val)} color={c} width={60} height={20}/>:null;})()}
                 </div>
               </div>
             );
@@ -2717,7 +2731,6 @@ function PerformancePage({staff,perfData,setPerfData}){
                       </div>
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:10}}>
-                      {trend.length>1&&<Sparkline values={trend.map(d=>d.val)} color={c} width={60} height={20}/>}
                       {num&&<div style={{height:4,width:60,background:'var(--surface3)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:c,width:Math.min(100,num/16*100)+'%'}}/></div>}
                       <input type="number" min="0" max="50" step="0.1" value={val} placeholder="—"
                         onChange={e=>setGvaEdits(p=>({...p,[s.id]:e.target.value}))}
