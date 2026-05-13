@@ -2320,7 +2320,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           <div style={{fontSize:12,color:'#555'}}>Jane data (Appointments + Shift reports) · GVA · Retention · {data.snapshots.length} snapshot{data.snapshots.length!==1?'s':''} stored</div>
         </div>
         <div className="flex aic g5" style={{flexWrap:'wrap'}}>
-          {[['overview','▣ Overview'],['compare','⇄ Compare'],['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['appointments','📋 Appointments'],['gva','📈 GVA'],['retention','🔄 Retention'],['trends','↗ Trends'],['import','📂 Jane Import']].map(([k,l])=>(
+          {[['overview','▣ Overview'],...(data.snapshots.length>=2?[['compare','⇄ Compare']]:[]),['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['appointments','📋 Appointments'],['gva','📈 GVA'],['retention','🔄 Retention'],['trends','↗ Trends'],['import','📂 Jane Import']].map(([k,l])=>(
             <button key={k} className={`btn btn-sm ${tab===k?'btn-go':'btn-ghost'}`} onClick={()=>setTab(k)}>{l}</button>
           ))}
         </div>
