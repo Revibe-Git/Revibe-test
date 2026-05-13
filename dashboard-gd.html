@@ -2093,26 +2093,42 @@ function PerformancePage({staff,perfData,setPerfData}){
   };
 
   /* ── Aggregate appointments CSV ─────────────── */
-  const aggregateAppointments=(rows)=>{
-    const byStaff={};
-    rows.forEach(r=>{
-      const name=r['staff_member_name']||r['staff member name']||'';
-      if(!name||name==='Guest Experience'||name==='Relax Spa')return;
-      if(!byStaff[name])byStaff[name]={name,completed:0,noShows:0,cancellations:0,rescheduled:0,total:0};
-      const state=(r['state']||'').toLowerCase();
-      byStaff[name].total++;
-      if(state==='arrived')byStaff[name].completed++;
-      else if(state==='no_show')byStaff[name].noShows++;
-      else if(state==='cancelled')byStaff[name].cancellations++;
-      else if(state==='rescheduled')byStaff[name].rescheduled++;
-    });
-    return Object.values(byStaff).map(r=>{
-      const matched=matchStaff(r.name);
-      return{...r,staffId:matched?.id||null,matchedName:matched?.name||null};
-    });
+  /* ── Get month from a date string ───────────── */
+  const getMonth=(dateStr)=>{
+    if(!dateStr)return null;
+    // handles "2026-01-15 09:00:00 -0500" and "2026-01-15"
+    const m=dateStr.match(/(\d{4}-\d{2})/);
+    return m?m[1]:null;
   };
 
-  /* ── Parse shift report ─────────────────────── */
+  /* ── Aggregate appointments by month ────────── */
+  const aggregateAppointmentsByMonth=(rows)=>{
+    const byMonth={};
+    rows.forEach(r=>{
+      const name=r['staff_member_name']||'';
+      if(!name||name==='Guest Experience'||name==='Relax Spa')return;
+      const month=getMonth(r['start_at']);
+      if(!month)return;
+      if(!byMonth[month])byMonth[month]={};
+      if(!byMonth[month][name])byMonth[month][name]={name,completed:0,noShows:0,cancellations:0,rescheduled:0};
+      const state=(r['state']||'').toLowerCase();
+      if(state==='arrived')byMonth[month][name].completed++;
+      else if(state==='no_show')byMonth[month][name].noShows++;
+      else if(state==='cancelled')byMonth[month][name].cancellations++;
+      else if(state==='rescheduled')byMonth[month][name].rescheduled++;
+    });
+    // Convert to {month -> [{staffId,name,...}]}
+    const result={};
+    Object.entries(byMonth).forEach(([month,staffMap])=>{
+      result[month]=Object.values(staffMap).map(r=>{
+        const matched=matchStaff(r.name);
+        return{...r,staffId:matched?.id||null,matchedName:matched?.name||null};
+      });
+    });
+    return result;
+  };
+
+  /* ── Parse shift report (no date column — single snapshot) */
   const parseShiftReport=(rows)=>{
     return rows.map(r=>{
       const name=r['staff name']||r['name']||Object.values(r)[0]||'';
@@ -2127,32 +2143,32 @@ function PerformancePage({staff,perfData,setPerfData}){
     }).filter(Boolean).filter(r=>r.name);
   };
 
-  /* ── Parse sales/revenue CSV ────────────────── */
-  const parseSalesReport=(rows)=>{
-    // Normalize column names (Jane exports with leading spaces)
-    const norm=(r)=>{
-      const out={};
-      Object.entries(r).forEach(([k,v])=>out[k.toLowerCase().trim()]=v?.toString().trim()||'');
-      return out;
-    };
-    const byStaff={};
+  /* ── Parse sales by month ────────────────────── */
+  const parseSalesByMonth=(rows)=>{
+    const norm=(r)=>{const out={};Object.entries(r).forEach(([k,v])=>out[k.toLowerCase().trim()]=v?.toString().trim()||'');return out;};
+    const byMonth={};
     rows.forEach(row=>{
       const r=norm(row);
       const name=r['staff member']||r['staff_member']||'';
-      if(!name||name==='Guest Experience'||name==='Relax Spa'||name==='')return;
-      const status=r['status']||'';
-      if(status!=='paid')return; // only count paid
+      if(!name||name==='Guest Experience'||name==='Relax Spa'||!name)return;
+      if(r['status']!=='paid')return;
       const category=(r['income category']||r['income_category']||'').toLowerCase();
-      if(category.includes('product'))return; // skip product sales, only treatment
+      if(category.includes('product'))return;
       const collected=parseFloat((r['collected']||'0').replace(/[$,]/g,''))||0;
-      if(!byStaff[name])byStaff[name]={name,revenue:0,invoices:0};
-      byStaff[name].revenue+=collected;
-      byStaff[name].invoices++;
+      if(!collected)return;
+      const month=getMonth(r['purchase date']||r['invoice date']);
+      if(!month)return;
+      if(!byMonth[month])byMonth[month]={};
+      if(!byMonth[month][name])byMonth[month][name]={name,revenue:0};
+      byMonth[month][name].revenue+=collected;
     });
-    return Object.values(byStaff).map(r=>{
-      const matched=matchStaff(r.name);
-      return{...r,revenue:Math.round(r.revenue*100)/100,staffId:matched?.id||null,matchedName:matched?.name||null};
-    }).filter(r=>r.revenue>0);
+    const result={};
+    Object.entries(byMonth).forEach(([month,staffMap])=>{
+      result[month]=Object.values(staffMap)
+        .map(r=>{const matched=matchStaff(r.name);return{...r,revenue:Math.round(r.revenue*100)/100,staffId:matched?.id||null,matchedName:matched?.name||null};})
+        .filter(r=>r.revenue>0);
+    });
+    return result;
   };
 
   /* ── Handle file upload ─────────────────────── */
@@ -2164,42 +2180,85 @@ function PerformancePage({staff,perfData,setPerfData}){
       const rows=parseCSV(text);
       if(!rows.length){setImportMsg({type:'error',msg:'File is empty or unreadable.'});setImporting(false);return;}
       const type=detectFileType(rows);
-      let parsed=[];
+
+      let newSnapshots=[...data.snapshots];
+      let totalPractitioners=0,totalMatched=0,monthsCreated=[];
+
       if(type==='appointments'){
-        parsed=aggregateAppointments(rows);
-      }else if(type==='shift'){
-        parsed=parseShiftReport(rows);
+        const byMonth=aggregateAppointmentsByMonth(rows);
+        Object.entries(byMonth).forEach(([month,parsed])=>{
+          totalPractitioners=Math.max(totalPractitioners,parsed.length);
+          totalMatched=Math.max(totalMatched,parsed.filter(r=>r.staffId).length);
+          monthsCreated.push(month);
+          const snapDate=month+'-28'; // end of month marker
+          const existingIdx=newSnapshots.findIndex(s=>s.date.startsWith(month));
+          if(existingIdx>=0){
+            // Merge appointments into existing snapshot for this month
+            const existing=newSnapshots[existingIdx];
+            const mergedRows=[...existing.rows];
+            parsed.forEach(nr=>{
+              const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
+              if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
+              else mergedRows.push(nr);
+            });
+            newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
+          }else{
+            newSnapshots.push({id:'snap_'+month+'_appt',date:snapDate,rows:parsed,files:[file.name],type:'appointments'});
+          }
+        });
       }else if(type==='sales'){
-        parsed=parseSalesReport(rows);
+        const byMonth=parseSalesByMonth(rows);
+        Object.entries(byMonth).forEach(([month,parsed])=>{
+          totalPractitioners=Math.max(totalPractitioners,parsed.length);
+          totalMatched=Math.max(totalMatched,parsed.filter(r=>r.staffId).length);
+          monthsCreated.push(month);
+          const snapDate=month+'-28';
+          const existingIdx=newSnapshots.findIndex(s=>s.date.startsWith(month));
+          if(existingIdx>=0){
+            const existing=newSnapshots[existingIdx];
+            const mergedRows=[...existing.rows];
+            parsed.forEach(nr=>{
+              const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
+              if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
+              else mergedRows.push(nr);
+            });
+            newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
+          }else{
+            newSnapshots.push({id:'snap_'+month+'_sales',date:snapDate,rows:parsed,files:[file.name],type:'sales'});
+          }
+        });
+      }else if(type==='shift'){
+        // Shift report has no date column — use the snapDate picker as before
+        const parsed=parseShiftReport(rows);
+        if(!parsed.length){setImportMsg({type:'error',msg:'No staff rows found in shift report.'});setImporting(false);return;}
+        totalPractitioners=parsed.length;
+        totalMatched=parsed.filter(r=>r.staffId).length;
+        const existingIdx=newSnapshots.findIndex(s=>s.date===snapDate);
+        if(existingIdx>=0){
+          const existing=newSnapshots[existingIdx];
+          const mergedRows=[...existing.rows];
+          parsed.forEach(nr=>{
+            const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
+            if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
+            else mergedRows.push(nr);
+          });
+          newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
+        }else{
+          newSnapshots.push({id:'snap_'+Date.now(),date:snapDate,rows:parsed,files:[file.name],type:'shift'});
+        }
+        monthsCreated=[snapDate.slice(0,7)];
       }else{
         setImportMsg({type:'error',msg:'Could not identify this file type. Columns found: '+Object.keys(rows[0]).join(', ')});
         setImporting(false);return;
       }
-      if(!parsed.length){setImportMsg({type:'error',msg:'No practitioner rows found after parsing.'});setImporting(false);return;}
 
-      const matched=parsed.filter(r=>r.staffId).length;
-      const unmatched=parsed.filter(r=>!r.staffId).map(r=>r.name);
-
-      // Merge with existing snapshot for same date if exists
-      const existingIdx=data.snapshots.findIndex(s=>s.date===snapDate);
-      let newSnapshots=[...data.snapshots];
-      if(existingIdx>=0){
-        // Merge rows
-        const existing=newSnapshots[existingIdx];
-        const mergedRows=[...existing.rows];
-        parsed.forEach(nr=>{
-          const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
-          if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
-          else mergedRows.push(nr);
-        });
-        newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
-      }else{
-        newSnapshots=[...newSnapshots,{id:'snap_'+Date.now(),date:snapDate,rows:parsed,files:[file.name],type}].slice(-24);
-      }
-
+      // Sort snapshots by date, keep last 36
+      newSnapshots=newSnapshots.sort((a,b)=>a.date.localeCompare(b.date)).slice(-36);
       save({...data,snapshots:newSnapshots,lastImport:new Date().toISOString()});
-      let msg=`✓ ${type==='appointments'?'Appointments':'Shift'} report imported — ${parsed.length} practitioners, ${matched} matched to staff profiles.`;
-      if(unmatched.length)msg+=` Unmatched: ${unmatched.slice(0,5).join(', ')}${unmatched.length>5?' +'+( unmatched.length-5)+' more':''}`;
+
+      const uniqMonths=[...new Set(monthsCreated)].sort();
+      const monthNames=uniqMonths.map(m=>new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}));
+      let msg=`✓ ${type} report auto-split into ${uniqMonths.length} monthly snapshot${uniqMonths.length!==1?'s':''}: ${monthNames.join(', ')}. ${totalPractitioners} practitioners, ${totalMatched} matched.`;
       setImportMsg({type:'success',msg});
     }catch(e){setImportMsg({type:'error',msg:'Error: '+e.message});}
     setImporting(false);
@@ -2830,10 +2889,15 @@ function PerformancePage({staff,perfData,setPerfData}){
           </div>
 
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#555'}}>Snapshot Date</div>
-            <input type="date" value={snapDate} onChange={e=>setSnapDate(e.target.value)}
+            <div style={{fontSize:12,color:'#555',lineHeight:1.6}}>
+              <strong style={{color:'#aaa'}}>Appointments</strong> and <strong style={{color:'#aaa'}}>Sales</strong> CSVs auto-split by month from the row dates — just drop them in.<br/>
+              <strong style={{color:'#aaa'}}>Shift Report</strong> has no date column, so set the month it covers below.
+            </div>
+          </div>
+          <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#555'}}>Shift Report Month</div>
+            <input type="month" value={snapDate.slice(0,7)} onChange={e=>setSnapDate(e.target.value+'-28')}
               style={{background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:12,padding:'5px 10px',outline:'none'}}/>
-            <span style={{fontSize:11,color:'#555'}}>Set to the end date of the period this CSV covers</span>
           </div>
 
           <div className={`perf-drop${dragging?' drag':''}`}
@@ -2866,8 +2930,11 @@ function PerformancePage({staff,perfData,setPerfData}){
                 return(
                   <div key={snap.id} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'10px 14px',marginBottom:7,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                     <div>
-                      <div style={{fontSize:13,fontWeight:600,color:'#ddd'}}>{new Date(snap.date+'T12:00').toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'})}</div>
-                      <div style={{fontSize:11,color:'#555',marginTop:2}}>{(snap.files||[snap.type||'import']).join(' + ')} · {snap.rows.length} practitioners · {matched} matched to profiles</div>
+                      <div style={{fontSize:13,fontWeight:600,color:'#ddd'}}>
+                        {new Date(snap.date.slice(0,7)+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}
+                        <span style={{fontSize:10,color:'#555',fontWeight:400,marginLeft:8,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>{snap.type||'import'}</span>
+                      </div>
+                      <div style={{fontSize:11,color:'#555',marginTop:2}}>{(snap.files||[]).slice(0,2).join(' · ')} · {snap.rows.length} practitioners · {matched} matched</div>
                     </div>
                     <button className="btn btn-ghost btn-xs" style={{color:'#555',fontSize:11}}
                       onClick={()=>{if(confirm('Delete this snapshot?'))save({...data,snapshots:data.snapshots.filter(s=>s.id!==snap.id)});}}>✕</button>
