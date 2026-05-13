@@ -1995,12 +1995,13 @@ function LineChart({snapshots,staffId,metric,color,label,fmt}){
   );
 }
 
-function PerformancePage({staff}){
+function PerformancePage({staff,perfData,setPerfData}){
   const SK='rvgd3_perf3';
-  const[data,setData]=useState(()=>{
-    try{const s=localStorage.getItem(SK);return s?JSON.parse(s):{snapshots:[],gva:{},lastImport:null};}
-    catch{return{snapshots:[],gva:{},lastImport:null};}
-  });
+  const data=perfData||{snapshots:[],gva:{},retention:{},lastImport:null};
+  const save=(d)=>{
+    setPerfData(d);
+    try{localStorage.setItem(SK,JSON.stringify(d));}catch{}
+  };
   const[tab,setTab]=useState('overview');
   const[dragging,setDragging]=useState(false);
   const[importing,setImporting]=useState(false);
@@ -2011,8 +2012,9 @@ function PerformancePage({staff}){
   const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
-
-  const save=(d)=>{setData(d);};
+  const[periodFilter,setPeriodFilter]=useState('all');
+  const[compareA,setCompareA]=useState('');
+  const[compareB,setCompareB]=useState('');
 
   /* ── CSV parser ─────────────────────────────── */
   const parseCSV=(text)=>{
@@ -2203,11 +2205,63 @@ function PerformancePage({staff}){
     setImporting(false);
   };
 
-  /* ── Latest snapshot merged with staff ──────── */
-  const latestSnap=data.snapshots.length?data.snapshots[data.snapshots.length-1]:null;
+  /* ── Period helpers ─────────────────────────── */
+  const allSnapDates=useMemo(()=>[...new Set(data.snapshots.map(s=>s.date))].sort(),[data.snapshots]);
+
+  // Get available months/quarters/years from snapshot dates
+  const availMonths=useMemo(()=>[...new Set(allSnapDates.map(d=>d.slice(0,7)))].sort(),[allSnapDates]);
+  const availQuarters=useMemo(()=>[...new Set(allSnapDates.map(d=>{const [y,m]=d.split('-');const q=Math.ceil(parseInt(m)/3);return`${y}-Q${q}`;}))].sort(),[allSnapDates]);
+  const availYears=useMemo(()=>[...new Set(allSnapDates.map(d=>d.slice(0,4)))].sort(),[allSnapDates]);
+
+  // Filter snapshots by period
+  const filterSnaps=(filter)=>{
+    if(!filter||filter==='all')return data.snapshots;
+    if(filter.includes('-Q')){
+      const[y,q]=filter.split('-Q');
+      return data.snapshots.filter(s=>{
+        const[sy,sm]=s.date.split('-');
+        return sy===y&&Math.ceil(parseInt(sm)/3)===parseInt(q);
+      });
+    }
+    if(filter.length===7)return data.snapshots.filter(s=>s.date.startsWith(filter)); // YYYY-MM
+    if(filter.length===4)return data.snapshots.filter(s=>s.date.startsWith(filter)); // YYYY
+    return data.snapshots;
+  };
+
+  // Aggregate rows across multiple snapshots for a period
+  // For appointments: sum across snapshots. For utilization/revenue: use latest in period.
+  const aggregateRows=(snaps)=>{
+    if(!snaps.length)return[];
+    const byStaff={};
+    snaps.forEach(snap=>{
+      (snap.rows||[]).forEach(r=>{
+        if(!r.staffId)return;
+        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,appointments:0};
+        const b=byStaff[r.staffId];
+        if(r.completed)b.completed+=(parseFloat(r.completed)||0);
+        if(r.noShows)b.noShows+=(parseFloat(r.noShows)||0);
+        if(r.cancellations)b.cancellations+=(parseFloat(r.cancellations)||0);
+        if(r.rescheduled)b.rescheduled+=(parseFloat(r.rescheduled)||0);
+        if(r.revenue)b.revenue+=(parseFloat(r.revenue)||0);
+        if(r.appointments)b.appointments+=(parseFloat(r.appointments)||0);
+        if(r.utilization!=null)b.utilization=parseFloat(r.utilization)||null; // latest wins
+      });
+    });
+    return Object.values(byStaff).map(r=>({...r,revenue:Math.round(r.revenue*100)/100}));
+  };
+
+  // Active filtered rows
+  const filteredSnaps=useMemo(()=>filterSnaps(periodFilter),[data.snapshots,periodFilter]);
+  const filteredRows=useMemo(()=>aggregateRows(filteredSnaps),[filteredSnaps]);
+
+  // Compare mode rows
+  const compareARows=useMemo(()=>aggregateRows(filterSnaps(compareA)),[data.snapshots,compareA]);
+  const compareBRows=useMemo(()=>aggregateRows(filterSnaps(compareB)),[data.snapshots,compareB]);
+
+  /* ── Merged staff with period-filtered data ── */
   const mergedStaff=useMemo(()=>
     staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops').map(s=>{
-      const jr=latestSnap?.rows?.find(r=>r.staffId===s.id);
+      const jr=filteredRows.find(r=>r.staffId===s.id);
       const gvaVal=parseFloat(gvaEdits[s.id]!==undefined?gvaEdits[s.id]:data.gva[s.id])||null;
       const retVal=data.retention?.[s.id]||null;
       return{...s,
@@ -2217,7 +2271,7 @@ function PerformancePage({staff}){
         revenue:jr?.revenue||null,
         gva:gvaVal,retention:retVal};
     })
-  ,[staff,latestSnap,data.gva,data.retention,gvaEdits]);
+  ,[staff,filteredRows,data.gva,data.retention,gvaEdits]);
 
   const withUtil  =mergedStaff.filter(s=>s.utilization!=null).sort((a,b)=>b.utilization-a.utilization);
   const withAppts =mergedStaff.filter(s=>s.completed!=null).sort((a,b)=>b.completed-a.completed);
@@ -2232,6 +2286,7 @@ function PerformancePage({staff}){
   const totalRev=withRev.reduce((a,s)=>a+(s.revenue||0),0);
 
   const fmtRev=(v)=>v>=1000?'$'+(v/1000).toFixed(1)+'k':'$'+Math.round(v);
+  const pctDiff=(a,b)=>b&&a?Math.round(((a-b)/b)*100):null;
 
   const getTrend=(sId,metric)=>data.snapshots.map(snap=>{
     const r=snap.rows?.find(r=>r.staffId===sId);
@@ -2265,7 +2320,7 @@ function PerformancePage({staff}){
           <div style={{fontSize:12,color:'#555'}}>Jane data (Appointments + Shift reports) · GVA · Retention · {data.snapshots.length} snapshot{data.snapshots.length!==1?'s':''} stored</div>
         </div>
         <div className="flex aic g5" style={{flexWrap:'wrap'}}>
-          {[['overview','▣ Overview'],['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['appointments','📋 Appointments'],['gva','📈 GVA'],['retention','🔄 Retention'],['trends','↗ Trends'],['import','📂 Jane Import']].map(([k,l])=>(
+          {[['overview','▣ Overview'],['compare','⇄ Compare'],['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['appointments','📋 Appointments'],['gva','📈 GVA'],['retention','🔄 Retention'],['trends','↗ Trends'],['import','📂 Jane Import']].map(([k,l])=>(
             <button key={k} className={`btn btn-sm ${tab===k?'btn-go':'btn-ghost'}`} onClick={()=>setTab(k)}>{l}</button>
           ))}
         </div>
@@ -2278,6 +2333,113 @@ function PerformancePage({staff}){
         <div className="sc yellow"><div className="sc-lbl">Avg GVA</div><div className="sc-val">{avgGva||'—'}</div><div className="sc-sub">365-day rolling</div></div>
         <div className="sc gray"><div className="sc-lbl">Snapshots</div><div className="sc-val">{data.snapshots.length}</div><div className="sc-sub">{data.lastImport?new Date(data.lastImport).toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'No imports yet'}</div></div>
       </div>
+
+      {/* Period filter bar — shown on all tabs except import/gva/retention/trends */}
+      {!['import','gva','retention','trends'].includes(tab)&&data.snapshots.length>0&&(
+        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#555',flexShrink:0}}>Period</div>
+          <div style={{display:'flex',gap:5,flexWrap:'wrap',flex:1}}>
+            <button className={`btn btn-xs ${periodFilter==='all'?'btn-go':'btn-ghost'}`} onClick={()=>setPeriodFilter('all')}>All Time</button>
+            {availYears.map(y=>(
+              <button key={y} className={`btn btn-xs ${periodFilter===y?'btn-go':'btn-ghost'}`} onClick={()=>setPeriodFilter(y)}>{y}</button>
+            ))}
+            {availQuarters.map(q=>(
+              <button key={q} className={`btn btn-xs ${periodFilter===q?'btn-lime':'btn-ghost'}`} onClick={()=>setPeriodFilter(q)}>{q.replace('-','  ')}</button>
+            ))}
+            {availMonths.map(m=>(
+              <button key={m} className={`btn btn-xs ${periodFilter===m?'btn-lime':'btn-ghost'}`} onClick={()=>setPeriodFilter(m)}>
+                {new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}
+              </button>
+            ))}
+          </div>
+          {periodFilter!=='all'&&(
+            <div style={{fontSize:11,color:'var(--lime)',flexShrink:0}}>
+              {filteredSnaps.length} snapshot{filteredSnaps.length!==1?'s':''} in period
+              <button className="btn btn-ghost btn-xs" style={{marginLeft:8,fontSize:10}} onClick={()=>setPeriodFilter('all')}>✕ Clear</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── COMPARE TAB ── */}
+      {tab==='compare'&&(
+        <div>
+          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'14px 16px',marginBottom:14}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#aaa',marginBottom:10}}>Select Two Periods to Compare</div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+              {[['A',compareA,setCompareA,'#CAE8C1'],['B',compareB,setCompareB,'#6B9FD4']].map(([label,val,setter,color])=>(
+                <div key={label}>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,color,letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:8}}>Period {label}</div>
+                  <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+                    {availYears.map(y=><button key={y} className={`btn btn-xs ${val===y?'btn-go':'btn-ghost'}`} onClick={()=>setter(y)}>{y}</button>)}
+                    {availQuarters.map(q=><button key={q} className={`btn btn-xs ${val===q?'btn-lime':'btn-ghost'}`} onClick={()=>setter(q)}>{q.replace('-','  ')}</button>)}
+                    {availMonths.map(m=><button key={m} className={`btn btn-xs ${val===m?'btn-lime':'btn-ghost'}`} onClick={()=>setter(m)}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}</button>)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {compareA&&compareB?(()=>{
+            const metrics=[
+              {key:'revenue',label:'Revenue',fmt:fmtRev,color:'#CAE8C1'},
+              {key:'completed',label:'Completed Visits',fmt:v=>v,color:'#6B9FD4'},
+              {key:'utilization',label:'Utilization %',fmt:v=>v+'%',color:'#44ccaa'},
+              {key:'noShows',label:'No-Shows',fmt:v=>v,color:'#E05252'},
+              {key:'cancellations',label:'Cancellations',fmt:v=>v,color:'#F4DB71'},
+            ];
+            const clinStaff=staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops');
+            return(
+              <div>
+                {metrics.map(({key,label,fmt,color})=>{
+                  const aRows=compareARows,bRows=compareBRows;
+                  const staffWithData=clinStaff.filter(s=>
+                    aRows.find(r=>r.staffId===s.id)?.[key]!=null||
+                    bRows.find(r=>r.staffId===s.id)?.[key]!=null
+                  );
+                  if(!staffWithData.length)return null;
+                  const maxVal=Math.max(...staffWithData.map(s=>Math.max(parseFloat(aRows.find(r=>r.staffId===s.id)?.[key])||0,parseFloat(bRows.find(r=>r.staffId===s.id)?.[key])||0)),1);
+                  return(
+                    <div key={key} className="perf-slot" style={{marginBottom:12}}>
+                      <div className="perf-slot-head"><span className="perf-slot-title" style={{color}}>{label}</span>
+                        <div style={{display:'flex',gap:14,fontSize:11}}>
+                          <span style={{color:'#CAE8C1'}}>■ {compareA.length===7?new Date(compareA+'-15').toLocaleDateString('en-CA',{month:'short',year:'2-digit'}):compareA}</span>
+                          <span style={{color:'#6B9FD4'}}>■ {compareB.length===7?new Date(compareB+'-15').toLocaleDateString('en-CA',{month:'short',year:'2-digit'}):compareB}</span>
+                        </div>
+                      </div>
+                      <div className="perf-slot-body">
+                        {staffWithData.map(s=>{
+                          const aRow=aRows.find(r=>r.staffId===s.id);
+                          const bRow=bRows.find(r=>r.staffId===s.id);
+                          const aVal=parseFloat(aRow?.[key])||0;
+                          const bVal=parseFloat(bRow?.[key])||0;
+                          const diff=pctDiff(aVal,bVal);
+                          return(
+                            <div key={s.id} style={{padding:'8px 0',borderBottom:'1px solid rgba(50,50,50,.5)'}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:5}}>
+                                <div style={{fontSize:12,fontWeight:600,color:'#ddd',minWidth:160}}>{s.name.split(' ')[0]} {s.name.split(' ').slice(-1)[0]}</div>
+                                <div style={{fontSize:12,color:'#CAE8C1',minWidth:60,textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{aVal?fmt(aVal):'—'}</div>
+                                <div style={{fontSize:12,color:'#6B9FD4',minWidth:60,textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{bVal?fmt(bVal):'—'}</div>
+                                {diff!=null&&aVal&&bVal&&<span style={{fontSize:10,fontWeight:700,color:diff>0?'#44CCAA':'#E05252',background:diff>0?'rgba(68,204,170,.1)':'rgba(224,82,82,.1)',padding:'1px 6px',borderRadius:3}}>{diff>0?'▲':'▼'}{Math.abs(diff)}%</span>}
+                              </div>
+                              <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                                {aVal>0&&<div style={{height:4,borderRadius:2,background:'rgba(202,232,193,.15)',overflow:'hidden'}}><div style={{height:'100%',background:'#CAE8C1',width:(aVal/maxVal*100)+'%',borderRadius:2}}/></div>}
+                                {bVal>0&&<div style={{height:4,borderRadius:2,background:'rgba(107,159,212,.15)',overflow:'hidden'}}><div style={{height:'100%',background:'#6B9FD4',width:(bVal/maxVal*100)+'%',borderRadius:2}}/></div>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })():(
+            <div className="card"><div className="empty"><div className="empty-ico">⇄</div><p>Select two periods above to compare them side by side.<br/><span style={{fontSize:11,color:'#555'}}>Import monthly Jane CSVs to unlock more period options.</span></p></div></div>
+          )}
+        </div>
+      )}
 
       {/* ── OVERVIEW ── */}
       {tab==='overview'&&(
