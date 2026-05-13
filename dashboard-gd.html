@@ -2442,61 +2442,36 @@ function PerformancePage({staff,perfData,setPerfData}){
       {/* ── COMPARE TAB ── */}
       {tab==='compare'&&(
         <div>
-          {/* Explain the concept */}
           {data.snapshots.length<2?(
             <div style={{background:'rgba(107,159,212,.06)',border:'1px solid rgba(107,159,212,.18)',borderRadius:8,padding:'22px 24px',marginBottom:14,textAlign:'center'}}>
               <div style={{fontSize:28,marginBottom:10}}>⇄</div>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:'#6B9FD4',letterSpacing:'1px',marginBottom:8}}>MONTH-TO-MONTH COMPARISON</div>
               <div style={{fontSize:13,color:'#888',lineHeight:1.8,maxWidth:500,margin:'0 auto'}}>
-                You currently have <strong style={{color:'#ddd'}}>1 snapshot</strong> (Jan–May YTD).<br/>
-                To compare periods, import monthly CSVs from Jane — one per month.<br/>
-                <span style={{fontSize:11,color:'#555',marginTop:8,display:'block'}}>e.g. Export April 1–30, import it. Export May 1–31, import it. Then compare April vs May instantly.</span>
+                Import monthly CSVs to compare periods side by side.<br/>
+                <span style={{fontSize:11,color:'#555',display:'block',marginTop:8}}>e.g. Export April 1–30, import it. Export May 1–31, import it. Then compare April vs May.</span>
               </div>
               <button className="btn btn-ghost btn-sm" style={{marginTop:14}} onClick={()=>setTab('import')}>Go to Import →</button>
             </div>
           ):(
             <div>
-              {/* Period pickers — plain language */}
+              {/* Period pickers */}
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'14px 16px',marginBottom:14}}>
                 <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:16,alignItems:'start'}}>
-                  {/* This Period */}
                   <div>
                     <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',marginBottom:8}}>This Period</div>
                     <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-                      {availMonths.map(m=>(
-                        <button key={m} className={`btn btn-xs ${compareA===m?'btn-lime':'btn-ghost'}`} onClick={()=>setCompareA(m)}>
-                          {new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}
-                        </button>
-                      ))}
-                      {availQuarters.map(q=>(
-                        <button key={q} className={`btn btn-xs ${compareA===q?'btn-lime':'btn-ghost'}`} onClick={()=>setCompareA(q)}>
-                          {q.replace('-Q',' Q')}
-                        </button>
-                      ))}
-                      {availYears.map(y=>(
-                        <button key={y} className={`btn btn-xs ${compareA===y?'btn-go':'btn-ghost'}`} onClick={()=>setCompareA(y)}>{y}</button>
-                      ))}
+                      {availMonths.map(m=><button key={m} className={`btn btn-xs ${compareA===m?'btn-lime':'btn-ghost'}`} onClick={()=>setCompareA(m)}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}</button>)}
+                      {availQuarters.map(q=><button key={q} className={`btn btn-xs ${compareA===q?'btn-lime':'btn-ghost'}`} onClick={()=>setCompareA(q)}>{q.replace('-Q',' Q')}</button>)}
+                      {availYears.map(y=><button key={y} className={`btn btn-xs ${compareA===y?'btn-go':'btn-ghost'}`} onClick={()=>setCompareA(y)}>{y}</button>)}
                     </div>
                   </div>
-                  {/* vs label */}
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#333',paddingTop:24,textAlign:'center'}}>VS</div>
-                  {/* Previous Period */}
                   <div>
                     <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#6B9FD4',marginBottom:8}}>Previous Period</div>
                     <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-                      {availMonths.map(m=>(
-                        <button key={m} className={`btn btn-xs ${compareB===m?'btn-go':'btn-ghost'}`} onClick={()=>setCompareB(m)}>
-                          {new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}
-                        </button>
-                      ))}
-                      {availQuarters.map(q=>(
-                        <button key={q} className={`btn btn-xs ${compareB===q?'btn-go':'btn-ghost'}`} onClick={()=>setCompareB(q)}>
-                          {q.replace('-Q',' Q')}
-                        </button>
-                      ))}
-                      {availYears.map(y=>(
-                        <button key={y} className={`btn btn-xs ${compareB===y?'btn-go':'btn-ghost'}`} onClick={()=>setCompareB(y)}>{y}</button>
-                      ))}
+                      {availMonths.map(m=><button key={m} className={`btn btn-xs ${compareB===m?'btn-go':'btn-ghost'}`} onClick={()=>setCompareB(m)}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}</button>)}
+                      {availQuarters.map(q=><button key={q} className={`btn btn-xs ${compareB===q?'btn-go':'btn-ghost'}`} onClick={()=>setCompareB(q)}>{q.replace('-Q',' Q')}</button>)}
+                      {availYears.map(y=><button key={y} className={`btn btn-xs ${compareB===y?'btn-go':'btn-ghost'}`} onClick={()=>setCompareB(y)}>{y}</button>)}
                     </div>
                   </div>
                 </div>
@@ -2505,9 +2480,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               {(!compareA||!compareB)?(
                 <div className="card"><div className="empty"><div className="empty-ico" style={{fontSize:28}}>⇄</div><p>Select a period on each side above.</p></div></div>
               ):compareA===compareB?(
-                <div style={{padding:'16px',background:'rgba(224,82,82,.08)',border:'1px solid rgba(224,82,82,.2)',borderRadius:6,fontSize:12,color:'#E05252',textAlign:'center'}}>
-                  Select two <strong>different</strong> periods to compare.
-                </div>
+                <div style={{padding:'16px',background:'rgba(224,82,82,.08)',border:'1px solid rgba(224,82,82,.2)',borderRadius:6,fontSize:12,color:'#E05252',textAlign:'center'}}>Select two different periods to compare.</div>
               ):(()=>{
                 const fmtPeriod=(p)=>p.length===7?new Date(p+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'}):p.includes('Q')?p.replace('-Q',' Q'):p;
                 const metrics=[
@@ -2515,91 +2488,121 @@ function PerformancePage({staff,perfData,setPerfData}){
                   {key:'completed',label:'Completed Visits',fmt:v=>v,color:'#6B9FD4',higherBetter:true},
                   {key:'utilization',label:'Utilization %',fmt:v=>v+'%',color:'#44ccaa',higherBetter:true},
                   {key:'noShows',label:'No-Shows',fmt:v=>v,color:'#E05252',higherBetter:false},
-                  {key:'cancellations',label:'Cancellations',fmt:v=>v,color:'#F4DB71',higherBetter:false},
                 ];
                 const clinStaff=staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops');
+
+                // SVG wave/line chart for one metric across all practitioners
+                const WaveChart=({aRows,bRows,staffList,metricKey,colorA,colorB,fmt})=>{
+                  const pts=staffList.map(s=>({
+                    name:s.name.split(' ')[0]+' '+s.name.split(' ').slice(-1)[0],
+                    a:parseFloat(aRows.find(r=>r.staffId===s.id)?.[metricKey])||0,
+                    b:parseFloat(bRows.find(r=>r.staffId===s.id)?.[metricKey])||0,
+                  })).filter(p=>p.a>0||p.b>0);
+                  if(!pts.length)return null;
+                  const maxVal=Math.max(...pts.flatMap(p=>[p.a,p.b]),1);
+                  const W=Math.max(600,pts.length*52);
+                  const H=120;
+                  const PAD={t:16,b:32,l:8,r:8};
+                  const xStep=(W-PAD.l-PAD.r)/(Math.max(pts.length-1,1));
+                  const yOf=(v)=>PAD.t+(1-v/maxVal)*(H-PAD.t-PAD.b);
+                  const xOf=(i)=>PAD.l+i*xStep;
+
+                  // Smooth cubic bezier path
+                  const smoothPath=(values)=>{
+                    if(values.length<2)return`M${xOf(0)},${yOf(values[0])}`;
+                    let d=`M${xOf(0)},${yOf(values[0])}`;
+                    for(let i=1;i<values.length;i++){
+                      const x0=xOf(i-1),y0=yOf(values[i-1]);
+                      const x1=xOf(i),y1=yOf(values[i]);
+                      const cpx=(x0+x1)/2;
+                      d+=` C${cpx},${y0} ${cpx},${y1} ${x1},${y1}`;
+                    }
+                    return d;
+                  };
+
+                  const aVals=pts.map(p=>p.a);
+                  const bVals=pts.map(p=>p.b);
+                  const aPath=smoothPath(aVals);
+                  const bPath=smoothPath(bVals);
+
+                  // Area fill path
+                  const areaPath=(vals,color)=>{
+                    const p=smoothPath(vals);
+                    return p+` L${xOf(vals.length-1)},${H-PAD.b} L${xOf(0)},${H-PAD.b} Z`;
+                  };
+
+                  return(
+                    <div style={{overflowX:'auto',marginTop:8}}>
+                      <svg width={W} height={H} style={{display:'block',overflow:'visible'}}>
+                        {/* Baseline */}
+                        <line x1={PAD.l} y1={H-PAD.b} x2={W-PAD.r} y2={H-PAD.b} stroke="#1e1e1e" strokeWidth="1"/>
+                        {/* Gridlines */}
+                        {[0.25,0.5,0.75].map(f=>(
+                          <line key={f} x1={PAD.l} y1={PAD.t+(1-f)*(H-PAD.t-PAD.b)} x2={W-PAD.r} y2={PAD.t+(1-f)*(H-PAD.t-PAD.b)} stroke="#1a1a1a" strokeWidth="1"/>
+                        ))}
+                        {/* B area + line (previous — behind) */}
+                        <path d={areaPath(bVals)} fill={colorB} opacity="0.04"/>
+                        <path d={bPath} fill="none" stroke={colorB} strokeWidth="1.5" strokeOpacity="0.5" strokeDasharray="4 3"/>
+                        {/* A area + line (current — front) */}
+                        <path d={areaPath(aVals)} fill={colorA} opacity="0.07"/>
+                        <path d={aPath} fill="none" stroke={colorA} strokeWidth="2.5"/>
+                        {/* Dots and labels */}
+                        {pts.map((p,i)=>{
+                          const ax=xOf(i),ay=yOf(p.a);
+                          const bx=xOf(i),by=yOf(p.b);
+                          const diff=p.b?Math.round(((p.a-p.b)/p.b)*100):null;
+                          return(
+                            <g key={i}>
+                              {/* B dot */}
+                              {p.b>0&&<circle cx={bx} cy={by} r="3" fill={colorB} opacity="0.6"/>}
+                              {/* A dot */}
+                              {p.a>0&&<circle cx={ax} cy={ay} r="4" fill={colorA}/>}
+                              {/* Value label above A dot */}
+                              {p.a>0&&<text x={ax} y={ay-8} textAnchor="middle" fontSize="9" fill={colorA} fontWeight="600">{fmt(p.a)}</text>}
+                              {/* Name label at bottom */}
+                              <text x={ax} y={H-PAD.b+14} textAnchor="middle" fontSize="9" fill="#555">{p.name.split(' ')[0]}</text>
+                              {/* % change badge */}
+                              {diff!==null&&p.a>0&&p.b>0&&(
+                                <text x={ax} y={H-PAD.b+24} textAnchor="middle" fontSize="8" fontWeight="700" fill={diff>=0?'#44CCAA':'#E05252'}>{diff>=0?'▲':'▼'}{Math.abs(diff)}%</text>
+                              )}
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                  );
+                };
+
                 return(
                   <div>
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-                      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px'}}>
-                        {fmtPeriod(compareA)} <span style={{color:'#333',fontWeight:400,fontSize:13,margin:'0 8px'}}>vs</span> {fmtPeriod(compareB)}
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+                      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#ddd',letterSpacing:'1px'}}>
+                        {fmtPeriod(compareA)} <span style={{color:'#333',fontWeight:400,fontSize:14,margin:'0 10px'}}>vs</span> {fmtPeriod(compareB)}
                       </div>
-                      <div style={{display:'flex',gap:16,fontSize:11}}>
-                        <span><span style={{color:'#CAE8C1',fontWeight:700}}>●</span> {fmtPeriod(compareA)}</span>
-                        <span><span style={{color:'#6B9FD4',fontWeight:700}}>●</span> {fmtPeriod(compareB)}</span>
+                      <div style={{display:'flex',gap:18,fontSize:11,alignItems:'center'}}>
+                        <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:20,height:2.5,background:'#CAE8C1',borderRadius:2}}/>{fmtPeriod(compareA)}</span>
+                        <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{display:'inline-block',width:20,height:2,background:'#6B9FD4',borderRadius:2,opacity:0.5}}/>{fmtPeriod(compareB)}</span>
                       </div>
                     </div>
                     {metrics.map(({key,label,fmt,color,higherBetter})=>{
-                      const staffWithData=clinStaff.filter(s=>
-                        (compareARows.find(r=>r.staffId===s.id)?.[key]||0)>0||
-                        (compareBRows.find(r=>r.staffId===s.id)?.[key]||0)>0
-                      );
+                      const staffWithData=clinStaff.filter(s=>(compareARows.find(r=>r.staffId===s.id)?.[key]||0)>0||(compareBRows.find(r=>r.staffId===s.id)?.[key]||0)>0);
                       if(!staffWithData.length)return null;
-                      // Sort by This Period value descending
-                      const sorted=[...staffWithData].sort((a,b)=>{
-                        const av=parseFloat(compareARows.find(r=>r.staffId===a.id)?.[key])||0;
-                        const bv=parseFloat(compareARows.find(r=>r.staffId===b.id)?.[key])||0;
-                        return bv-av;
-                      });
-                      const allVals=sorted.flatMap(s=>[
-                        parseFloat(compareARows.find(r=>r.staffId===s.id)?.[key])||0,
-                        parseFloat(compareBRows.find(r=>r.staffId===s.id)?.[key])||0
-                      ]);
-                      const maxVal=Math.max(...allVals,1);
+                      const totalA=staffWithData.reduce((a,s)=>a+(parseFloat(compareARows.find(r=>r.staffId===s.id)?.[key])||0),0);
+                      const totalB=staffWithData.reduce((a,s)=>a+(parseFloat(compareBRows.find(r=>r.staffId===s.id)?.[key])||0),0);
+                      const totalDiff=totalB?Math.round(((totalA-totalB)/totalB)*100):null;
+                      const sorted=[...staffWithData].sort((a,b)=>(parseFloat(compareARows.find(r=>r.staffId===b.id)?.[key])||0)-(parseFloat(compareARows.find(r=>r.staffId===a.id)?.[key])||0));
                       return(
-                        <div key={key} className="perf-slot" style={{marginBottom:12}}>
+                        <div key={key} className="perf-slot" style={{marginBottom:16}}>
                           <div className="perf-slot-head">
                             <span className="perf-slot-title" style={{color}}>{label}</span>
-                            <div style={{fontSize:11,color:'#555'}}>
-                              Clinic total: <span style={{color:'#CAE8C1',fontWeight:700}}>{fmt(sorted.reduce((a,s)=>a+(parseFloat(compareARows.find(r=>r.staffId===s.id)?.[key])||0),0))}</span>
-                              <span style={{margin:'0 6px',color:'#333'}}>→</span>
-                              <span style={{color:'#6B9FD4',fontWeight:700}}>{fmt(sorted.reduce((a,s)=>a+(parseFloat(compareBRows.find(r=>r.staffId===s.id)?.[key])||0),0))}</span>
+                            <div style={{display:'flex',alignItems:'center',gap:12,fontSize:12}}>
+                              <span style={{color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{fmt(totalA)}</span>
+                              <span style={{color:'#555',fontSize:11}}>vs {fmt(totalB)}</span>
+                              {totalDiff!==null&&<span style={{fontSize:11,fontWeight:700,color:higherBetter?(totalDiff>=0?'#44CCAA':'#E05252'):(totalDiff<=0?'#44CCAA':'#E05252'),background:'rgba(255,255,255,.04)',padding:'2px 8px',borderRadius:3}}>{totalDiff>=0?'▲':'▼'}{Math.abs(totalDiff)}% clinic</span>}
                             </div>
                           </div>
-                          <div className="perf-slot-body">
-                            {sorted.map(s=>{
-                              const aVal=parseFloat(compareARows.find(r=>r.staffId===s.id)?.[key])||0;
-                              const bVal=parseFloat(compareBRows.find(r=>r.staffId===s.id)?.[key])||0;
-                              if(!aVal&&!bVal)return null;
-                              const diff=bVal&&aVal?Math.round(((aVal-bVal)/bVal)*100):null;
-                              const improved=higherBetter?diff>0:diff<0;
-                              const W=260,H=6;
-                              return(
-                                <div key={s.id} style={{padding:'10px 0',borderBottom:'1px solid rgba(50,50,50,.4)'}}>
-                                  <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
-                                    <div style={{fontSize:12,fontWeight:600,color:'#ddd',minWidth:150,flexShrink:0}}>
-                                      {s.name.split(' ')[0]} {s.name.split(' ').slice(-1)[0]}
-                                    </div>
-                                    {/* Dot chart — two dots on a scale line */}
-                                    <div style={{flex:1,position:'relative',height:20,minWidth:120}}>
-                                      <div style={{position:'absolute',top:'50%',left:0,right:0,height:1,background:'rgba(255,255,255,.06)',transform:'translateY(-50%)'}}/>
-                                      {/* B dot (previous) */}
-                                      {bVal>0&&<div style={{position:'absolute',top:'50%',left:(bVal/maxVal*100)+'%',transform:'translate(-50%,-50%)',width:8,height:8,borderRadius:'50%',background:'#6B9FD4',opacity:0.7,zIndex:1}}/>}
-                                      {/* A dot (current) */}
-                                      {aVal>0&&<div style={{position:'absolute',top:'50%',left:(aVal/maxVal*100)+'%',transform:'translate(-50%,-50%)',width:10,height:10,borderRadius:'50%',background:'#CAE8C1',zIndex:2,boxShadow:'0 0 0 2px rgba(202,232,193,.2)'}}/>}
-                                      {/* Connector line between dots */}
-                                      {aVal>0&&bVal>0&&(()=>{
-                                        const x1=Math.min(aVal,bVal)/maxVal*100;
-                                        const x2=Math.max(aVal,bVal)/maxVal*100;
-                                        const c=improved?'rgba(68,204,170,.4)':'rgba(224,82,82,.4)';
-                                        return<div style={{position:'absolute',top:'50%',left:x1+'%',width:(x2-x1)+'%',height:2,background:c,transform:'translateY(-50%)',zIndex:0}}/>;
-                                      })()}
-                                    </div>
-                                    {/* Values */}
-                                    <div style={{display:'flex',gap:10,alignItems:'center',flexShrink:0}}>
-                                      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:800,color:'#CAE8C1'}}>{aVal?fmt(aVal):'—'}</span>
-                                      <span style={{fontSize:10,color:'#444'}}>vs</span>
-                                      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:600,color:'#6B9FD4',opacity:0.8}}>{bVal?fmt(bVal):'—'}</span>
-                                      {diff!=null&&aVal&&bVal&&(
-                                        <span style={{fontSize:10,fontWeight:700,color:improved?'#44CCAA':'#E05252',background:improved?'rgba(68,204,170,.1)':'rgba(224,82,82,.1)',padding:'2px 6px',borderRadius:3,minWidth:42,textAlign:'center'}}>
-                                          {diff>0?'▲':'▼'}{Math.abs(diff)}%
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                          <div className="perf-slot-body" style={{paddingTop:8}}>
+                            <WaveChart aRows={compareARows} bRows={compareBRows} staffList={sorted} metricKey={key} colorA="#CAE8C1" colorB="#6B9FD4" fmt={fmt}/>
                           </div>
                         </div>
                       );
