@@ -2050,23 +2050,43 @@ function PerformancePage({staff}){
   const matchStaff=(name)=>{
     if(!name||typeof name!=='string')return null;
     const clean=(s)=>s.toLowerCase()
-      .replace(/^(dr\.\s*)+/,'').replace(/\bkam kei\b/,'winson')
-      .replace(/\bvince\b/,'vincent').replace(/[^a-z\s]/g,'').trim();
+      .replace(/^(dr\.\s*)+/,'')           // remove Dr. prefix(es)
+      .replace(/\bkam kei\b/,'winson')     // Winson's Jane name
+      .replace(/\bvince\b/,'vincent')      // Vince → Vincent
+      .replace(/\bmichael\b/,'mike')       // Michael Ross → Mike Ross
+      .replace(/[-]/g,' ')                 // hyphens to spaces
+      .replace(/[^a-z\s]/g,'')            // remove non-alpha
+      .replace(/\s+/g,' ').trim();
+
     const n=clean(name);
-    // exact
+    // exact after cleaning
     let m=staff.find(s=>clean(s.name)===n);
     if(m)return m;
-    // first+last
+    // first + last name match
     const np=n.split(' ').filter(Boolean);
     m=staff.find(s=>{
       const sp=clean(s.name).split(' ').filter(Boolean);
       return sp[0]===np[0]&&sp[sp.length-1]===np[np.length-1];
     });
     if(m)return m;
-    // last name only
+    // last name only (for longer last names)
     const last=np[np.length-1];
-    m=staff.find(s=>clean(s.name).endsWith(last)&&last.length>3);
-    return m||null;
+    if(last.length>4){
+      m=staff.find(s=>clean(s.name).split(' ').pop()===last);
+      if(m)return m;
+    }
+    // fuzzy last name — handles MacPherson vs MacPhearson
+    if(last.length>5){
+      m=staff.find(s=>{
+        const sl=clean(s.name).split(' ').pop();
+        if(Math.abs(sl.length-last.length)>2)return false;
+        let diff=0;
+        for(let i=0;i<Math.min(sl.length,last.length);i++)if(sl[i]!==last[i])diff++;
+        return diff<=2;
+      });
+      if(m)return m;
+    }
+    return null;
   };
 
   /* ── Aggregate appointments CSV ─────────────── */
@@ -2185,7 +2205,7 @@ function PerformancePage({staff}){
   /* ── Latest snapshot merged with staff ──────── */
   const latestSnap=data.snapshots.length?data.snapshots[data.snapshots.length-1]:null;
   const mergedStaff=useMemo(()=>
-    staff.filter(s=>s.tracks&&s.tracks.length>0).map(s=>{
+    staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops').map(s=>{
       const jr=latestSnap?.rows?.find(r=>r.staffId===s.id);
       const gvaVal=parseFloat(gvaEdits[s.id]!==undefined?gvaEdits[s.id]:data.gva[s.id])||null;
       const retVal=data.retention?.[s.id]||null;
@@ -2360,7 +2380,7 @@ function PerformancePage({staff}){
               <button className="btn btn-lime btn-sm" onClick={saveGVA} disabled={!Object.keys(gvaEdits).length}>{gvaSaved?'✓ Saved':'Save GVA'}</button>
             </div>
             <div className="perf-slot-body">
-              {staff.filter(s=>s.tracks&&s.tracks.length>0).map(s=>{
+              {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops').map(s=>{
                 const roadmapN=parseInt((s.roadmap||'').match(/L(\d)/)?.[1]||'1');
                 const targets=s.tracks?.includes('spa')&&!s.tracks?.includes('clinical')?[6,9,12,18]:[4,6,8,12];
                 const target=targets[Math.min(roadmapN-1,3)];
@@ -2417,7 +2437,7 @@ function PerformancePage({staff}){
               }} disabled={!Object.keys(retentionEdits).length}>{retSaved?'✓ Saved':'Save Retention'}</button>
             </div>
             <div className="perf-slot-body">
-              {staff.filter(s=>s.tracks&&s.tracks.length>0).map(s=>{
+              {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops').map(s=>{
                 const editing=retentionEdits[s.id]!==undefined;
                 const val=editing?retentionEdits[s.id]:((data.retention||{})[s.id]||'');
                 const num=parseFloat(val)||null;
