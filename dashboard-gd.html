@@ -1927,61 +1927,77 @@ function App(){
 /* ══ PERFORMANCE & REVENUE PAGE ══ */
 /* ══ PERFORMANCE & REVENUE PAGE ══ */
 
-// ── Tiny SVG Sparkline ────────────────────────────────────────────────────────
-function Sparkline({values, color, width=120, height=32}){
+function Sparkline({values,color,width=120,height=32}){
   if(!values||values.length<2)return null;
-  const min=Math.min(...values);
-  const max=Math.max(...values);
-  const range=max-min||1;
+  const min=Math.min(...values),max=Math.max(...values),range=max-min||1;
   const pts=values.map((v,i)=>{
     const x=Math.round((i/(values.length-1))*width);
-    const y=Math.round(height-((v-min)/range*(height-4))-2);
-    return`${x},${y}`;
+    const y=Math.round(height-((v-min)/range*(height-6))-3);
+    return x+','+y;
   }).join(' ');
-  const trend=values[values.length-1]>values[0];
-  const tcolor=trend?color:'#E05252';
-  return(
-    <svg width={width} height={height} style={{overflow:'visible'}}>
-      <polyline points={pts} fill="none" stroke={tcolor} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
-      <circle cx={pts.split(' ').pop().split(',')[0]} cy={pts.split(' ').pop().split(',')[1]} r="3" fill={tcolor}/>
-    </svg>
-  );
+  const up=values[values.length-1]>=values[0];
+  const c=up?color:'#E05252';
+  const last=pts.split(' ').pop().split(',');
+  return(<svg width={width} height={height} style={{overflow:'visible'}}>
+    <polyline points={pts} fill="none" stroke={c} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
+    <circle cx={last[0]} cy={last[1]} r="3" fill={c}/>
+  </svg>);
 }
 
-// ── SVG Bar Chart ─────────────────────────────────────────────────────────────
-function MiniBarChart({snapshots, staffId, metric, color, height=80}){
-  if(!snapshots||snapshots.length<1)return null;
-  const vals=snapshots.map(s=>{
+function LineChart({snapshots,staffId,metric,color,label,fmt}){
+  const pts=snapshots.map(s=>{
     const r=s.rows?.find(r=>r.staffId===staffId);
-    return r?parseFloat(r[metric])||0:0;
-  }).filter((_,i)=>snapshots[i].rows?.find(r=>r.staffId===staffId));
-  if(!vals.length)return null;
-  const max=Math.max(...vals)||1;
-  const w=200; const bw=Math.max(8,Math.floor((w-vals.length*3)/vals.length));
+    return r&&r[metric]!=null?{date:s.date,val:parseFloat(r[metric])||0}:null;
+  }).filter(Boolean);
+  if(pts.length<1)return<div style={{fontSize:11,color:'#555',padding:16,textAlign:'center'}}>No {label.toLowerCase()} data yet — import more snapshots to see trends.</div>;
+  if(pts.length===1)return(
+    <div style={{textAlign:'center',padding:20}}>
+      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color}}>{fmt(pts[0].val)}</div>
+      <div style={{fontSize:11,color:'#555',marginTop:4}}>{new Date(pts[0].date+'T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</div>
+      <div style={{fontSize:11,color:'#666',marginTop:8,fontStyle:'italic'}}>Import another snapshot to see a trend line.</div>
+    </div>
+  );
+  const vals=pts.map(p=>p.val);
+  const min=Math.min(...vals),max=Math.max(...vals),range=max-min||1;
+  const W=340,H=90,PAD=10;
+  const coords=pts.map((p,i)=>({
+    x:PAD+Math.round((i/(pts.length-1))*(W-PAD*2)),
+    y:PAD+Math.round((1-(p.val-min)/range)*(H-PAD*2)),
+    val:p.val,date:p.date
+  }));
+  const pathD=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
+  const areaD=pathD+` L${coords[coords.length-1].x},${H+PAD} L${coords[0].x},${H+PAD} Z`;
+  const latest=vals[vals.length-1],prev=vals.length>1?vals[vals.length-2]:null;
+  const delta=prev!=null&&prev!==0?((latest-prev)/prev*100).toFixed(1):null;
+  const up=delta>=0;
   return(
-    <svg width={w} height={height+20} style={{overflow:'visible'}}>
-      {vals.map((v,i)=>{
-        const bh=Math.max(2,Math.round((v/max)*(height-4)));
-        const x=i*(bw+3);
-        const snap=snapshots[i];
-        const label=snap?new Date(snap.date).toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'';
-        return(
+    <div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color,lineHeight:1}}>{fmt(latest)}</span>
+        {delta!=null&&<span style={{fontSize:12,color:up?'#44CCAA':'#E05252',fontWeight:700,background:up?'rgba(68,204,170,.1)':'rgba(224,82,82,.1)',padding:'2px 8px',borderRadius:3}}>{up?'▲':'▼'}{Math.abs(delta)}%</span>}
+      </div>
+      <svg width={W} height={H+PAD*2+18} style={{overflow:'visible',display:'block'}}>
+        <path d={areaD} fill={color} opacity="0.07"/>
+        <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
+        {coords.map((c,i)=>(
           <g key={i}>
-            <rect x={x} y={height-bh} width={bw} height={bh} fill={color} rx="2" opacity="0.85"/>
-            <text x={x+bw/2} y={height+14} textAnchor="middle" fontSize="8" fill="#555">{label}</text>
+            <circle cx={c.x} cy={c.y} r="4" fill={color} opacity="0.9"/>
+            <text x={c.x} y={c.y-8} textAnchor="middle" fontSize="9" fill={color} opacity="0.75">{fmt(c.val)}</text>
+            <text x={c.x} y={H+PAD*2+15} textAnchor="middle" fontSize="8" fill="#555">
+              {new Date(c.date+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}
+            </text>
           </g>
-        );
-      })}
-    </svg>
+        ))}
+        <line x1={PAD} y1={H+PAD} x2={W-PAD} y2={H+PAD} stroke="#2a2a2a" strokeWidth="1"/>
+      </svg>
+    </div>
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
 function PerformancePage({staff}){
-  const storageKey='rvgd3_perf2';
-  // Data shape: { snapshots: [{id, date, rows:[{staffId,name,revenue,utilization,appointments,noShows,cancellations}]}], gva:{staffId:value}, lastImport }
+  const SK='rvgd3_perf3';
   const[data,setData]=useState(()=>{
-    try{const s=localStorage.getItem(storageKey);return s?JSON.parse(s):{snapshots:[],gva:{},lastImport:null};}
+    try{const s=localStorage.getItem(SK);return s?JSON.parse(s):{snapshots:[],gva:{},lastImport:null};}
     catch{return{snapshots:[],gva:{},lastImport:null};}
   });
   const[tab,setTab]=useState('overview');
@@ -1991,17 +2007,13 @@ function PerformancePage({staff}){
   const[gvaEdits,setGvaEdits]=useState({});
   const[gvaSaved,setGvaSaved]=useState(false);
   const[trendStaff,setTrendStaff]=useState(null);
-  const[importDate,setImportDate]=useState(new Date().toISOString().slice(0,10));
+  const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
+  const[retentionEdits,setRetentionEdits]=useState({});
+  const[retSaved,setRetSaved]=useState(false);
 
-  const save=(d)=>{setData(d);try{localStorage.setItem(storageKey,JSON.stringify(d));}catch{}};
+  const save=(d)=>{setData(d);try{localStorage.setItem(SK,JSON.stringify(d));}catch{}};
 
-  // Latest snapshot rows
-  const latestRows=useMemo(()=>{
-    if(!data.snapshots.length)return[];
-    return data.snapshots[data.snapshots.length-1].rows||[];
-  },[data.snapshots]);
-
-  /* ── CSV parser (handles quoted fields) ─────── */
+  /* ── CSV parser ─────────────────────────────── */
   const parseCSV=(text)=>{
     const lines=text.split(/\r?\n/).filter(l=>l.trim());
     if(lines.length<2)return[];
@@ -2009,144 +2021,217 @@ function PerformancePage({staff}){
       const vals=[];let cur='',inQ=false;
       for(const c of line){
         if(c==='"'){inQ=!inQ;}
-        else if(c===','&&!inQ){vals.push(cur.trim().replace(/^"|"$/g,''));cur='';}
+        else if(c===','&&!inQ){vals.push(cur.replace(/^"|"$/g,'').trim());cur='';}
         else cur+=c;
       }
-      vals.push(cur.trim().replace(/^"|"$/g,''));
+      vals.push(cur.replace(/^"|"$/g,'').trim());
       return vals;
     };
     const headers=parseRow(lines[0]).map(h=>h.toLowerCase().trim());
     return lines.slice(1).map(l=>{
       const vals=parseRow(l);
-      const obj={};
-      headers.forEach((h,i)=>obj[h]=vals[i]||'');
+      const obj={};headers.forEach((h,i)=>obj[h]=vals[i]||'');
       return obj;
+    }).filter(r=>Object.values(r).some(v=>v));
+  };
+
+  /* ── Detect file type ───────────────────────── */
+  const detectFileType=(rows)=>{
+    if(!rows.length)return null;
+    const keys=Object.keys(rows[0]).map(k=>k.toLowerCase().trim());
+    const has=(k)=>keys.some(h=>h.includes(k));
+    if(has('staff_member_name')||has('start_at')||has('patient_guid'))return'appointments';
+    if(has('shift total')||has('appointment total hours')||has('shift_total'))return'shift';
+    if(has('staff member')||has('subtotal')||has('collected')||has('income category'))return'sales';
+    return'unknown';
+  };
+
+  /* ── Fuzzy name → staff match ───────────────── */
+  const matchStaff=(name)=>{
+    if(!name||typeof name!=='string')return null;
+    const clean=(s)=>s.toLowerCase()
+      .replace(/^(dr\.\s*)+/,'').replace(/\bkam kei\b/,'winson')
+      .replace(/\bvince\b/,'vincent').replace(/[^a-z\s]/g,'').trim();
+    const n=clean(name);
+    // exact
+    let m=staff.find(s=>clean(s.name)===n);
+    if(m)return m;
+    // first+last
+    const np=n.split(' ').filter(Boolean);
+    m=staff.find(s=>{
+      const sp=clean(s.name).split(' ').filter(Boolean);
+      return sp[0]===np[0]&&sp[sp.length-1]===np[np.length-1];
+    });
+    if(m)return m;
+    // last name only
+    const last=np[np.length-1];
+    m=staff.find(s=>clean(s.name).endsWith(last)&&last.length>3);
+    return m||null;
+  };
+
+  /* ── Aggregate appointments CSV ─────────────── */
+  const aggregateAppointments=(rows)=>{
+    const byStaff={};
+    rows.forEach(r=>{
+      const name=r['staff_member_name']||r['staff member name']||'';
+      if(!name||name==='Guest Experience'||name==='Relax Spa')return;
+      if(!byStaff[name])byStaff[name]={name,completed:0,noShows:0,cancellations:0,rescheduled:0,total:0};
+      const state=(r['state']||'').toLowerCase();
+      byStaff[name].total++;
+      if(state==='arrived')byStaff[name].completed++;
+      else if(state==='no_show')byStaff[name].noShows++;
+      else if(state==='cancelled')byStaff[name].cancellations++;
+      else if(state==='rescheduled')byStaff[name].rescheduled++;
+    });
+    return Object.values(byStaff).map(r=>{
+      const matched=matchStaff(r.name);
+      return{...r,staffId:matched?.id||null,matchedName:matched?.name||null};
     });
   };
 
-  /* ── Column detection (very permissive) ─────── */
-  const detectCols=(rows)=>{
-    if(!rows.length)return null;
-    const keys=Object.keys(rows[0]);
-    const find=(candidates)=>keys.find(k=>candidates.some(c=>k.includes(c)))||null;
-    return{
-      name:    find(['practitioner name','practitioner','provider name','provider','therapist','clinician','staff']),
-      revenue: find(['gross revenue','revenue','billed','amount billed','charge','fee','total revenue','gross']),
-      util:    find(['utilization','util','booked %','booking rate','occupancy']),
-      appts:   find(['appointments','appointment count','total appointments','appts','bookings','visits','total visits']),
-      noshow:  find(['no show','no-show','no shows','noshow','missed']),
-      cancel:  find(['cancelled','cancellation','cancel','canceled']),
+  /* ── Parse shift report ─────────────────────── */
+  const parseShiftReport=(rows)=>{
+    return rows.map(r=>{
+      const name=r['staff name']||r['name']||Object.values(r)[0]||'';
+      if(!name||name==='Guest Experience'||name==='Relax Spa')return null;
+      const apptHrs=parseFloat(r['appointment total hours']||r['appointment_total_hours']||0)||0;
+      const shiftHrs=parseFloat(r['shift total hours']||r['shift_total_hours']||0)||0;
+      const apptCount=parseInt(r['appointment total count']||r['appointment_total_count']||0)||0;
+      const util=shiftHrs>0?Math.round((apptHrs/shiftHrs)*100):null;
+      const matched=matchStaff(name);
+      return{name,staffId:matched?.id||null,matchedName:matched?.name||null,
+        utilization:util,appointments:apptCount,appointmentHours:apptHrs,shiftHours:shiftHrs};
+    }).filter(Boolean).filter(r=>r.name);
+  };
+
+  /* ── Parse sales/revenue CSV ────────────────── */
+  const parseSalesReport=(rows)=>{
+    // Normalize column names (Jane exports with leading spaces)
+    const norm=(r)=>{
+      const out={};
+      Object.entries(r).forEach(([k,v])=>out[k.toLowerCase().trim()]=v?.toString().trim()||'');
+      return out;
     };
+    const byStaff={};
+    rows.forEach(row=>{
+      const r=norm(row);
+      const name=r['staff member']||r['staff_member']||'';
+      if(!name||name==='Guest Experience'||name==='Relax Spa'||name==='')return;
+      const status=r['status']||'';
+      if(status!=='paid')return; // only count paid
+      const category=(r['income category']||r['income_category']||'').toLowerCase();
+      if(category.includes('product'))return; // skip product sales, only treatment
+      const collected=parseFloat((r['collected']||'0').replace(/[$,]/g,''))||0;
+      if(!byStaff[name])byStaff[name]={name,revenue:0,invoices:0};
+      byStaff[name].revenue+=collected;
+      byStaff[name].invoices++;
+    });
+    return Object.values(byStaff).map(r=>{
+      const matched=matchStaff(r.name);
+      return{...r,revenue:Math.round(r.revenue*100)/100,staffId:matched?.id||null,matchedName:matched?.name||null};
+    }).filter(r=>r.revenue>0);
   };
 
-  /* ── Fuzzy name match to staff ──────────────── */
-  const matchToStaff=(name)=>{
-    if(!name)return null;
-    const n=name.toLowerCase().replace(/[^a-z\s]/g,'').trim();
-    return staff.find(s=>{
-      const sn=s.name.toLowerCase().replace(/[^a-z\s]/g,'').trim();
-      if(sn===n||sn.includes(n)||n.includes(sn))return true;
-      const [sf,...sl]=sn.split(' ');const [nf,...nl]=n.split(' ');
-      return sf===nf&&sl.pop()===nl.pop();
-    })||null;
-  };
-
-  /* ── Process and save imported CSV ─────────── */
+  /* ── Handle file upload ─────────────────────── */
   const handleFile=async(file)=>{
-    if(!file||!file.name.endsWith('.csv')){
-      setImportMsg({type:'error',msg:'Please upload a .csv file exported from Jane.'});
-      return;
-    }
+    if(!file||!file.name.endsWith('.csv')){setImportMsg({type:'error',msg:'Please upload a .csv file from Jane.'});return;}
     setImporting(true);setImportMsg(null);
     try{
       const text=await file.text();
       const rows=parseCSV(text);
-      if(!rows.length){setImportMsg({type:'error',msg:'File appears empty or unreadable.'});setImporting(false);return;}
+      if(!rows.length){setImportMsg({type:'error',msg:'File is empty or unreadable.'});setImporting(false);return;}
+      const type=detectFileType(rows);
+      let parsed=[];
+      if(type==='appointments'){
+        parsed=aggregateAppointments(rows);
+      }else if(type==='shift'){
+        parsed=parseShiftReport(rows);
+      }else if(type==='sales'){
+        parsed=parseSalesReport(rows);
+      }else{
+        setImportMsg({type:'error',msg:'Could not identify this file type. Columns found: '+Object.keys(rows[0]).join(', ')});
+        setImporting(false);return;
+      }
+      if(!parsed.length){setImportMsg({type:'error',msg:'No practitioner rows found after parsing.'});setImporting(false);return;}
 
-      const cols=detectCols(rows);
-      if(!cols.name){setImportMsg({type:'error',msg:'Could not find a practitioner name column. Make sure this is a Jane Appointments or Utilization report.'});setImporting(false);return;}
+      const matched=parsed.filter(r=>r.staffId).length;
+      const unmatched=parsed.filter(r=>!r.staffId).map(r=>r.name);
 
-      const parsed=rows.map(r=>{
-        const name=r[cols.name]?.trim();
-        if(!name)return null;
-        const pn=(k)=>{if(!k||!r[k])return null;const v=r[k].replace(/[$,%\s]/g,'');return parseFloat(v)||null;};
-        const matched=matchToStaff(name);
-        return{
-          name,
-          staffId:matched?.id||null,
-          revenue:pn(cols.revenue),
-          utilization:pn(cols.util),
-          appointments:pn(cols.appts),
-          noShows:pn(cols.noshow),
-          cancellations:pn(cols.cancel),
-        };
-      }).filter(r=>r&&r.name);
+      // Merge with existing snapshot for same date if exists
+      const existingIdx=data.snapshots.findIndex(s=>s.date===snapDate);
+      let newSnapshots=[...data.snapshots];
+      if(existingIdx>=0){
+        // Merge rows
+        const existing=newSnapshots[existingIdx];
+        const mergedRows=[...existing.rows];
+        parsed.forEach(nr=>{
+          const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
+          if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
+          else mergedRows.push(nr);
+        });
+        newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
+      }else{
+        newSnapshots=[...newSnapshots,{id:'snap_'+Date.now(),date:snapDate,rows:parsed,files:[file.name],type}].slice(-24);
+      }
 
-      if(!parsed.length){setImportMsg({type:'error',msg:'No practitioner rows found. Check the CSV format.'});setImporting(false);return;}
-
-      const matchedCount=parsed.filter(r=>r.staffId).length;
-      const newSnapshot={id:'snap_'+Date.now(),date:importDate,rows:parsed,filename:file.name};
-
-      // Keep up to 24 snapshots (2 years of monthly imports)
-      const newSnapshots=[...data.snapshots,newSnapshot].slice(-24);
-      const updated={...data,snapshots:newSnapshots,lastImport:new Date().toISOString()};
-      save(updated);
-      setImportMsg({type:'success',msg:`✓ Imported ${parsed.length} practitioners (${matchedCount} matched to staff profiles) from ${file.name}. Saved as snapshot for ${importDate}.`});
-    }catch(e){
-      setImportMsg({type:'error',msg:'Error reading file: '+e.message});
-    }
+      save({...data,snapshots:newSnapshots,lastImport:new Date().toISOString()});
+      let msg=`✓ ${type==='appointments'?'Appointments':'Shift'} report imported — ${parsed.length} practitioners, ${matched} matched to staff profiles.`;
+      if(unmatched.length)msg+=` Unmatched: ${unmatched.slice(0,5).join(', ')}${unmatched.length>5?' +'+( unmatched.length-5)+' more':''}`;
+      setImportMsg({type:'success',msg});
+    }catch(e){setImportMsg({type:'error',msg:'Error: '+e.message});}
     setImporting(false);
   };
 
-  /* ── Merged view: latest Jane + GVA + staff ── */
+  /* ── Latest snapshot merged with staff ──────── */
+  const latestSnap=data.snapshots.length?data.snapshots[data.snapshots.length-1]:null;
   const mergedStaff=useMemo(()=>
     staff.filter(s=>s.tracks&&s.tracks.length>0).map(s=>{
-      const jr=latestRows.find(r=>r.staffId===s.id)||latestRows.find(r=>{
-        const rn=(r.name||'').toLowerCase().replace(/[^a-z\s]/g,'').trim();
-        const sn=s.name.toLowerCase().replace(/[^a-z\s]/g,'').trim();
-        return rn===sn;
-      });
+      const jr=latestSnap?.rows?.find(r=>r.staffId===s.id);
       const gvaVal=parseFloat(gvaEdits[s.id]!==undefined?gvaEdits[s.id]:data.gva[s.id])||null;
-      return{...s, revenue:jr?.revenue||null, utilization:jr?.utilization||null,
-        appointments:jr?.appointments||null, noShows:jr?.noShows||null,
-        cancellations:jr?.cancellations||null, gva:gvaVal};
+      const retVal=data.retention?.[s.id]||null;
+      return{...s,
+        completed:jr?.completed||null,utilization:jr?.utilization||null,
+        appointments:jr?.appointments||null,noShows:jr?.noShows||null,
+        cancellations:jr?.cancellations||null,rescheduled:jr?.rescheduled||null,
+        revenue:jr?.revenue||null,
+        gva:gvaVal,retention:retVal};
     })
-  ,[staff,latestRows,data.gva,gvaEdits]);
+  ,[staff,latestSnap,data.gva,data.retention,gvaEdits]);
 
-  const withRev  =mergedStaff.filter(s=>s.revenue!==null).sort((a,b)=>b.revenue-a.revenue);
-  const withUtil =mergedStaff.filter(s=>s.utilization!==null).sort((a,b)=>b.utilization-a.utilization);
-  const withGva  =mergedStaff.filter(s=>s.gva!==null).sort((a,b)=>b.gva-a.gva);
-  const maxRev   =withRev[0]?.revenue||1;
-  const maxGva   =Math.max(...withGva.map(s=>s.gva),1);
+  const withUtil  =mergedStaff.filter(s=>s.utilization!=null).sort((a,b)=>b.utilization-a.utilization);
+  const withAppts =mergedStaff.filter(s=>s.completed!=null).sort((a,b)=>b.completed-a.completed);
+  const withGva   =mergedStaff.filter(s=>s.gva!=null).sort((a,b)=>b.gva-a.gva);
+  const withRet   =mergedStaff.filter(s=>s.retention!=null).sort((a,b)=>b.retention-a.retention);
+  const withRev   =mergedStaff.filter(s=>s.revenue!=null).sort((a,b)=>b.revenue-a.revenue);
+  const maxUtil=100,maxAppts=withAppts[0]?.completed||1,maxGva=Math.max(...withGva.map(s=>s.gva),1),maxRev=withRev[0]?.revenue||1;
 
-  const totalRev =withRev.reduce((a,s)=>a+(s.revenue||0),0);
-  const avgUtil  =withUtil.length?Math.round(withUtil.reduce((a,s)=>a+s.utilization,0)/withUtil.length):null;
-  const avgGva   =withGva.length?Math.round(withGva.reduce((a,s)=>a+(s.gva||0),0)/withGva.length*10)/10:null;
-  const fmtRev   =(v)=>v>=1000?'$'+(v/1000).toFixed(1)+'k':'$'+Math.round(v);
+  const avgUtil=withUtil.length?Math.round(withUtil.reduce((a,s)=>a+s.utilization,0)/withUtil.length):null;
+  const avgGva=withGva.length?Math.round(withGva.reduce((a,s)=>a+(s.gva||0),0)/withGva.length*10)/10:null;
+  const totalCompleted=withAppts.reduce((a,s)=>a+(s.completed||0),0);
+  const totalRev=withRev.reduce((a,s)=>a+(s.revenue||0),0);
 
-  /* ── GVA save ────────────────────────────────── */
+  const fmtRev=(v)=>v>=1000?'$'+(v/1000).toFixed(1)+'k':'$'+Math.round(v);
+
+  const getTrend=(sId,metric)=>data.snapshots.map(snap=>{
+    const r=snap.rows?.find(r=>r.staffId===sId);
+    return{date:snap.date,val:r?parseFloat(r[metric])||null:null};
+  }).filter(d=>d.val!=null);
+
   const saveGVA=()=>{
-    const newGva={...data.gva};
-    Object.entries(gvaEdits).forEach(([k,v])=>{if(v!=='')newGva[k]=parseFloat(v)||0;});
-    save({...data,gva:newGva});
-    setGvaEdits({});
-    setGvaSaved(true);
+    const ng={...data.gva};
+    Object.entries(gvaEdits).forEach(([k,v])=>{if(v!=='')ng[k]=parseFloat(v)||0;});
+    save({...data,gva:ng});setGvaEdits({});setGvaSaved(true);
     setTimeout(()=>setGvaSaved(false),2000);
   };
 
-  /* ── Trend data for a staff member ──────────── */
-  const getTrend=(staffId,metric)=>
-    data.snapshots.map(snap=>{
-      const r=snap.rows?.find(r=>r.staffId===staffId);
-      return{date:snap.date,val:r?parseFloat(r[metric])||null:null};
-    }).filter(d=>d.val!==null);
-
-  /* ── Bar row component ───────────────────────── */
-  const BarRow=({label,value,max,color,sub,onClick})=>(
-    <div className="perf-bar-row" style={{cursor:onClick?'pointer':'default'}} onClick={onClick}>
-      <div className="perf-bar-name">{label}</div>
-      <div className="perf-bar-track"><div className="perf-bar-fill" style={{width:Math.min(100,(value/max)*100)+'%',background:color}}/></div>
-      <div className="perf-bar-val" style={{color}}>{sub||value}</div>
+  const BarRow=({s,val,max,color,sub,metric})=>(
+    <div className="perf-bar-row" style={{cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+      <div className="perf-bar-name">{s.name.split(' ')[0]} {s.name.split(' ').slice(-1)[0]}</div>
+      <div className="perf-bar-track"><div className="perf-bar-fill" style={{width:Math.min(100,(val/max)*100)+'%',background:color}}/></div>
+      <div className="flex aic g8">
+        <div className="perf-bar-val" style={{color}}>{sub||val}</div>
+        {(()=>{const t=getTrend(s.id,metric);return t.length>1?<Sparkline values={t.map(d=>d.val)} color={color} width={60} height={20}/>:null;})()}
+      </div>
     </div>
   );
 
@@ -2156,20 +2241,20 @@ function PerformancePage({staff}){
       <div className="flex aic jsb" style={{marginBottom:14}}>
         <div>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#aaa',marginBottom:3}}>Performance & Revenue</div>
-          <div style={{fontSize:12,color:'#555'}}>Jane CSV data · GVA tracking · trend charts · {data.snapshots.length} snapshot{data.snapshots.length!==1?'s':''} stored</div>
+          <div style={{fontSize:12,color:'#555'}}>Jane data (Appointments + Shift reports) · GVA · Retention · {data.snapshots.length} snapshot{data.snapshots.length!==1?'s':''} stored</div>
         </div>
         <div className="flex aic g5" style={{flexWrap:'wrap'}}>
-          {[['overview','▣ Overview'],['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['gva','📈 GVA'],['trends','↗ Trends'],['import','📂 Jane Import']].map(([k,l])=>(
+          {[['overview','▣ Overview'],['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['appointments','📋 Appointments'],['gva','📈 GVA'],['retention','🔄 Retention'],['trends','↗ Trends'],['import','📂 Jane Import']].map(([k,l])=>(
             <button key={k} className={`btn btn-sm ${tab===k?'btn-go':'btn-ghost'}`} onClick={()=>setTab(k)}>{l}</button>
           ))}
         </div>
       </div>
 
-      {/* Stats bar */}
+      {/* Stats */}
       <div className="sg4" style={{marginBottom:14}}>
-        <div className="sc lime"><div className="sc-lbl">Total Revenue</div><div className="sc-val">{totalRev?fmtRev(totalRev):'—'}</div><div className="sc-sub">{withRev.length} practitioners</div></div>
-        <div className="sc go"><div className="sc-lbl">Avg Utilization</div><div className="sc-val">{avgUtil!==null?avgUtil+'%':'—'}</div><div className="sc-sub">{withUtil.length} tracked</div></div>
-        <div className="sc yellow"><div className="sc-lbl">Avg GVA</div><div className="sc-val">{avgGva!==null?avgGva:'—'}</div><div className="sc-sub">365-day rolling</div></div>
+        <div className="sc go"><div className="sc-lbl">Avg Utilization</div><div className="sc-val">{avgUtil!=null?avgUtil+'%':'—'}</div><div className="sc-sub">{withUtil.length} tracked</div></div>
+        <div className="sc lime"><div className="sc-lbl">Completed Visits</div><div className="sc-val">{totalCompleted||'—'}</div><div className="sc-sub">{withAppts.length} practitioners</div></div>
+        <div className="sc yellow"><div className="sc-lbl">Avg GVA</div><div className="sc-val">{avgGva||'—'}</div><div className="sc-sub">365-day rolling</div></div>
         <div className="sc gray"><div className="sc-lbl">Snapshots</div><div className="sc-val">{data.snapshots.length}</div><div className="sc-sub">{data.lastImport?new Date(data.lastImport).toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'No imports yet'}</div></div>
       </div>
 
@@ -2177,32 +2262,20 @@ function PerformancePage({staff}){
       {tab==='overview'&&(
         <div className="grid2">
           <div className="perf-slot">
-            <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#CAE8C1'}}>Revenue</span>{!withRev.length&&<span style={{fontSize:11,color:'#555'}}>Import Jane CSV →</span>}</div>
-            <div className="perf-slot-body">{withRev.length?withRev.slice(0,10).map(s=><BarRow key={s.id} label={s.name.split(' ')[0]+' '+s.name.split(' ').slice(-1)[0]} value={s.revenue} max={maxRev} color="#CAE8C1" sub={fmtRev(s.revenue)} onClick={()=>{setTrendStaff(s);setTab('trends');}}/>):<div className="empty" style={{padding:24}}><div className="empty-ico">💰</div><p>Import a Jane CSV to see revenue.</p></div>}</div>
+            <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#CAE8C1'}}>Revenue</span>{!withRev.length&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('import')}>Import →</button>}</div>
+            <div className="perf-slot-body">{withRev.length?withRev.slice(0,12).map(s=><BarRow key={s.id} s={s} val={s.revenue} max={maxRev} color="#CAE8C1" sub={fmtRev(s.revenue)} metric="revenue"/>):<div className="empty" style={{padding:24}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue.</p></div>}</div>
+          </div>
+          <div className="perf-slot">
+            <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#44ccaa'}}>Utilization %</span>{!withUtil.length&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('import')}>Import →</button>}</div>
+            <div className="perf-slot-body">{withUtil.length?withUtil.slice(0,12).map(s=>{const c=s.utilization>=85?'#CAE8C1':s.utilization>=75?'#44ccaa':s.utilization>=65?'#F4DB71':'#E05252';return<BarRow key={s.id} s={s} val={s.utilization} max={100} color={c} sub={s.utilization+'%'} metric="utilization"/>}):<div className="empty" style={{padding:24}}><div className="empty-ico">⏱</div><p>Import a Shift Report CSV to see utilization.</p></div>}</div>
+          </div>
+          <div className="perf-slot">
+            <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#6B9FD4'}}>Completed Visits</span>{!withAppts.length&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('import')}>Import →</button>}</div>
+            <div className="perf-slot-body">{withAppts.length?withAppts.slice(0,12).map(s=><BarRow key={s.id} s={s} val={s.completed} max={maxAppts} color="#6B9FD4" metric="completed"/>):<div className="empty" style={{padding:24}}><div className="empty-ico">📋</div><p>Import an Appointments CSV to see visit counts.</p></div>}</div>
           </div>
           <div className="perf-slot">
             <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#F4DB71'}}>GVA</span><button className="btn btn-ghost btn-xs" onClick={()=>setTab('gva')}>Edit →</button></div>
-            <div className="perf-slot-body">{withGva.length?withGva.map(s=>{const t=s.roadmap?.includes('L1')?4:s.roadmap?.includes('L2')?6:s.roadmap?.includes('L3')?8:12;const c=s.gva>=t?'#CAE8C1':s.gva>=t*.75?'#F4DB71':'#E05252';return<BarRow key={s.id} label={s.name.split(' ')[0]+' '+s.name.split(' ').slice(-1)[0]} value={s.gva} max={maxGva} color={c} onClick={()=>{setTrendStaff(s);setTab('trends');}}/>}):<div className="empty" style={{padding:24}}><div className="empty-ico">📈</div><p>Enter GVA values in the GVA tab.</p></div>}</div>
-          </div>
-          <div className="perf-slot">
-            <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#44ccaa'}}>Utilization %</span>{!withUtil.length&&<span style={{fontSize:11,color:'#555'}}>Import Jane CSV →</span>}</div>
-            <div className="perf-slot-body">{withUtil.length?withUtil.map(s=>{const c=s.utilization>=85?'#CAE8C1':s.utilization>=75?'#44ccaa':s.utilization>=65?'#F4DB71':'#E05252';return<BarRow key={s.id} label={s.name.split(' ')[0]+' '+s.name.split(' ').slice(-1)[0]} value={s.utilization} max={100} color={c} sub={s.utilization+'%'} onClick={()=>{setTrendStaff(s);setTab('trends');}}/>}):<div className="empty" style={{padding:24}}><div className="empty-ico">⏱</div><p>Import a Jane CSV to see utilization.</p></div>}</div>
-          </div>
-          <div className="perf-slot">
-            <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#aaa'}}>Full Snapshot</span></div>
-            <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
-              <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{['Name','Rev','Util','Appts','N/S','GVA'].map(h=><th key={h} style={{padding:'6px 9px',textAlign:h==='Name'?'left':'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.2px',textTransform:'uppercase',color:'#666',fontWeight:600}}>{h}</th>)}</tr></thead>
-              <tbody>{mergedStaff.map(s=>(
-                <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
-                  <td style={{padding:'6px 9px',color:'#ddd',fontSize:12}}>{s.name}</td>
-                  <td style={{padding:'6px 9px',textAlign:'right',color:s.revenue?'#CAE8C1':'#333',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{s.revenue?fmtRev(s.revenue):'—'}</td>
-                  <td style={{padding:'6px 9px',textAlign:'right',color:s.utilization?s.utilization>=75?'#44ccaa':'#F4DB71':'#333',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{s.utilization?s.utilization+'%':'—'}</td>
-                  <td style={{padding:'6px 9px',textAlign:'right',color:'#888'}}>{s.appointments||'—'}</td>
-                  <td style={{padding:'6px 9px',textAlign:'right',color:s.noShows>5?'#E05252':'#888'}}>{s.noShows||'—'}</td>
-                  <td style={{padding:'6px 9px',textAlign:'right',color:s.gva?'#F4DB71':'#333',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{s.gva||'—'}</td>
-                </tr>
-              ))}</tbody>
-            </table></div>
+            <div className="perf-slot-body">{withGva.length?withGva.map(s=>{const t=s.roadmap?.includes('L1')?4:s.roadmap?.includes('L2')?6:s.roadmap?.includes('L3')?8:12;const c=s.gva>=t?'#CAE8C1':s.gva>=t*.75?'#F4DB71':'#E05252';return<BarRow key={s.id} s={s} val={s.gva} max={maxGva} color={c} metric="gva_val"/>}):<div className="empty" style={{padding:24}}><div className="empty-ico">📈</div><p>Enter GVA values in the GVA tab.</p></div>}</div>
           </div>
         </div>
       )}
@@ -2210,63 +2283,92 @@ function PerformancePage({staff}){
       {/* ── REVENUE ── */}
       {tab==='revenue'&&(
         <div className="perf-slot">
-          <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#CAE8C1'}}>Revenue by Practitioner</span></div>
+          <div className="perf-slot-head">
+            <span className="perf-slot-title" style={{color:'#CAE8C1'}}>Revenue by Practitioner</span>
+            {totalRev>0&&<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#CAE8C1'}}>Total: {fmtRev(totalRev)}</span>}
+          </div>
           <div className="perf-slot-body">{withRev.length?withRev.map(s=>(
-            <div key={s.id} className="perf-bar-row" style={{padding:'10px 0',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+            <div key={s.id} className="perf-bar-row" style={{padding:'9px 0',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
               <div style={{minWidth:180}}><div style={{fontSize:13,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:11,color:'#555',marginTop:2}}>{s.site}</div></div>
-              <div className="perf-bar-track" style={{height:7}}><div className="perf-bar-fill" style={{width:(s.revenue/maxRev*100)+'%',background:'#CAE8C1'}}/></div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#CAE8C1',minWidth:80,textAlign:'right'}}>{fmtRev(s.revenue)}</div>
-              <div style={{marginLeft:8}}>{(()=>{const t=getTrend(s.id,'revenue');return t.length>1?<Sparkline values={t.map(d=>d.val)} color="#CAE8C1"/>:null;})()}</div>
+              <div className="perf-bar-track" style={{height:6}}><div className="perf-bar-fill" style={{width:(s.revenue/maxRev*100)+'%',background:'#CAE8C1'}}/></div>
+              <div style={{display:'flex',alignItems:'center',gap:8,minWidth:120,justifyContent:'flex-end'}}>
+                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(s.revenue)}</span>
+                {(()=>{const t=getTrend(s.id,'revenue');return t.length>1?<Sparkline values={t.map(d=>d.val)} color="#CAE8C1" width={60} height={20}/>:null;})()}
+              </div>
             </div>
-          )):<div className="empty" style={{padding:40}}><div className="empty-ico">💰</div><p>No revenue data. Import a Jane CSV.</p></div>}</div>
+          )):<div className="empty" style={{padding:40}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue data.</p></div>}</div>
         </div>
       )}
 
       {/* ── UTILIZATION ── */}
       {tab==='utilization'&&(
         <div className="perf-slot">
-          <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#44ccaa'}}>Utilization %</span><span style={{fontSize:11,color:'#555'}}>65% min · 75% good · 85%+ strong</span></div>
+          <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#44ccaa'}}>Utilization % — from Shift Report</span><span style={{fontSize:11,color:'#555'}}>65% min · 75% good · 85%+ strong</span></div>
           <div className="perf-slot-body">{withUtil.length?withUtil.map(s=>{
             const c=s.utilization>=85?'#CAE8C1':s.utilization>=75?'#44ccaa':s.utilization>=65?'#F4DB71':'#E05252';
             const lbl=s.utilization>=85?'Strong':s.utilization>=75?'Good':s.utilization>=65?'Developing':'Below';
-            const t=getTrend(s.id,'utilization');
             return(
-              <div key={s.id} className="perf-bar-row" style={{padding:'10px 0',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+              <div key={s.id} className="perf-bar-row" style={{padding:'9px 0',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
                 <div style={{minWidth:180}}><div style={{fontSize:13,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:11,color:'#555',marginTop:2}}>{s.site}</div></div>
-                <div className="perf-bar-track" style={{height:7}}><div className="perf-bar-fill" style={{width:s.utilization+'%',background:c}}/></div>
-                <div style={{minWidth:120,textAlign:'right',display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}>
+                <div className="perf-bar-track" style={{height:6}}><div className="perf-bar-fill" style={{width:s.utilization+'%',background:c}}/></div>
+                <div style={{display:'flex',alignItems:'center',gap:8,minWidth:130,justifyContent:'flex-end'}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:c}}>{s.utilization}%</span>
                   <span style={{fontSize:9,background:c+'22',color:c,border:'1px solid '+c+'44',borderRadius:3,padding:'2px 5px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{lbl}</span>
+                  {(()=>{const t=getTrend(s.id,'utilization');return t.length>1?<Sparkline values={t.map(d=>d.val)} color={c} width={60} height={20}/>:null;})()}
                 </div>
-                {t.length>1&&<Sparkline values={t.map(d=>d.val)} color={c}/>}
               </div>
             );
-          }):<div className="empty" style={{padding:40}}><div className="empty-ico">⏱</div><p>No utilization data. Import a Jane CSV.</p></div>}</div>
+          }):<div className="empty" style={{padding:40}}><div className="empty-ico">⏱</div><p>Import a Shift Report CSV to see utilization data.</p></div>}</div>
         </div>
       )}
 
-      {/* ── GVA INPUT ── */}
+      {/* ── APPOINTMENTS ── */}
+      {tab==='appointments'&&(
+        <div className="perf-slot">
+          <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#CAE8C1'}}>Appointments — from Appointments CSV</span></div>
+          <div className="perf-slot-body">{withAppts.length?(
+            <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+              <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{['Practitioner','Completed','No-Shows','Cancellations','Rescheduled','Cancel Rate'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:h==='Practitioner'?'left':'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1px',textTransform:'uppercase',color:'#666',fontWeight:600}}>{h}</th>)}</tr></thead>
+              <tbody>{withAppts.map(s=>{
+                const total=(s.completed||0)+(s.noShows||0)+(s.cancellations||0)+(s.rescheduled||0);
+                const cancelRate=total>0?Math.round(((s.cancellations||0)/total)*100):0;
+                return(
+                  <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+                    <td style={{padding:'8px 10px'}}><div style={{fontSize:13,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:11,color:'#555'}}>{s.site}</div></td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.completed||0}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:(s.noShows||0)>8?'#E05252':'#888'}}>{s.noShows||0}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:(s.cancellations||0)>15?'#F4DB71':'#888'}}>{s.cancellations||0}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:'#888'}}>{s.rescheduled||0}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:cancelRate>15?'#E05252':cancelRate>10?'#F4DB71':'#44ccaa',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{cancelRate}%</td>
+                  </tr>
+                );
+              })}</tbody>
+            </table></div>
+          ):<div className="empty" style={{padding:40}}><div className="empty-ico">📋</div><p>Import an Appointments CSV to see per-practitioner breakdown.</p></div>}</div>
+        </div>
+      )}
+
+      {/* ── GVA ── */}
       {tab==='gva'&&(
         <div>
           <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:12,color:'#aaa',lineHeight:1.7}}>
-            <strong style={{color:'var(--lime)'}}>GVA (Guest Visit Average)</strong> — Rolling 365-day average visits per active guest. Manually entered. Targets: Clinical L1 ≥4 · L2 ≥6 · L3 ≥8 · L4 ≥12 · Spa L1 ≥6 · L2 ≥9 · L3 ≥12 · L4 ≥18
+            <strong style={{color:'var(--lime)'}}>GVA (Guest Visit Average)</strong> — Rolling 365-day average visits per active guest. Manually entered. Targets vary by track and level: Clinical L1 ≥4 · L2 ≥6 · L3 ≥8 · L4 ≥12
           </div>
           <div className="perf-slot">
             <div className="perf-slot-head">
-              <span className="perf-slot-title" style={{color:'#F4DB71'}}>GVA — Manual Input</span>
+              <span className="perf-slot-title" style={{color:'#F4DB71'}}>GVA — Manual Entry</span>
               <button className="btn btn-lime btn-sm" onClick={saveGVA} disabled={!Object.keys(gvaEdits).length}>{gvaSaved?'✓ Saved':'Save GVA'}</button>
             </div>
             <div className="perf-slot-body">
               {staff.filter(s=>s.tracks&&s.tracks.length>0).map(s=>{
-                const isSpa=s.tracks?.includes('spa')&&!s.tracks?.includes('clinical');
-                const roadmapN=s.roadmap?.match(/L(\d)/)?parseInt(s.roadmap.match(/L(\d)/)[1]):1;
-                const targets=isSpa?[6,9,12,18]:[4,6,8,12];
+                const roadmapN=parseInt((s.roadmap||'').match(/L(\d)/)?.[1]||'1');
+                const targets=s.tracks?.includes('spa')&&!s.tracks?.includes('clinical')?[6,9,12,18]:[4,6,8,12];
                 const target=targets[Math.min(roadmapN-1,3)];
                 const editing=gvaEdits[s.id]!==undefined;
                 const val=editing?gvaEdits[s.id]:(data.gva[s.id]||'');
                 const num=parseFloat(val)||null;
                 const c=num?num>=target?'#CAE8C1':num>=target*.75?'#F4DB71':'#E05252':'#555';
-                const trend=getTrend(s.id,'gva_snapshot');
+                const trend=getTrend(s.id,'gva_val');
                 return(
                   <div key={s.id} className="gva-input-row">
                     <div style={{flex:1,display:'flex',alignItems:'center',gap:10}}>
@@ -2277,10 +2379,11 @@ function PerformancePage({staff}){
                       </div>
                     </div>
                     <div style={{display:'flex',alignItems:'center',gap:10}}>
-                      {num&&<div style={{height:4,width:70,background:'var(--surface3)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:c,width:Math.min(100,num/18*100)+'%'}}/></div>}
+                      {trend.length>1&&<Sparkline values={trend.map(d=>d.val)} color={c} width={60} height={20}/>}
+                      {num&&<div style={{height:4,width:60,background:'var(--surface3)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:c,width:Math.min(100,num/16*100)+'%'}}/></div>}
                       <input type="number" min="0" max="50" step="0.1" value={val} placeholder="—"
                         onChange={e=>setGvaEdits(p=>({...p,[s.id]:e.target.value}))}
-                        style={{width:65,textAlign:'center',background:'var(--surface3)',border:'1px solid',borderColor:editing?'var(--go)':'var(--border2)',borderRadius:5,color:num?c:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,padding:'5px 0',outline:'none'}}/>
+                        style={{width:62,textAlign:'center',background:'var(--surface3)',border:'1px solid',borderColor:editing?'var(--go)':'var(--border2)',borderRadius:5,color:num?c:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,padding:'5px 0',outline:'none'}}/>
                       {num&&<span style={{fontSize:10,background:c+'18',color:c,border:'1px solid '+c+'33',borderRadius:3,padding:'2px 7px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,minWidth:64,textAlign:'center'}}>{num>=target?'On Target':'Below'}</span>}
                     </div>
                   </div>
@@ -2297,145 +2400,127 @@ function PerformancePage({staff}){
         </div>
       )}
 
+      {/* ── RETENTION ── */}
+      {tab==='retention'&&(
+        <div>
+          <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:12,color:'#aaa',lineHeight:1.7}}>
+            <strong style={{color:'var(--lime)'}}>Retention %</strong> — Manually enter each practitioner's member retention rate. Pull this from Jane's Member Retention report (Reports → Member Retention → filter by staff). Target: ≥75% good · ≥85% strong.
+          </div>
+          <div className="perf-slot">
+            <div className="perf-slot-head">
+              <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — Manual Entry</span>
+              <button className="btn btn-lime btn-sm" onClick={()=>{
+                const nr={...data.retention||{}};
+                Object.entries(retentionEdits).forEach(([k,v])=>{if(v!=='')nr[k]=parseFloat(v)||0;});
+                save({...data,retention:nr});setRetentionEdits({});setRetSaved(true);
+                setTimeout(()=>setRetSaved(false),2000);
+              }} disabled={!Object.keys(retentionEdits).length}>{retSaved?'✓ Saved':'Save Retention'}</button>
+            </div>
+            <div className="perf-slot-body">
+              {staff.filter(s=>s.tracks&&s.tracks.length>0).map(s=>{
+                const editing=retentionEdits[s.id]!==undefined;
+                const val=editing?retentionEdits[s.id]:((data.retention||{})[s.id]||'');
+                const num=parseFloat(val)||null;
+                const c=num?num>=85?'#CAE8C1':num>=75?'#44ccaa':num>=65?'#F4DB71':'#E05252':'#555';
+                const lbl=num?num>=85?'Strong':num>=75?'Good':num>=65?'Developing':'Below':'';
+                return(
+                  <div key={s.id} className="gva-input-row">
+                    <div style={{flex:1,display:'flex',alignItems:'center',gap:10}}>
+                      <Av name={s.name} sz="sm"/>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:600,color:'#ddd'}}>{s.name}</div>
+                        <div style={{fontSize:11,color:'#555'}}>{s.site} · Target ≥75%</div>
+                      </div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                      {num&&<div style={{height:4,width:60,background:'var(--surface3)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:c,width:Math.min(100,num)+'%'}}/></div>}
+                      <input type="number" min="0" max="100" step="0.1" value={val} placeholder="—"
+                        onChange={e=>setRetentionEdits(p=>({...p,[s.id]:e.target.value}))}
+                        style={{width:62,textAlign:'center',background:'var(--surface3)',border:'1px solid',borderColor:editing?'var(--go)':'var(--border2)',borderRadius:5,color:num?c:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,padding:'5px 0',outline:'none'}}/>
+                      {num&&<span style={{fontSize:10,background:c+'18',color:c,border:'1px solid '+c+'33',borderRadius:3,padding:'2px 7px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,minWidth:64,textAlign:'center'}}>{lbl}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── TRENDS ── */}
       {tab==='trends'&&(
         <div>
-          {/* Staff picker */}
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'12px 14px',marginBottom:14}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:8}}>Select Practitioner</div>
             <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-              {mergedStaff.filter(s=>{
-                const t=data.snapshots.some(snap=>snap.rows?.some(r=>r.staffId===s.id));
-                const hasGva=!!data.gva[s.id];
-                return t||hasGva;
-              }).map(s=>(
-                <button key={s.id}
-                  className={`btn btn-sm ${trendStaff?.id===s.id?'btn-lime':'btn-ghost'}`}
-                  onClick={()=>setTrendStaff(s)}>{s.name.split(' ')[0]}</button>
+              {mergedStaff.map(s=>(
+                <button key={s.id} className={`btn btn-sm ${trendStaff?.id===s.id?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendStaff(s)}>
+                  {s.name.split(' ')[0]}
+                </button>
               ))}
             </div>
-            {data.snapshots.length<2&&<div style={{fontSize:11,color:'#555',marginTop:8,fontStyle:'italic'}}>Import at least 2 CSV snapshots to see trends. Each import is saved separately — import monthly to build history.</div>}
+            {data.snapshots.length<2&&<div style={{fontSize:11,color:'#555',marginTop:8,fontStyle:'italic'}}>Import at least 2 CSV snapshots to see trend lines. Import monthly to build history.</div>}
           </div>
-
           {trendStaff?(
             <div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:14}}>{trendStaff.name.toUpperCase()} — Trends</div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:14}}>
+                {trendStaff.name.toUpperCase()}
+                <span style={{fontSize:12,color:'#555',fontWeight:400,letterSpacing:'1px',marginLeft:12}}>{trendStaff.site} · {trendStaff.roadmap||'—'}</span>
+              </div>
               <div className="grid2">
                 {[
-                  {key:'revenue',label:'Revenue',color:'#CAE8C1',fmt:(v)=>fmtRev(v)},
-                  {key:'utilization',label:'Utilization %',color:'#44ccaa',fmt:(v)=>v+'%'},
-                  {key:'appointments',label:'Appointments',color:'#6B9FD4',fmt:(v)=>v},
-                  {key:'noShows',label:'No-Shows',color:'#E05252',fmt:(v)=>v},
-                ].map(({key,label,color,fmt})=>{
-                  const trend=getTrend(trendStaff.id,key);
-                  if(!trend.length)return(
-                    <div key={key} className="perf-slot">
-                      <div className="perf-slot-head"><span className="perf-slot-title" style={{color}}>{label}</span></div>
-                      <div className="perf-slot-body empty"><div className="empty-ico" style={{fontSize:20}}>—</div><p style={{fontSize:12}}>No data yet for {label.toLowerCase()}</p></div>
-                    </div>
-                  );
-                  const latest=trend[trend.length-1].val;
-                  const prev=trend.length>1?trend[trend.length-2].val:null;
-                  const delta=prev?((latest-prev)/prev*100).toFixed(1):null;
-                  const up=delta>0;
-                  return(
-                    <div key={key} className="perf-slot">
-                      <div className="perf-slot-head">
-                        <span className="perf-slot-title" style={{color}}>{label}</span>
-                        <div className="flex aic g8">
-                          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color}}>{fmt(latest)}</span>
-                          {delta!==null&&<span style={{fontSize:11,color:up?'#44CCAA':'#E05252',fontWeight:700}}>{up?'▲':'▼'}{Math.abs(delta)}%</span>}
-                        </div>
-                      </div>
-                      <div className="perf-slot-body">
-                        {/* SVG line chart */}
-                        {(()=>{
-                          const w=320,h=80,pad=8;
-                          const vals=trend.map(d=>d.val);
-                          const min=Math.min(...vals);
-                          const max=Math.max(...vals)||1;
-                          const range=max-min||1;
-                          const pts=vals.map((v,i)=>{
-                            const x=pad+Math.round((i/(vals.length-1||1))*(w-pad*2));
-                            const y=pad+Math.round((1-(v-min)/range)*(h-pad*2));
-                            return{x,y,v,date:trend[i].date};
-                          });
-                          const pathD=pts.map((p,i)=>(i===0?'M':'L')+p.x+','+p.y).join(' ');
-                          const areaD=pathD+` L${pts[pts.length-1].x},${h+pad} L${pts[0].x},${h+pad} Z`;
-                          return(
-                            <div>
-                              <svg width={w} height={h+pad*2+20} style={{overflow:'visible',display:'block'}}>
-                                {/* Area fill */}
-                                <path d={areaD} fill={color} opacity="0.06"/>
-                                {/* Line */}
-                                <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
-                                {/* Dots + labels */}
-                                {pts.map((p,i)=>(
-                                  <g key={i}>
-                                    <circle cx={p.x} cy={p.y} r="4" fill={color} opacity="0.9"/>
-                                    <text x={p.x} y={p.y-8} textAnchor="middle" fontSize="9" fill={color} opacity="0.7">{fmt(p.v)}</text>
-                                    <text x={p.x} y={h+pad*2+16} textAnchor="middle" fontSize="8" fill="#555">{new Date(p.date+'T12:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}</text>
-                                  </g>
-                                ))}
-                                {/* Baseline */}
-                                <line x1={pad} y1={h+pad} x2={w-pad} y2={h+pad} stroke="var(--border)" strokeWidth="1"/>
-                              </svg>
-                            </div>
-                          );
-                        })()}
-                        <div style={{marginTop:6,display:'flex',gap:8,flexWrap:'wrap'}}>
-                          {trend.map((d,i)=>(
-                            <div key={i} style={{fontSize:10,color:'#555',background:'var(--surface3)',borderRadius:3,padding:'2px 7px'}}>
-                              {new Date(d.date+'T12:00:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}: <span style={{color,fontWeight:700}}>{fmt(d.val)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {/* GVA trend */}
-                {(()=>{
-                  const gvaHistory=Object.entries(data.gva_history||{})
-                    .filter(([k])=>k.startsWith(trendStaff.id+'_'))
-                    .map(([k,v])=>({date:k.replace(trendStaff.id+'_',''),val:parseFloat(v)||0}))
-                    .sort((a,b)=>new Date(a.date)-new Date(b.date));
-                  const curGva=parseFloat(data.gva[trendStaff.id])||null;
-                  if(!gvaHistory.length&&!curGva)return null;
-                  const displayVals=curGva&&!gvaHistory.some(h=>h.date===new Date().toISOString().slice(0,7))
-                    ?[...gvaHistory,{date:'Current',val:curGva}]:gvaHistory;
-                  return(
-                    <div className="perf-slot">
-                      <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#F4DB71'}}>GVA History</span>{curGva&&<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#F4DB71'}}>{curGva}</span>}</div>
-                      <div className="perf-slot-body">
-                        {displayVals.length>1?(()=>{
-                          const w=320,h=80,pad=8;
-                          const vals=displayVals.map(d=>d.val);
-                          const min=Math.min(...vals);const max=Math.max(...vals)||1;const range=max-min||1;
-                          const pts=vals.map((v,i)=>({x:pad+Math.round((i/(vals.length-1||1))*(w-pad*2)),y:pad+Math.round((1-(v-min)/range)*(h-pad*2)),v,date:displayVals[i].date}));
-                          const pathD=pts.map((p,i)=>(i===0?'M':'L')+p.x+','+p.y).join(' ');
-                          return(
-                            <svg width={w} height={h+pad*2+20} style={{overflow:'visible',display:'block'}}>
-                              <path d={pathD+` L${pts[pts.length-1].x},${h+pad} L${pts[0].x},${h+pad} Z`} fill="#F4DB71" opacity="0.06"/>
-                              <path d={pathD} fill="none" stroke="#F4DB71" strokeWidth="2.5" strokeLinejoin="round"/>
-                              {pts.map((p,i)=>(
-                                <g key={i}>
-                                  <circle cx={p.x} cy={p.y} r="4" fill="#F4DB71" opacity="0.9"/>
-                                  <text x={p.x} y={p.y-8} textAnchor="middle" fontSize="9" fill="#F4DB71" opacity="0.7">{p.v}</text>
-                                  <text x={p.x} y={h+pad*2+16} textAnchor="middle" fontSize="8" fill="#555">{p.date}</text>
-                                </g>
-                              ))}
-                            </svg>
-                          );
-                        })():<div style={{fontSize:12,color:'#555'}}>Current GVA: <span style={{color:'#F4DB71',fontWeight:700}}>{curGva}</span>. Save more GVA snapshots over time to see a trend.</div>}
-                      </div>
-                    </div>
-                  );
-                })()}
+                  {key:'revenue',label:'Revenue',color:'#CAE8C1',fmt:v=>fmtRev(v)},
+                  {key:'utilization',label:'Utilization %',color:'#44ccaa',fmt:v=>v+'%'},
+                  {key:'completed',label:'Completed Visits',color:'#6B9FD4',fmt:v=>v},
+                  {key:'noShows',label:'No-Shows',color:'#E05252',fmt:v=>v},
+                  {key:'cancellations',label:'Cancellations',color:'#F4DB71',fmt:v=>v},
+                ].map(({key,label,color,fmt})=>(
+                  <div key={key} className="perf-slot">
+                    <div className="perf-slot-head"><span className="perf-slot-title" style={{color}}>{label}</span></div>
+                    <div className="perf-slot-body"><LineChart snapshots={data.snapshots} staffId={trendStaff.id} metric={key} color={color} label={label} fmt={fmt}/></div>
+                  </div>
+                ))}
+                {/* GVA trend from gva object history */}
+                <div className="perf-slot">
+                  <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#F4DB71'}}>GVA</span></div>
+                  <div className="perf-slot-body">
+                    {(()=>{
+                      const cur=data.gva[trendStaff.id];
+                      const hist=(data.gva_history||{})[trendStaff.id]||[];
+                      const pts=[...hist];
+                      if(cur&&!hist.some(h=>h.date===snapDate))pts.push({date:'Current',val:parseFloat(cur)});
+                      if(!pts.length)return<div style={{fontSize:11,color:'#555',padding:16,textAlign:'center'}}>No GVA data yet. Enter a value in the GVA tab.</div>;
+                      if(pts.length===1)return<div style={{textAlign:'center',padding:20}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:'#F4DB71'}}>{pts[0].val}</div><div style={{fontSize:11,color:'#555',marginTop:8}}>Enter GVA values over multiple months to see a trend.</div></div>;
+                      const vals=pts.map(p=>parseFloat(p.val));
+                      const min=Math.min(...vals),max=Math.max(...vals),range=max-min||1;
+                      const W=340,H=90,PAD=10;
+                      const coords=pts.map((p,i)=>({x:PAD+Math.round((i/(pts.length-1))*(W-PAD*2)),y:PAD+Math.round((1-(parseFloat(p.val)-min)/range)*(H-PAD*2)),val:parseFloat(p.val),date:p.date}));
+                      const pathD=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
+                      return<svg width={W} height={H+PAD*2+18} style={{overflow:'visible',display:'block'}}>
+                        <path d={pathD+` L${coords[coords.length-1].x},${H+PAD} L${coords[0].x},${H+PAD} Z`} fill="#F4DB71" opacity="0.07"/>
+                        <path d={pathD} fill="none" stroke="#F4DB71" strokeWidth="2.5" strokeLinejoin="round"/>
+                        {coords.map((c,i)=><g key={i}><circle cx={c.x} cy={c.y} r="4" fill="#F4DB71" opacity="0.9"/><text x={c.x} y={c.y-8} textAnchor="middle" fontSize="9" fill="#F4DB71" opacity="0.75">{c.val}</text><text x={c.x} y={H+PAD*2+15} textAnchor="middle" fontSize="8" fill="#555">{c.date}</text></g>)}
+                        <line x1={PAD} y1={H+PAD} x2={W-PAD} y2={H+PAD} stroke="#2a2a2a" strokeWidth="1"/>
+                      </svg>;
+                    })()}
+                  </div>
+                </div>
+                {/* Retention trend */}
+                <div className="perf-slot">
+                  <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention %</span></div>
+                  <div className="perf-slot-body">
+                    {(()=>{
+                      const cur=(data.retention||{})[trendStaff.id];
+                      if(!cur)return<div style={{fontSize:11,color:'#555',padding:16,textAlign:'center'}}>No retention data yet. Enter a value in the Retention tab.</div>;
+                      const c=cur>=85?'#CAE8C1':cur>=75?'#44ccaa':cur>=65?'#F4DB71':'#E05252';
+                      return<div style={{textAlign:'center',padding:20}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:40,fontWeight:800,color:c,lineHeight:1}}>{cur}%</div><div style={{fontSize:11,color:'#555',marginTop:8}}>Enter retention monthly to build a trend.</div></div>;
+                    })()}
+                  </div>
+                </div>
               </div>
             </div>
           ):(
-            <div className="card"><div className="empty"><div className="empty-ico">↗</div><p>Select a practitioner above to view their trend charts.<br/><span style={{fontSize:11,color:'#555'}}>Trends build automatically with each Jane import you do.</span></p></div></div>
+            <div className="card"><div className="empty"><div className="empty-ico">↗</div><p>Select a practitioner above to view their individual trend charts.</p></div></div>
           )}
         </div>
       )}
@@ -2445,45 +2530,47 @@ function PerformancePage({staff}){
         <div>
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'16px 18px',marginBottom:14}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',fontWeight:700,marginBottom:10}}>How to Export from Jane</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
               {[
-                {n:1,title:'Appointments Report',desc:'Jane → Reports → Appointments → Set date range → ··· menu → Export CSV',cols:'Practitioner, Revenue, Appointments, No-shows, Cancellations'},
-                {n:2,title:'Utilization Report',desc:'Jane → Reports → Utilization → Set date range → Export CSV',cols:'Practitioner, Utilization %, Booked hours'},
+                {n:1,title:'Appointments Report',where:'Reports → Appointments',action:'Set date range → ··· menu → Export CSV',cols:'staff_member_name, state, no_show_at, cancelled_at',note:'Gives: completed visits, no-shows, cancellations per practitioner'},
+                {n:2,title:'Shift Report',where:'Reports → Payroll → Timesheets',action:'Set date range → Export CSV',cols:'Staff Name, Appointment Total Hours, Shift Total Hours',note:'Gives: utilization % (Appt Hours ÷ Shift Hours)'},
+                {n:3,title:'Sales Report',where:'Reports → Sales',action:'Set date range → Export CSV',cols:'Staff Member, Status, Income Category, Collected',note:'Gives: revenue per practitioner (paid treatment income only)'},
               ].map(s=>(
                 <div key={s.n} style={{background:'var(--surface3)',borderRadius:5,padding:'12px 14px',border:'1px solid var(--border)'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
                     <div style={{width:22,height:22,borderRadius:4,background:'var(--go)',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,fontSize:13,color:'var(--lime)',flexShrink:0}}>{s.n}</div>
                     <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,fontWeight:700,color:'#ddd'}}>{s.title}</div>
                   </div>
-                  <div style={{fontSize:11,color:'#888',lineHeight:1.6,marginBottom:5}}>{s.desc}</div>
-                  <div style={{fontSize:10,color:'#555'}}>Columns: {s.cols}</div>
+                  <div style={{fontSize:11,color:'#888',lineHeight:1.6,marginBottom:4}}><strong style={{color:'#aaa'}}>Where:</strong> {s.where}</div>
+                  <div style={{fontSize:11,color:'#888',lineHeight:1.6,marginBottom:4}}><strong style={{color:'#aaa'}}>Export:</strong> {s.action}</div>
+                  <div style={{fontSize:10,color:'#555',marginBottom:4}}>Columns: {s.cols}</div>
+                  <div style={{fontSize:10,color:'#44ccaa',fontStyle:'italic'}}>{s.note}</div>
                 </div>
               ))}
             </div>
             <div style={{marginTop:12,padding:'9px 12px',background:'rgba(202,232,193,.05)',border:'1px solid rgba(202,232,193,.12)',borderRadius:5,fontSize:11,color:'#888',lineHeight:1.6}}>
-              <strong style={{color:'var(--lime)'}}>Tip:</strong> Each upload is saved as a separate snapshot with the date you set below. Import monthly to build trend history — all snapshots are kept so you can see performance over time.
+              <strong style={{color:'var(--lime)'}}>Tip:</strong> Import both files for the same period — Appointments gives visit counts, Shift gives utilization. They merge into the same snapshot automatically. Import monthly to build trend history.
             </div>
           </div>
 
-          {/* Date picker for snapshot */}
-          <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:10}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#555'}}>Snapshot Date (period this CSV covers)</div>
-            <input type="date" value={importDate} onChange={e=>setImportDate(e.target.value)}
+          <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#555'}}>Snapshot Date</div>
+            <input type="date" value={snapDate} onChange={e=>setSnapDate(e.target.value)}
               style={{background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:12,padding:'5px 10px',outline:'none'}}/>
+            <span style={{fontSize:11,color:'#555'}}>Set to the end date of the period this CSV covers</span>
           </div>
 
-          {/* Drop zone */}
           <div className={`perf-drop${dragging?' drag':''}`}
             onDragOver={e=>{e.preventDefault();setDragging(true);}}
             onDragLeave={()=>setDragging(false)}
             onDrop={e=>{e.preventDefault();setDragging(false);const f=e.dataTransfer.files[0];if(f)handleFile(f);}}
-            onClick={()=>document.getElementById('jane-file-in').click()}>
-            <input id="jane-file-in" type="file" accept=".csv" onChange={e=>{handleFile(e.target.files[0]);e.target.value='';}}/>
+            onClick={()=>document.getElementById('jane-csv-in').click()}>
+            <input id="jane-csv-in" type="file" accept=".csv" onChange={e=>{handleFile(e.target.files[0]);e.target.value='';}}/>
             <div style={{fontSize:32,marginBottom:10}}>📊</div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:'var(--lime)',letterSpacing:'1px',marginBottom:4}}>
-              {importing?'Processing CSV…':'Drop Jane CSV Here or Click to Browse'}
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:'var(--lime)',letterSpacing:'1px',marginBottom:4}}>
+              {importing?'Processing…':'Drop Appointments or Shift Report CSV here'}
             </div>
-            <div style={{fontSize:12,color:'#555'}}>Appointments or Utilization export · .csv format · Each upload saved as a snapshot</div>
+            <div style={{fontSize:12,color:'#555'}}>Auto-detects file type · Both files can be imported for the same snapshot date</div>
           </div>
 
           {importMsg&&(
@@ -2495,24 +2582,19 @@ function PerformancePage({staff}){
             </div>
           )}
 
-          {/* Snapshot history */}
           {data.snapshots.length>0&&(
             <div style={{marginTop:18}}>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:8}}>
-                Saved Snapshots ({data.snapshots.length})
-              </div>
-              {[...data.snapshots].reverse().map((snap,i)=>{
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:8}}>Saved Snapshots ({data.snapshots.length})</div>
+              {[...data.snapshots].reverse().map(snap=>{
                 const matched=snap.rows.filter(r=>r.staffId).length;
                 return(
                   <div key={snap.id} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'10px 14px',marginBottom:7,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                     <div>
-                      <div style={{fontSize:13,fontWeight:600,color:'#ddd'}}>{new Date(snap.date+'T12:00:00').toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'})}</div>
-                      <div style={{fontSize:11,color:'#555',marginTop:2}}>{snap.filename} · {snap.rows.length} practitioners · {matched} matched</div>
+                      <div style={{fontSize:13,fontWeight:600,color:'#ddd'}}>{new Date(snap.date+'T12:00').toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'})}</div>
+                      <div style={{fontSize:11,color:'#555',marginTop:2}}>{(snap.files||[snap.type||'import']).join(' + ')} · {snap.rows.length} practitioners · {matched} matched to profiles</div>
                     </div>
                     <button className="btn btn-ghost btn-xs" style={{color:'#555',fontSize:11}}
-                      onClick={()=>{if(confirm('Delete this snapshot?'))save({...data,snapshots:data.snapshots.filter(s=>s.id!==snap.id)});}}>
-                      ✕ Delete
-                    </button>
+                      onClick={()=>{if(confirm('Delete this snapshot?'))save({...data,snapshots:data.snapshots.filter(s=>s.id!==snap.id)});}}>✕</button>
                   </div>
                 );
               })}
