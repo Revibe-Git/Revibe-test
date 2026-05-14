@@ -2298,7 +2298,7 @@ function PerformancePage({staff,perfData,setPerfData}){
     snaps.forEach(snap=>{
       (snap.rows||[]).forEach(r=>{
         if(!r.staffId)return;
-        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,appointments:0};
+        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0};
         const b=byStaff[r.staffId];
         if(r.completed)b.completed+=(parseFloat(r.completed)||0);
         if(r.noShows)b.noShows+=(parseFloat(r.noShows)||0);
@@ -2306,10 +2306,19 @@ function PerformancePage({staff,perfData,setPerfData}){
         if(r.rescheduled)b.rescheduled+=(parseFloat(r.rescheduled)||0);
         if(r.revenue)b.revenue+=(parseFloat(r.revenue)||0);
         if(r.appointments)b.appointments+=(parseFloat(r.appointments)||0);
-        if(r.utilization!=null)b.utilization=parseFloat(r.utilization)||null; // latest wins
+        // Average utilization across months rather than summing
+        if(r.utilization!=null){
+          b.utilization=(b.utilization||0)+(parseFloat(r.utilization)||0);
+          b.utilizationCount++;
+        }
       });
     });
-    return Object.values(byStaff).map(r=>({...r,revenue:Math.round(r.revenue*100)/100}));
+    return Object.values(byStaff).map(r=>({
+      ...r,
+      revenue:Math.round(r.revenue*100)/100,
+      // Average the utilization across however many shift snapshots exist
+      utilization:r.utilizationCount>0?Math.round(r.utilization/r.utilizationCount):null,
+    }));
   };
 
   // Active filtered rows
@@ -2421,7 +2430,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               <button key={y} className={`btn btn-xs ${periodFilter===y?'btn-go':'btn-ghost'}`} onClick={()=>setPeriodFilter(y)}>{y}</button>
             ))}
             {availQuarters.map(q=>(
-              <button key={q} className={`btn btn-xs ${periodFilter===q?'btn-lime':'btn-ghost'}`} onClick={()=>setPeriodFilter(q)}>{q.replace('-','  ')}</button>
+              <button key={q} className={`btn btn-xs ${periodFilter===q?'btn-lime':'btn-ghost'}`} onClick={()=>setPeriodFilter(q)}>{q.replace('-Q',' Q')}</button>
             ))}
             {availMonths.map(m=>(
               <button key={m} className={`btn btn-xs ${periodFilter===m?'btn-lime':'btn-ghost'}`} onClick={()=>setPeriodFilter(m)}>
@@ -2482,7 +2491,12 @@ function PerformancePage({staff,perfData,setPerfData}){
               ):compareA===compareB?(
                 <div style={{padding:'16px',background:'rgba(224,82,82,.08)',border:'1px solid rgba(224,82,82,.2)',borderRadius:6,fontSize:12,color:'#E05252',textAlign:'center'}}>Select two different periods to compare.</div>
               ):(()=>{
-                const fmtPeriod=(p)=>p.length===7?new Date(p+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'}):p.includes('Q')?p.replace('-Q',' Q'):p;
+                const fmtPeriod=(p)=>{
+                  if(!p)return'—';
+                  if(p.includes('-Q')){const[y,q]=p.split('-Q');return`Q${q} ${y}`;}
+                  if(p.length===7){try{return new Date(p+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'});}catch{return p;}}
+                  return p; // year like "2026"
+                };
                 const metrics=[
                   {key:'revenue',label:'Revenue',fmt:fmtRev,color:'#CAE8C1',higherBetter:true},
                   {key:'completed',label:'Completed Visits',fmt:v=>v,color:'#6B9FD4',higherBetter:true},
