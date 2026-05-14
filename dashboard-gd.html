@@ -1785,6 +1785,7 @@ const NAV=[
   {id:'schedule',   icon:'📅', label:'Schedule & Meetings'},
   {id:'clinresources', icon:'◫', label:'Clinician Resources'},
   {id:'gdtracker',     icon:'◷', label:'G&D Schedule Tracker'},
+  {id:'systematic',    icon:'⬡', label:'Systematic Thinking'},
 ];
 const MENTORS=[
   {id:'m1',name:'Mike Ross',     role:'Clinical Lead',  discipline:'pt'   },
@@ -1866,7 +1867,7 @@ function App(){
     return{...s,evals:sEvals};
   },[activeId,staff,evals]);
 
-  const PAGES={overview:Overview,staff:StaffPage,evals:EvalsPage,education:EduPage,mentors:MentorsPage,gaps:GapsPage,performance:PerformancePage,forms:FormsPage,resources:ResourcesPage,leadership:LeadershipPage,schedule:SchedulePage,clinresources:ClinResourcesPage,gdtracker:GDTrackerPage};
+  const PAGES={overview:Overview,staff:StaffPage,evals:EvalsPage,education:EduPage,mentors:MentorsPage,gaps:GapsPage,performance:PerformancePage,forms:FormsPage,resources:ResourcesPage,leadership:LeadershipPage,schedule:SchedulePage,clinresources:ClinResourcesPage,gdtracker:GDTrackerPage,systematic:SystematicPage};
   const PageComp=PAGES[page]||Overview;
 
   return(
@@ -2636,21 +2637,24 @@ function PerformancePage({staff,perfData,setPerfData}){
             <span style={{fontSize:11,color:'#555'}}>65% min · 75% good · 85%+ strong</span>
           </div>
           {(()=>{
-            // Use filtered rows if they have utilization, otherwise fall back to all-time
-            const hasUtil=withUtil.length>0;
-            const fallbackRows=hasUtil?withUtil:mergedStaff.filter(s=>{
-              const jr=data.snapshots.flatMap(sn=>sn.rows||[]).find(r=>r.staffId===s.id&&r.utilization!=null);
-              return jr;
-            }).map(s=>{
-              const jr=data.snapshots.flatMap(sn=>sn.rows||[]).find(r=>r.staffId===s.id&&r.utilization!=null);
-              return{...s,utilization:jr?.utilization||null};
-            }).filter(s=>s.utilization!=null).sort((a,b)=>b.utilization-a.utilization);
-            const showing=hasUtil?withUtil:fallbackRows;
+            // Always show utilization — fall back to all snapshots if filtered period has none
+            const allUtilRows=data.snapshots
+              .flatMap(sn=>(sn.rows||[]).filter(r=>r.utilization!=null))
+              .reduce((acc,r)=>{
+                if(!acc[r.staffId]||r.utilization>0)acc[r.staffId]=r;
+                return acc;
+              },{});
+            const fallbackStaff=Object.values(allUtilRows).map(r=>{
+              const s=staff.find(st=>st.id===r.staffId);
+              return s?{...s,utilization:parseFloat(r.utilization)||null}:null;
+            }).filter(Boolean).filter(s=>s.utilization!=null).sort((a,b)=>b.utilization-a.utilization);
+            const showing=withUtil.length>0?withUtil:fallbackStaff;
+            const isFiltered=periodFilter!=='all'&&withUtil.length===0&&fallbackStaff.length>0;
             return(
               <div>
-                {!hasUtil&&periodFilter!=='all'&&fallbackRows.length>0&&(
+                {isFiltered&&(
                   <div style={{padding:'8px 14px',background:'rgba(244,219,113,.06)',border:'1px solid rgba(244,219,113,.18)',borderRadius:5,fontSize:11,color:'#F4DB71',marginBottom:8}}>
-                    No shift report for this period — showing most recent available utilization data. Import a Shift Report for each month to track per-period utilization.
+                    No shift report for this period — showing most recent available utilization. Import a monthly Shift Report to track per-period utilization.
                   </div>
                 )}
                 <div className="perf-slot-body">{showing.length?showing.map(s=>{
@@ -8232,6 +8236,240 @@ function GDEditPanel({r, onSave, onCancel, onDelete}){
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+/* ══ SYSTEMATIC THINKING ══ */
+function SystematicPage(){
+  const SK='rvgd3_systematic';
+  const[sessions,setSessions]=useState(()=>{try{const s=localStorage.getItem(SK);return s?JSON.parse(s):[];}catch{return[];}});
+  const[concepts,setConcepts]=useState(()=>{try{const s=localStorage.getItem(SK+'_concepts');return s?JSON.parse(s):[];}catch{return[];}});
+  const[view,setView]=useState('home'); // home | new-session | session | new-concept | concept
+  const[active,setActive]=useState(null);
+  const[form,setForm]=useState({});
+  const[saving,setSaving]=useState(false);
+
+  const save=(s,c)=>{
+    if(s!==undefined){setSessions(s);try{localStorage.setItem(SK,JSON.stringify(s));}catch{}}
+    if(c!==undefined){setConcepts(c);try{localStorage.setItem(SK+'_concepts',JSON.stringify(c));}catch{}}
+  };
+
+  const TAGS=['Assessment','Treatment Approach','Communication','Clinical Reasoning','Case Study','Framework','Protocol','Team Standard'];
+
+  const newSession=()=>{setForm({title:'',date:new Date().toISOString().slice(0,10),facilitator:'Josh Alferez',attendees:'',tags:[],notes:'',keyTakeaways:'',concepts:''});setView('new-session');};
+  const newConcept=()=>{setForm({title:'',category:'Framework',tags:[],summary:'',detail:'',relatedSessions:[]});setView('new-concept');};
+
+  const saveSession=()=>{
+    const s={...form,id:'sess_'+Date.now(),createdAt:new Date().toISOString()};
+    const updated=[s,...sessions];
+    save(updated,undefined);
+    setActive(s);setView('session');
+  };
+
+  const saveConcept=()=>{
+    const c={...form,id:'con_'+Date.now(),createdAt:new Date().toISOString()};
+    const updated=[c,...concepts];
+    save(undefined,updated);
+    setActive(c);setView('concept');
+  };
+
+  const CATS=['Framework','Protocol','Assessment Tool','Communication Standard','Clinical Approach','Team Standard'];
+
+  if(view==='new-session') return(
+    <div>
+      <div className="flex aic g8" style={{marginBottom:16}}>
+        <button className="btn btn-ghost btn-sm" onClick={()=>setView('home')}>← Back</button>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#ddd',letterSpacing:'1px'}}>LOG SESSION</div>
+      </div>
+      <div className="card" style={{display:'flex',flexDirection:'column',gap:14}}>
+        {[['Title','title','text','e.g. Shoulder Assessment Framework — Session 1'],['Date','date','date',''],['Facilitator','facilitator','text',''],['Attendees','attendees','text','e.g. Morgan, Zeeruk, Mike...']].map(([lbl,key,type,ph])=>(
+          <div key={key}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#666',marginBottom:5}}>{lbl}</div>
+            <input type={type} value={form[key]||''} placeholder={ph} onChange={e=>setForm(p=>({...p,[key]:e.target.value}))}
+              style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',padding:'8px 12px',fontSize:13,outline:'none'}}/>
+          </div>
+        ))}
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#666',marginBottom:5}}>Tags</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {TAGS.map(t=><button key={t} className={`btn btn-xs ${(form.tags||[]).includes(t)?'btn-lime':'btn-ghost'}`}
+              onClick={()=>setForm(p=>({...p,tags:(p.tags||[]).includes(t)?p.tags.filter(x=>x!==t):[...(p.tags||[]),t]}))}>{t}</button>)}
+          </div>
+        </div>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#666',marginBottom:5}}>Session Notes</div>
+          <textarea value={form.notes||''} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} rows={8} placeholder="Capture everything — raw notes, ideas, diagrams described in words, questions raised..."
+            style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',padding:'10px 12px',fontSize:13,lineHeight:1.7,resize:'vertical',outline:'none'}}/>
+        </div>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#666',marginBottom:5}}>Key Takeaways</div>
+          <textarea value={form.keyTakeaways||''} onChange={e=>setForm(p=>({...p,keyTakeaways:e.target.value}))} rows={3} placeholder="What should every team member remember from this session?"
+            style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',padding:'10px 12px',fontSize:13,lineHeight:1.7,resize:'vertical',outline:'none'}}/>
+        </div>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#666',marginBottom:5}}>Concepts Introduced</div>
+          <input type="text" value={form.concepts||''} placeholder="e.g. Load tolerance model, Hip-knee relationship, Interview framework" onChange={e=>setForm(p=>({...p,concepts:e.target.value}))}
+            style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',padding:'8px 12px',fontSize:13,outline:'none'}}/>
+        </div>
+        <div className="flex aic g8">
+          <button className="btn btn-lime btn-sm" onClick={saveSession} disabled={!form.title}>Save Session</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setView('home')}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if(view==='session'&&active) return(
+    <div>
+      <div className="flex aic g8" style={{marginBottom:16}}>
+        <button className="btn btn-ghost btn-sm" onClick={()=>setView('home')}>← Back</button>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#ddd',letterSpacing:'1px'}}>{active.title.toUpperCase()}</div>
+      </div>
+      <div className="card" style={{display:'flex',flexDirection:'column',gap:16}}>
+        <div style={{display:'flex',gap:16,flexWrap:'wrap',fontSize:11,color:'#555'}}>
+          <span>📅 {new Date(active.date+'T12:00').toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'})}</span>
+          <span>👤 {active.facilitator}</span>
+          {active.attendees&&<span>🧑‍🤝‍🧑 {active.attendees}</span>}
+        </div>
+        {(active.tags||[]).length>0&&<div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{active.tags.map(t=><span key={t} style={{fontSize:10,background:'var(--go-dim)',color:'var(--lime)',border:'1px solid var(--go-b)',borderRadius:3,padding:'2px 8px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,letterSpacing:'1px'}}>{t}</span>)}</div>}
+        {active.keyTakeaways&&(<div style={{background:'rgba(202,232,193,.06)',border:'1px solid rgba(202,232,193,.15)',borderRadius:6,padding:'12px 16px'}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',marginBottom:8}}>Key Takeaways</div>
+          <div style={{fontSize:13,color:'#ddd',lineHeight:1.8,whiteSpace:'pre-wrap'}}>{active.keyTakeaways}</div>
+        </div>)}
+        {active.notes&&(<div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#666',marginBottom:8}}>Session Notes</div>
+          <div style={{fontSize:13,color:'#aaa',lineHeight:1.8,whiteSpace:'pre-wrap',background:'var(--surface2)',borderRadius:5,padding:'12px 14px'}}>{active.notes}</div>
+        </div>)}
+        {active.concepts&&(<div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#666',marginBottom:8}}>Concepts Introduced</div>
+          <div style={{fontSize:12,color:'#888'}}>{active.concepts}</div>
+        </div>)}
+        <button className="btn btn-red btn-xs" style={{alignSelf:'flex-start'}} onClick={()=>{if(confirm('Delete this session?')){save(sessions.filter(s=>s.id!==active.id),undefined);setView('home');}}}>Delete Session</button>
+      </div>
+    </div>
+  );
+
+  if(view==='new-concept') return(
+    <div>
+      <div className="flex aic g8" style={{marginBottom:16}}>
+        <button className="btn btn-ghost btn-sm" onClick={()=>setView('home')}>← Back</button>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#ddd',letterSpacing:'1px'}}>NEW CONCEPT</div>
+      </div>
+      <div className="card" style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#666',marginBottom:5}}>Concept Name</div>
+          <input type="text" value={form.title||''} placeholder="e.g. Load Tolerance Framework" onChange={e=>setForm(p=>({...p,title:e.target.value}))}
+            style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',padding:'8px 12px',fontSize:13,outline:'none'}}/>
+        </div>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#666',marginBottom:5}}>Category</div>
+          <select value={form.category||'Framework'} onChange={e=>setForm(p=>({...p,category:e.target.value}))}
+            style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',padding:'7px 10px',fontSize:13,outline:'none',width:'100%'}}>
+            {CATS.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#666',marginBottom:5}}>One-Line Summary</div>
+          <input type="text" value={form.summary||''} placeholder="What is this in one sentence?" onChange={e=>setForm(p=>({...p,summary:e.target.value}))}
+            style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',padding:'8px 12px',fontSize:13,outline:'none'}}/>
+        </div>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:10,letterSpacing:'2px',textTransform:'uppercase',color:'#666',marginBottom:5}}>Full Detail</div>
+          <textarea value={form.detail||''} onChange={e=>setForm(p=>({...p,detail:e.target.value}))} rows={8} placeholder="Explain the concept fully — how it works, when to apply it, examples, edge cases..."
+            style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',padding:'10px 12px',fontSize:13,lineHeight:1.7,resize:'vertical',outline:'none'}}/>
+        </div>
+        <div className="flex aic g8">
+          <button className="btn btn-lime btn-sm" onClick={saveConcept} disabled={!form.title}>Save Concept</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setView('home')}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if(view==='concept'&&active) return(
+    <div>
+      <div className="flex aic g8" style={{marginBottom:16}}>
+        <button className="btn btn-ghost btn-sm" onClick={()=>setView('home')}>← Back</button>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#ddd',letterSpacing:'1px'}}>{active.title.toUpperCase()}</div>
+      </div>
+      <div className="card" style={{display:'flex',flexDirection:'column',gap:14}}>
+        <span style={{fontSize:10,background:'var(--go-dim)',color:'var(--lime)',border:'1px solid var(--go-b)',borderRadius:3,padding:'2px 8px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,letterSpacing:'1px',alignSelf:'flex-start'}}>{active.category}</span>
+        {active.summary&&<div style={{fontSize:14,color:'#ddd',fontStyle:'italic',borderLeft:'2px solid var(--go)',paddingLeft:12}}>{active.summary}</div>}
+        {active.detail&&<div style={{fontSize:13,color:'#aaa',lineHeight:1.8,whiteSpace:'pre-wrap'}}>{active.detail}</div>}
+        <button className="btn btn-red btn-xs" style={{alignSelf:'flex-start'}} onClick={()=>{if(confirm('Delete this concept?')){save(undefined,concepts.filter(c=>c.id!==active.id));setView('home');}}}>Delete</button>
+      </div>
+    </div>
+  );
+
+  // Home view
+  return(
+    <div>
+      <div className="flex aic jsb" style={{marginBottom:16}}>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#aaa',marginBottom:3}}>Systematic Thinking</div>
+          <div style={{fontSize:12,color:'#555'}}>Structural integration · Clinical knowledge capture · Team standards</div>
+        </div>
+        <div className="flex aic g8">
+          <button className="btn btn-ghost btn-sm" onClick={newConcept}>+ Concept</button>
+          <button className="btn btn-lime btn-sm" onClick={newSession}>+ Log Session</button>
+        </div>
+      </div>
+
+      {sessions.length===0&&concepts.length===0?(
+        <div style={{background:'rgba(202,232,193,.04)',border:'1px solid rgba(202,232,193,.12)',borderRadius:8,padding:'40px 24px',textAlign:'center',marginBottom:16}}>
+          <div style={{fontSize:36,marginBottom:14}}>⬡</div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#CAE8C1',letterSpacing:'1px',marginBottom:8}}>READY TO CAPTURE</div>
+          <div style={{fontSize:13,color:'#666',lineHeight:1.8,maxWidth:480,margin:'0 auto'}}>
+            Log your first workshop session and start building REVIBE's systematic clinical thinking library.<br/>
+            <span style={{fontSize:11,color:'#444',display:'block',marginTop:6}}>Sessions capture raw workshop notes. Concepts distill them into reusable frameworks the whole team can reference.</span>
+          </div>
+          <div className="flex aic g10" style={{justifyContent:'center',marginTop:18}}>
+            <button className="btn btn-ghost btn-sm" onClick={newConcept}>+ Add a Concept</button>
+            <button className="btn btn-lime btn-sm" onClick={newSession}>+ Log First Session</button>
+          </div>
+        </div>
+      ):(
+        <div className="grid2">
+          {/* Sessions */}
+          <div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              Workshop Sessions <span style={{color:'#333',fontSize:10}}>{sessions.length}</span>
+            </div>
+            {sessions.length===0?(
+              <div className="card empty"><div className="empty-ico">📝</div><p>No sessions yet.</p></div>
+            ):sessions.map(s=>(
+              <div key={s.id} className="card" style={{cursor:'pointer',marginBottom:8}} onClick={()=>{setActive(s);setView('session');}}>
+                <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:8}}>
+                  <div style={{fontSize:13,fontWeight:600,color:'#ddd',flex:1}}>{s.title}</div>
+                  <div style={{fontSize:10,color:'#444',flexShrink:0}}>{new Date(s.date+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}</div>
+                </div>
+                {s.facilitator&&<div style={{fontSize:11,color:'#555',marginTop:3}}>Led by {s.facilitator}</div>}
+                {(s.tags||[]).length>0&&<div style={{display:'flex',gap:4,flexWrap:'wrap',marginTop:6}}>{s.tags.map(t=><span key={t} style={{fontSize:9,background:'var(--go-dim)',color:'var(--lime)',border:'1px solid var(--go-b)',borderRadius:2,padding:'1px 5px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{t}</span>)}</div>}
+                {s.keyTakeaways&&<div style={{fontSize:11,color:'#666',marginTop:6,lineHeight:1.5,display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{s.keyTakeaways}</div>}
+              </div>
+            ))}
+          </div>
+          {/* Concepts */}
+          <div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#F4DB71',marginBottom:10,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              Knowledge Base <span style={{color:'#333',fontSize:10}}>{concepts.length}</span>
+            </div>
+            {concepts.length===0?(
+              <div className="card empty"><div className="empty-ico">⬡</div><p>No concepts yet.<br/><span style={{fontSize:11,color:'#555'}}>Distill sessions into reusable frameworks.</span></p></div>
+            ):concepts.map(c=>(
+              <div key={c.id} className="card" style={{cursor:'pointer',marginBottom:8}} onClick={()=>{setActive(c);setView('concept');}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:4}}>
+                  <div style={{fontSize:13,fontWeight:600,color:'#ddd'}}>{c.title}</div>
+                  <span style={{fontSize:9,background:'var(--go-dim)',color:'var(--lime)',border:'1px solid var(--go-b)',borderRadius:2,padding:'1px 6px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,flexShrink:0}}>{c.category}</span>
+                </div>
+                {c.summary&&<div style={{fontSize:12,color:'#666',fontStyle:'italic'}}>{c.summary}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
