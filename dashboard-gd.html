@@ -2618,6 +2618,11 @@ function PerformancePage({staff,perfData,setPerfData}){
                       <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#ddd',letterSpacing:'1px'}}>
                         {fmtPeriod(compareA)} <span style={{color:'#333',fontWeight:400,fontSize:14,margin:'0 10px'}}>vs</span> {fmtPeriod(compareB)}
                       </div>
+                      <div style={{fontSize:10,color:'#444'}}>
+                        A snaps: {filterSnaps(compareA).length} · B snaps: {filterSnaps(compareB).length} · 
+                        A dates: {filterSnaps(compareA).map(s=>s.date.slice(0,7)).join(',')} · 
+                        B dates: {filterSnaps(compareB).map(s=>s.date.slice(0,7)).join(',')}
+                      </div>
                       <div style={{display:'flex',gap:16,fontSize:11,alignItems:'center'}}>
                         <span style={{display:'flex',alignItems:'center',gap:6}}><span style={{width:12,height:12,borderRadius:2,background:'#CAE8C1',display:'inline-block'}}/>{fmtPeriod(compareA)}</span>
                         <span style={{display:'flex',alignItems:'center',gap:6}}><span style={{width:12,height:12,borderRadius:2,background:'#6B9FD4',display:'inline-block',opacity:0.6}}/>{fmtPeriod(compareB)}</span>
