@@ -1850,7 +1850,7 @@ function App(){
   const[activeId,setActiveId]=useState(null);
   const{notifs,addNotif,markRead,markAllRead}=useNotifications();
   const[meetings,setMeetings]=useState(()=>{try{const s=localStorage.getItem('rvgd3_meetings');if(s)return JSON.parse(s);}catch{}return [];});
-  const[perfData,setPerfData]=useState(()=>{try{const s=localStorage.getItem('rvgd3_perf3');return s?JSON.parse(s):{snapshots:[],gva:{},retention:{}};}catch{return{snapshots:[],gva:{},retention:{}};}});
+  const[perfData,setPerfData]=useState({snapshots:[],gva:{},retention:{},lastImport:null});
   useEffect(()=>{try{localStorage.setItem('rvgd3_meetings',JSON.stringify(meetings));}catch{}},[meetings]);
 
   useEffect(()=>sv('staff',staff),[staff]);
@@ -3012,7 +3012,9 @@ function PerformancePage({staff,perfData,setPerfData}){
             <button className="btn btn-ghost btn-xs" style={{color:'#E05252',marginLeft:'auto',flexShrink:0}}
               onClick={async()=>{if(confirm('Reset ALL performance data? This clears all snapshots, GVA, and retention entries. Cannot be undone.')){
                 await clearAllFromSB();
-                save({snapshots:[],gva:{},retention:{},lastImport:null});
+                const empty={snapshots:[],gva:{},retention:{},lastImport:null};
+                try{localStorage.removeItem('rvgd3_perf3');localStorage.removeItem('rvgd3_perf2');localStorage.removeItem('rvgd3_perf');}catch{}
+                save(empty);
                 setImportMsg({type:'success',msg:'✓ All data cleared. Import fresh CSVs to start over.'});
               }}}>
               ⚠ Reset All Data
