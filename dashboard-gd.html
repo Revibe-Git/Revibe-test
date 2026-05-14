@@ -2193,7 +2193,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           totalPractitioners=Math.max(totalPractitioners,parsed.length);
           totalMatched=Math.max(totalMatched,parsed.filter(r=>r.staffId).length);
           monthsCreated.push(month);
-          const snapDate=month+'-28'; // end of month marker
+          const snapDate=month+'-01';
           const existingIdx=newSnapshots.findIndex(s=>s.date.startsWith(month));
           if(existingIdx>=0){
             // Merge appointments into existing snapshot for this month
@@ -2215,7 +2215,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           totalPractitioners=Math.max(totalPractitioners,parsed.length);
           totalMatched=Math.max(totalMatched,parsed.filter(r=>r.staffId).length);
           monthsCreated.push(month);
-          const snapDate=month+'-28';
+          const snapDate=month+'-01';
           const existingIdx=newSnapshots.findIndex(s=>s.date.startsWith(month));
           if(existingIdx>=0){
             const existing=newSnapshots[existingIdx];
@@ -2417,7 +2417,7 @@ function PerformancePage({staff,perfData,setPerfData}){
         <div className="sc go"><div className="sc-lbl">Avg Utilization</div><div className="sc-val">{avgUtil!=null?avgUtil+'%':'—'}</div><div className="sc-sub">{withUtil.length} tracked</div></div>
         <div className="sc lime"><div className="sc-lbl">Completed Visits</div><div className="sc-val">{totalCompleted||'—'}</div><div className="sc-sub">{withAppts.length} practitioners</div></div>
         <div className="sc yellow"><div className="sc-lbl">Avg GVA</div><div className="sc-val">{avgGva||'—'}</div><div className="sc-sub">365-day rolling</div></div>
-        <div className="sc gray"><div className="sc-lbl">Snapshots</div><div className="sc-val">{data.snapshots.length}</div><div className="sc-sub">{data.lastImport?new Date(data.lastImport).toLocaleDateString('en-CA',{month:'short',day:'numeric'}):'No imports yet'}</div></div>
+        <div className="sc gray"><div className="sc-lbl">Snapshots</div><div className="sc-val">{data.snapshots.length}</div><div className="sc-sub">{data.lastImport?new Date(data.lastImport).toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'No imports yet'}</div></div>
       </div>
 
       {/* Period filter bar — shown on all tabs except import/gva/retention/trends */}
@@ -2929,7 +2929,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           </div>
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#555'}}>Shift Report Month</div>
-            <input type="month" value={snapDate.slice(0,7)} onChange={e=>setSnapDate(e.target.value+'-28')}
+            <input type="month" value={snapDate.slice(0,7)} onChange={e=>setSnapDate(e.target.value+'-01')}
               style={{background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:12,padding:'5px 10px',outline:'none'}}/>
           </div>
 
@@ -3729,7 +3729,7 @@ function StaffNumbersTab({staff,perfData}){
         <div>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#aaa',marginBottom:3}}>Performance Numbers</div>
           <div style={{fontSize:12,color:'#555'}}>
-            {latestSnap?`Latest data from ${new Date(latestSnap.date+'T12:00').toLocaleDateString('en-CA',{month:'long',day:'numeric',year:'numeric'})} · ${perfData.snapshots.length} snapshot${perfData.snapshots.length!==1?'s':''} total`:'No Jane data imported yet'}
+            {latestSnap?`Latest data from ${new Date(latestSnap.date.slice(0,7)+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})} · ${perfData.snapshots.length} snapshot${perfData.snapshots.length!==1?'s':''} total`:'No Jane data imported yet'}
           </div>
         </div>
         {perfData.snapshots.length>1&&<div style={{fontSize:11,color:'#44CCAA'}}>↗ Trends available</div>}
