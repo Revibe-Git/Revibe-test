@@ -2434,7 +2434,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             ))}
             {availMonths.map(m=>(
               <button key={m} className={`btn btn-xs ${periodFilter===m?'btn-lime':'btn-ghost'}`} onClick={()=>setPeriodFilter(m)}>
-                {new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}
+                {new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}
               </button>
             ))}
           </div>
@@ -2469,7 +2469,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                   <div>
                     <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',marginBottom:8}}>This Period</div>
                     <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-                      {availMonths.map(m=><button key={m} className={`btn btn-xs ${compareA===m?'btn-lime':'btn-ghost'}`} onClick={()=>setCompareA(m)}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}</button>)}
+                      {availMonths.map(m=><button key={m} className={`btn btn-xs ${compareA===m?'btn-lime':'btn-ghost'}`} onClick={()=>setCompareA(m)}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</button>)}
                       {availQuarters.map(q=><button key={q} className={`btn btn-xs ${compareA===q?'btn-lime':'btn-ghost'}`} onClick={()=>setCompareA(q)}>{q.replace('-Q',' Q')}</button>)}
                       {availYears.map(y=><button key={y} className={`btn btn-xs ${compareA===y?'btn-go':'btn-ghost'}`} onClick={()=>setCompareA(y)}>{y}</button>)}
                     </div>
@@ -2478,7 +2478,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                   <div>
                     <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#6B9FD4',marginBottom:8}}>Previous Period</div>
                     <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-                      {availMonths.map(m=><button key={m} className={`btn btn-xs ${compareB===m?'btn-go':'btn-ghost'}`} onClick={()=>setCompareB(m)}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}</button>)}
+                      {availMonths.map(m=><button key={m} className={`btn btn-xs ${compareB===m?'btn-go':'btn-ghost'}`} onClick={()=>setCompareB(m)}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</button>)}
                       {availQuarters.map(q=><button key={q} className={`btn btn-xs ${compareB===q?'btn-go':'btn-ghost'}`} onClick={()=>setCompareB(q)}>{q.replace('-Q',' Q')}</button>)}
                       {availYears.map(y=><button key={y} className={`btn btn-xs ${compareB===y?'btn-go':'btn-ghost'}`} onClick={()=>setCompareB(y)}>{y}</button>)}
                     </div>
