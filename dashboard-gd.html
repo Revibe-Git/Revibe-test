@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!DOCTYPE html><!-- v20260514221343 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2061,6 +2061,7 @@ function PerformancePage({staff,perfData,setPerfData}){
       .replace(/\bkam kei\b/,'winson')     // Winson's Jane name
       .replace(/\bvince\b/,'vincent')      // Vince → Vincent
       .replace(/\bmichael\b/,'mike')       // Michael Ross → Mike Ross
+      .replace(/\bjoshua\b/,'josh')        // Joshua → Josh
       .replace(/[-']/g,' ')               // hyphens and apostrophes to spaces
       .replace(/[^a-z\s]/g,'')            // remove non-alpha
       .replace(/\s+/g,' ').trim();
