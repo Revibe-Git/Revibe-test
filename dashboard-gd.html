@@ -2001,7 +2001,79 @@ function LineChart({snapshots,staffId,metric,color,label,fmt}){
 
 function PerformancePage({staff,perfData,setPerfData}){
   const SK='rvgd3_perf3';
+  const SB=window.__SB; // Supabase client from auth
+  const[loading,setLoading]=useState(true);
   const data=perfData||{snapshots:[],gva:{},retention:{},lastImport:null};
+
+  // Load from Supabase on mount
+  useEffect(()=>{
+    if(!SB){setLoading(false);return;}
+    const load=async()=>{
+      try{
+        // Load snapshots
+        const{data:snaps,error:se}=await SB.from('performance_snapshots').select('*').order('date',{ascending:true});
+        // Load GVA entries (latest per staff)
+        const{data:gvaRows}=await SB.from('gva_entries').select('*').order('recorded_at',{ascending:false});
+        // Load retention entries (latest per staff)
+        const{data:retRows}=await SB.from('retention_entries').select('*').order('recorded_at',{ascending:false});
+
+        if(!se&&snaps){
+          const gva={};
+          (gvaRows||[]).forEach(r=>{if(!gva[r.staff_id])gva[r.staff_id]=r.value;});
+          const retention={};
+          (retRows||[]).forEach(r=>{if(!retention[r.staff_id])retention[r.staff_id]=r.value;});
+          const d={snapshots:snaps.map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:snaps[snaps.length-1]?.created_at||null};
+          setPerfData(d);
+          try{localStorage.setItem(SK,JSON.stringify(d));}catch{}
+        }
+      }catch(e){console.warn('Supabase load failed, using localStorage',e);}
+      setLoading(false);
+    };
+    load();
+  },[]);
+
+  // Save snapshot to Supabase
+  const saveSnapshot=async(snap)=>{
+    if(!SB)return;
+    try{
+      await SB.from('performance_snapshots').upsert({
+        id:snap.id,date:snap.date,rows:snap.rows,files:snap.files,type:snap.type
+      });
+    }catch(e){console.warn('Snapshot save failed',e);}
+  };
+
+  // Save GVA to Supabase
+  const saveGVAToSB=async(staffId,value,recordedBy)=>{
+    if(!SB)return;
+    try{
+      await SB.from('gva_entries').insert({staff_id:staffId,value,recorded_by:recordedBy,recorded_at:new Date().toISOString().slice(0,10)});
+    }catch(e){console.warn('GVA save failed',e);}
+  };
+
+  // Save retention to Supabase
+  const saveRetentionToSB=async(staffId,value,recordedBy)=>{
+    if(!SB)return;
+    try{
+      await SB.from('retention_entries').insert({staff_id:staffId,value,recorded_by:recordedBy,recorded_at:new Date().toISOString().slice(0,10)});
+    }catch(e){console.warn('Retention save failed',e);}
+  };
+
+  // Delete snapshot from Supabase
+  const deleteSnapshot=async(id)=>{
+    if(!SB)return;
+    try{await SB.from('performance_snapshots').delete().eq('id',id);}catch{}
+  };
+
+  // Clear all from Supabase
+  const clearAllFromSB=async()=>{
+    if(!SB)return;
+    try{
+      await SB.from('performance_snapshots').delete().neq('id','_none_');
+      await SB.from('gva_entries').delete().neq('id','_none_');
+      await SB.from('retention_entries').delete().neq('id','_none_');
+    }catch(e){console.warn('Clear all failed',e);}
+  };
+
   const save=(d)=>{
     setPerfData(d);
     try{localStorage.setItem(SK,JSON.stringify(d));}catch{}
@@ -2263,7 +2335,12 @@ function PerformancePage({staff,perfData,setPerfData}){
 
       // Sort snapshots by date, keep last 36
       newSnapshots=newSnapshots.sort((a,b)=>a.date.localeCompare(b.date)).slice(-36);
-      save({...data,snapshots:newSnapshots,lastImport:new Date().toISOString()});
+      const newData={...data,snapshots:newSnapshots,lastImport:new Date().toISOString()};
+      save(newData);
+      // Save new snapshots to Supabase
+      for(const snap of newSnapshots){
+        await saveSnapshot(snap);
+      }
 
       const uniqMonths=[...new Set(monthsCreated)].sort();
       const monthNames=uniqMonths.map(m=>new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}));
@@ -2370,10 +2447,16 @@ function PerformancePage({staff,perfData,setPerfData}){
     return{date:snap.date,val:r?parseFloat(r[metric])||null:null};
   }).filter(d=>d.val!=null);
 
-  const saveGVA=()=>{
+  const saveGVA=async()=>{
     const ng={...data.gva};
-    Object.entries(gvaEdits).forEach(([k,v])=>{if(v!=='')ng[k]=parseFloat(v)||0;});
-    save({...data,gva:ng});setGvaEdits({});setGvaSaved(true);
+    const entries=Object.entries(gvaEdits);
+    entries.forEach(([k,v])=>{if(v!=='')ng[k]=parseFloat(v)||0;});
+    save({...data,gva:ng});
+    // Save to Supabase
+    for(const[staffId,val] of entries){
+      if(val!=='')await saveGVAToSB(staffId,parseFloat(val)||0,'management');
+    }
+    setGvaEdits({});setGvaSaved(true);
     setTimeout(()=>setGvaSaved(false),2000);
   };
 
@@ -2402,6 +2485,13 @@ function PerformancePage({staff,perfData,setPerfData}){
       </div>
     );
   };
+
+  if(loading)return(
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',padding:60,gap:12,color:'#555'}}>
+      <div style={{width:16,height:16,border:'2px solid var(--border2)',borderTopColor:'var(--go)',borderRadius:'50%',animation:'spin .7s linear infinite'}}/>
+      Loading performance data…
+    </div>
+  );
 
   return(
     <div>
@@ -2765,10 +2855,15 @@ function PerformancePage({staff,perfData,setPerfData}){
           <div className="perf-slot">
             <div className="perf-slot-head">
               <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — Manual Entry</span>
-              <button className="btn btn-lime btn-sm" onClick={()=>{
+              <button className="btn btn-lime btn-sm" onClick={async()=>{
                 const nr={...data.retention||{}};
-                Object.entries(retentionEdits).forEach(([k,v])=>{if(v!=='')nr[k]=parseFloat(v)||0;});
-                save({...data,retention:nr});setRetentionEdits({});setRetSaved(true);
+                const entries=Object.entries(retentionEdits);
+                entries.forEach(([k,v])=>{if(v!=='')nr[k]=parseFloat(v)||0;});
+                save({...data,retention:nr});
+                for(const[staffId,val] of entries){
+                  if(val!=='')await saveRetentionToSB(staffId,parseFloat(val)||0,'management');
+                }
+                setRetentionEdits({});setRetSaved(true);
                 setTimeout(()=>setRetSaved(false),2000);
               }} disabled={!Object.keys(retentionEdits).length}>{retSaved?'✓ Saved':'Save Retention'}</button>
             </div>
@@ -2915,7 +3010,8 @@ function PerformancePage({staff,perfData,setPerfData}){
               <strong style={{color:'#aaa'}}>Shift Report</strong> has no date column, so set the month it covers below.
             </div>
             <button className="btn btn-ghost btn-xs" style={{color:'#E05252',marginLeft:'auto',flexShrink:0}}
-              onClick={()=>{if(confirm('Reset ALL performance data? This clears all snapshots, GVA, and retention entries. Cannot be undone.')){
+              onClick={async()=>{if(confirm('Reset ALL performance data? This clears all snapshots, GVA, and retention entries. Cannot be undone.')){
+                await clearAllFromSB();
                 save({snapshots:[],gva:{},retention:{},lastImport:null});
                 setImportMsg({type:'success',msg:'✓ All data cleared. Import fresh CSVs to start over.'});
               }}}>
@@ -2957,7 +3053,10 @@ function PerformancePage({staff,perfData,setPerfData}){
                   {data.snapshots.length} Snapshots · {[...new Set(data.snapshots.map(s=>s.date.slice(0,7)))].length} months · {[...new Set(data.snapshots.map(s=>s.date.slice(0,4)))].sort().join(', ')}
                 </div>
                 <button className="btn btn-ghost btn-xs" style={{color:'#E05252',fontSize:11}}
-                  onClick={()=>{if(confirm('Delete ALL snapshots? This cannot be undone.'))save({...data,snapshots:[],lastImport:null});}}>
+                  onClick={async()=>{if(confirm('Delete ALL snapshots? This cannot be undone.')){{
+                    await clearAllFromSB();
+                    save({...data,snapshots:[],lastImport:null});
+                  }}}}>
                   Clear All
                 </button>
               </div>
@@ -2973,7 +3072,10 @@ function PerformancePage({staff,perfData,setPerfData}){
                       </span>
                       <span style={{fontSize:9,color:'#555'}}>{types.join('')}</span>
                       <button style={{background:'none',border:'none',color:'#333',cursor:'pointer',fontSize:10,padding:0,lineHeight:1}}
-                        onClick={()=>{if(confirm('Delete this snapshot?'))save({...data,snapshots:data.snapshots.filter(s=>s.id!==snap.id)});}}>✕</button>
+                        onClick={async()=>{if(confirm('Delete this snapshot?')){
+                          await deleteSnapshot(snap.id);
+                          save({...data,snapshots:data.snapshots.filter(s=>s.id!==snap.id)});
+                        }}}>✕</button>
                     </div>
                   );
                 })}
