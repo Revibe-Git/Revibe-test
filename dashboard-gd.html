@@ -2913,6 +2913,13 @@ function PerformancePage({staff,perfData,setPerfData}){
               <strong style={{color:'#aaa'}}>Appointments</strong> and <strong style={{color:'#aaa'}}>Sales</strong> CSVs auto-split by month from the row dates — just drop them in.<br/>
               <strong style={{color:'#aaa'}}>Shift Report</strong> has no date column, so set the month it covers below.
             </div>
+            <button className="btn btn-ghost btn-xs" style={{color:'#E05252',marginLeft:'auto',flexShrink:0}}
+              onClick={()=>{if(confirm('Reset ALL performance data? This clears all snapshots, GVA, and retention entries. Cannot be undone.')){
+                save({snapshots:[],gva:{},retention:{},lastImport:null});
+                setImportMsg({type:'success',msg:'✓ All data cleared. Import fresh CSVs to start over.'});
+              }}}>
+              ⚠ Reset All Data
+            </button>
           </div>
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'2px',textTransform:'uppercase',color:'#555'}}>Shift Report Month</div>
