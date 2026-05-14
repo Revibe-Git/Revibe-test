@@ -2623,6 +2623,10 @@ function PerformancePage({staff,perfData,setPerfData}){
                         A dates: {filterSnaps(compareA).map(s=>s.date.slice(0,7)).join(',')} · 
                         B dates: {filterSnaps(compareB).map(s=>s.date.slice(0,7)).join(',')}
                       </div>
+                      <div style={{fontSize:10,color:'#666'}}>
+                        Morgan A: {filterSnaps(compareA).map(s=>{const r=s.rows?.find(r=>r.name&&r.name.includes('Morgan'));return r?`${s.date.slice(0,7)}=$${r.revenue}`:'no'}).join(' ')}
+                        · Morgan B: {filterSnaps(compareB).map(s=>{const r=s.rows?.find(r=>r.name&&r.name.includes('Morgan'));return r?`${s.date.slice(0,7)}=$${r.revenue}`:'no'}).join(' ')}
+                      </div>
                       <div style={{display:'flex',gap:16,fontSize:11,alignItems:'center'}}>
                         <span style={{display:'flex',alignItems:'center',gap:6}}><span style={{width:12,height:12,borderRadius:2,background:'#CAE8C1',display:'inline-block'}}/>{fmtPeriod(compareA)}</span>
                         <span style={{display:'flex',alignItems:'center',gap:6}}><span style={{width:12,height:12,borderRadius:2,background:'#6B9FD4',display:'inline-block',opacity:0.6}}/>{fmtPeriod(compareB)}</span>
