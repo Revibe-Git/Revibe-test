@@ -2008,40 +2008,41 @@ function LineChart({snapshots,staffId,metric,color,label,fmt}){
 
 function PerformancePage({staff,perfData,setPerfData}){
   const SK='rvgd3_perf3';
-  const SB=window.__SB; // Supabase client from auth
   const[loading,setLoading]=useState(true);
   const data=perfData||{snapshots:[],gva:{},retention:{},lastImport:null};
 
-  // Load from Supabase on mount
+  // Load from Supabase on mount — read __SB inside effect so auth has time to set it
   useEffect(()=>{
-    if(!SB){setLoading(false);return;}
-    const load=async()=>{
+    const tryLoad=async()=>{
+      const SB=window.__SB;
+      if(!SB){
+        // No Supabase yet — data already starts empty from App state
+        setLoading(false);
+        return;
+      }
       try{
-        // Load snapshots
         const{data:snaps,error:se}=await SB.from('performance_snapshots').select('*').order('date',{ascending:true});
-        // Load GVA entries (latest per staff)
         const{data:gvaRows}=await SB.from('gva_entries').select('*').order('recorded_at',{ascending:false});
-        // Load retention entries (latest per staff)
         const{data:retRows}=await SB.from('retention_entries').select('*').order('recorded_at',{ascending:false});
-
-        if(!se&&snaps){
+        if(!se){
           const gva={};
           (gvaRows||[]).forEach(r=>{if(!gva[r.staff_id])gva[r.staff_id]=r.value;});
           const retention={};
           (retRows||[]).forEach(r=>{if(!retention[r.staff_id])retention[r.staff_id]=r.value;});
-          const d={snapshots:snaps.map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:snaps[snaps.length-1]?.created_at||null};
-          setPerfData(d);
-          try{localStorage.setItem(SK,JSON.stringify(d));}catch{}
+          const loaded={snapshots:(snaps||[]).map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:(snaps||[]).length?(snaps[snaps.length-1]?.created_at||null):null};
+          setPerfData(loaded);
         }
-      }catch(e){console.warn('Supabase load failed, using localStorage',e);}
+      }catch(e){console.warn('Supabase perf load error:',e);}
       setLoading(false);
     };
-    load();
+    // Small delay to let auth initialize __SB
+    const t=setTimeout(tryLoad,800);
+    return()=>clearTimeout(t);
   },[]);
 
   // Save snapshot to Supabase
   const saveSnapshot=async(snap)=>{
-    if(!SB)return;
+    const SB=window.__SB;if(!SB)return;
     try{
       await SB.from('performance_snapshots').upsert({
         id:snap.id,date:snap.date,rows:snap.rows,files:snap.files,type:snap.type
@@ -2051,7 +2052,7 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   // Save GVA to Supabase
   const saveGVAToSB=async(staffId,value,recordedBy)=>{
-    if(!SB)return;
+    const SB=window.__SB;if(!SB)return;
     try{
       await SB.from('gva_entries').insert({staff_id:staffId,value,recorded_by:recordedBy,recorded_at:new Date().toISOString().slice(0,10)});
     }catch(e){console.warn('GVA save failed',e);}
@@ -2059,7 +2060,7 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   // Save retention to Supabase
   const saveRetentionToSB=async(staffId,value,recordedBy)=>{
-    if(!SB)return;
+    const SB=window.__SB;if(!SB)return;
     try{
       await SB.from('retention_entries').insert({staff_id:staffId,value,recorded_by:recordedBy,recorded_at:new Date().toISOString().slice(0,10)});
     }catch(e){console.warn('Retention save failed',e);}
@@ -2067,13 +2068,13 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   // Delete snapshot from Supabase
   const deleteSnapshot=async(id)=>{
-    if(!SB)return;
+    const SB=window.__SB;if(!SB)return;
     try{await SB.from('performance_snapshots').delete().eq('id',id);}catch{}
   };
 
   // Clear all from Supabase
   const clearAllFromSB=async()=>{
-    if(!SB)return;
+    const SB=window.__SB;if(!SB)return;
     try{
       await SB.from('performance_snapshots').delete().neq('id','_none_');
       await SB.from('gva_entries').delete().neq('id','_none_');
