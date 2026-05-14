@@ -2015,13 +2015,15 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[loading,setLoading]=useState(true);
   const data=perfData||{snapshots:[],gva:{},retention:{},lastImport:null};
 
-  // Load from Supabase on mount — read __SB inside effect so auth has time to set it
+  // Load from Supabase on mount — retry until __SB is available
   useEffect(()=>{
+    let attempts=0;
     const tryLoad=async()=>{
       const SB=window.__SB;
       if(!SB){
-        // No Supabase yet — data already starts empty from App state
-        setLoading(false);
+        attempts++;
+        if(attempts<10){setTimeout(tryLoad,500);}
+        else{setLoading(false);}
         return;
       }
       try{
@@ -2035,23 +2037,22 @@ function PerformancePage({staff,perfData,setPerfData}){
           (retRows||[]).forEach(r=>{if(!retention[r.staff_id])retention[r.staff_id]=r.value;});
           const loaded={snapshots:(snaps||[]).map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:(snaps||[]).length?(snaps[snaps.length-1]?.created_at||null):null};
           setPerfData(loaded);
-        }
-      }catch(e){console.warn('Supabase perf load error:',e);}
+        }else{console.warn('[Perf] Supabase error:',se);}
+      }catch(e){console.warn('[Perf] Load failed:',e);}
       setLoading(false);
     };
-    // Small delay to let auth initialize __SB
-    const t=setTimeout(tryLoad,800);
-    return()=>clearTimeout(t);
+    setTimeout(tryLoad,300);
   },[]);
 
   // Save snapshot to Supabase
   const saveSnapshot=async(snap)=>{
     const SB=window.__SB;if(!SB)return;
     try{
-      await SB.from('performance_snapshots').upsert({
+      const{error}=await SB.from('performance_snapshots').upsert({
         id:snap.id,date:snap.date,rows:snap.rows,files:snap.files,type:snap.type
       });
-    }catch(e){console.warn('Snapshot save failed',e);}
+      if(error)console.warn('[Perf] saveSnapshot error:',error);
+    }catch(e){console.warn('[Perf] saveSnapshot failed:',e);}
   };
 
   // Save GVA to Supabase
