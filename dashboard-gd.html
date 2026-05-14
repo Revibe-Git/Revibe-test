@@ -2061,11 +2061,12 @@ function PerformancePage({staff,perfData,setPerfData}){
       .replace(/\bkam kei\b/,'winson')     // Winson's Jane name
       .replace(/\bvince\b/,'vincent')      // Vince → Vincent
       .replace(/\bmichael\b/,'mike')       // Michael Ross → Mike Ross
-      .replace(/[-]/g,' ')                 // hyphens to spaces
+      .replace(/[-']/g,' ')               // hyphens and apostrophes to spaces
       .replace(/[^a-z\s]/g,'')            // remove non-alpha
       .replace(/\s+/g,' ').trim();
 
     const n=clean(name);
+    if(!n)return null;
     // exact after cleaning
     let m=staff.find(s=>clean(s.name)===n);
     if(m)return m;
@@ -2082,7 +2083,7 @@ function PerformancePage({staff,perfData,setPerfData}){
       m=staff.find(s=>clean(s.name).split(' ').pop()===last);
       if(m)return m;
     }
-    // fuzzy last name — handles MacPherson vs MacPhearson
+    // fuzzy last name — handles MacPherson vs MacPhearson, Patino vs Pitano
     if(last.length>5){
       m=staff.find(s=>{
         const sl=clean(s.name).split(' ').pop();
