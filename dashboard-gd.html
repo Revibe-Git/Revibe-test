@@ -2107,22 +2107,29 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   /* ── CSV parser ─────────────────────────────── */
   const parseCSV=(text)=>{
-    const lines=text.split(/\r?\n/).filter(l=>l.trim());
-    if(lines.length<2)return[];
-    const parseRow=(line)=>{
-      const vals=[];let cur='',inQ=false;
-      for(const c of line){
-        if(c==='"'){inQ=!inQ;}
-        else if(c===','&&!inQ){vals.push(cur.replace(/^"|"$/g,'').trim());cur='';}
-        else cur+=c;
+    // Proper CSV parser that handles quoted fields with embedded newlines and commas
+    const rows=[];
+    let i=0,cur='',inQ=false,fields=[];
+    while(i<=text.length){
+      const c=text[i];
+      if(c==='"'){
+        if(inQ&&text[i+1]==='"'){cur+='"';i+=2;continue;} // escaped quote
+        inQ=!inQ;i++;continue;
       }
-      vals.push(cur.replace(/^"|"$/g,'').trim());
-      return vals;
-    };
-    const headers=parseRow(lines[0]).map(h=>h.toLowerCase().trim());
-    return lines.slice(1).map(l=>{
-      const vals=parseRow(l);
-      const obj={};headers.forEach((h,i)=>obj[h]=vals[i]||'');
+      if(c===','&&!inQ){fields.push(cur.trim());cur='';i++;continue;}
+      if((c==='\n'||c==='\r'||c===undefined)&&!inQ){
+        if(c==='\r'&&text[i+1]==='\n')i++;
+        fields.push(cur.trim());
+        if(fields.some(f=>f))rows.push(fields);
+        fields=[];cur='';i++;continue;
+      }
+      cur+=(c||'');i++;
+    }
+    if(!rows.length)return[];
+    const headers=rows[0].map(h=>h.toLowerCase().replace(/^"|"$/g,'').trim());
+    return rows.slice(1).map(vals=>{
+      const obj={};
+      headers.forEach((h,idx)=>obj[h]=(vals[idx]||'').replace(/^"|"$/g,'').trim());
       return obj;
     }).filter(r=>Object.values(r).some(v=>v));
   };
@@ -2617,15 +2624,6 @@ function PerformancePage({staff,perfData,setPerfData}){
                     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
                       <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#ddd',letterSpacing:'1px'}}>
                         {fmtPeriod(compareA)} <span style={{color:'#333',fontWeight:400,fontSize:14,margin:'0 10px'}}>vs</span> {fmtPeriod(compareB)}
-                      </div>
-                      <div style={{fontSize:10,color:'#444'}}>
-                        A snaps: {filterSnaps(compareA).length} · B snaps: {filterSnaps(compareB).length} · 
-                        A dates: {filterSnaps(compareA).map(s=>s.date.slice(0,7)).join(',')} · 
-                        B dates: {filterSnaps(compareB).map(s=>s.date.slice(0,7)).join(',')}
-                      </div>
-                      <div style={{fontSize:10,color:'#666'}}>
-                        Morgan A: {filterSnaps(compareA).map(s=>{const r=s.rows?.find(r=>r.name&&r.name.includes('Morgan'));return r?`${s.date.slice(0,7)}=$${r.revenue}`:'no'}).join(' ')}
-                        · Morgan B: {filterSnaps(compareB).map(s=>{const r=s.rows?.find(r=>r.name&&r.name.includes('Morgan'));return r?`${s.date.slice(0,7)}=$${r.revenue}`:'no'}).join(' ')}
                       </div>
                       <div style={{display:'flex',gap:16,fontSize:11,alignItems:'center'}}>
                         <span style={{display:'flex',alignItems:'center',gap:6}}><span style={{width:12,height:12,borderRadius:2,background:'#CAE8C1',display:'inline-block'}}/>{fmtPeriod(compareA)}</span>
