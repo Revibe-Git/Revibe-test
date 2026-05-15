@@ -8595,5 +8595,42 @@ function SystematicPage(){
 ReactDOM.render(<App/>,document.getElementById('root'));
 
 </script>
+
+<!-- ── Supabase Auth Script ──────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  const SUPABASE_URL='https://ekjzbdvvxvylembmrphv.supabase.co';
+  const SUPABASE_KEY='sb_publishable_2NpHtgiPTvrqi3bkQiejNw_Ob5dsATN';
+  const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+  window.__SB=sb;
+
+  window.handleSignOut=async function(){
+    await sb.auth.signOut();
+    window.__RV_USER=null;
+    window.location.reload();
+  };
+
+  async function loadUserFromSession(session){
+    const email=session.user.email;
+    const{data:row,error}=await sb.from('staff').select('id,name,discipline,role').eq('email',email).single();
+    if(error||!row){await sb.auth.signOut();return;}
+    const isAdmin=row.discipline==='mgmt'||['management','clinic_lead','lead','admin'].includes((row.role||'').toLowerCase());
+    window.__RV_USER={id:row.id,name:row.name,email,discipline:row.discipline,role:row.role||'therapist',isAdmin};
+    window.dispatchEvent(new Event('rv-auth-ready'));
+  }
+
+  async function init(){
+    const{data:{session}}=await sb.auth.getSession();
+    if(session){await loadUserFromSession(session);}
+  }
+
+  sb.auth.onAuthStateChange((event,session)=>{
+    if(event==='SIGNED_IN'&&session&&!window.__RV_USER){loadUserFromSession(session);}
+  });
+
+  init();
+})();
+</script>
 </body>
 </html>
