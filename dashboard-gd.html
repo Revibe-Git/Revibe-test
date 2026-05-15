@@ -4092,7 +4092,7 @@ function AddStaffModal({onClose,onSave}){
                 <optgroup label="Strength &amp; Conditioning">
                   <option>Strength &amp; Conditioning Coach</option>
                   <option>Personal Trainer</option>
-                  <option>Senior S&amp;C Coach</option>
+                  <option>Senior Performance Coach</option>
                 </optgroup>
               </select></div>
             <div className="fg"><label>Site</label><select value={f.site} onChange={e=>set('site',e.target.value)}>{SITES.map(s=><option key={s}>{s}</option>)}</select></div>
@@ -5634,7 +5634,7 @@ const SEED_LEADERSHIP = [
     notes:'',
   },
   {
-    id:'lt-zeeruk',name:'Zeeruk Rehman',disc:'PT',level:2,role:'PT / S&C',primaryLoc:'Mississauga',secondaryLoc:'',
+    id:'lt-zeeruk',name:'Zeeruk Rehman',disc:'PT',level:2,role:'PT / Performance',primaryLoc:'Mississauga',secondaryLoc:'',
     region:'West',status:'Full-Time',weeklyHrs:40,leadHrs:3,timeAvail:'Yes',travel:'No',
     risk:'Moderate',finStab:'Stable',pathway:'Performance',lastReview:'2025-11-03',nextReview:'2026-02-03',
     s2:{clinical:7,utilRev:7,initiative:7,teamContrib:7,commInfluence:6,systemsDocs:7,communityBrand:6,mentorship:5,emotMaturity:7,bizAwareness:6,crossLoc:7,autonomous:7},
@@ -5843,7 +5843,7 @@ function getBandLabel(v){
                 <optgroup label="Strength &amp; Conditioning">
                   <option>Strength &amp; Conditioning Coach</option>
                   <option>Personal Trainer</option>
-                  <option>Senior S&amp;C Coach</option>
+                  <option>Senior Performance Coach</option>
                 </optgroup>
               </select></div>
         <div className="fg"><label>Site</label><select value={f.site} onChange={e=>set('site',e.target.value)}>{SITES.map(s=><option key={s}>{s}</option>)}</select></div>
@@ -6259,7 +6259,7 @@ function LtProfileModal({person,onClose,onUpdate}){
               <div style={{background:'rgba(0,88,77,.12)',border:'1px solid rgba(0,88,77,.3)',borderRadius:5,padding:'8px 14px',marginBottom:12,fontSize:12,color:'var(--lime)'}}>✎ Edit profile — click Save All when done</div>
               <div className="fgrid">
                 <div className="fg full"><label>Full Name</label><input value={s1.name} onChange={e=>setS1(p=>({...p,name:e.target.value}))}/></div>
-                <div className="fg"><label>Discipline</label><select value={s1.disc} onChange={e=>setS1(p=>({...p,disc:e.target.value}))}>{['PT','Chiro','RMT','S&C','Admin','Spa'].map(d=><option key={d}>{d}</option>)}</select></div>
+                <div className="fg"><label>Discipline</label><select value={s1.disc} onChange={e=>setS1(p=>({...p,disc:e.target.value}))}>{['PT','Chiro','RMT','Performance','Admin','Spa'].map(d=><option key={d}>{d}</option>)}</select></div>
                 <div className="fg"><label>Level</label><select value={s1.level} onChange={e=>setS1(p=>({...p,level:parseInt(e.target.value)}))}>{[1,2,3,4].map(l=><option key={l} value={l}>Level {l}</option>)}</select></div>
                 <div className="fg"><label>Role</label><input value={s1.role} onChange={e=>setS1(p=>({...p,role:e.target.value}))}/></div>
                 <div className="fg"><label>Primary Location</label><select value={s1.primaryLoc} onChange={e=>setS1(p=>({...p,primaryLoc:e.target.value}))}>{['Markham','Mississauga','Toronto','Ajax','Oakville'].map(l=><option key={l}>{l}</option>)}</select></div>
@@ -6420,7 +6420,7 @@ function AddLtProfileModal({onClose,onAdd}){
           <div className="bc fw6" style={{fontSize:20,letterSpacing:2,marginBottom:16}}>ADD TO LEADERSHIP TRACKER</div>
           <div className="fgrid">
             <div className="fg full"><label>Full Name</label><input value={f.name} onChange={e=>set('name',e.target.value)} placeholder="First Last"/></div>
-            <div className="fg"><label>Discipline</label><select value={f.disc} onChange={e=>set('disc',e.target.value)}>{['PT','Chiro','RMT','S&C','Admin','Spa'].map(d=><option key={d}>{d}</option>)}</select></div>
+            <div className="fg"><label>Discipline</label><select value={f.disc} onChange={e=>set('disc',e.target.value)}>{['PT','Chiro','RMT','Performance','Admin','Spa'].map(d=><option key={d}>{d}</option>)}</select></div>
             <div className="fg"><label>Level</label><select value={f.level} onChange={e=>set('level',parseInt(e.target.value))}>{[1,2,3,4].map(l=><option key={l} value={l}>Level {l}</option>)}</select></div>
             <div className="fg full"><label>Role</label><select value={f.role} onChange={e=>set('role',e.target.value)}>
                 <optgroup label="Physiotherapy">
@@ -6461,7 +6461,7 @@ function AddLtProfileModal({onClose,onAdd}){
                 <optgroup label="Strength &amp; Conditioning">
                   <option>Strength &amp; Conditioning Coach</option>
                   <option>Personal Trainer</option>
-                  <option>Senior S&amp;C Coach</option>
+                  <option>Senior Performance Coach</option>
                 </optgroup>
               </select></div>
             <div className="fg"><label>Primary Location</label><select value={f.primaryLoc} onChange={e=>set('primaryLoc',e.target.value)}>{['Markham','Mississauga','Toronto','Ajax','Oakville'].map(l=><option key={l}>{l}</option>)}</select></div>
