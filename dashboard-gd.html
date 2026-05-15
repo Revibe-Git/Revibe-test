@@ -3631,6 +3631,7 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff,p
                 <span className="muted">{staff.role}</span>
                 {staff.split&&<span style={{marginLeft:6,fontSize:11,background:'rgba(68,204,170,.1)',color:'#44CCAA',border:'1px solid rgba(68,204,170,.2)',borderRadius:3,padding:'1px 7px'}}>{staff.split}% split</span>}
                 {staff.stipend&&<span style={{marginLeft:4,fontSize:11,background:'rgba(244,219,113,.08)',color:'#F4DB71',border:'1px solid rgba(244,219,113,.2)',borderRadius:3,padding:'1px 7px'}}>+Stipend</span>}
+                {staff.pelvicFloor&&<span style={{marginLeft:4,fontSize:11,background:'rgba(187,153,255,.08)',color:'#BB99FF',border:'1px solid rgba(187,153,255,.2)',borderRadius:3,padding:'1px 7px'}}>Pelvic Floor</span>}
                 <span className="muted">·</span>
                 <span className="muted">{staff.site}</span>
                 {staff.roadmap&&<span className="badge b-quarterly">{staff.roadmap}</span>}
@@ -5791,7 +5792,7 @@ function getBandLabel(v){
       {staff.notes&&<div className="hb hb-gray mb14"><div style={{fontSize:8,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',marginBottom:5}}>Profile Summary</div><div className="sm" style={{lineHeight:1.65}}>{staff.notes}</div></div>}
       {staff.reflection&&staff.reflection.length>20&&<div className="note-item mb14"><div className="note-date">Latest G&D Reflection</div><div className="sm" style={{lineHeight:1.6}}>{staff.reflection}</div></div>}
       <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'12px 16px'}}>
-        {[['Name',staff.name],['Email',staff.email||'—'],['Discipline',DISC.find(d=>d.id===staff.discipline)?.label||staff.discipline],['Role',staff.role||'—'],['Site',staff.site||'—'],['Roadmap',staff.roadmap||'—'],['Archetype',staff.archetype||'—'],['Split %',staff.split?(staff.split+'%'):'—'],['Stipend',staff.stipend?'Yes':'No'],['GVA',(()=>{const pd=perfData||{};const gv=(pd.gva||{})[staff.id];return gv?gv+' visits / active guest (365-day)':'Not set — log in Performance tab'})()]].map(([k,v])=>(
+        {[['Name',staff.name],['Email',staff.email||'—'],['Discipline',DISC.find(d=>d.id===staff.discipline)?.label||staff.discipline],['Role',staff.role||'—'],['Site',staff.site||'—'],['Roadmap',staff.roadmap||'—'],['Archetype',staff.archetype||'—'],['Split %',staff.split?(staff.split+'%'):'—'],['Stipend',staff.stipend?'Yes':'No'],['Specialization',staff.pelvicFloor?'Pelvic Floor Physiotherapist':'—'],['GVA',(()=>{const pd=perfData||{};const gv=(pd.gva||{})[staff.id];return gv?gv+' visits / active guest (365-day)':'Not set — log in Performance tab'})()]].filter(([k])=>k!=='Specialization'||staff.discipline==='pt').map(([k,v])=>(
           <div key={k} style={{display:'flex',alignItems:'center',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
             <span style={{fontSize:12,color:'#999',minWidth:100}}>{k}</span>
             <span style={{fontSize:12,color:'var(--text)'}}>{v}</span>
@@ -5859,6 +5860,9 @@ function getBandLabel(v){
         <div className="fg"><label>Archetype</label><input value={f.archetype} onChange={e=>set('archetype',e.target.value)} placeholder="Anchor / Builder / Mentor…"/></div>
         <div className="fg"><label>Split %<span style={{fontSize:10,fontWeight:400,color:'#777',letterSpacing:0,textTransform:'none'}}> — set at yearly G&D</span></label><input value={f.split||''} onChange={e=>set('split',e.target.value)} placeholder="e.g. 45" type="number" min="0" max="100"/></div>
         <div className="fg"><label>Monthly Stipend</label><label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginTop:5,fontSize:12,color:'#aaa',fontFamily:'Barlow,sans-serif',letterSpacing:'normal',textTransform:'none'}}><input type="checkbox" checked={!!f.stipend} onChange={e=>set('stipend',e.target.checked)} style={{accentColor:'var(--go)'}}/> Receives monthly stipend</label></div>
+        {(f.discipline==='pt'||staff.discipline==='pt')&&(
+          <div className="fg"><label>Specialization</label><label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginTop:5,fontSize:12,color:'#aaa',fontFamily:'Barlow,sans-serif',letterSpacing:'normal',textTransform:'none'}}><input type="checkbox" checked={!!f.pelvicFloor} onChange={e=>set('pelvicFloor',e.target.checked)} style={{accentColor:'var(--go)'}}/> Pelvic Floor Physiotherapist</label></div>
+        )}
         <div className="fg full"><label>Rubric Tracks</label>
           <div className="flex aic g6" style={{paddingTop:4}}>{['clinical','spa','sc'].map(t=><button key={t} className={`track-pill tp-${t}${f.tracks.includes(t)?' active':''}`} onClick={()=>toggleTrack(t)}>{TRACK_META[t]?.label}</button>)}</div>
         </div>
