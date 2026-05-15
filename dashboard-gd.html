@@ -903,107 +903,94 @@ const RUBRIC_SYSTEMS = {
   },
   "sc": {
     "id": "sc",
-    "label": "S&C / Performance",
-    "tagline": "Programming is the plan. Coaching is the delivery. Results are the proof.",
+    "label": "Performance Coaching",
+    "tagline": "Coaching is leadership. Hard skills matter. Soft skills multiply hard skills.",
     "color": "#F4DB71",
-    "headerNote": "A 7/10 represents clinical competency tied to diagnosis + integration. 8\u201310 reflects integrative and predictive care.",
-    "col04Label": "0\u20134 (Surface / Mechanical)",
-    "col56Label": "5\u20136 (Transactional / Basic)",
-    "col7Label": "7 (Competent: Integrative)",
-    "col810Label": "8\u201310 (Predictive / Leader)",
+    "headerNote": "A 7/10 represents independent competency at Revibe coaching standards. 8–10 reflects advanced leadership, mentorship, and elite athlete outcomes.",
+    "col04Label": "1–4 (Foundational / Developing)",
+    "col56Label": "5–6 (Emerging / Functional)",
+    "col7Label": "7 (Competent: Revibe Standard)",
+    "col810Label": "8–10 (Advanced / Elite / Mastery)",
     "cats": [
       {
         "id": "comm",
-        "label": "Communication & Connection",
+        "label": "Communication & Trust",
+        "weight": 25
+      },
+      {
+        "id": "awareness",
+        "label": "Awareness & Athlete Reading",
         "weight": 20
       },
       {
-        "id": "history",
-        "label": "Health History & Subjective Intake",
-        "weight": 10
-      },
-      {
-        "id": "assessment",
-        "label": "Observation & Assessment",
-        "weight": 10
-      },
-      {
-        "id": "programming",
-        "label": "Programming & Intent Alignment",
-        "weight": 30
+        "id": "structure",
+        "label": "Session Structure, Intent & Flow",
+        "weight": 20
       },
       {
         "id": "cueing",
-        "label": "Cueing & Movement Coaching",
-        "weight": 15
+        "label": "Movement Coaching & Cueing",
+        "weight": 20
       },
       {
         "id": "energy",
-        "label": "Energy, Leadership & Session Control",
+        "label": "Energy, Leadership & Environment Control",
         "weight": 10
       },
       {
-        "id": "professionalism",
-        "label": "Professionalism & Documentation",
+        "id": "brand",
+        "label": "Brand Presence & Community Involvement",
         "weight": 5
       }
     ],
     "catDefs": [
       {
         "id": "comm",
-        "label": "Communication & Connection",
-        "col04": "Scripted; low energy; one-way instruction",
-        "col56": "Basic rapport; checks in but not adaptive",
-        "col7": "Engaging; adjusts tone & language to client",
-        "col810": "Intuitive communicator; inspires effort & ownership"
+        "label": "Communication & Trust",
+        "col04": "Scripted or passive; one-way instruction; low athlete buy-in; cannot adapt communication style",
+        "col56": "Basic rapport established; checks in but inconsistent; limited emotional intelligence; accountability is reactive",
+        "col7": "Clear and concise; builds trust consistently; explains session intent and 'why'; adapts communication style to athlete",
+        "col810": "Intuitive communicator; inspires ownership; drives accountability through trust; natural relationship builder; athletes self-correct"
       },
       {
-        "id": "history",
-        "label": "Health History & Subjective Intake",
-        "col04": "Quick soreness check only; no load awareness",
-        "col56": "Asks about pain & fatigue; limited context",
-        "col7": "Connects readiness, stress, sleep to session plan",
-        "col810": "Layers psychosocial + performance variables; adjusts strategically"
+        "id": "awareness",
+        "label": "Awareness & Athlete Reading",
+        "col04": "Only reacts to obvious cues; no environmental awareness; cannot read room or athlete energy",
+        "col56": "Notices basic fatigue or pain signals; limited real-time adaptability; situational awareness developing",
+        "col7": "Adjusts coaching effectively in real time; reads body language and energy; understands when to push or pull back",
+        "col810": "Elite situational awareness; anticipates athlete behavior patterns; adapts naturally before issues arise; controls environment proactively"
       },
       {
-        "id": "assessment",
-        "label": "Observation & Assessment",
-        "col04": "Only corrects obvious errors; reactive",
-        "col56": "Identifies basic faults; fixes locally",
-        "col7": "Reads movement chains; adjusts load & position",
-        "col810": "Sees compensation patterns early; prevents breakdown before it appears"
-      },
-      {
-        "id": "programming",
-        "label": "Programming & Intent Alignment",
-        "col04": "Random or template-based session",
-        "col56": "Session fits general goal but lacks progression",
-        "col7": "Session clearly tied to phase & long-term objective",
-        "col810": "Predictive progression; session builds toward measurable performance outcome"
+        "id": "structure",
+        "label": "Session Structure, Intent & Flow",
+        "col04": "Random or template-only sessions; poor pacing; disorganized transitions; no clear progression logic",
+        "col56": "Sessions have basic structure; some intent but inconsistent progression; transitions slow; engagement drops",
+        "col7": "Structured sessions with clear intent; logical exercise flow; appropriate progressions; organized pacing; consistent athlete engagement",
+        "col810": "Predictive programming; every decision serves long-term development; elite session flow; athlete always understands why and buys in fully"
       },
       {
         "id": "cueing",
-        "label": "Cueing & Movement Coaching",
-        "col04": "Generic cues; over-talks or under-coaches",
-        "col56": "Gives correct cues but inconsistent timing",
-        "col7": "Clear, efficient cues; uses verbal/visual/tactile well",
-        "col810": "High-level coaching presence; cues elevate intensity & precision instantly"
+        "label": "Movement Coaching & Cueing",
+        "col04": "Generic or over-coached cues; poor demonstration quality; misses technical faults; no regressions/progressions",
+        "col56": "Correct cues but inconsistent timing; demonstrations adequate; identifies basic faults but fixes locally only",
+        "col7": "Effective cueing and demonstrations; corrects movement appropriately; uses verbal, visual, and tactile cues well; simplifies concepts",
+        "col810": "High-level coaching presence; cues elevate intensity and precision instantly; sees compensation chains early; regressions and progressions are fluid"
       },
       {
         "id": "energy",
-        "label": "Energy, Leadership & Session Control",
-        "col04": "Session feels disorganized; passive control",
-        "col56": "Adequate flow; minor downtime or drift",
-        "col7": "Smooth transitions; strong room command",
-        "col810": "Elite leadership; high tempo, zero wasted time, client fully engaged"
+        "label": "Energy, Leadership & Environment Control",
+        "col04": "Passive presence; low confidence; session feels disorganized; no room command; cannot maintain standards",
+        "col56": "Adequate control; voice present but inconsistent; minor drift in environment; authority not fully established",
+        "col7": "Confident session leadership; strong room control; maintains environment standards; commands respect consistently",
+        "col810": "Elite leadership presence; sets tone instantly; zero wasted energy; athletes perform at higher level because of the coach in the room"
       },
       {
-        "id": "professionalism",
-        "label": "Professionalism & Documentation",
-        "col04": "No tracking; reactive scheduling",
-        "col56": "Basic load entry; minimal future planning",
-        "col7": "Tracks metrics; preps next progression step",
-        "col810": "Strategic tracking; anticipates plateaus; protects retention"
+        "id": "brand",
+        "label": "Brand Presence & Community Involvement",
+        "col04": "Minimal participation; limited brand awareness; not visible in community or content",
+        "col56": "Some involvement in events and content; inconsistent participation; limited referral or relationship development",
+        "col7": "Consistent involvement in community and brand initiatives; participates in content and event support; positive Revibe representation",
+        "col810": "Leadership in brand awareness; drives educational content; strong community relationships; generates referrals naturally; elevates brand visibility"
       }
     ],
     "roadmap": {
@@ -1267,7 +1254,7 @@ const SEED_STAFF = [
     "name": "Zeeruk Rehman",
     "email": "zeeruk@revibeto.com",
     "discipline": "pt",
-    "role": "Physiotherapist / S&C Coach",
+    "role": "Physiotherapist / Performance Coach",
     "site": "Mississauga",
     "roadmap": "L2\u2192L3",
     "tracks": [
@@ -1288,7 +1275,7 @@ const SEED_STAFF = [
       "sc": null
     },
     "archetype": "",
-    "notes": "Strong exercise programming (8/10) and assessment. Manual technique is a significant gap at 3/10 on clinical track. Also assessed under S&C model.",
+    "notes": "Strong exercise programming (8/10) and assessment. Manual technique is a significant gap at 3/10 on clinical track. Also assessed under Performance Coaching model.",
     "reflection": "Yearly G&D review discussed technique gaps. Zeeruk committed to focused manual training."
   },
   {
@@ -1780,7 +1767,7 @@ const PERIODS=['Weekly','Monthly','Quarterly','Annual'];
 const TRACK_META={
   clinical:{label:'Clinical',color:'#CAE8C1',cls:'b-clinical',tpCls:'tp-clinical'},
   spa:     {label:'Spa',     color:'#BB99FF', cls:'b-spa',     tpCls:'tp-spa'},
-  sc:      {label:'S&C',     color:'#F4DB71', cls:'b-sc',      tpCls:'tp-sc'},
+  sc:      {label:'Performance',     color:'#F4DB71', cls:'b-sc',      tpCls:'tp-sc'},
 };
 const NAV=[
   {id:'overview',  icon:'▣', label:'Overview'},
@@ -3218,7 +3205,7 @@ function StaffPage({staff,openProfile,setModal}){
             <option value="all">All Tracks</option>
             <option value="clinical">Clinical</option>
             <option value="spa">Spa</option>
-            <option value="sc">S&C / Performance</option>
+            <option value="sc">Performance Coaching</option>
           </select>
         </div>
         <div className="flex aic g6"><span className="muted">{filtered.length} staff</span><button className="btn btn-lime btn-sm" onClick={()=>setModal('addStaff')}>+ Add Staff</button></div>
@@ -3356,7 +3343,7 @@ function MentorsPage({staff,sessions,evals,openProfile}){
       <div className="card">
         <div className="card-head"><span className="card-lbl">All Staff — Track & Score Overview</span></div>
         <div className="tbl-wrap"><table>
-          <thead><tr><th>Staff</th><th>Tracks</th><th>Roadmap</th><th>Clinical</th><th>Spa</th><th>S&C</th><th>Best Level</th></tr></thead>
+          <thead><tr><th>Staff</th><th>Tracks</th><th>Roadmap</th><th>Clinical</th><th>Spa</th><th>Perf</th><th>Best Level</th></tr></thead>
           <tbody>
             {staff.filter(s=>s.tracks&&s.tracks.length>0).map(s=>{
               const cSc=s.scores?.clinical?.total??null;
@@ -3428,7 +3415,7 @@ function GapsPage({staff,evals,openProfile}){
       <div className="card">
         <div className="card-head"><span className="card-lbl">Full Staff Score Matrix</span></div>
         <div className="tbl-wrap"><table>
-          <thead><tr><th>Staff</th><th>Tracks</th><th>Clinical</th><th>Spa</th><th>S&C</th><th>Best</th><th>Level</th></tr></thead>
+          <thead><tr><th>Staff</th><th>Tracks</th><th>Clinical</th><th>Spa</th><th>Perf</th><th>Best</th><th>Level</th></tr></thead>
           <tbody>
             {staff.filter(s=>s.tracks&&s.tracks.length>0).sort((a,b)=>(getBestScore(b)||0)-(getBestScore(a)||0)).map(s=>{
               const cSc=s.scores?.clinical?.total??null;
@@ -7034,9 +7021,9 @@ const SEED_CLIN_RESOURCES = [
   {
     id:'cr7', type:'course', title:'NSCA — Strength & Conditioning Fundamentals',
     url:'https://www.nsca.com/education/articles/',
-    description:'NSCA articles and resources on program design, assessment, and coaching fundamentals for S&C practitioners.',
+    description:'NSCA articles and resources on program design, assessment, and coaching fundamentals for Performance Coaches.',
     categories:['programming','cueing','exercise'], roles:['pt'], pinned:false,
-    addedBy:'Joel Kerr', dateAdded:'2025-02-15', tags:['S&C','programming','NSCA'],
+    addedBy:'Joel Kerr', dateAdded:'2025-02-15', tags:['Performance Coaching','programming','NSCA'],
   },
   {
     id:'cr8', type:'template', title:'SOAP Note Template — Revibe Standard',
