@@ -1837,7 +1837,7 @@ function App(){
   const[activeId,setActiveId]=useState(null);
   const{notifs,addNotif,markRead,markAllRead}=useNotifications();
   const[meetings,setMeetings]=useState(()=>{try{const s=localStorage.getItem('rvgd3_meetings');if(s)return JSON.parse(s);}catch{}return [];});
-  const[perfData,setPerfData]=useState({snapshots:[],gva:{},retention:{},lastImport:null});
+  const[perfData,setPerfData]=useState(()=>{try{const s=localStorage.getItem('rvgd3_perf3');return s?JSON.parse(s):{snapshots:[],gva:{},retention:{},lastImport:null};}catch{return{snapshots:[],gva:{},retention:{},lastImport:null};}});
   useEffect(()=>{try{localStorage.setItem('rvgd3_meetings',JSON.stringify(meetings));}catch{}},[meetings]);
 
   useEffect(()=>sv('staff',staff),[staff]);
@@ -2065,7 +2065,8 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   const save=(d)=>{
     setPerfData(d);
-    // No longer writing to localStorage - Supabase is source of truth
+    // Write to localStorage as primary (instant, survives refresh)
+    try{localStorage.setItem('rvgd3_perf3',JSON.stringify(d));}catch{}
   };
   const[tab,setTab]=useState('overview');
   const[dragging,setDragging]=useState(false);
