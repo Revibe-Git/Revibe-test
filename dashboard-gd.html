@@ -3674,7 +3674,7 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff,p
           </div>
 
           {/* PROFILE TAB */}
-          {tab==='profile'&&(<ProfileEditTab staff={staff} setStaff={setStaff} perfData={perfData}/>)}
+          {tab==='profile'&&(<ProfileEditTab staff={staff} setStaff={setStaff} perfData={perfData} onClose={onClose}/>)}
 
           {/* SCORES TAB */}
           {tab==='scores'&&rs&&(<ScoresEditTab staff={staff} setStaff={setStaff} activeTrack={activeTrack} setActiveTrack={setActiveTrack} tracks={tracks} rs={rs} trackScore={trackScore} trackTotal={trackTotal}/>)}
@@ -5756,7 +5756,7 @@ function getBandLabel(v){
   if(n>=7)return{label:'Competent',cls:'band-competent'};
   if(n>=5)return{label:'Transactional',cls:'band-transact'};
   return{label:'Surface',cls:'band-surface'};
-}function ProfileEditTab({staff,setStaff,perfData}){
+}function ProfileEditTab({staff,setStaff,perfData,onClose}){
   const[editing,setEditing]=useState(false);
   const[f,setF]=useState({name:staff.name||'',email:staff.email||'',discipline:staff.discipline||'pt',role:staff.role||'',site:staff.site||'Markham',roadmap:staff.roadmap||'',archetype:staff.archetype||'',notes:staff.notes||'',reflection:staff.reflection||'',tracks:staff.tracks||[]});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
@@ -5777,7 +5777,15 @@ function getBandLabel(v){
 
   if(!editing)return(
     <div>
-      <div style={{display:'flex',justifyContent:'flex-end',marginBottom:10}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <button className="btn btn-red btn-xs" onClick={()=>{
+          if(confirm(`Remove ${staff.name} from the dashboard? This cannot be undone.`)){
+            setStaff(prev=>prev.filter(s=>s.id!==staff.id));
+            const sb=window.__SB;
+            if(sb)sb.from('staff').delete().eq('id',staff.id).then();
+            onClose();
+          }
+        }}>✕ Remove Profile</button>
         <button className="btn btn-go btn-sm" onClick={()=>setEditing(true)}>✎ Edit Profile</button>
       </div>
       {staff.notes&&<div className="hb hb-gray mb14"><div style={{fontSize:8,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',marginBottom:5}}>Profile Summary</div><div className="sm" style={{lineHeight:1.65}}>{staff.notes}</div></div>}
