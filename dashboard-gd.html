@@ -1853,6 +1853,106 @@ function App(){
   useEffect(()=>sv('evals',evals),[evals]);
   useEffect(()=>sv('sessions',sessions),[sessions]);
 
+  // ── Supabase sync helpers ──────────────────────────────────────
+  const SB=()=>window.__SB;
+
+  // Generic upsert for simple JSONB tables
+  const sbUpsert=async(table,id,data)=>{
+    const sb=SB();if(!sb)return;
+    try{await sb.from(table).upsert({id,data});}catch(e){console.warn(`SB upsert ${table}:`,e);}
+  };
+  const sbDelete=async(table,id)=>{
+    const sb=SB();if(!sb)return;
+    try{await sb.from(table).delete().eq('id',id);}catch(e){console.warn(`SB delete ${table}:`,e);}
+  };
+  const sbLoad=async(table)=>{
+    const sb=SB();if(!sb)return null;
+    try{const{data,error}=await sb.from(table).select('*');if(error)return null;return data;}
+    catch{return null;}
+  };
+  const sbLoadSingleton=async(table)=>{
+    const sb=SB();if(!sb)return null;
+    try{const{data,error}=await sb.from(table).select('*').eq('id','singleton').single();if(error)return null;return data?.data;}
+    catch{return null;}
+  };
+
+  const[sbLoaded,setSbLoaded]=useState(false);
+
+  // Load ALL data from Supabase on mount — always prefer Supabase over localStorage
+  useEffect(()=>{
+    let cancelled=false;
+    const load=async()=>{
+      const sb=SB();
+      if(!sb){setTimeout(()=>{if(!cancelled)load();},400);return;}
+      // Staff profiles
+      try{
+        const{data:staffRows,error}=await sb.from('staff').select('*');
+        if(!error&&staffRows&&staffRows.length>0&&!cancelled){
+          const local=ld('staff',SEED_STAFF);
+          const merged=staffRows.map(row=>{
+            const localRow=local.find(s=>s.id===row.id)||{};
+            return{...localRow,...row};
+          });
+          const sbIds=new Set(staffRows.map(r=>r.id));
+          const localOnly=local.filter(s=>!sbIds.has(s.id));
+          setStaff([...merged,...localOnly]);
+        }
+      }catch(e){console.warn('SB staff load:',e);}
+      // Evaluations
+      try{
+        const rows=await sbLoad('evaluations');
+        if(!cancelled){
+          if(rows&&rows.length>0){const d=rows.map(r=>r.data);setEvals(d);sv('evals',d);}
+          // If Supabase empty but localStorage has data, push up
+          else{const local=ld('evals',[]);if(local.length>0)local.forEach(e=>{if(e.id)sbUpsert('evaluations',e.id,e);});}
+        }
+      }catch{}
+      // Education sessions
+      try{
+        const rows=await sbLoad('education_sessions');
+        if(!cancelled){
+          if(rows&&rows.length>0){const d=rows.map(r=>r.data);setSessions(d);sv('sessions',d);}
+          else{const local=ld('sessions',[]);if(local.length>0)local.forEach(s=>{if(s.id)sbUpsert('education_sessions',s.id,s);});}
+        }
+      }catch{}
+      // Meetings
+      try{
+        const rows=await sbLoad('meetings');
+        if(!cancelled){
+          if(rows&&rows.length>0){const d=rows.map(r=>r.data);setMeetings(d);localStorage.setItem('rvgd3_meetings',JSON.stringify(d));}
+          else{try{const local=JSON.parse(localStorage.getItem('rvgd3_meetings')||'[]');if(local.length>0)local.forEach(m=>{if(m.id)sbUpsert('meetings',m.id,m);});}catch{}}
+        }
+      }catch{}
+      if(!cancelled)setSbLoaded(true);
+    };
+    load();
+    return()=>{cancelled=true;};
+  },[]);
+
+  // Sync evals to Supabase when they change — only after initial load
+  useEffect(()=>{
+    if(!sbLoaded)return;
+    const sb=SB();if(!sb||!evals.length)return;
+    evals.forEach(e=>{if(e.id)sbUpsert('evaluations',e.id,e);});
+  },[evals,sbLoaded]);
+
+  // Sync sessions to Supabase when they change — only after initial load
+  useEffect(()=>{
+    if(!sbLoaded)return;
+    const sb=SB();if(!sb||!sessions.length)return;
+    sessions.forEach(s=>{if(s.id)sbUpsert('education_sessions',s.id,s);});
+  },[sessions,sbLoaded]);
+
+  // Sync meetings to Supabase when they change — only after initial load
+  useEffect(()=>{
+    if(!sbLoaded)return;
+    const sb=SB();if(!sb||!meetings.length)return;
+    meetings.forEach(m=>{if(m.id)sbUpsert('meetings',m.id,m);});
+  },[meetings,sbLoaded]);
+
+  // Expose helpers for child components
+  const sbHelpers={sbUpsert,sbDelete,sbLoad,sbLoadSingleton};
+
   const openProfile=id=>{setActiveId(id);setModal('profile');};
 
   const activeStaff=useMemo(()=>{
@@ -1912,7 +2012,7 @@ function App(){
         </div>
         <div className="scroll">
           <div className="pg">
-            <PageComp staff={staff} evals={evals} setEvals={setEvals} sessions={sessions} mentors={MENTORS} setPage={setPage} openProfile={openProfile} setModal={setModal} setStaff={setStaff} meetings={meetings} setMeetings={setMeetings} addNotif={addNotif} currentUser='Dave' perfData={perfData} setPerfData={setPerfData}/>
+            <PageComp staff={staff} evals={evals} setEvals={setEvals} sessions={sessions} mentors={MENTORS} setPage={setPage} openProfile={openProfile} setModal={setModal} setStaff={setStaff} meetings={meetings} setMeetings={setMeetings} addNotif={addNotif} currentUser='Dave' perfData={perfData} setPerfData={setPerfData} sbHelpers={sbHelpers}/>
           </div>
         </div>
       </div>
@@ -3470,15 +3570,39 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff,p
   const rs=RUBRIC_SYSTEMS[activeTrack];
 
   const handleFileDrop=async(files)=>{
-    const newFiles=await Promise.all(Array.from(files).map(f=>new Promise(res=>{
-      const r=new FileReader();
-      r.onload=e=>res({id:'f'+Date.now()+Math.random(),name:f.name,size:f.size,type:f.type,date:new Date().toISOString().slice(0,10),data:e.target.result});
-      r.readAsDataURL(f);
-    })));
+    const newFiles=await Promise.all(Array.from(files).map(async f=>{
+      const fileId='f'+Date.now()+Math.random().toString(36).slice(2,7);
+      const meta={id:fileId,name:f.name,size:f.size,type:f.type,date:new Date().toISOString().slice(0,10)};
+      // Try Supabase Storage first
+      const sb=window.__SB;
+      if(sb){
+        try{
+          const path=`${staff.id}/${fileId}_${f.name}`;
+          const{error}=await sb.storage.from('staff-files').upload(path,f,{upsert:true});
+          if(!error){
+            const{data:urlData}=sb.storage.from('staff-files').getPublicUrl(path);
+            return{...meta,storageUrl:urlData?.publicUrl,path};
+          }
+        }catch(e){console.warn('Storage upload failed, falling back to base64:',e);}
+      }
+      // Fallback to base64
+      return new Promise(res=>{
+        const r=new FileReader();
+        r.onload=e=>res({...meta,data:e.target.result});
+        r.readAsDataURL(f);
+      });
+    }));
     setStaff(prev=>prev.map(s=>s.id===staff.id?{...s,files:[...(s.files||[]),...newFiles]}:s));
   };
-  const removeFile=fid=>setStaff(prev=>prev.map(s=>s.id===staff.id?{...s,files:(s.files||[]).filter(f=>f.id!==fid)}:s));
-  const downloadFile=f=>{const a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();};
+  const removeFile=async(fid)=>{
+    const f=(staff.files||[]).find(x=>x.id===fid);
+    if(f?.path){const sb=window.__SB;if(sb)sb.storage.from('staff-files').remove([f.path]).then();}
+    setStaff(prev=>prev.map(s=>s.id===staff.id?{...s,files:(s.files||[]).filter(f=>f.id!==fid)}:s));
+  };
+  const downloadFile=f=>{
+    if(f.storageUrl){window.open(f.storageUrl,'_blank');return;}
+    const a=document.createElement('a');a.href=f.data;a.download=f.name;a.click();
+  };
 
   const trackScore=staff.scores?.[activeTrack];
   const trackTotal=trackScore?.total??null;
@@ -5637,7 +5761,19 @@ function getBandLabel(v){
   const[f,setF]=useState({name:staff.name||'',email:staff.email||'',discipline:staff.discipline||'pt',role:staff.role||'',site:staff.site||'Markham',roadmap:staff.roadmap||'',archetype:staff.archetype||'',notes:staff.notes||'',reflection:staff.reflection||'',tracks:staff.tracks||[]});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const toggleTrack=t=>setF(p=>({...p,tracks:p.tracks.includes(t)?p.tracks.filter(x=>x!==t):[...p.tracks,t]}));
-  const save=()=>{setStaff(prev=>prev.map(s=>s.id===staff.id?{...s,...f}:s));setEditing(false);};
+  const save=()=>{
+    const updated={...staff,...f};
+    setStaff(prev=>prev.map(s=>s.id===staff.id?updated:s));
+    setEditing(false);
+    // Sync to Supabase staff table
+    const sb=window.__SB;
+    if(sb){
+      const{files,...staffData}=updated; // exclude base64 files from DB
+      sb.from('staff').update(staffData).eq('id',staff.id).then(({error})=>{
+        if(error)console.warn('Staff profile sync error:',error);
+      });
+    }
+  };
 
   if(!editing)return(
     <div>
@@ -6354,7 +6490,18 @@ function LeadershipPage(){
   const[filterStatus,setFilterStatus]=useState('all');
   const[filterDisc,setFilterDisc]=useState('all');
   const[showAdd,setShowAdd]=useState(false);
-  const save=(data)=>{setLtData(data);try{localStorage.setItem('rvgd3_leadership',JSON.stringify(data));}catch{}};
+  useEffect(()=>{
+    const sb=window.__SB;if(!sb)return;
+    sb.from('leadership_entries').select('*').order('created_at',{ascending:true}).then(({data,error})=>{
+      if(!error&&data&&data.length>0){const d=data.map(r=>r.data);setLtData(d);localStorage.setItem('rvgd3_leadership',JSON.stringify(d));}
+    });
+  },[]);
+  const save=(data)=>{
+    setLtData(data);
+    try{localStorage.setItem('rvgd3_leadership',JSON.stringify(data));}catch{}
+    const sb=window.__SB;if(!sb)return;
+    data.forEach(p=>{if(p.id)sb.from('leadership_entries').upsert({id:p.id,data:p}).then();});
+  };
   const updatePerson=(id,updates)=>{const updated=ltData.map(p=>p.id===id?{...p,...updates}:p);save(updated);if(selectedPerson?.id===id)setSelectedPerson(updated.find(p=>p.id===id));};
   const addPerson=p=>save([...ltData,p]);
   const removePerson=id=>{save(ltData.filter(p=>p.id!==id));setSelectedPerson(null);};
@@ -7070,6 +7217,21 @@ function ClinResourcesPage({staff, addNotif, currentUser}){
     try{const s=localStorage.getItem('rvgd3_clinres');if(s)return JSON.parse(s);}catch{}
     return SEED_CLIN_RESOURCES;
   });
+  React.useEffect(()=>{
+    const sb=window.__SB;if(!sb)return;
+    sb.from('resources').select('*').then(({data,error})=>{
+      if(!error&&data&&data.length>0){
+        const d=data.map(r=>r.data||r);
+        setResources(d);localStorage.setItem('rvgd3_clinres',JSON.stringify(d));
+      }
+    });
+  },[]);
+  const saveResources=(data)=>{
+    setResources(data);
+    try{localStorage.setItem('rvgd3_clinres',JSON.stringify(data));}catch{}
+    const sb=window.__SB;if(!sb)return;
+    data.forEach(r=>{if(r.id)sb.from('resources').upsert({id:r.id,data:r}).then();});
+  };
   React.useEffect(()=>{try{localStorage.setItem('rvgd3_clinres',JSON.stringify(resources));}catch{}},[resources]);
 
   const[search,setSearch]=React.useState('');
@@ -7094,8 +7256,8 @@ function ClinResourcesPage({staff, addNotif, currentUser}){
   const pinned = filtered.filter(r=>r.pinned);
   const rest   = filtered.filter(r=>!r.pinned);
 
-  const deleteRes = (id)=>{setResources(p=>p.filter(r=>r.id!==id));setConfirmDel(null);};
-  const togglePin = (id)=>setResources(p=>p.map(r=>r.id===id?{...r,pinned:!r.pinned}:r));
+  const deleteRes = (id)=>{const updated=resources.filter(r=>r.id!==id);saveResources(updated);setConfirmDel(null);};
+  const togglePin = (id)=>{const updated=resources.map(r=>r.id===id?{...r,pinned:!r.pinned}:r);saveResources(updated);};
 
   const typeInfo = (t)=>RESOURCE_TYPES.find(x=>x.id===t)||RESOURCE_TYPES[1];
 
@@ -7204,8 +7366,8 @@ function ClinResourcesPage({staff, addNotif, currentUser}){
       {/* Modals */}
       {showAdd&&<AddResourceModal onClose={()=>{setShowAdd(false);setEditRes(null);}} existing={editRes}
         onSave={r=>{
-          if(editRes) setResources(p=>p.map(x=>x.id===editRes.id?{...editRes,...r}:x));
-          else setResources(p=>[...p,{...r,id:'cr'+Date.now(),dateAdded:new Date().toISOString().slice(0,10)}]);
+          if(editRes){const updated=resources.map(x=>x.id===editRes.id?{...editRes,...r}:x);saveResources(updated);}
+          else{const updated=[...resources,{...r,id:'cr'+Date.now(),dateAdded:new Date().toISOString().slice(0,10)}];saveResources(updated);}
           setShowAdd(false);setEditRes(null);
         }} staff={staff}/>}
       {viewRes&&<ResourceDetailModal r={viewRes} onClose={()=>setViewRes(null)} onEdit={()=>{setEditRes(viewRes);setViewRes(null);setShowAdd(true);}} typeInfo={typeInfo}/>}
@@ -7537,6 +7699,18 @@ function ResourceThreadModal({resource, onClose, staff, currentUser, addNotif}){
   const[comments,setComments]=React.useState(()=>{
     try{const s=localStorage.getItem(storageKey);return s?JSON.parse(s):[];}catch{return[];}
   });
+  React.useEffect(()=>{
+    const sb=window.__SB;if(!sb)return;
+    sb.from('staff_comments').select('*').eq('staff_id',resource.id).order('created_at',{ascending:true}).then(({data,error})=>{
+      if(!error&&data&&data.length>0){const d=data.map(r=>r.data);setComments(d);localStorage.setItem(storageKey,JSON.stringify(d));}
+    });
+  },[]);
+  const saveComments=(data)=>{
+    setComments(data);
+    try{localStorage.setItem(storageKey,JSON.stringify(data));}catch{}
+    const sb=window.__SB;if(!sb)return;
+    data.forEach(c=>{if(c.id)sb.from('staff_comments').upsert({id:c.id,staff_id:resource.id,data:c}).then();});
+  };
   React.useEffect(()=>{try{localStorage.setItem(storageKey,JSON.stringify(comments));}catch{}},[comments]);
 
   const[text,setText]=React.useState('');
@@ -7642,7 +7816,7 @@ function ResourceThreadModal({resource, onClose, staff, currentUser, addNotif}){
       loadingSummary:true,
     };
 
-    setComments(p=>[...p,newComment]);
+    saveComments([...comments,newComment]);
     setText('');setReplyTo(null);setAttachFile(null);setAttachFileName('');setLinkUrl('');setLinkTitle('');setShowLinkForm(false);
     setPosting(false);
     setTimeout(()=>bottomRef.current?.scrollIntoView({behavior:'smooth'}),100);
@@ -7666,7 +7840,7 @@ function ResourceThreadModal({resource, onClose, staff, currentUser, addNotif}){
 
     // Get AI summary async
     const summary=await getAISummary(text.trim(),linkUrl,attachFileName);
-    setComments(p=>p.map(c=>c.id===newComment.id?{...c,aiSummary:summary,loadingSummary:false}:c));
+    setComments(p=>{const updated=p.map(c=>c.id===newComment.id?{...c,aiSummary:summary,loadingSummary:false}:c);saveComments(updated);return updated;});
   };
 
   // Render single comment
@@ -8014,6 +8188,18 @@ function GDTrackerPage(){
     try{const s=localStorage.getItem('rvgd3_gdtracker');if(s)return JSON.parse(s);}catch{}
     return GD_SEED;
   });
+  useEffect(()=>{
+    const sb=window.__SB;if(!sb)return;
+    sb.from('gd_tracker').select('*').eq('id','singleton').single().then(({data,error})=>{
+      if(!error&&data?.data){setRecords(data.data);localStorage.setItem('rvgd3_gdtracker',JSON.stringify(data.data));}
+    });
+  },[]);
+  const saveRecords=(data)=>{
+    setRecords(data);
+    try{localStorage.setItem('rvgd3_gdtracker',JSON.stringify(data));}catch{}
+    const sb=window.__SB;if(!sb)return;
+    sb.from('gd_tracker').upsert({id:'singleton',data,updated_at:new Date().toISOString()}).then();
+  };
   useEffect(()=>{try{localStorage.setItem('rvgd3_gdtracker',JSON.stringify(records));}catch{}},[records]);
 
   const[editId,setEditId]=useState(null);
@@ -8048,7 +8234,7 @@ function GDTrackerPage(){
     return true;
   });
 
-  const updateRecord=(id,changes)=>setRecords(p=>p.map(r=>r.id===id?{...r,...changes}:r));
+  const updateRecord=(id,changes)=>{const updated=records.map(r=>r.id===id?{...r,...changes}:r);saveRecords(updated);};
   const selectedRecord=records.find(r=>r.id===selectedId)||null;
 
   return(
@@ -8069,7 +8255,7 @@ function GDTrackerPage(){
             </button>
             <button className="btn btn-lime btn-sm" onClick={()=>{
               const r={id:'gd_'+Date.now(),name:'New Therapist',site:'Mississauga',split:'',stipend:false,q1:'',q2:'',q3:'',q4:'',annual:'',notes:''};
-              setRecords(p=>[...p,r]);setSelectedId(r.id);
+              saveRecords([...records,r]);setSelectedId(r.id);
             }}>+ Add</button>
           </div>
         </div>
@@ -8148,7 +8334,7 @@ function GDTrackerPage(){
           ? <GDEditPanel r={selectedRecord}
               onSave={changes=>{updateRecord(selectedId,changes);setEditId(null);}}
               onCancel={()=>setEditId(null)}
-              onDelete={()=>{setRecords(p=>p.filter(x=>x.id!==selectedId));setSelectedId(null);setEditId(null);}}/>
+              onDelete={()=>{saveRecords(records.filter(x=>x.id!==selectedId));setSelectedId(null);setEditId(null);}}/>
           : <GDDetailPanel r={selectedRecord}
               onEdit={()=>setEditId(selectedId)}
               onClose={()=>setSelectedId(null)}
@@ -8392,14 +8578,32 @@ function SystematicPage(){
   const SK='rvgd3_systematic';
   const[sessions,setSessions]=useState(()=>{try{const s=localStorage.getItem(SK);return s?JSON.parse(s):[];}catch{return[];}});
   const[concepts,setConcepts]=useState(()=>{try{const s=localStorage.getItem(SK+'_concepts');return s?JSON.parse(s):[];}catch{return[];}});
-  const[view,setView]=useState('home'); // home | new-session | session | new-concept | concept
+  const[view,setView]=useState('home');
   const[active,setActive]=useState(null);
   const[form,setForm]=useState({});
   const[saving,setSaving]=useState(false);
 
+  useEffect(()=>{
+    const sb=window.__SB;if(!sb)return;
+    sb.from('systematic_sessions').select('*').order('created_at',{ascending:false}).then(({data,error})=>{
+      if(!error&&data&&data.length>0){const d=data.map(r=>r.data);setSessions(d);localStorage.setItem(SK,JSON.stringify(d));}
+    });
+    sb.from('systematic_concepts').select('*').order('created_at',{ascending:false}).then(({data,error})=>{
+      if(!error&&data&&data.length>0){const d=data.map(r=>r.data);setConcepts(d);localStorage.setItem(SK+'_concepts',JSON.stringify(d));}
+    });
+  },[]);
+
   const save=(s,c)=>{
-    if(s!==undefined){setSessions(s);try{localStorage.setItem(SK,JSON.stringify(s));}catch{}}
-    if(c!==undefined){setConcepts(c);try{localStorage.setItem(SK+'_concepts',JSON.stringify(c));}catch{}}
+    if(s!==undefined){
+      setSessions(s);
+      try{localStorage.setItem(SK,JSON.stringify(s));}catch{}
+      const sb=window.__SB;if(sb)s.forEach(item=>{if(item.id)sb.from('systematic_sessions').upsert({id:item.id,data:item}).then();});
+    }
+    if(c!==undefined){
+      setConcepts(c);
+      try{localStorage.setItem(SK+'_concepts',JSON.stringify(c));}catch{}
+      const sb=window.__SB;if(sb)c.forEach(item=>{if(item.id)sb.from('systematic_concepts').upsert({id:item.id,data:item}).then();});
+    }
   };
 
   const TAGS=['Assessment','Treatment Approach','Communication','Clinical Reasoning','Case Study','Framework','Protocol','Team Standard'];
