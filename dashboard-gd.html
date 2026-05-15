@@ -2,6 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// Initialize Supabase client immediately so it's available to all scripts
+(function(){
+  const SUPABASE_URL='https://ekjzbdvvxvylembmrphv.supabase.co';
+  const SUPABASE_KEY='sb_publishable_2NpHtgiPTvrqi3bkQiejNw_Ob5dsATN';
+  window.__SB=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+})();
+</script>
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1991,33 +2000,46 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[loading,setLoading]=useState(true);
   const data=perfData||{snapshots:[],gva:{},retention:{},lastImport:null};
 
-  // Load from Supabase on mount — retry until __SB is available
+  // Load from Supabase on mount — merge with localStorage, Supabase wins
   useEffect(()=>{
     let attempts=0;
     const tryLoad=async()=>{
       const SB=window.__SB;
       if(!SB){
         attempts++;
-        if(attempts<10){setTimeout(tryLoad,500);}
+        if(attempts<10){setTimeout(tryLoad,300);}
         else{setLoading(false);}
         return;
       }
       try{
         const{data:snaps,error:se}=await SB.from('performance_snapshots').select('*').order('date',{ascending:true});
-        const{data:gvaRows}=await SB.from('gva_entries').select('*').order('recorded_at',{ascending:false});
-        const{data:retRows}=await SB.from('retention_entries').select('*').order('recorded_at',{ascending:false});
-        if(!se){
+        if(!se&&snaps&&snaps.length>0){
+          const{data:gvaRows}=await SB.from('gva_entries').select('*').order('recorded_at',{ascending:false});
+          const{data:retRows}=await SB.from('retention_entries').select('*').order('recorded_at',{ascending:false});
           const gva={};
           (gvaRows||[]).forEach(r=>{if(!gva[r.staff_id])gva[r.staff_id]=r.value;});
           const retention={};
           (retRows||[]).forEach(r=>{if(!retention[r.staff_id])retention[r.staff_id]=r.value;});
-          const loaded={snapshots:(snaps||[]).map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:(snaps||[]).length?(snaps[snaps.length-1]?.created_at||null):null};
+          const loaded={snapshots:snaps.map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:snaps[snaps.length-1]?.created_at||null};
+          // Supabase data is fresher — update state and localStorage
           setPerfData(loaded);
-        }else{console.warn('[Perf] Supabase error:',se);}
-      }catch(e){console.warn('[Perf] Load failed:',e);}
+          try{localStorage.setItem('rvgd3_perf3',JSON.stringify(loaded));}catch{}
+        }
+        // If Supabase is empty but localStorage has data, save localStorage to Supabase
+        else if(!se&&snaps&&snaps.length===0){
+          const local=perfData;
+          if(local.snapshots&&local.snapshots.length>0){
+            for(const snap of local.snapshots){
+              await SB.from('performance_snapshots').upsert({
+                id:snap.id,date:snap.date,rows:snap.rows,files:snap.files||[],type:snap.type||'sales'
+              });
+            }
+          }
+        }
+      }catch(e){console.warn('[Perf] Supabase sync error:',e);}
       setLoading(false);
     };
-    setTimeout(tryLoad,300);
+    setTimeout(tryLoad,500);
   },[]);
 
   // Save snapshot to Supabase
@@ -2334,14 +2356,19 @@ function PerformancePage({staff,perfData,setPerfData}){
       newSnapshots=newSnapshots.sort((a,b)=>a.date.localeCompare(b.date)).slice(-36);
       const newData={...data,snapshots:newSnapshots,lastImport:new Date().toISOString()};
       save(newData);
-      // Save new snapshots to Supabase
-      for(const snap of newSnapshots){
-        await saveSnapshot(snap);
-      }
+      // Save to Supabase
+      let sbOk=true;
+      if(window.__SB){
+        for(const snap of newSnapshots){
+          await saveSnapshot(snap);
+        }
+      }else{sbOk=false;}
 
       const uniqMonths=[...new Set(monthsCreated)].sort();
       const monthNames=uniqMonths.map(m=>new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}));
       let msg=`✓ ${type} report auto-split into ${uniqMonths.length} monthly snapshot${uniqMonths.length!==1?'s':''}: ${monthNames.join(', ')}. ${totalPractitioners} practitioners, ${totalMatched} matched.`;
+      if(!sbOk)msg+=` (Saved locally — Supabase unavailable)`;
+      else msg+=` Saved to Supabase ✓`;
       setImportMsg({type:'success',msg});
     }catch(e){setImportMsg({type:'error',msg:'Error: '+e.message});}
     setImporting(false);
@@ -8598,13 +8625,9 @@ ReactDOM.render(<App/>,document.getElementById('root'));
 </script>
 
 <!-- ── Supabase Auth Script ──────────────────────────── -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
-  const SUPABASE_URL='https://ekjzbdvvxvylembmrphv.supabase.co';
-  const SUPABASE_KEY='sb_publishable_2NpHtgiPTvrqi3bkQiejNw_Ob5dsATN';
-  const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-  window.__SB=sb;
+  const sb=window.__SB;
 
   window.handleSignOut=async function(){
     await sb.auth.signOut();
