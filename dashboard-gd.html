@@ -1760,6 +1760,21 @@ const DISC=[
   {id:'edu',   label:'Education Lead',  abbr:'Edu',   cls:'b-edu'   },
   {id:'ops',   label:'Operations',      abbr:'Ops',   cls:'b-ops'   },
 ];
+
+// Specializations — grouped by discipline (or 'all' for universal)
+// Add new ones here as needed
+const SPECIALIZATIONS=[
+  {id:'pelvicFloor',   label:'Pelvic Floor PT',           disc:['pt']},
+  {id:'sportsPT',      label:'Sports Physiotherapy',      disc:['pt']},
+  {id:'acupuncture',   label:'Acupuncture',               disc:['pt','chiro','rmt']},
+  {id:'dryNeedling',   label:'Dry Needling',              disc:['pt','chiro']},
+  {id:'prenatal',      label:'Prenatal Massage',          disc:['rmt']},
+  {id:'hotStone',      label:'Hot Stone Massage',         disc:['rmt']},
+  {id:'cranioSacral',  label:'Craniosacral Therapy',      disc:['pt','rmt','osteo']},
+  {id:'lymphatic',     label:'Lymphatic Drainage',        disc:['rmt','pt']},
+  {id:'iMS',           label:'IMS / Intramuscular Stim',  disc:['pt','chiro']},
+  {id:'visceral',      label:'Visceral Manipulation',     disc:['osteo','pt']},
+];
 const SITES=['Markham','Mississauga','Toronto','Ajax','Oakville'];
 const PERIODS=['Weekly','Monthly','Quarterly','Annual'];
 const TRACK_META={
@@ -3631,7 +3646,7 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff,p
                 <span className="muted">{staff.role}</span>
                 {staff.split&&<span style={{marginLeft:6,fontSize:11,background:'rgba(68,204,170,.1)',color:'#44CCAA',border:'1px solid rgba(68,204,170,.2)',borderRadius:3,padding:'1px 7px'}}>{staff.split}% split</span>}
                 {staff.stipend&&<span style={{marginLeft:4,fontSize:11,background:'rgba(244,219,113,.08)',color:'#F4DB71',border:'1px solid rgba(244,219,113,.2)',borderRadius:3,padding:'1px 7px'}}>+Stipend</span>}
-                {staff.pelvicFloor&&<span style={{marginLeft:4,fontSize:11,background:'rgba(187,153,255,.08)',color:'#BB99FF',border:'1px solid rgba(187,153,255,.2)',borderRadius:3,padding:'1px 7px'}}>Pelvic Floor</span>}
+                {(staff.specializations||[]).map(sid=>{const sp=SPECIALIZATIONS.find(s=>s.id===sid);return sp?<span key={sid} style={{marginLeft:4,fontSize:11,background:'rgba(187,153,255,.08)',color:'#BB99FF',border:'1px solid rgba(187,153,255,.2)',borderRadius:3,padding:'1px 7px'}}>{sp.label}</span>:null;})}
                 <span className="muted">·</span>
                 <span className="muted">{staff.site}</span>
                 {staff.roadmap&&<span className="badge b-quarterly">{staff.roadmap}</span>}
@@ -5792,7 +5807,7 @@ function getBandLabel(v){
       {staff.notes&&<div className="hb hb-gray mb14"><div style={{fontSize:8,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',marginBottom:5}}>Profile Summary</div><div className="sm" style={{lineHeight:1.65}}>{staff.notes}</div></div>}
       {staff.reflection&&staff.reflection.length>20&&<div className="note-item mb14"><div className="note-date">Latest G&D Reflection</div><div className="sm" style={{lineHeight:1.6}}>{staff.reflection}</div></div>}
       <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'12px 16px'}}>
-        {[['Name',staff.name],['Email',staff.email||'—'],['Discipline',DISC.find(d=>d.id===staff.discipline)?.label||staff.discipline],['Role',staff.role||'—'],['Site',staff.site||'—'],['Roadmap',staff.roadmap||'—'],['Archetype',staff.archetype||'—'],['Split %',staff.split?(staff.split+'%'):'—'],['Stipend',staff.stipend?'Yes':'No'],['Specialization',staff.pelvicFloor?'Pelvic Floor Physiotherapist':'—'],['GVA',(()=>{const pd=perfData||{};const gv=(pd.gva||{})[staff.id];return gv?gv+' visits / active guest (365-day)':'Not set — log in Performance tab'})()]].filter(([k])=>k!=='Specialization'||staff.discipline==='pt').map(([k,v])=>(
+        {[['Name',staff.name],['Email',staff.email||'—'],['Discipline',DISC.find(d=>d.id===staff.discipline)?.label||staff.discipline],['Role',staff.role||'—'],['Site',staff.site||'—'],['Roadmap',staff.roadmap||'—'],['Archetype',staff.archetype||'—'],['Split %',staff.split?(staff.split+'%'):'—'],['Stipend',staff.stipend?'Yes':'No'],...((staff.specializations||[]).length>0?[['Specializations',(staff.specializations||[]).map(sid=>SPECIALIZATIONS.find(s=>s.id===sid)?.label).filter(Boolean).join(', ')]]:{}),['GVA',(()=>{const pd=perfData||{};const gv=(pd.gva||{})[staff.id];return gv?gv+' visits / active guest (365-day)':'Not set — log in Performance tab'})()]].map(([k,v])=>(
           <div key={k} style={{display:'flex',alignItems:'center',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
             <span style={{fontSize:12,color:'#999',minWidth:100}}>{k}</span>
             <span style={{fontSize:12,color:'var(--text)'}}>{v}</span>
@@ -5813,6 +5828,7 @@ function getBandLabel(v){
         <div className="fg full"><label>Full Name</label><input value={f.name} onChange={e=>set('name',e.target.value)}/></div>
         <div className="fg full"><label>Email (revibeto.com)</label><input value={f.email||''} onChange={e=>set('email',e.target.value)} placeholder="firstname@revibeto.com"/></div>
         <div className="fg"><label>Discipline</label><select value={f.discipline} onChange={e=>set('discipline',e.target.value)}>{DISC.map(d=><option key={d.id} value={d.id}>{d.label}</option>)}</select></div>
+        {(()=>{const specs=SPECIALIZATIONS.filter(s=>s.disc.includes(f.discipline||staff.discipline));if(!specs.length)return null;const cur=f.specializations||staff.specializations||[];return(<div className="fg full"><label>Specializations</label><div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:6}}>{specs.map(s=>{const on=cur.includes(s.id);return(<button key={s.id} type="button" onClick={()=>{const next=on?cur.filter(x=>x!==s.id):[...cur,s.id];set('specializations',next);}} style={{fontSize:11,padding:'4px 10px',borderRadius:4,border:'1px solid '+(on?'rgba(187,153,255,.4)':'var(--border2)'),background:on?'rgba(187,153,255,.12)':'var(--surface3)',color:on?'#BB99FF':'#555',cursor:'pointer',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,letterSpacing:'0.5px'}}>{s.label}</button>);})}</div></div>);})()}
         <div className="fg"><label>Role / Title</label><select value={f.role} onChange={e=>set('role',e.target.value)}>
                 <optgroup label="Physiotherapy">
                   <option>Physiotherapist</option>
@@ -5860,9 +5876,6 @@ function getBandLabel(v){
         <div className="fg"><label>Archetype</label><input value={f.archetype} onChange={e=>set('archetype',e.target.value)} placeholder="Anchor / Builder / Mentor…"/></div>
         <div className="fg"><label>Split %<span style={{fontSize:10,fontWeight:400,color:'#777',letterSpacing:0,textTransform:'none'}}> — set at yearly G&D</span></label><input value={f.split||''} onChange={e=>set('split',e.target.value)} placeholder="e.g. 45" type="number" min="0" max="100"/></div>
         <div className="fg"><label>Monthly Stipend</label><label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginTop:5,fontSize:12,color:'#aaa',fontFamily:'Barlow,sans-serif',letterSpacing:'normal',textTransform:'none'}}><input type="checkbox" checked={!!f.stipend} onChange={e=>set('stipend',e.target.checked)} style={{accentColor:'var(--go)'}}/> Receives monthly stipend</label></div>
-        {(f.discipline==='pt'||staff.discipline==='pt')&&(
-          <div className="fg"><label>Specialization</label><label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginTop:5,fontSize:12,color:'#aaa',fontFamily:'Barlow,sans-serif',letterSpacing:'normal',textTransform:'none'}}><input type="checkbox" checked={!!f.pelvicFloor} onChange={e=>set('pelvicFloor',e.target.checked)} style={{accentColor:'var(--go)'}}/> Pelvic Floor Physiotherapist</label></div>
-        )}
         <div className="fg full"><label>Rubric Tracks</label>
           <div className="flex aic g6" style={{paddingTop:4}}>{['clinical','spa','sc'].map(t=><button key={t} className={`track-pill tp-${t}${f.tracks.includes(t)?' active':''}`} onClick={()=>toggleTrack(t)}>{TRACK_META[t]?.label}</button>)}</div>
         </div>
