@@ -1782,7 +1782,7 @@ const TRACK_META={
 const NAV=[
   {id:'overview',  icon:'▣', label:'Overview'},
   {id:'staff',     icon:'◎', label:'Staff Profiles'},
-  {id:'evals',     icon:'◈', label:'Evaluations'},
+  {id:'evals',     icon:'◈', label:'G&D Evaluations'},
   {id:'education', icon:'◉', label:'Education Sessions'},
   {id:'mentors',   icon:'◐', label:'Mentor Leads'},
   {id:'gaps',      icon:'⚑', label:'Gap Analysis'},
@@ -2575,7 +2575,8 @@ function PerformancePage({staff,perfData,setPerfData}){
 
       const uniqMonths=[...new Set(monthsCreated)].sort();
       const monthNames=uniqMonths.map(m=>new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}));
-      let msg=`✓ ${type} report auto-split into ${uniqMonths.length} monthly snapshot${uniqMonths.length!==1?'s':''}: ${monthNames.join(', ')}. ${totalPractitioners} practitioners, ${totalMatched} matched.`;
+      const totalIA=newSnapshots.flatMap(s=>s.rows||[]).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
+      let msg=`✓ ${type} report auto-split into ${uniqMonths.length} monthly snapshot${uniqMonths.length!==1?'s':''}: ${monthNames.join(', ')}. ${totalPractitioners} practitioners, ${totalMatched} matched.${totalIA>0?` ${totalIA} initial assessments detected.`:''}`;
       if(!sbOk)msg+=` (Saved locally — Supabase unavailable)`;
       else msg+=` Saved to Supabase ✓`;
       setImportMsg({type:'success',msg});
