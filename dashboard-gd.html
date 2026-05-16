@@ -2060,51 +2060,133 @@ function Sparkline({values,color,width=120,height=32}){
   </svg>);
 }
 
-function LineChart({snapshots,staffId,metric,color,label,fmt}){
-  const pts=snapshots.map(s=>{
+function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg}){
+  const allPts=snapshots.map(s=>{
     const r=s.rows?.find(r=>r.staffId===staffId);
     return r&&r[metric]!=null?{date:s.date,val:parseFloat(r[metric])||0}:null;
   }).filter(Boolean);
-  if(pts.length<1)return<div style={{fontSize:14,color:'#777',padding:16,textAlign:'center'}}>No {label.toLowerCase()} data yet — import more snapshots to see trends.</div>;
+
+  // Apply timeframe filter
+  const now=new Date();
+  const pts=allPts.filter(p=>{
+    if(!timeframe||timeframe==='all')return true;
+    const d=new Date(p.date+'T12:00');
+    if(timeframe==='3m'){const cutoff=new Date(now);cutoff.setMonth(cutoff.getMonth()-3);return d>=cutoff;}
+    if(timeframe==='6m'){const cutoff=new Date(now);cutoff.setMonth(cutoff.getMonth()-6);return d>=cutoff;}
+    if(timeframe==='12m'){const cutoff=new Date(now);cutoff.setMonth(cutoff.getMonth()-12);return d>=cutoff;}
+    if(timeframe==='ytd'){return d.getFullYear()===now.getFullYear();}
+    return true;
+  });
+
+  if(pts.length<1)return<div style={{fontSize:14,color:'#777',padding:'20px 16px',textAlign:'center'}}>No {label.toLowerCase()} data for this period.</div>;
+
+  const vals=pts.map(p=>p.val);
+  const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
+
   if(pts.length===1)return(
-    <div style={{textAlign:'center',padding:20}}>
-      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color}}>{fmt(pts[0].val)}</div>
-      <div style={{fontSize:14,color:'#777',marginTop:4}}>{new Date(pts[0].date+'T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</div>
-      <div style={{fontSize:14,color:'#999',marginTop:8,fontStyle:'italic'}}>Import another snapshot to see a trend line.</div>
+    <div style={{padding:'16px 0'}}>
+      <div style={{display:'flex',alignItems:'center',gap:24,flexWrap:'wrap',marginBottom:8}}>
+        <div><div style={{fontSize:13,color:'#888',marginBottom:2}}>Latest</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color,lineHeight:1}}>{fmt(pts[0].val)}</div></div>
+        <div><div style={{fontSize:13,color:'#888',marginBottom:2}}>Your Avg</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#aaa',lineHeight:1}}>{fmt(Math.round(avg))}</div></div>
+        {clinicAvg!=null&&<div><div style={{fontSize:13,color:'#888',marginBottom:2}}>Clinic Avg</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#555',lineHeight:1}}>{fmt(Math.round(clinicAvg))}</div></div>}
+      </div>
+      <div style={{fontSize:13,color:'#888',fontStyle:'italic'}}>Import more snapshots to see a trend line.</div>
     </div>
   );
-  const vals=pts.map(p=>p.val);
-  const min=Math.min(...vals),max=Math.max(...vals),range=max-min||1;
-  const W=340,H=90,PAD=10;
+
+  const min=Math.min(...vals)*0.9,max=Math.max(...vals)*1.1;
+  const range=max-min||1;
+  const W=500,H=140,PADX=52,PADY=16,BOTTOM=32;
+
+  const toY=(v)=>PADY+Math.round((1-(v-min)/range)*(H-PADY*2));
   const coords=pts.map((p,i)=>({
-    x:PAD+Math.round((i/(pts.length-1))*(W-PAD*2)),
-    y:PAD+Math.round((1-(p.val-min)/range)*(H-PAD*2)),
+    x:PADX+Math.round((i/(pts.length-1))*(W-PADX-14)),
+    y:toY(p.val),
     val:p.val,date:p.date
   }));
   const pathD=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
-  const areaD=pathD+` L${coords[coords.length-1].x},${H+PAD} L${coords[0].x},${H+PAD} Z`;
-  const latest=vals[vals.length-1],prev=vals.length>1?vals[vals.length-2]:null;
+  const areaD=pathD+` L${coords[coords.length-1].x},${H} L${coords[0].x},${H} Z`;
+  const latest=vals[vals.length-1];
+  const prev=vals.length>1?vals[vals.length-2]:null;
   const delta=prev!=null&&prev!==0?((latest-prev)/prev*100).toFixed(1):null;
   const up=delta>=0;
+  const avgY=toY(avg);
+  const clinicAvgY=clinicAvg!=null?toY(Math.max(min,Math.min(max,clinicAvg))):null;
+
+  const gridLines=4;
+  const yGrid=Array.from({length:gridLines+1},(_,i)=>({
+    y:PADY+Math.round((i/gridLines)*(H-PADY*2)),
+    val:max-((max-min)*(i/gridLines))
+  }));
+
+  const showLabel=(i)=>{
+    if(pts.length<=6)return true;
+    if(pts.length<=12)return i%2===0||i===pts.length-1;
+    return i===0||i===Math.floor(pts.length/2)||i===pts.length-1;
+  };
+
   return(
     <div>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color,lineHeight:1}}>{fmt(latest)}</span>
-        {delta!=null&&<span style={{fontSize:14,color:up?'#44CCAA':'#E05252',fontWeight:700,background:up?'rgba(68,204,170,.1)':'rgba(224,82,82,.1)',padding:'2px 8px',borderRadius:3}}>{up?'▲':'▼'}{Math.abs(delta)}%</span>}
+      {/* Stats row */}
+      <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:12}}>
+        <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>
+          <div>
+            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Latest</div>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color,lineHeight:1}}>{fmt(latest)}</span>
+              {delta!=null&&<span style={{fontSize:13,color:up?'#44CCAA':'#E05252',fontWeight:700,background:up?'rgba(68,204,170,.1)':'rgba(224,82,82,.1)',padding:'2px 8px',borderRadius:4}}>{up?'▲':'▼'}{Math.abs(delta)}%</span>}
+            </div>
+          </div>
+          <div>
+            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Their Avg / mo</div>
+            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#aaa',lineHeight:1}}>{fmt(Math.round(avg))}</span>
+          </div>
+          {clinicAvg!=null&&<div>
+            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Clinic Avg / mo</div>
+            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#555',lineHeight:1}}>{fmt(Math.round(clinicAvg))}</span>
+          </div>}
+        </div>
+        <div style={{fontSize:13,color:'#777'}}>{pts.length} months</div>
       </div>
-      <svg width={W} height={H+PAD*2+18} style={{overflow:'visible',display:'block'}}>
-        <path d={areaD} fill={color} opacity="0.07"/>
-        <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
-        {coords.map((c,i)=>(
+      {/* Chart */}
+      <svg width="100%" viewBox={`0 0 ${W} ${H+BOTTOM}`} style={{display:'block',overflow:'visible'}}>
+        {/* Y-axis grid */}
+        {yGrid.map((g,i)=>(
           <g key={i}>
-            <circle cx={c.x} cy={c.y} r="4" fill={color} opacity="0.9"/>
-            <text x={c.x} y={c.y-8} textAnchor="middle" fontSize="9" fill={color} opacity="0.75">{fmt(c.val)}</text>
-            <text x={c.x} y={H+PAD*2+15} textAnchor="middle" fontSize="8" fill="#555">
-              {new Date(c.date+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}
-            </text>
+            <line x1={PADX} y1={g.y} x2={W-14} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/>
+            <text x={PADX-6} y={g.y+4} textAnchor="end" fontSize="11" fill="#666">{fmt(Math.round(g.val))}</text>
           </g>
         ))}
-        <line x1={PAD} y1={H+PAD} x2={W-PAD} y2={H+PAD} stroke="#2a2a2a" strokeWidth="1"/>
+        {/* Clinic avg reference line */}
+        {clinicAvgY!=null&&clinicAvgY>PADY&&clinicAvgY<H&&(
+          <g>
+            <line x1={PADX} y1={clinicAvgY} x2={W-14} y2={clinicAvgY} stroke="#444" strokeWidth="1.5" strokeDasharray="5,4"/>
+            <text x={W-12} y={clinicAvgY+4} fontSize="11" fill="#555" textAnchor="start">clinic</text>
+          </g>
+        )}
+        {/* Personal avg reference line */}
+        {avgY>PADY&&avgY<H&&(
+          <g>
+            <line x1={PADX} y1={avgY} x2={W-14} y2={avgY} stroke={color} strokeWidth="1.5" strokeDasharray="4,3" opacity="0.4"/>
+            <text x={W-12} y={avgY+4} fontSize="11" fill={color} opacity="0.6" textAnchor="start">avg</text>
+          </g>
+        )}
+        {/* Area fill */}
+        <path d={areaD} fill={color} opacity="0.07"/>
+        {/* Line */}
+        <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
+        {/* Points */}
+        {coords.map((c,i)=>(
+          <g key={i}>
+            <circle cx={c.x} cy={c.y} r="4.5" fill={color} opacity="0.9"/>
+            {pts.length<=10&&<text x={c.x} y={c.y-11} textAnchor="middle" fontSize="11" fill={color} opacity="0.85" fontWeight="600">{fmt(c.val)}</text>}
+            {showLabel(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">
+              {new Date(c.date+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}
+            </text>}
+          </g>
+        ))}
+        {/* Baseline */}
+        <line x1={PADX} y1={H} x2={W-14} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
       </svg>
     </div>
   );
@@ -2212,6 +2294,7 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[gvaEdits,setGvaEdits]=useState({});
   const[gvaSaved,setGvaSaved]=useState(false);
   const[trendStaff,setTrendStaff]=useState(null);
+  const[trendTimeframe,setTrendTimeframe]=useState('12m');
   const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
@@ -3071,77 +3154,81 @@ function PerformancePage({staff,perfData,setPerfData}){
       {/* ── TRENDS ── */}
       {tab==='trends'&&(
         <div>
-          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'12px 14px',marginBottom:14}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:8}}>Select Practitioner</div>
-            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-              {mergedStaff.map(s=>(
-                <button key={s.id} className={`btn btn-sm ${trendStaff?.id===s.id?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendStaff(s)}>
-                  {s.name.split(' ')[0]}
-                </button>
-              ))}
+          {/* Controls */}
+          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'12px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+            <div style={{flex:1,minWidth:200}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:8}}>Practitioner</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {mergedStaff.map(s=>(
+                  <button key={s.id} className={`btn btn-sm ${trendStaff?.id===s.id?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendStaff(s)}>
+                    {s.name.split(' ')[0]}
+                  </button>
+                ))}
+              </div>
             </div>
-            {data.snapshots.length<2&&<div style={{fontSize:14,color:'#777',marginTop:8,fontStyle:'italic'}}>Import at least 2 CSV snapshots to see trend lines. Import monthly to build history.</div>}
+            <div style={{flexShrink:0}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:8}}>Timeframe</div>
+              <div style={{display:'flex',gap:6}}>
+                {[['3m','3 Months'],['6m','6 Months'],['ytd','Year to Date'],['12m','12 Months'],['all','All Time']].map(([v,l])=>(
+                  <button key={v} className={`btn btn-sm ${trendTimeframe===v?'btn-go':'btn-ghost'}`} onClick={()=>setTrendTimeframe(v)}>{l}</button>
+                ))}
+              </div>
+            </div>
           </div>
+
+          {data.snapshots.length<2&&<div style={{fontSize:14,color:'#777',padding:'12px 0',fontStyle:'italic'}}>Import at least 2 monthly snapshots to see trend lines.</div>}
+
           {trendStaff?(
             <div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:14}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:16}}>
                 {trendStaff.name.toUpperCase()}
-                <span style={{fontSize:14,color:'#777',fontWeight:400,letterSpacing:'1px',marginLeft:12}}>{trendStaff.site} · {trendStaff.roadmap||'—'}</span>
+                <span style={{fontSize:14,color:'#888',fontWeight:400,letterSpacing:'1px',marginLeft:12}}>{trendStaff.site} · {trendStaff.roadmap||'—'}</span>
               </div>
-              <div className="grid2">
-                {[
-                  {key:'revenue',label:'Revenue',color:'#CAE8C1',fmt:v=>fmtRev(v)},
-                  {key:'utilization',label:'Utilization %',color:'#44ccaa',fmt:v=>v+'%'},
-                  {key:'completed',label:'Completed Visits',color:'#6B9FD4',fmt:v=>v},
-                  {key:'noShows',label:'No-Shows',color:'#E05252',fmt:v=>v},
-                  {key:'cancellations',label:'Cancellations',color:'#F4DB71',fmt:v=>v},
-                ].map(({key,label,color,fmt})=>(
-                  <div key={key} className="perf-slot">
-                    <div className="perf-slot-head"><span className="perf-slot-title" style={{color}}>{label}</span></div>
-                    <div className="perf-slot-body"><LineChart snapshots={data.snapshots} staffId={trendStaff.id} metric={key} color={color} label={label} fmt={fmt}/></div>
+              {(()=>{
+                // Compute clinic-wide monthly averages per metric for the selected timeframe
+                const now=new Date();
+                const inTimeframe=(dateStr)=>{
+                  if(!trendTimeframe||trendTimeframe==='all')return true;
+                  const d=new Date(dateStr+'T12:00');
+                  if(trendTimeframe==='3m'){const c=new Date(now);c.setMonth(c.getMonth()-3);return d>=c;}
+                  if(trendTimeframe==='6m'){const c=new Date(now);c.setMonth(c.getMonth()-6);return d>=c;}
+                  if(trendTimeframe==='12m'){const c=new Date(now);c.setMonth(c.getMonth()-12);return d>=c;}
+                  if(trendTimeframe==='ytd')return d.getFullYear()===now.getFullYear();
+                  return true;
+                };
+                const filteredSnaps=data.snapshots.filter(s=>inTimeframe(s.date));
+                const clinicAvg={};
+                ['revenue','utilization','completed','noShows','cancellations'].forEach(metric=>{
+                  const monthlyTotals=filteredSnaps.map(s=>{
+                    const rows=(s.rows||[]).filter(r=>r[metric]!=null);
+                    if(!rows.length)return null;
+                    const total=rows.reduce((a,r)=>a+(parseFloat(r[metric])||0),0);
+                    return rows.length>0?total/rows.length:null; // average across practitioners per month
+                  }).filter(v=>v!=null);
+                  clinicAvg[metric]=monthlyTotals.length?monthlyTotals.reduce((a,b)=>a+b,0)/monthlyTotals.length:null;
+                });
+                return(
+                  <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                    {[
+                      {key:'revenue',label:'Revenue',color:'#CAE8C1',fmt:v=>fmtRev(v)},
+                      {key:'utilization',label:'Utilization %',color:'#44ccaa',fmt:v=>v+'%'},
+                      {key:'completed',label:'Completed Visits',color:'#6B9FD4',fmt:v=>v},
+                      {key:'noShows',label:'No-Shows',color:'#E05252',fmt:v=>v},
+                      {key:'cancellations',label:'Cancellations',color:'#F4DB71',fmt:v=>v},
+                    ].map(({key,label,color,fmt})=>(
+                      <div key={key} className="perf-slot">
+                        <div className="perf-slot-head"><span className="perf-slot-title" style={{color}}>{label}</span></div>
+                        <div style={{padding:'4px 16px 16px'}}>
+                          <LineChart snapshots={data.snapshots} staffId={trendStaff.id} metric={key} color={color} label={label} fmt={fmt} timeframe={trendTimeframe} clinicAvg={clinicAvg[key]}/>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-                {/* GVA trend from gva object history */}
-                <div className="perf-slot">
-                  <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#F4DB71'}}>GVA</span></div>
-                  <div className="perf-slot-body">
-                    {(()=>{
-                      const cur=data.gva[trendStaff.id];
-                      const hist=(data.gva_history||{})[trendStaff.id]||[];
-                      const pts=[...hist];
-                      if(cur&&!hist.some(h=>h.date===snapDate))pts.push({date:'Current',val:parseFloat(cur)});
-                      if(!pts.length)return<div style={{fontSize:14,color:'#777',padding:16,textAlign:'center'}}>No GVA data yet. Enter a value in the GVA tab.</div>;
-                      if(pts.length===1)return<div style={{textAlign:'center',padding:20}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:'#F4DB71'}}>{pts[0].val}</div><div style={{fontSize:14,color:'#777',marginTop:8}}>Enter GVA values over multiple months to see a trend.</div></div>;
-                      const vals=pts.map(p=>parseFloat(p.val));
-                      const min=Math.min(...vals),max=Math.max(...vals),range=max-min||1;
-                      const W=340,H=90,PAD=10;
-                      const coords=pts.map((p,i)=>({x:PAD+Math.round((i/(pts.length-1))*(W-PAD*2)),y:PAD+Math.round((1-(parseFloat(p.val)-min)/range)*(H-PAD*2)),val:parseFloat(p.val),date:p.date}));
-                      const pathD=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
-                      return<svg width={W} height={H+PAD*2+18} style={{overflow:'visible',display:'block'}}>
-                        <path d={pathD+` L${coords[coords.length-1].x},${H+PAD} L${coords[0].x},${H+PAD} Z`} fill="#F4DB71" opacity="0.07"/>
-                        <path d={pathD} fill="none" stroke="#F4DB71" strokeWidth="2.5" strokeLinejoin="round"/>
-                        {coords.map((c,i)=><g key={i}><circle cx={c.x} cy={c.y} r="4" fill="#F4DB71" opacity="0.9"/><text x={c.x} y={c.y-8} textAnchor="middle" fontSize="9" fill="#F4DB71" opacity="0.75">{c.val}</text><text x={c.x} y={H+PAD*2+15} textAnchor="middle" fontSize="8" fill="#555">{c.date}</text></g>)}
-                        <line x1={PAD} y1={H+PAD} x2={W-PAD} y2={H+PAD} stroke="#2a2a2a" strokeWidth="1"/>
-                      </svg>;
-                    })()}
-                  </div>
-                </div>
-                {/* Retention trend */}
-                <div className="perf-slot">
-                  <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention %</span></div>
-                  <div className="perf-slot-body">
-                    {(()=>{
-                      const cur=(data.retention||{})[trendStaff.id];
-                      if(!cur)return<div style={{fontSize:14,color:'#777',padding:16,textAlign:'center'}}>No retention data yet. Enter a value in the Retention tab.</div>;
-                      const c=cur>=85?'#CAE8C1':cur>=75?'#44ccaa':cur>=65?'#F4DB71':'#E05252';
-                      return<div style={{textAlign:'center',padding:20}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:40,fontWeight:800,color:c,lineHeight:1}}>{cur}%</div><div style={{fontSize:14,color:'#777',marginTop:8}}>Enter retention monthly to build a trend.</div></div>;
-                    })()}
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </div>
           ):(
-            <div className="card"><div className="empty"><div className="empty-ico">↗</div><p>Select a practitioner above to view their individual trend charts.</p></div></div>
+            <div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to view their trends.</div>
           )}
         </div>
       )}
