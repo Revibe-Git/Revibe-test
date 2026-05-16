@@ -2664,7 +2664,7 @@ function PerformancePage({staff,perfData,setPerfData}){
         completed:jr?.completed||null,utilization:jr?.utilization||null,
         appointments:jr?.appointments||null,noShows:jr?.noShows||null,
         cancellations:jr?.cancellations||null,rescheduled:jr?.rescheduled||null,
-        revenue:jr?.revenue||null,
+        revenue:jr?.revenue||null,initialAssessments:jr?.initialAssessments||null,
         gva:gvaVal,retention:retVal};
     })
   ,[staff,filteredRows,data.gva,data.retention,gvaEdits]);
