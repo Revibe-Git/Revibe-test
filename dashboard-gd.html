@@ -1818,6 +1818,9 @@ const sv=(k,v)=>{try{localStorage.setItem('rvgd3_'+k,JSON.stringify(v));}catch{}
 const calcScore=(scores,rubricId)=>{
   if(!scores||!rubricId||!RUBRIC_SYSTEMS[rubricId])return null;
   const cats=RUBRIC_SYSTEMS[rubricId].cats;
+  // If none of the category scores are filled in, return null (not scored yet)
+  const hasAny=cats.some(c=>scores[c.id]!=null&&scores[c.id]!==''&&parseFloat(scores[c.id])>0);
+  if(!hasAny)return null;
   let t=0;cats.forEach(c=>{t+=parseFloat(scores[c.id]||0)*(c.weight/100);});
   return Math.round(t*100)/100;
 };
