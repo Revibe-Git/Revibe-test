@@ -2411,9 +2411,14 @@ function PerformancePage({staff,perfData,setPerfData}){
       const month=getMonth(r['start_at']);
       if(!month)return;
       if(!byMonth[month])byMonth[month]={};
-      if(!byMonth[month][name])byMonth[month][name]={name,completed:0,noShows:0,cancellations:0,rescheduled:0};
+      if(!byMonth[month][name])byMonth[month][name]={name,completed:0,noShows:0,cancellations:0,rescheduled:0,initialAssessments:0};
       const state=(r['state']||'').toLowerCase();
-      if(state==='arrived')byMonth[month][name].completed++;
+      const treatmentName=(r['treatment_name']||'').toLowerCase();
+      const isInitial=treatmentName.startsWith('initial') || treatmentName.includes('initial assessment');
+      if(state==='arrived'){
+        byMonth[month][name].completed++;
+        if(isInitial)byMonth[month][name].initialAssessments++;
+      }
       else if(state==='no_show')byMonth[month][name].noShows++;
       else if(state==='cancelled')byMonth[month][name].cancellations++;
       else if(state==='rescheduled')byMonth[month][name].rescheduled++;
@@ -2672,6 +2677,7 @@ function PerformancePage({staff,perfData,setPerfData}){
   const avgUtil=withUtil.length?Math.round(withUtil.reduce((a,s)=>a+s.utilization,0)/withUtil.length):null;
   const avgGva=withGva.length?Math.round(withGva.reduce((a,s)=>a+(s.gva||0),0)/withGva.length*10)/10:null;
   const totalCompleted=withAppts.reduce((a,s)=>a+(s.completed||0),0);
+  const totalInitialAssessments=withAppts.reduce((a,s)=>a+(s.initialAssessments||0),0);
   const totalRev=withRev.reduce((a,s)=>a+(s.revenue||0),0);
 
   const fmtRev=(v)=>v>=1000?'$'+(v/1000).toFixed(1)+'k':'$'+Math.round(v);
@@ -2747,6 +2753,7 @@ function PerformancePage({staff,perfData,setPerfData}){
       <div className="sg4" style={{marginBottom:14}}>
         <div className="sc go"><div className="sc-lbl">Avg Utilization</div><div className="sc-val">{avgUtil!=null?avgUtil+'%':'—'}</div><div className="sc-sub">{withUtil.length} tracked</div></div>
         <div className="sc lime"><div className="sc-lbl">Completed Visits</div><div className="sc-val">{totalCompleted||'—'}</div><div className="sc-sub">{withAppts.length} practitioners</div></div>
+        <div className="sc" style={{borderColor:'rgba(187,153,255,.3)'}}><div className="sc-lbl" style={{color:'#BB99FF'}}>Initial Assessments</div><div className="sc-val" style={{color:'#BB99FF'}}>{totalInitialAssessments||'—'}</div><div className="sc-sub">{withAppts.length?`${(totalInitialAssessments/totalCompleted*100).toFixed(1)}% of visits`:'—'}</div></div>
         <div className="sc yellow"><div className="sc-lbl">Avg GVA</div><div className="sc-val">{avgGva||'—'}</div><div className="sc-sub">365-day rolling</div></div>
         <div className="sc gray"><div className="sc-lbl">Snapshots</div><div className="sc-val">{data.snapshots.length}</div><div className="sc-sub">{data.lastImport?new Date(data.lastImport).toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'No imports yet'}</div></div>
       </div>
@@ -3003,8 +3010,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               </select>
             </div>
           )}
-          {sectionCompare.appointments&&sectionA.appointments&&sectionB.appointments?(()=>{
-            const rowsA=aggregateRows(filterSnaps(sectionA.appointments));
+          {sectionCompare.appointments&&sectionA.appointments&&sectionB.appointments?(()=>{            const rowsA=aggregateRows(filterSnaps(sectionA.appointments));
             const rowsB=aggregateRows(filterSnaps(sectionB.appointments));
             const merged=staff.filter(s=>rowsA.find(r=>r.staffId===s.id)||rowsB.find(r=>r.staffId===s.id)).map(s=>{
               const a=rowsA.find(r=>r.staffId===s.id);const b=rowsB.find(r=>r.staffId===s.id);
@@ -3028,7 +3034,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             </table></div>);
           })():(<div className="perf-slot-body">{withAppts.length?(
             <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-              <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{['Practitioner','Completed','No-Shows','Cancellations','Rescheduled','Cancel Rate'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:h==='Practitioner'?'left':'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',textTransform:'uppercase',color:'#999',fontWeight:600}}>{h}</th>)}</tr></thead>
+              <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{['Practitioner','Completed','Initial Assessments','No-Shows','Cancellations','Rescheduled','Cancel Rate'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:h==='Practitioner'?'left':'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',textTransform:'uppercase',color:'#999',fontWeight:600}}>{h}</th>)}</tr></thead>
               <tbody>{withAppts.map(s=>{
                 const total=(s.completed||0)+(s.noShows||0)+(s.cancellations||0)+(s.rescheduled||0);
                 const cancelRate=total>0?Math.round(((s.cancellations||0)/total)*100):0;
@@ -3036,6 +3042,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                   <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
                     <td style={{padding:'8px 10px'}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777'}}>{s.site}</div></td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.completed||0}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:'#BB99FF',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.initialAssessments||0}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:(s.noShows||0)>8?'#E05252':'#888'}}>{s.noShows||0}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:(s.cancellations||0)>15?'#F4DB71':'#888'}}>{s.cancellations||0}</td>
                     <td style={{padding:'8px 10px',textAlign:'right',color:'#888'}}>{s.rescheduled||0}</td>
@@ -3198,7 +3205,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                 };
                 const filteredSnaps=data.snapshots.filter(s=>inTimeframe(s.date));
                 const clinicAvg={};
-                ['revenue','utilization','completed','noShows','cancellations'].forEach(metric=>{
+                ['revenue','utilization','completed','initialAssessments','noShows','cancellations'].forEach(metric=>{
                   const monthlyTotals=filteredSnaps.map(s=>{
                     const rows=(s.rows||[]).filter(r=>r[metric]!=null);
                     if(!rows.length)return null;
@@ -3213,6 +3220,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                       {key:'revenue',label:'Revenue',color:'#CAE8C1',fmt:v=>fmtRev(v)},
                       {key:'utilization',label:'Utilization %',color:'#44ccaa',fmt:v=>v+'%'},
                       {key:'completed',label:'Completed Visits',color:'#6B9FD4',fmt:v=>v},
+                      {key:'initialAssessments',label:'Initial Assessments',color:'#BB99FF',fmt:v=>v},
                       {key:'noShows',label:'No-Shows',color:'#E05252',fmt:v=>v},
                       {key:'cancellations',label:'Cancellations',color:'#F4DB71',fmt:v=>v},
                     ].map(({key,label,color,fmt})=>(
