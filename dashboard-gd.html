@@ -2708,7 +2708,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           </div>
           <div className="perf-slot">
             <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#44ccaa'}}>Utilization %</span>{!withUtil.length&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('import')}>Import →</button>}</div>
-            <div className="perf-slot-body">{withUtil.length?withUtil.slice(0,12).map(s=>{const c=s.utilization>=85?'#CAE8C1':s.utilization>=75?'#44ccaa':s.utilization>=65?'#F4DB71':'#E05252';return<BarRow key={s.id} s={s} val={s.utilization} max={100} color={c} sub={s.utilization+'%'} metric="utilization"/>}):<div className="empty" style={{padding:24}}><div className="empty-ico">⏱</div><p>Import a Shift Report CSV to see utilization.</p></div>}</div>
+            <div className="perf-slot-body">{withUtil.length?withUtil.slice(0,12).map(s=>{const c=s.utilization>=85?'#CAE8C1':s.utilization>=70?'#44ccaa':s.utilization>50?'#F4DB71':'#E05252';return<BarRow key={s.id} s={s} val={s.utilization} max={100} color={c} sub={s.utilization+'%'} metric="utilization"/>}):<div className="empty" style={{padding:24}}><div className="empty-ico">⏱</div><p>Import a Shift Report CSV to see utilization.</p></div>}</div>
           </div>
           <div className="perf-slot">
             <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#6B9FD4'}}>Completed Visits</span>{!withAppts.length&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('import')}>Import →</button>}</div>
@@ -2880,8 +2880,8 @@ function PerformancePage({staff,perfData,setPerfData}){
                   </div>
                 )}
                 <div className="perf-slot-body">{showing.length?showing.map(s=>{
-                  const c=s.utilization>=85?'#CAE8C1':s.utilization>=75?'#44ccaa':s.utilization>=65?'#F4DB71':'#E05252';
-                  const lbl=s.utilization>=85?'Strong':s.utilization>=75?'Good':s.utilization>=65?'Developing':'Below';
+                  const c=s.utilization>=85?'#CAE8C1':s.utilization>=70?'#44ccaa':s.utilization>50?'#F4DB71':'#E05252';
+                  const lbl=s.utilization>=85?'Strong':s.utilization>=70?'Good':s.utilization>50?'Fair':'Low';
                   return(
                     <div key={s.id} className="perf-bar-row" style={{padding:'9px 0',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
                       <div style={{minWidth:180}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777',marginTop:2}}>{s.site}</div></div>
@@ -3045,7 +3045,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                 const val=editing?retentionEdits[s.id]:((data.retention||{})[s.id]||'');
                 const num=parseFloat(val)||null;
                 const c=num?num>=85?'#CAE8C1':num>=75?'#44ccaa':num>=65?'#F4DB71':'#E05252':'#555';
-                const lbl=num?num>=85?'Strong':num>=75?'Good':num>=65?'Developing':'Below':'';
+                const lbl=num?num>=85?'Strong':num>=70?'Good':num>50?'Fair':'Low':'';
                 return(
                   <div key={s.id} className="gva-input-row">
                     <div style={{flex:1,display:'flex',alignItems:'center',gap:10}}>
@@ -4054,7 +4054,7 @@ function StaffNumbersTab({staff,perfData}){
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',marginBottom:10}}>From Jane — Latest Period</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
                 <StatCard label="Revenue" value={latestRow.revenue} fmt={fmtRev} color="#CAE8C1" metric="revenue"/>
-                <StatCard label="Utilization" value={latestRow.utilization} fmt={v=>v+'%'} color={latestRow.utilization>=85?'#CAE8C1':latestRow.utilization>=75?'#44ccaa':latestRow.utilization>=65?'#F4DB71':'#E05252'} target={75} metric="utilization"/>
+                <StatCard label="Utilization" value={latestRow.utilization} fmt={v=>v+'%'} color={latestRow.utilization>=85?'#CAE8C1':latestRow.utilization>=70?'#44ccaa':latestRow.utilization>50?'#F4DB71':'#E05252'} target={75} metric="utilization"/>
                 <StatCard label="Completed Visits" value={latestRow.completed} color="#6B9FD4" metric="completed"/>
                 <StatCard label="No-Shows" value={latestRow.noShows} color={latestRow.noShows>8?'#E05252':'#888'} metric="noShows"/>
                 <StatCard label="Cancellations" value={latestRow.cancellations} color={latestRow.cancellations>15?'#F4DB71':'#888'} metric="cancellations"/>
