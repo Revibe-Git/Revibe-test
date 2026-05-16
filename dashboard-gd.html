@@ -2269,13 +2269,15 @@ function PerformancePage({staff,perfData,setPerfData}){
   const matchStaff=(name)=>{
     if(!name||typeof name!=='string')return null;
     const clean=(s)=>s.toLowerCase()
-      .replace(/^(dr\.\s*)+/,'')           // remove Dr. prefix(es)
-      .replace(/\bkam kei\b/,'winson')     // Winson's Jane name
-      .replace(/\bvince\b/,'vincent')      // Vince → Vincent
-      .replace(/\bmichael\b/,'mike')       // Michael Ross → Mike Ross
-      .replace(/\bjoshua\b/,'josh')        // Joshua → Josh
-      .replace(/[-']/g,' ')               // hyphens and apostrophes to spaces
-      .replace(/[^a-z\s]/g,'')            // remove non-alpha
+      .replace(/^(dr\.\s*)+/,'')
+      .replace(/\bkam kei\b/,'winson')
+      .replace(/\bvince\b/,'vincent')
+      .replace(/\bmichael\b/,'mike')
+      .replace(/\bjoshua\b/,'josh')
+      .replace(/macpherson/,'macphearson')   // Jane spells it MacPherson, profiles use MacPhearson
+      .replace(/patino/,'pitano')            // Jane: Bitar Patino, profiles: Bitar-Pitano
+      .replace(/[-']/g,' ')
+      .replace(/[^a-z\s]/g,'')
       .replace(/\s+/g,' ').trim();
 
     const n=clean(name);
@@ -2504,6 +2506,13 @@ function PerformancePage({staff,perfData,setPerfData}){
   const availYears=useMemo(()=>[...new Set(allSnapDates.map(d=>d.slice(0,4)))].sort(),[allSnapDates]);
 
   // Filter snapshots by period
+  const fmtPeriodLabel=(p)=>{
+    if(!p||p==='all')return'All Time';
+    if(p.includes('-Q')){const[y,q]=p.split('-Q');return 'Q'+q+' '+y;}
+    if(p.length===7)return new Date(p+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
+    if(p.length===4)return p+' (Full Year)';
+    return p;
+  };
   const filterSnaps=(filter)=>{
     if(!filter||filter==='all')return data.snapshots;
     if(filter.includes('-Q')){
@@ -2727,7 +2736,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0 14px',flexWrap:'wrap'}}>
               <select value={sectionA.revenue||''} onChange={e=>setSectionA(p=>({...p,revenue:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(202,232,193,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
-                <option value="">This period…</option>
+                <option value="">Select period…</option>
                 {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}>
                   <option value={y}>{y} (Full Year)</option>
                   {['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}
@@ -2737,7 +2746,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               <span style={{color:'#555',fontSize:15}}>vs</span>
               <select value={sectionB.revenue||''} onChange={e=>setSectionB(p=>({...p,revenue:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(107,159,212,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
-                <option value="">Compare to…</option>
+                <option value="">Select period…</option>
                 {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}>
                   <option value={y}>{y} (Full Year)</option>
                   {['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}
@@ -2764,10 +2773,10 @@ function PerformancePage({staff,perfData,setPerfData}){
             return(<div>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,paddingBottom:10,borderBottom:'1px solid var(--border)'}}>
                 <div style={{display:'flex',gap:20}}>
-                  <div><div style={{fontSize:13,color:'#CAE8C1',marginBottom:2}}>● {sectionA.revenue}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(totA)}</div></div>
-                  <div><div style={{fontSize:13,color:'#6B9FD4',marginBottom:2}}>● {sectionB.revenue}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#6B9FD4'}}>{fmtRev(totB)}</div></div>
+                  <div><div style={{fontSize:13,color:'#CAE8C1',marginBottom:2}}>● {fmtPeriodLabel(sectionA.revenue)}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(totA)}</div></div>
+                  <div><div style={{fontSize:13,color:'#6B9FD4',marginBottom:2}}>● {fmtPeriodLabel(sectionB.revenue)}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#6B9FD4'}}>{fmtRev(totB)}</div></div>
                 </div>
-                <div style={{textAlign:'right'}}><div style={{fontSize:13,color:'#888'}}>Overall</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:diff>=0?'#CAE8C1':'#E05252'}}>{diff>=0?'▲':'▼'}{Math.abs(pct)}%</div></div>
+                <div style={{textAlign:'right'}}><div style={{fontSize:13,color:'#888'}}>vs {fmtPeriodLabel(sectionB.revenue)}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:diff>=0?'#CAE8C1':'#E05252'}}>{diff>=0?'▲':'▼'}{Math.abs(pct)}%</div></div>
               </div>
               {merged.map(r=>{
                 const d=r.revA-r.revB;const p=r.revB>0?Math.round((d/r.revB)*100):0;
@@ -2814,13 +2823,13 @@ function PerformancePage({staff,perfData,setPerfData}){
             <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0 14px',flexWrap:'wrap'}}>
               <select value={sectionA.utilization||''} onChange={e=>setSectionA(p=>({...p,utilization:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(68,204,170,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
-                <option value="">This period…</option>
+                <option value="">Select period…</option>
                 {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
               </select>
               <span style={{color:'#555',fontSize:15}}>vs</span>
               <select value={sectionB.utilization||''} onChange={e=>setSectionB(p=>({...p,utilization:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(107,159,212,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
-                <option value="">Compare to…</option>
+                <option value="">Select period…</option>
                 {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
               </select>
             </div>
@@ -2902,13 +2911,13 @@ function PerformancePage({staff,perfData,setPerfData}){
             <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0 14px',flexWrap:'wrap'}}>
               <select value={sectionA.appointments||''} onChange={e=>setSectionA(p=>({...p,appointments:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(202,232,193,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
-                <option value="">This period…</option>
+                <option value="">Select period…</option>
                 {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
               </select>
               <span style={{color:'#555',fontSize:15}}>vs</span>
               <select value={sectionB.appointments||''} onChange={e=>setSectionB(p=>({...p,appointments:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(107,159,212,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
-                <option value="">Compare to…</option>
+                <option value="">Select period…</option>
                 {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
               </select>
             </div>
