@@ -2217,9 +2217,13 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
-  const[periodFilter,setPeriodFilter]=useState('all');
+  const[periodFilter,setPeriodFilter]=useState(()=>new Date().toISOString().slice(0,7));
   const[compareA,setCompareA]=useState('');
   const[compareB,setCompareB]=useState('');
+  // Per-section compare state
+  const[sectionCompare,setSectionCompare]=useState({revenue:false,utilization:false,appointments:false,gva:false,retention:false});
+  const[sectionA,setSectionA]=useState({});
+  const[sectionB,setSectionB]=useState({});
 
   /* ── CSV parser ─────────────────────────────── */
   const parseCSV=(text)=>{
@@ -2643,7 +2647,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           <div style={{fontSize:14,color:'#777'}}>Jane data (Appointments + Shift reports) · GVA · Retention · {data.snapshots.length} snapshot{data.snapshots.length!==1?'s':''} stored</div>
         </div>
         <div className="flex aic g5" style={{flexWrap:'wrap'}}>
-          {[['overview','▣ Overview'],...(data.snapshots.length>=2?[['compare','⇄ Compare']]:[]),['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['appointments','📋 Appointments'],['gva','📈 GVA'],['retention','🔄 Retention'],['trends','↗ Trends'],['import','📂 Jane Import']].map(([k,l])=>(
+          {[['overview','▣ Overview'],['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['appointments','📋 Appointments'],['gva','📈 GVA'],['retention','🔄 Retention'],['trends','↗ Trends'],['import','📂 Jane Import']].map(([k,l])=>(
             <button key={k} className={`btn btn-sm ${tab===k?'btn-go':'btn-ghost'}`} onClick={()=>setTab(k)}>{l}</button>
           ))}
         </div>
@@ -2657,171 +2661,36 @@ function PerformancePage({staff,perfData,setPerfData}){
         <div className="sc gray"><div className="sc-lbl">Snapshots</div><div className="sc-val">{data.snapshots.length}</div><div className="sc-sub">{data.lastImport?new Date(data.lastImport).toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'No imports yet'}</div></div>
       </div>
 
-      {/* Period filter bar — shown on all tabs except import/gva/retention/trends */}
-      {!['import','gva','retention','trends','compare'].includes(tab)&&data.snapshots.length>0&&(
-        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:12}}>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#777',flexShrink:0}}>Period</div>
+      {/* Period filter bar */}
+      {!['import','gva','retention','trends'].includes(tab)&&data.snapshots.length>0&&(
+        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#777',flexShrink:0}}>Viewing</div>
           <select value={periodFilter} onChange={e=>setPeriodFilter(e.target.value)}
-            style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
+            style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:260}}>
             <option value="all">All Time</option>
-            {availYears.length>0&&<optgroup label="Year">{availYears.map(y=><option key={y} value={y}>{y}</option>)}</optgroup>}
-            {availQuarters.length>0&&<optgroup label="Quarter">{availQuarters.map(q=><option key={q} value={q}>{q.replace('-Q','  Q')}</option>)}</optgroup>}
-            {availMonths.length>0&&<optgroup label="Month">{availMonths.map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>}
+            {availYears.map(y=>(
+              <optgroup key={y} label={'── '+y+' ──'}>
+                <option value={y}>{y} (Full Year)</option>
+                {['Q1','Q2','Q3','Q4'].filter(q=>{
+                  const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];
+                  return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));
+                }).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}
+                {availMonths.filter(m=>m.startsWith(y)).map(m=>(
+                  <option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>
+                ))}
+              </optgroup>
+            ))}
           </select>
-          {periodFilter!=='all'&&(
-            <div style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'var(--lime)'}}>
-              {filteredSnaps.length} snapshot{filteredSnaps.length!==1?'s':''} in period
-              {(()=>{const cur=new Date().toISOString().slice(0,7);return periodFilter===cur?<span style={{color:'#F4DB71'}}>· partial month</span>:null;})()}
-              <button className="btn btn-ghost btn-xs" style={{fontSize:13}} onClick={()=>setPeriodFilter('all')}>✕ Clear</button>
-            </div>
-          )}
+          <div style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'var(--lime)'}}>
+            {filteredSnaps.length} snapshot{filteredSnaps.length!==1?'s':''} in view
+            {periodFilter===new Date().toISOString().slice(0,7)&&<span style={{color:'#F4DB71'}}>· current month</span>}
+            {periodFilter!=='all'&&periodFilter!==new Date().toISOString().slice(0,7)&&(
+              <button className="btn btn-ghost btn-xs" style={{fontSize:13}} onClick={()=>setPeriodFilter(new Date().toISOString().slice(0,7))}>← This Month</button>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ── COMPARE TAB ── */}
-      {tab==='compare'&&(
-        <div>
-          {data.snapshots.length<2?(
-            <div style={{background:'rgba(107,159,212,.06)',border:'1px solid rgba(107,159,212,.18)',borderRadius:8,padding:'22px 24px',marginBottom:14,textAlign:'center'}}>
-              <div style={{fontSize:28,marginBottom:10}}>⇄</div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:700,color:'#6B9FD4',letterSpacing:'1px',marginBottom:8}}>MONTH-TO-MONTH COMPARISON</div>
-              <div style={{fontSize:15,color:'#888',lineHeight:1.8,maxWidth:500,margin:'0 auto'}}>
-                Import monthly CSVs to compare periods side by side.<br/>
-                <span style={{fontSize:14,color:'#777',display:'block',marginTop:8}}>e.g. Export April 1–30, import it. Export May 1–31, import it. Then compare April vs May.</span>
-              </div>
-              <button className="btn btn-ghost btn-sm" style={{marginTop:14}} onClick={()=>setTab('import')}>Go to Import →</button>
-            </div>
-          ):(
-            <div>
-              {/* Period pickers */}
-              <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'14px 16px',marginBottom:14}}>
-                <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:16,alignItems:'center'}}>
-                  <div>
-                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',marginBottom:8}}>This Period</div>
-                    <select value={compareA} onChange={e=>setCompareA(e.target.value)}
-                      style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'6px 10px',outline:'none',cursor:'pointer',width:'100%'}}>
-                      <option value="">Select period…</option>
-                      {availYears.length>0&&<optgroup label="Year">{availYears.map(y=><option key={y} value={y}>{y}</option>)}</optgroup>}
-                      {availQuarters.length>0&&<optgroup label="Quarter">{availQuarters.map(q=><option key={q} value={q}>{q.replace('-Q','  Q')}</option>)}</optgroup>}
-                      {availMonths.length>0&&<optgroup label="Month">{availMonths.map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>}
-                    </select>
-                  </div>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#888',textAlign:'center'}}>VS</div>
-                  <div>
-                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#6B9FD4',marginBottom:8}}>Previous Period</div>
-                    <select value={compareB} onChange={e=>setCompareB(e.target.value)}
-                      style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'6px 10px',outline:'none',cursor:'pointer',width:'100%'}}>
-                      <option value="">Select period…</option>
-                      {availYears.length>0&&<optgroup label="Year">{availYears.map(y=><option key={y} value={y}>{y}</option>)}</optgroup>}
-                      {availQuarters.length>0&&<optgroup label="Quarter">{availQuarters.map(q=><option key={q} value={q}>{q.replace('-Q','  Q')}</option>)}</optgroup>}
-                      {availMonths.length>0&&<optgroup label="Month">{availMonths.map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {(!compareA||!compareB)?(
-                <div className="card"><div className="empty"><div className="empty-ico" style={{fontSize:28}}>⇄</div><p>Select a period on each side above.</p></div></div>
-              ):compareA===compareB?(
-                <div style={{padding:'16px',background:'rgba(224,82,82,.08)',border:'1px solid rgba(224,82,82,.2)',borderRadius:6,fontSize:14,color:'#E05252',textAlign:'center'}}>Select two different periods to compare.</div>
-              ):(()=>{
-                const fmtPeriod=(p)=>{
-                  if(!p)return'—';
-                  if(p.includes('-Q')){const[y,q]=p.split('-Q');return`Q${q} ${y}`;}
-                  if(p.length===7){try{return new Date(p+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'});}catch{return p;}}
-                  return p; // year like "2026"
-                };
-                const metrics=[
-                  {key:'revenue',label:'Revenue',fmt:fmtRev,color:'#CAE8C1',higherBetter:true},
-                  {key:'completed',label:'Completed Visits',fmt:v=>v,color:'#6B9FD4',higherBetter:true},
-                  {key:'utilization',label:'Utilization %',fmt:v=>v+'%',color:'#44ccaa',higherBetter:true},
-                  {key:'noShows',label:'No-Shows',fmt:v=>v,color:'#E05252',higherBetter:false},
-                ];
-                const clinStaff=staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops');
-
-                return(
-                  <div>
-                    {/* Header */}
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
-                      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#ddd',letterSpacing:'1px'}}>
-                        {fmtPeriod(compareA)} <span style={{color:'#888',fontWeight:400,fontSize:14,margin:'0 10px'}}>vs</span> {fmtPeriod(compareB)}
-                      </div>
-                      <div style={{display:'flex',gap:16,fontSize:14,alignItems:'center'}}>
-                        <span style={{display:'flex',alignItems:'center',gap:6}}><span style={{width:12,height:12,borderRadius:2,background:'#CAE8C1',display:'inline-block'}}/>{fmtPeriod(compareA)}</span>
-                        <span style={{display:'flex',alignItems:'center',gap:6}}><span style={{width:12,height:12,borderRadius:2,background:'#6B9FD4',display:'inline-block',opacity:0.6}}/>{fmtPeriod(compareB)}</span>
-                      </div>
-                    </div>
-
-                    {metrics.map(({key,label,fmt,color,higherBetter})=>{
-                      const staffWithData=clinStaff.filter(s=>(parseFloat(compareARows.find(r=>r.staffId===s.id)?.[key])||0)>0||(parseFloat(compareBRows.find(r=>r.staffId===s.id)?.[key])||0)>0);
-                      if(!staffWithData.length)return null;
-                      const totalA=staffWithData.reduce((a,s)=>a+(parseFloat(compareARows.find(r=>r.staffId===s.id)?.[key])||0),0);
-                      const totalB=staffWithData.reduce((a,s)=>a+(parseFloat(compareBRows.find(r=>r.staffId===s.id)?.[key])||0),0);
-                      const totalDiff=totalB?Math.round(((totalA-totalB)/totalB)*100):null;
-                      const maxVal=Math.max(...staffWithData.flatMap(s=>[parseFloat(compareARows.find(r=>r.staffId===s.id)?.[key])||0,parseFloat(compareBRows.find(r=>r.staffId===s.id)?.[key])||0]),1);
-                      const sorted=[...staffWithData].sort((a,b)=>(parseFloat(compareARows.find(r=>r.staffId===b.id)?.[key])||0)-(parseFloat(compareARows.find(r=>r.staffId===a.id)?.[key])||0));
-
-                      return(
-                        <div key={key} className="perf-slot" style={{marginBottom:14}}>
-                          {/* Metric header */}
-                          <div className="perf-slot-head">
-                            <span className="perf-slot-title" style={{color}}>{label}</span>
-                            <div style={{display:'flex',alignItems:'center',gap:10}}>
-                              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#CAE8C1'}}>{fmt(totalA)}</span>
-                              <span style={{fontSize:14,color:'#777'}}>vs {fmt(totalB)}</span>
-                              {totalDiff!=null&&<span style={{fontSize:14,fontWeight:700,padding:'2px 8px',borderRadius:3,color:higherBetter?(totalDiff>=0?'#44CCAA':'#E05252'):(totalDiff<=0?'#44CCAA':'#E05252'),background:'rgba(255,255,255,.04)'}}>{totalDiff>=0?'▲':'▼'}{Math.abs(totalDiff)}% overall</span>}
-                            </div>
-                          </div>
-                          {/* Table rows */}
-                          <div className="perf-slot-body">
-                            {sorted.map(s=>{
-                              const aVal=parseFloat(compareARows.find(r=>r.staffId===s.id)?.[key])||0;
-                              const bVal=parseFloat(compareBRows.find(r=>r.staffId===s.id)?.[key])||0;
-                              if(!aVal&&!bVal)return null;
-                              const diff=bVal>0?Math.round(((aVal-bVal)/bVal)*100):null;
-                              const improved=higherBetter?diff>=0:diff<=0;
-                              const diffColor=diff===0?'#555':improved?'#44CCAA':'#E05252';
-                              return(
-                                <div key={s.id} style={{display:'grid',gridTemplateColumns:'160px 1fr 80px 80px 64px',alignItems:'center',gap:10,padding:'7px 0',borderBottom:'1px solid rgba(50,50,50,.5)'}}>
-                                  {/* Name */}
-                                  <div style={{fontSize:14,fontWeight:600,color:'#ddd',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name.split(' ')[0]} {s.name.split(' ').slice(-1)[0]}</div>
-                                  {/* Dual bar */}
-                                  <div style={{display:'flex',flexDirection:'column',gap:3}}>
-                                    {aVal>0&&(
-                                      <div style={{display:'flex',alignItems:'center',gap:6}}>
-                                        <div style={{height:5,borderRadius:3,background:'#CAE8C1',width:Math.max(4,(aVal/maxVal)*100)+'%',maxWidth:'100%'}}/>
-                                      </div>
-                                    )}
-                                    {bVal>0&&(
-                                      <div style={{display:'flex',alignItems:'center',gap:6}}>
-                                        <div style={{height:5,borderRadius:3,background:'#6B9FD4',opacity:0.55,width:Math.max(4,(bVal/maxVal)*100)+'%',maxWidth:'100%'}}/>
-                                      </div>
-                                    )}
-                                  </div>
-                                  {/* This period value */}
-                                  <div style={{textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:800,color:'#CAE8C1'}}>{aVal?fmt(aVal):'—'}</div>
-                                  {/* Previous period value */}
-                                  <div style={{textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:600,color:'#6B9FD4',opacity:0.7}}>{bVal?fmt(bVal):'—'}</div>
-                                  {/* Delta */}
-                                  <div style={{textAlign:'right',fontSize:14,fontWeight:700,color:diffColor}}>
-                                    {diff!=null&&aVal&&bVal?(diff===0?'—':(diff>0?'▲':'▼')+Math.abs(diff)+'%'):'—'}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── OVERVIEW ── */}
       {tab==='overview'&&(
         <div className="grid2">
           <div className="perf-slot">
@@ -2848,9 +2717,77 @@ function PerformancePage({staff,perfData,setPerfData}){
         <div className="perf-slot">
           <div className="perf-slot-head">
             <span className="perf-slot-title" style={{color:'#CAE8C1'}}>Revenue by Practitioner</span>
-            {totalRev>0&&<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#CAE8C1'}}>Total: {fmtRev(totalRev)}</span>}
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              {totalRev>0&&<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#CAE8C1'}}>Total: {fmtRev(totalRev)}</span>}
+              <button className={`btn btn-xs ${sectionCompare.revenue?'btn-go':'btn-ghost'}`}
+                onClick={()=>setSectionCompare(p=>({...p,revenue:!p.revenue}))}>⇄ Compare</button>
+            </div>
           </div>
-          <div className="perf-slot-body">{withRev.length?withRev.map(s=>(
+          {sectionCompare.revenue&&(
+            <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0 14px',flexWrap:'wrap'}}>
+              <select value={sectionA.revenue||''} onChange={e=>setSectionA(p=>({...p,revenue:e.target.value}))}
+                style={{background:'var(--surface3)',border:'1px solid rgba(202,232,193,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
+                <option value="">This period…</option>
+                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}>
+                  <option value={y}>{y} (Full Year)</option>
+                  {['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}
+                  {availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}
+                </optgroup>)}
+              </select>
+              <span style={{color:'#555',fontSize:15}}>vs</span>
+              <select value={sectionB.revenue||''} onChange={e=>setSectionB(p=>({...p,revenue:e.target.value}))}
+                style={{background:'var(--surface3)',border:'1px solid rgba(107,159,212,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
+                <option value="">Compare to…</option>
+                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}>
+                  <option value={y}>{y} (Full Year)</option>
+                  {['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}
+                  {availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}
+                </optgroup>)}
+              </select>
+            </div>
+          )}
+          {sectionCompare.revenue&&sectionA.revenue&&sectionB.revenue?(()=>{
+            const rowsA=aggregateRows(filterSnaps(sectionA.revenue));
+            const rowsB=aggregateRows(filterSnaps(sectionB.revenue));
+            const allStaff=[...new Set([...rowsA.map(r=>r.staffId),...rowsB.map(r=>r.staffId)])];
+            const merged=allStaff.map(id=>{
+              const a=rowsA.find(r=>r.staffId===id);
+              const b=rowsB.find(r=>r.staffId===id);
+              const s=staff.find(x=>x.id===id);
+              return{id,name:s?.name||id,site:s?.site||'',revA:a?.revenue||0,revB:b?.revenue||0};
+            }).filter(r=>r.revA>0||r.revB>0).sort((a,b)=>b.revA-a.revA);
+            const maxVal=Math.max(...merged.map(r=>Math.max(r.revA,r.revB)),1);
+            const totA=merged.reduce((s,r)=>s+r.revA,0);
+            const totB=merged.reduce((s,r)=>s+r.revB,0);
+            const diff=totA-totB;
+            const pct=totB>0?Math.round((diff/totB)*100):0;
+            return(<div>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12,paddingBottom:10,borderBottom:'1px solid var(--border)'}}>
+                <div style={{display:'flex',gap:20}}>
+                  <div><div style={{fontSize:13,color:'#CAE8C1',marginBottom:2}}>● {sectionA.revenue}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(totA)}</div></div>
+                  <div><div style={{fontSize:13,color:'#6B9FD4',marginBottom:2}}>● {sectionB.revenue}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#6B9FD4'}}>{fmtRev(totB)}</div></div>
+                </div>
+                <div style={{textAlign:'right'}}><div style={{fontSize:13,color:'#888'}}>Overall</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:diff>=0?'#CAE8C1':'#E05252'}}>{diff>=0?'▲':'▼'}{Math.abs(pct)}%</div></div>
+              </div>
+              {merged.map(r=>{
+                const d=r.revA-r.revB;const p=r.revB>0?Math.round((d/r.revB)*100):0;
+                return(<div key={r.id} style={{padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+                    <div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{r.name}</div><div style={{fontSize:13,color:'#777'}}>{r.site}</div></div>
+                    <div style={{display:'flex',gap:16,alignItems:'center'}}>
+                      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(r.revA)}</span>
+                      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#6B9FD4'}}>{fmtRev(r.revB)}</span>
+                      {(r.revA>0||r.revB>0)&&<span style={{fontSize:13,color:d>=0?'#CAE8C1':'#E05252',minWidth:50,textAlign:'right'}}>{d>=0?'▲':'▼'}{Math.abs(p)}%</span>}
+                    </div>
+                  </div>
+                  <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                    <div style={{height:5,background:'var(--border)',borderRadius:3}}><div style={{height:'100%',background:'#CAE8C1',borderRadius:3,width:(r.revA/maxVal*100)+'%'}}/></div>
+                    <div style={{height:5,background:'var(--border)',borderRadius:3}}><div style={{height:'100%',background:'#6B9FD4',opacity:.7,borderRadius:3,width:(r.revB/maxVal*100)+'%'}}/></div>
+                  </div>
+                </div>);
+              })}
+            </div>);
+          })():(<div className="perf-slot-body">{withRev.length?withRev.map(s=>(
             <div key={s.id} className="perf-bar-row" style={{padding:'9px 0',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
               <div style={{minWidth:180}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777',marginTop:2}}>{s.site}</div></div>
               <div className="perf-bar-track" style={{height:6}}><div className="perf-bar-fill" style={{width:(s.revenue/maxRev*100)+'%',background:'#CAE8C1'}}/></div>
@@ -2858,7 +2795,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                 <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(s.revenue)}</span>
               </div>
             </div>
-          )):<div className="empty" style={{padding:40}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue data.</p></div>}</div>
+          )):<div className="empty" style={{padding:40}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue data.</p></div>}</div>)}
         </div>
       )}
 
@@ -2867,9 +2804,52 @@ function PerformancePage({staff,perfData,setPerfData}){
         <div className="perf-slot">
           <div className="perf-slot-head">
             <span className="perf-slot-title" style={{color:'#44ccaa'}}>Utilization % — from Shift Report</span>
-            <span style={{fontSize:14,color:'#777'}}>65% min · 75% good · 85%+ strong</span>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              <span style={{fontSize:14,color:'#777'}}>65% min · 75% good · 85%+ strong</span>
+              <button className={`btn btn-xs ${sectionCompare.utilization?'btn-go':'btn-ghost'}`}
+                onClick={()=>setSectionCompare(p=>({...p,utilization:!p.utilization}))}>⇄ Compare</button>
+            </div>
           </div>
-          {(()=>{
+          {sectionCompare.utilization&&(
+            <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0 14px',flexWrap:'wrap'}}>
+              <select value={sectionA.utilization||''} onChange={e=>setSectionA(p=>({...p,utilization:e.target.value}))}
+                style={{background:'var(--surface3)',border:'1px solid rgba(68,204,170,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
+                <option value="">This period…</option>
+                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
+              </select>
+              <span style={{color:'#555',fontSize:15}}>vs</span>
+              <select value={sectionB.utilization||''} onChange={e=>setSectionB(p=>({...p,utilization:e.target.value}))}
+                style={{background:'var(--surface3)',border:'1px solid rgba(107,159,212,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
+                <option value="">Compare to…</option>
+                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
+              </select>
+            </div>
+          )}
+          {sectionCompare.utilization&&sectionA.utilization&&sectionB.utilization?(()=>{
+            const rowsA=aggregateRows(filterSnaps(sectionA.utilization));
+            const rowsB=aggregateRows(filterSnaps(sectionB.utilization));
+            const merged=staff.filter(s=>rowsA.find(r=>r.staffId===s.id)||rowsB.find(r=>r.staffId===s.id)).map(s=>{
+              const a=rowsA.find(r=>r.staffId===s.id);const b=rowsB.find(r=>r.staffId===s.id);
+              return{...s,utA:a?.utilization||null,utB:b?.utilization||null};
+            }).filter(r=>r.utA||r.utB).sort((a,b)=>(b.utA||0)-(a.utA||0));
+            return(<div>{merged.map(r=>{
+              const d=r.utA&&r.utB?r.utA-r.utB:null;
+              return(<div key={r.id} style={{padding:'8px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+                  <div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{r.name}</div><div style={{fontSize:13,color:'#777'}}>{r.site}</div></div>
+                  <div style={{display:'flex',gap:16,alignItems:'center'}}>
+                    {r.utA!=null&&<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#44ccaa'}}>{r.utA}%</span>}
+                    {r.utB!=null&&<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#6B9FD4'}}>{r.utB}%</span>}
+                    {d!=null&&<span style={{fontSize:13,color:d>=0?'#CAE8C1':'#E05252',minWidth:40}}>{d>=0?'+':''}{d.toFixed(1)}pp</span>}
+                  </div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                  {r.utA!=null&&<div style={{height:5,background:'var(--border)',borderRadius:3}}><div style={{height:'100%',background:'#44ccaa',borderRadius:3,width:r.utA+'%'}}/></div>}
+                  {r.utB!=null&&<div style={{height:5,background:'var(--border)',borderRadius:3}}><div style={{height:'100%',background:'#6B9FD4',opacity:.7,borderRadius:3,width:r.utB+'%'}}/></div>}
+                </div>
+              </div>);
+            })}</div>);
+          })():(()=>{
             // Always show utilization — fall back to all snapshots if filtered period has none
             const allUtilRows=data.snapshots
               .flatMap(sn=>(sn.rows||[]).filter(r=>r.utilization!=null))
@@ -2913,8 +2893,50 @@ function PerformancePage({staff,perfData,setPerfData}){
       {/* ── APPOINTMENTS ── */}
       {tab==='appointments'&&(
         <div className="perf-slot">
-          <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#CAE8C1'}}>Appointments — from Appointments CSV</span></div>
-          <div className="perf-slot-body">{withAppts.length?(
+          <div className="perf-slot-head">
+            <span className="perf-slot-title" style={{color:'#CAE8C1'}}>Appointments — from Appointments CSV</span>
+            <button className={`btn btn-xs ${sectionCompare.appointments?'btn-go':'btn-ghost'}`}
+              onClick={()=>setSectionCompare(p=>({...p,appointments:!p.appointments}))}>⇄ Compare</button>
+          </div>
+          {sectionCompare.appointments&&(
+            <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0 14px',flexWrap:'wrap'}}>
+              <select value={sectionA.appointments||''} onChange={e=>setSectionA(p=>({...p,appointments:e.target.value}))}
+                style={{background:'var(--surface3)',border:'1px solid rgba(202,232,193,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
+                <option value="">This period…</option>
+                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
+              </select>
+              <span style={{color:'#555',fontSize:15}}>vs</span>
+              <select value={sectionB.appointments||''} onChange={e=>setSectionB(p=>({...p,appointments:e.target.value}))}
+                style={{background:'var(--surface3)',border:'1px solid rgba(107,159,212,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
+                <option value="">Compare to…</option>
+                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
+              </select>
+            </div>
+          )}
+          {sectionCompare.appointments&&sectionA.appointments&&sectionB.appointments?(()=>{
+            const rowsA=aggregateRows(filterSnaps(sectionA.appointments));
+            const rowsB=aggregateRows(filterSnaps(sectionB.appointments));
+            const merged=staff.filter(s=>rowsA.find(r=>r.staffId===s.id)||rowsB.find(r=>r.staffId===s.id)).map(s=>{
+              const a=rowsA.find(r=>r.staffId===s.id);const b=rowsB.find(r=>r.staffId===s.id);
+              return{...s,cA:a?.completed||0,cB:b?.completed||0,nA:a?.noShows||0,nB:b?.noShows||0};
+            }).filter(r=>r.cA>0||r.cB>0).sort((a,b)=>b.cA-a.cA);
+            return(<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+              <thead><tr style={{borderBottom:'1px solid var(--border)'}}>
+                {['Practitioner',sectionA.appointments+' Visits',sectionB.appointments+' Visits','Change',sectionA.appointments+' No-Shows',sectionB.appointments+' No-Shows'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:h==='Practitioner'?'left':'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:'#999',fontWeight:600}}>{h}</th>)}
+              </tr></thead>
+              <tbody>{merged.map(s=>{
+                const d=s.cA-s.cB;const p=s.cB>0?Math.round((d/s.cB)*100):0;
+                return(<tr key={s.id} style={{borderBottom:'1px solid rgba(255,255,255,.04)'}} onClick={()=>{setTrendStaff(s);setTab('trends');}} className="perf-bar-row">
+                  <td style={{padding:'8px 10px'}}><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777'}}>{s.site}</div></td>
+                  <td style={{textAlign:'right',padding:'8px 10px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#CAE8C1'}}>{s.cA}</td>
+                  <td style={{textAlign:'right',padding:'8px 10px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#6B9FD4'}}>{s.cB}</td>
+                  <td style={{textAlign:'right',padding:'8px 10px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:d>=0?'#CAE8C1':'#E05252'}}>{d>=0?'▲':'▼'}{Math.abs(p)}%</td>
+                  <td style={{textAlign:'right',padding:'8px 10px',color:'#F4DB71'}}>{s.nA}</td>
+                  <td style={{textAlign:'right',padding:'8px 10px',color:'#888'}}>{s.nB}</td>
+                </tr>);
+              })}</tbody>
+            </table></div>);
+          })():(<div className="perf-slot-body">{withAppts.length?(
             <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
               <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{['Practitioner','Completed','No-Shows','Cancellations','Rescheduled','Cancel Rate'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:h==='Practitioner'?'left':'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',textTransform:'uppercase',color:'#999',fontWeight:600}}>{h}</th>)}</tr></thead>
               <tbody>{withAppts.map(s=>{
@@ -2932,7 +2954,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                 );
               })}</tbody>
             </table></div>
-          ):<div className="empty" style={{padding:40}}><div className="empty-ico">📋</div><p>Import an Appointments CSV to see per-practitioner breakdown.</p></div>}</div>
+          ):<div className="empty" style={{padding:40}}><div className="empty-ico">📋</div><p>Import an Appointments CSV to see per-practitioner breakdown.</p></div>}</div>)}
         </div>
       )}
 
