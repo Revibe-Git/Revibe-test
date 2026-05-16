@@ -2621,7 +2621,7 @@ function PerformancePage({staff,perfData,setPerfData}){
     snaps.forEach(snap=>{
       (snap.rows||[]).forEach(r=>{
         if(!r.staffId)return;
-        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0};
+        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
         const b=byStaff[r.staffId];
         if(r.completed)b.completed+=(parseFloat(r.completed)||0);
         if(r.noShows)b.noShows+=(parseFloat(r.noShows)||0);
@@ -2629,6 +2629,7 @@ function PerformancePage({staff,perfData,setPerfData}){
         if(r.rescheduled)b.rescheduled+=(parseFloat(r.rescheduled)||0);
         if(r.revenue)b.revenue+=(parseFloat(r.revenue)||0);
         if(r.appointments)b.appointments+=(parseFloat(r.appointments)||0);
+        if(r.initialAssessments)b.initialAssessments+=(parseFloat(r.initialAssessments)||0);
         // Average utilization across months rather than summing
         if(r.utilization!=null){
           b.utilization=(b.utilization||0)+(parseFloat(r.utilization)||0);
@@ -2806,6 +2807,89 @@ function PerformancePage({staff,perfData,setPerfData}){
             <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#F4DB71'}}>GVA</span><button className="btn btn-ghost btn-xs" onClick={()=>setTab('gva')}>Edit →</button></div>
             <div className="perf-slot-body">{withGva.length?withGva.map(s=>{const t=s.roadmap?.includes('L1')?4:s.roadmap?.includes('L2')?6:s.roadmap?.includes('L3')?8:12;const c=s.gva>=t?'#CAE8C1':s.gva>=t*.75?'#F4DB71':'#E05252';return<BarRow key={s.id} s={s} val={s.gva} max={maxGva} color={c} metric="gva_val"/>}):<div className="empty" style={{padding:24}}><div className="empty-ico">📈</div><p>Enter GVA values in the GVA tab.</p></div>}</div>
           </div>
+          {/* Initial Assessments — per practitioner + clinic trend */}
+          {(()=>{
+            const iaStaff=withAppts.filter(s=>(s.initialAssessments||0)>0).sort((a,b)=>(b.initialAssessments||0)-(a.initialAssessments||0));
+            const maxIA=iaStaff[0]?.initialAssessments||1;
+            const totalIA=iaStaff.reduce((a,s)=>a+(s.initialAssessments||0),0);
+            // Clinic-wide monthly trend from all snapshots
+            const clinicMonthlyIA=data.snapshots.map(s=>({
+              date:s.date,
+              total:(s.rows||[]).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0)
+            })).filter(p=>p.total>0).sort((a,b)=>a.date.localeCompare(b.date));
+            const monthlyAvg=clinicMonthlyIA.length?Math.round(clinicMonthlyIA.reduce((a,p)=>a+p.total,0)/clinicMonthlyIA.length):0;
+            return(<>
+              <div className="perf-slot">
+                <div className="perf-slot-head">
+                  <span className="perf-slot-title" style={{color:'#BB99FF'}}>Initial Assessments</span>
+                  {totalIA>0&&<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#BB99FF'}}>{totalIA} total · {monthlyAvg}/mo avg</span>}
+                  {!iaStaff.length&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('import')}>Import →</button>}
+                </div>
+                <div className="perf-slot-body">{iaStaff.length?iaStaff.map(s=>(
+                  <div key={s.id} className="perf-bar-row" style={{padding:'8px 0'}}>
+                    <div style={{minWidth:160}}><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#888'}}>{s.site}</div></div>
+                    <div className="perf-bar-track" style={{height:5}}><div className="perf-bar-fill" style={{width:((s.initialAssessments||0)/maxIA*100)+'%',background:'#BB99FF'}}/></div>
+                    <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:800,color:'#BB99FF',minWidth:36,textAlign:'right'}}>{s.initialAssessments||0}</span>
+                  </div>
+                )):<div className="empty" style={{padding:24}}><div className="empty-ico">📋</div><p>Import an Appointments CSV to see initial assessments.</p></div>}</div>
+              </div>
+              {/* Clinic-wide monthly trend */}
+              <div className="perf-slot" style={{gridColumn:'1 / -1'}}>
+                <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Initial Assessments — Clinic Monthly Trend</span></div>
+                <div style={{padding:'8px 16px 16px'}}>
+                  {clinicMonthlyIA.length<2?(
+                    <div className="empty" style={{padding:24}}><div className="empty-ico">📋</div><p>Import monthly Appointments CSVs to build trend history.</p></div>
+                  ):(()=>{
+                    const vals=clinicMonthlyIA.map(p=>p.total);
+                    const max=Math.max(...vals)*1.1||1;
+                    const min=0;
+                    const W=700,H=140,PADX=44,PADY=16,BOTTOM=32;
+                    const toY=v=>PADY+Math.round((1-(v-min)/(max-min))*(H-PADY*2));
+                    const coords=clinicMonthlyIA.map((p,i)=>({
+                      x:PADX+Math.round((i/(clinicMonthlyIA.length-1))*(W-PADX-16)),
+                      y:toY(p.total),val:p.total,date:p.date
+                    }));
+                    const pathD=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
+                    const areaD=pathD+` L${coords[coords.length-1].x},${H} L${coords[0].x},${H} Z`;
+                    const avgY=toY(monthlyAvg);
+                    const gridVals=[0,Math.round(max/2),Math.round(max)];
+                    return(
+                      <div>
+                        <div style={{display:'flex',gap:24,marginBottom:12}}>
+                          <div><div style={{fontSize:12,color:'#888',fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase',marginBottom:2}}>Monthly Avg</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:'#BB99FF'}}>{monthlyAvg}</span></div>
+                          <div><div style={{fontSize:12,color:'#888',fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase',marginBottom:2}}>Total</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:'#ddd'}}>{vals.reduce((a,b)=>a+b,0)}</span></div>
+                          <div><div style={{fontSize:12,color:'#888',fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase',marginBottom:2}}>Best Month</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:'#CAE8C1'}}>{Math.max(...vals)}</span><span style={{fontSize:13,color:'#888',marginLeft:6}}>{new Date(clinicMonthlyIA[vals.indexOf(Math.max(...vals))].date+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</span></div>
+                        </div>
+                        <svg width="100%" viewBox={`0 0 ${W} ${H+BOTTOM}`} style={{display:'block',overflow:'visible'}}>
+                          {gridVals.map((v,i)=>(
+                            <g key={i}>
+                              <line x1={PADX} y1={toY(v)} x2={W-16} y2={toY(v)} stroke="#1e1e1e" strokeWidth="1"/>
+                              <text x={PADX-6} y={toY(v)+4} textAnchor="end" fontSize="11" fill="#666">{v}</text>
+                            </g>
+                          ))}
+                          {/* Avg reference line */}
+                          <line x1={PADX} y1={avgY} x2={W-16} y2={avgY} stroke="#BB99FF" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.4"/>
+                          <text x={W-14} y={avgY+4} fontSize="11" fill="#BB99FF" opacity="0.6">avg</text>
+                          <path d={areaD} fill="#BB99FF" opacity="0.07"/>
+                          <path d={pathD} fill="none" stroke="#BB99FF" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
+                          {coords.map((c,i)=>(
+                            <g key={i}>
+                              <circle cx={c.x} cy={c.y} r="4.5" fill="#BB99FF" opacity="0.9"/>
+                              <text x={c.x} y={c.y-11} textAnchor="middle" fontSize="11" fill="#BB99FF" opacity="0.85" fontWeight="600">{c.val}</text>
+                              <text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">
+                                {new Date(c.date+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}
+                              </text>
+                            </g>
+                          ))}
+                          <line x1={PADX} y1={H} x2={W-16} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
+                        </svg>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </>);
+          })()}
         </div>
       )}
 
