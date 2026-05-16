@@ -1829,7 +1829,7 @@ const getBestScore=(staff)=>{
   let best=null;
   ['clinical','sc','spa'].forEach(t=>{
     const sc=staff.scores[t];
-    if(sc&&sc.total!==null&&sc.total!==undefined){
+    if(sc&&sc.total!==null&&sc.total!==undefined&&sc.total>0){
       if(best===null||sc.total>best)best=sc.total;
     }
   });
@@ -2566,7 +2566,7 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   /* ── Merged staff with period-filtered data ── */
   const mergedStaff=useMemo(()=>
-    staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops').map(s=>{
+    staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{
       const jr=filteredRows.find(r=>r.staffId===s.id);
       const gvaVal=parseFloat(gvaEdits[s.id]!==undefined?gvaEdits[s.id]:data.gva[s.id])||null;
       const retVal=data.retention?.[s.id]||null;
@@ -2977,7 +2977,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               <button className="btn btn-lime btn-sm" onClick={saveGVA} disabled={!Object.keys(gvaEdits).length}>{gvaSaved?'✓ Saved':'Save GVA'}</button>
             </div>
             <div className="perf-slot-body">
-              {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops').map(s=>{
+              {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{
                 const roadmapN=parseInt((s.roadmap||'').match(/L(\d)/)?.[1]||'1');
                 const targets=s.tracks?.includes('spa')&&!s.tracks?.includes('clinical')?[6,9,12,18]:[4,6,8,12];
                 const target=targets[Math.min(roadmapN-1,3)];
@@ -3038,7 +3038,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               }} disabled={!Object.keys(retentionEdits).length}>{retSaved?'✓ Saved':'Save Retention'}</button>
             </div>
             <div className="perf-slot-body">
-              {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops').map(s=>{
+              {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{
                 const editing=retentionEdits[s.id]!==undefined;
                 const val=editing?retentionEdits[s.id]:((data.retention||{})[s.id]||'');
                 const num=parseFloat(val)||null;
