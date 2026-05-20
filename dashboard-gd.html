@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- v20260520-retention-ia -->
+<!DOCTYPE html><!-- v20260520-ret-ia -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3385,121 +3385,212 @@ function PerformancePage({staff,perfData,setPerfData}){
               const byStaff={};
               if(dailyAppts.length>0){
                 dailyAppts.forEach(r=>{
-                  if(iaFrom&&r.date<iaFrom)return;if(iaTo&&r.date>iaTo)return;
+                  if(iaFrom&&r.date<iaFrom)return;
+                  if(iaTo&&r.date>iaTo)return;
                   const s=staff.find(x=>x.id===r.staff_id);
                   if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
                   if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
-                  const ia=r.initial_assessments||0;byStaff[r.staff_id].total+=ia;byStaff[r.staff_id].completed+=(r.completed||0);
+                  const ia=r.initial_assessments||0;
+                  byStaff[r.staff_id].total+=ia;
+                  byStaff[r.staff_id].completed+=(r.completed||0);
                   if(ia>0)byStaff[r.staff_id].dailyBreakdown[r.date]=(byStaff[r.staff_id].dailyBreakdown[r.date]||0)+ia;
                 });
               }else{
                 data.snapshots.forEach(snap=>{
-                  const m=snap.date.slice(0,7);if(iaFrom&&m<iaFrom.slice(0,7))return;if(iaTo&&m>iaTo.slice(0,7))return;
-                  (snap.rows||[]).forEach(r=>{if(!r.staffId)return;const s=staff.find(x=>x.id===r.staffId);if(!s||['mgmt','ops','edu'].includes(s.discipline))return;const ia=parseFloat(r.initialAssessments)||0;if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};byStaff[r.staffId].total+=ia;byStaff[r.staffId].completed+=(parseFloat(r.completed)||0);});
+                  const m=snap.date.slice(0,7);
+                  if(iaFrom&&m<iaFrom.slice(0,7))return;
+                  if(iaTo&&m>iaTo.slice(0,7))return;
+                  (snap.rows||[]).forEach(r=>{
+                    if(!r.staffId)return;
+                    const s=staff.find(x=>x.id===r.staffId);
+                    if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
+                    const ia=parseFloat(r.initialAssessments)||0;
+                    if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
+                    byStaff[r.staffId].total+=ia;
+                    byStaff[r.staffId].completed+=(parseFloat(r.completed)||0);
+                  });
                 });
               }
               return Object.values(byStaff).map(r=>({...r,iaRate:r.completed>0?Math.round((r.total/r.completed)*100):null}));
             },[iaFrom,iaTo,dailyAppts,data.snapshots,staff]);
             const clinicDailyTrend=React.useMemo(()=>{
-              if(!dailyAppts.length)return[];const byDate={};
-              dailyAppts.forEach(r=>{if(iaFrom&&r.date<iaFrom)return;if(iaTo&&r.date>iaTo)return;const s=staff.find(x=>x.id===r.staff_id);if(!s||['mgmt','ops','edu'].includes(s.discipline))return;const ia=r.initial_assessments||0;if(ia>0)byDate[r.date]=(byDate[r.date]||0)+ia;});
+              if(!dailyAppts.length)return[];
+              const byDate={};
+              dailyAppts.forEach(r=>{
+                if(iaFrom&&r.date<iaFrom)return;
+                if(iaTo&&r.date>iaTo)return;
+                const s=staff.find(x=>x.id===r.staff_id);
+                if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
+                const ia=r.initial_assessments||0;
+                if(ia>0)byDate[r.date]=(byDate[r.date]||0)+ia;
+              });
               return Object.entries(byDate).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count}));
             },[iaFrom,iaTo,dailyAppts,staff]);
             const sorted=[...iaByStaff].sort((a,b)=>{const av=a[iaSortKey]??-1,bv=b[iaSortKey]??-1;if(typeof av==='string')return iaSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);return iaSortDir==='desc'?bv-av:av-bv;});
-            const totalIA=sorted.reduce((a,s)=>a+s.total,0);const totalCompleted=sorted.reduce((a,s)=>a+s.completed,0);
+            const totalIA=sorted.reduce((a,s)=>a+s.total,0);
+            const totalCompleted=sorted.reduce((a,s)=>a+s.completed,0);
             const avgIA=sorted.filter(s=>s.total>0).length?(totalIA/sorted.filter(s=>s.total>0).length).toFixed(1):0;
-            const maxIA=Math.max(...sorted.map(s=>s.total),1);const hasDailyData=dailyAppts.length>0;
-            const SortTh=({label,k,align='right'})=>{const active=iaSortKey===k;return(<th style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleIaSort(k)}>{label}{active?(iaSortDir==='desc'?' ▼':' ▲'):''}</th>);};
+            const maxIA=Math.max(...sorted.map(s=>s.total),1);
+            const hasDailyData=dailyAppts.length>0;
+            const SortTh=({label,k,align='right'})=>{
+              const active=iaSortKey===k;
+              return(<th style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleIaSort(k)}>{label}{active?(iaSortDir==='desc'?' ▼':' ▲'):''}</th>);
+            };
             const selectedData=iaSelectedStaff?sorted.find(s=>s.staffId===iaSelectedStaff):null;
-            return(<div>
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
-                <div>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#aaa',marginBottom:2}}>Initial Assessments</div>
-                  <div style={{fontSize:14,color:'#777'}}>{hasDailyData?'Daily granular data — any date range':'Monthly snapshot data'}{!hasDailyData&&<span style={{marginLeft:8,color:'#F4DB71',fontSize:13}}>⚠ Re-import Appointments CSV for day-level tracking</span>}</div>
-                </div>
-                <div style={{display:'flex',gap:6}}>
-                  <button className={`btn btn-sm ${iaView==='summary'?'btn-go':'btn-ghost'}`} onClick={()=>setIaView('summary')}>Summary</button>
-                  {hasDailyData&&<button className={`btn btn-sm ${iaView==='daily'?'btn-go':'btn-ghost'}`} onClick={()=>setIaView('daily')}>Daily Trend</button>}
-                </div>
-              </div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
-                {[{label:'Total IAs',val:totalIA||'—',color:'#BB99FF'},{label:'Avg per Practitioner',val:totalIA>0?avgIA:'—',color:'#CAE8C1'},{label:'IA Rate',val:totalCompleted>0?(totalIA/totalCompleted*100).toFixed(1)+'%':'—',color:'#F4DB71',sub:'of completed visits'},{label:'Practitioners w/ IAs',val:sorted.filter(s=>s.total>0).length+' / '+sorted.length,color:'#6B9FD4'}].map(s=>(<div key={s.label} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'12px 14px'}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#999',marginBottom:5}}>{s.label}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:s.color,lineHeight:1}}>{s.val}</div>{s.sub&&<div style={{fontSize:13,color:'#777',marginTop:3}}>{s.sub}</div>}</div>))}
-              </div>
-              <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 14px',marginBottom:14}}>
-                <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                  {quickRanges.map(({l,f,t})=>(<button key={l} className={'btn btn-sm '+(iaFrom===f&&iaTo===t?'btn-go':'btn-ghost')} onClick={()=>{setIaFrom(f);setIaTo(t);}}>{l}</button>))}
-                  <div style={{width:1,height:22,background:'var(--border2)',margin:'0 4px',flexShrink:0}}/>
-                  <div style={{display:'flex',alignItems:'center',gap:6}}>
-                    <span style={{fontSize:12,color:'#777',fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>From</span>
-                    <input type="date" value={iaFrom} onChange={e=>setIaFrom(e.target.value)} style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:4,color:'var(--text)',fontSize:13,padding:'4px 8px',outline:'none'}}/>
-                    <span style={{fontSize:13,color:'#555'}}>→</span>
-                    <span style={{fontSize:12,color:'#777',fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>To</span>
-                    <input type="date" value={iaTo} onChange={e=>setIaTo(e.target.value)} style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:4,color:'var(--text)',fontSize:13,padding:'4px 8px',outline:'none'}}/>
+            return(
+              <div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
+                  <div>
+                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#aaa',marginBottom:2}}>Initial Assessments</div>
+                    <div style={{fontSize:14,color:'#777'}}>{hasDailyData?'Daily granular data — any date range':'Monthly snapshot data'}{!hasDailyData&&<span style={{marginLeft:8,color:'#F4DB71',fontSize:13}}>⚠ Re-import Appointments CSV for day-level tracking</span>}</div>
+                  </div>
+                  <div style={{display:'flex',gap:6}}>
+                    <button className={`btn btn-sm ${iaView==='summary'?'btn-go':'btn-ghost'}`} onClick={()=>setIaView('summary')}>Summary</button>
+                    {hasDailyData&&<button className={`btn btn-sm ${iaView==='daily'?'btn-go':'btn-ghost'}`} onClick={()=>setIaView('daily')}>Daily Trend</button>}
                   </div>
                 </div>
-              </div>
-              {iaView==='daily'&&hasDailyData&&(
-                <div className="perf-slot" style={{marginBottom:14}}>
-                  <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Clinic-Wide Daily Initial Assessments</span>{clinicDailyTrend.length>0&&<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#BB99FF'}}>{clinicDailyTrend.reduce((a,d)=>a+d.count,0)} total</span>}</div>
-                  <div style={{padding:'8px 16px 16px'}}>
-                    {clinicDailyTrend.length<1?(<div style={{fontSize:14,color:'#777',padding:'16px 0',textAlign:'center',fontStyle:'italic'}}>No initial assessments found in this date range.</div>):(()=>{
-                      const vals=clinicDailyTrend.map(d=>d.count);const maxV=Math.max(...vals,1);
-                      const W=600,H=120,PADX=32,PADY=12,BOT=28;
-                      const toY=v=>PADY+Math.round((1-v/maxV)*(H-PADY*2));
-                      const spacing=(W-PADX*2)/Math.max(clinicDailyTrend.length,1);
-                      const toX=(i)=>PADX+Math.round(i*spacing+spacing/2);
-                      const barW=Math.max(4,Math.floor(spacing*0.7));
-                      const dailyAvg=vals.reduce((a,b)=>a+b,0)/vals.length;const avgY=toY(dailyAvg);
-                      return(<div>
-                        <div style={{display:'flex',gap:20,marginBottom:10}}>
-                          <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:2}}>Daily Avg</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#BB99FF'}}>{dailyAvg.toFixed(1)}</span></div>
-                          <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:2}}>Peak Day</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#CAE8C1'}}>{Math.max(...vals)}</span><span style={{fontSize:13,color:'#888',marginLeft:6}}>{clinicDailyTrend[vals.indexOf(Math.max(...vals))]?.date}</span></div>
-                          <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:2}}>Days w/ IAs</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#F4DB71'}}>{vals.length}</span></div>
-                        </div>
-                        <svg width="100%" viewBox={`0 0 ${W} ${H+BOT}`} style={{display:'block',overflow:'visible'}}>
-                          {[0,Math.round(maxV/2),maxV].map((v,i)=>(<g key={i}><line x1={PADX} y1={toY(v)} x2={W-PADX} y2={toY(v)} stroke="#1e1e1e" strokeWidth="1"/><text x={PADX-5} y={toY(v)+4} textAnchor="end" fontSize="11" fill="#666">{v}</text></g>))}
-                          <line x1={PADX} y1={avgY} x2={W-PADX} y2={avgY} stroke="#BB99FF" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.5"/>
-                          {clinicDailyTrend.map((d,i)=>{const x=toX(i);const y=toY(d.count);const bh=H-PADY-y+PADY/2;const isMax=d.count===Math.max(...vals);const showLabel=clinicDailyTrend.length<=14||(i%Math.ceil(clinicDailyTrend.length/10)===0)||i===clinicDailyTrend.length-1;return(<g key={d.date}><rect x={x-barW/2} y={y} width={barW} height={Math.max(bh,2)} fill={isMax?'#CAE8C1':'#BB99FF'} opacity="0.85" rx="2"/><text x={x} y={y-4} textAnchor="middle" fontSize="11" fill={isMax?'#CAE8C1':'#BB99FF'} fontWeight="700">{d.count}</text>{showLabel&&<text x={x} y={H+BOT-4} textAnchor="middle" fontSize="10" fill="#777">{new Date(d.date+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}</text>}</g>);})}
-                          <line x1={PADX} y1={H} x2={W-PADX} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
-                        </svg>
-                      </div>);
-                    })()}
-                  </div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+                  {[
+                    {label:'Total IAs',val:totalIA||'—',color:'#BB99FF'},
+                    {label:'Avg per Practitioner',val:totalIA>0?avgIA:'—',color:'#CAE8C1'},
+                    {label:'IA Rate',val:totalCompleted>0?(totalIA/totalCompleted*100).toFixed(1)+'%':'—',color:'#F4DB71',sub:'of completed visits'},
+                    {label:'Practitioners w/ IAs',val:sorted.filter(s=>s.total>0).length+' / '+sorted.length,color:'#6B9FD4'},
+                  ].map(s=>(<div key={s.label} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'12px 14px'}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#999',marginBottom:5}}>{s.label}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:s.color,lineHeight:1}}>{s.val}</div>{s.sub&&<div style={{fontSize:13,color:'#777',marginTop:3}}>{s.sub}</div>}</div>))}
                 </div>
-              )}
-              {iaView==='summary'&&(
-                <div className="perf-slot">
-                  <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Initial Assessments by Practitioner</span><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,color:'#BB99FF',fontWeight:800}}>{totalIA} total</span></div>
-                  {sorted.length===0?(<div className="empty" style={{padding:40}}><div className="empty-ico">🩺</div><p>No data for this date range. Import Appointments CSV to track initial assessments.</p></div>):(
-                    <div>
-                      <div style={{overflowX:'auto'}}>
-                        <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                          <thead><tr style={{borderBottom:'1px solid var(--border)'}}><SortTh label="Practitioner" k="name" align="left"/><SortTh label="Initial Assessments" k="total"/><SortTh label="Completed Visits" k="completed"/><SortTh label="IA Rate %" k="iaRate"/><SortTh label="Site" k="site"/></tr></thead>
-                          <tbody>{sorted.map(s=>{
-                            const pct=s.total>0?(s.total/maxIA*100):0;const rateColor=s.iaRate!=null?(s.iaRate>=15?'#CAE8C1':s.iaRate>=10?'#44CCAA':s.iaRate>=5?'#F4DB71':'#aaa'):'#555';
-                            return(<tr key={s.staffId} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer',background:iaSelectedStaff===s.staffId?'rgba(187,153,255,.04)':'transparent'}} onClick={()=>setIaSelectedStaff(iaSelectedStaff===s.staffId?null:s.staffId)}>
-                              <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{DISC.find(d=>d.id===s.discipline)?.abbr||s.discipline}</div></div></div></td>
-                              <td style={{padding:'9px 12px',textAlign:'right'}}><div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:80,height:5,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:'#BB99FF',width:pct+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:s.total>0?'#BB99FF':'#555',minWidth:28,textAlign:'right'}}>{s.total||0}</span></div></td>
-                              <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa'}}>{s.completed||0}</td>
-                              <td style={{padding:'9px 12px',textAlign:'right'}}>{s.iaRate!=null?(<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:rateColor,background:rateColor+'18',border:'1px solid '+rateColor+'33',borderRadius:3,padding:'2px 7px'}}>{s.iaRate}%</span>):<span style={{color:'#555'}}>—</span>}</td>
-                              <td style={{padding:'9px 12px',textAlign:'right',color:'#777',fontSize:13}}>{s.site}</td>
-                            </tr>);
-                          })}</tbody>
-                          <tfoot><tr style={{borderTop:'2px solid var(--border)',background:'var(--surface2)'}}><td style={{padding:'8px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777'}}>Total</td><td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#BB99FF'}}>{totalIA}</td><td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:'#aaa'}}>{totalCompleted}</td><td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:'#F4DB71'}}>{totalCompleted>0?(totalIA/totalCompleted*100).toFixed(1)+'%':'—'}</td><td/></tr></tfoot>
-                        </table>
-                      </div>
-                      {selectedData&&hasDailyData&&Object.keys(selectedData.dailyBreakdown).length>0&&(
-                        <div style={{borderTop:'1px solid var(--border)',padding:'16px',background:'rgba(187,153,255,.03)'}}>
-                          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#BB99FF',marginBottom:12,display:'flex',alignItems:'center',justifyContent:'space-between'}}>{selectedData.name} — Daily Breakdown<button className="btn btn-ghost btn-xs" onClick={()=>setIaSelectedStaff(null)}>✕</button></div>
-                          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{Object.entries(selectedData.dailyBreakdown).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>(<div key={date} style={{background:'rgba(187,153,255,.1)',border:'1px solid rgba(187,153,255,.25)',borderRadius:4,padding:'6px 10px',textAlign:'center',minWidth:70}}><div style={{fontSize:13,color:'#999',marginBottom:2}}>{new Date(date+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#BB99FF'}}>{count}</div></div>))}</div>
-                        </div>
-                      )}
+                <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 14px',marginBottom:14}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                    {quickRanges.map(({l,f,t})=>(<button key={l} className={'btn btn-sm '+(iaFrom===f&&iaTo===t?'btn-go':'btn-ghost')} onClick={()=>{setIaFrom(f);setIaTo(t);}}>{l}</button>))}
+                    <div style={{width:1,height:22,background:'var(--border2)',margin:'0 4px',flexShrink:0}}/>
+                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{fontSize:12,color:'#777',fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>From</span>
+                      <input type="date" value={iaFrom} onChange={e=>setIaFrom(e.target.value)} style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:4,color:'var(--text)',fontSize:13,padding:'4px 8px',outline:'none'}}/>
+                      <span style={{fontSize:13,color:'#555'}}>→</span>
+                      <span style={{fontSize:12,color:'#777',fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>To</span>
+                      <input type="date" value={iaTo} onChange={e=>setIaTo(e.target.value)} style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:4,color:'var(--text)',fontSize:13,padding:'4px 8px',outline:'none'}}/>
                     </div>
-                  )}
+                  </div>
                 </div>
-              )}
-              {!hasDailyData&&sorted.length===0&&(<div style={{background:'rgba(244,219,113,.05)',border:'1px solid rgba(244,219,113,.15)',borderRadius:6,padding:'14px 18px',fontSize:14,color:'#F4DB71'}}><strong>Tip:</strong> Import an Appointments CSV in the Jane Import tab. Initial assessments are auto-detected from treatment names starting with "Initial".</div>)}
-            </div>);
+                {iaView==='daily'&&hasDailyData&&(
+                  <div className="perf-slot" style={{marginBottom:14}}>
+                    <div className="perf-slot-head">
+                      <span className="perf-slot-title" style={{color:'#BB99FF'}}>Clinic-Wide Daily Initial Assessments</span>
+                      {clinicDailyTrend.length>0&&<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#BB99FF'}}>{clinicDailyTrend.reduce((a,d)=>a+d.count,0)} total</span>}
+                    </div>
+                    <div style={{padding:'8px 16px 16px'}}>
+                      {clinicDailyTrend.length<1?(<div style={{fontSize:14,color:'#777',padding:'16px 0',textAlign:'center',fontStyle:'italic'}}>No initial assessments found in this date range.</div>):(()=>{
+                        const vals=clinicDailyTrend.map(d=>d.count);
+                        const maxV=Math.max(...vals,1);
+                        const W=600,H=120,PADX=32,PADY=12,BOT=28;
+                        const toY=v=>PADY+Math.round((1-v/maxV)*(H-PADY*2));
+                        const spacing=(W-PADX*2)/Math.max(clinicDailyTrend.length,1);
+                        const toX=(i)=>PADX+Math.round(i*spacing+spacing/2);
+                        const barW=Math.max(4,Math.floor(spacing*0.7));
+                        const dailyAvg=vals.reduce((a,b)=>a+b,0)/vals.length;
+                        const avgY=toY(dailyAvg);
+                        return(
+                          <div>
+                            <div style={{display:'flex',gap:20,marginBottom:10}}>
+                              <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:2}}>Daily Avg</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#BB99FF'}}>{dailyAvg.toFixed(1)}</span></div>
+                              <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:2}}>Peak Day</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#CAE8C1'}}>{Math.max(...vals)}</span><span style={{fontSize:13,color:'#888',marginLeft:6}}>{clinicDailyTrend[vals.indexOf(Math.max(...vals))]?.date}</span></div>
+                              <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:2}}>Days w/ IAs</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#F4DB71'}}>{vals.length}</span></div>
+                            </div>
+                            <svg width="100%" viewBox={`0 0 ${W} ${H+BOT}`} style={{display:'block',overflow:'visible'}}>
+                              {[0,Math.round(maxV/2),maxV].map((v,i)=>(<g key={i}><line x1={PADX} y1={toY(v)} x2={W-PADX} y2={toY(v)} stroke="#1e1e1e" strokeWidth="1"/><text x={PADX-5} y={toY(v)+4} textAnchor="end" fontSize="11" fill="#666">{v}</text></g>))}
+                              <line x1={PADX} y1={avgY} x2={W-PADX} y2={avgY} stroke="#BB99FF" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.5"/>
+                              {clinicDailyTrend.map((d,i)=>{
+                                const x=toX(i);const y=toY(d.count);const bh=H-PADY-y+PADY/2;const isMax=d.count===Math.max(...vals);
+                                const showLabel=clinicDailyTrend.length<=14||(i%Math.ceil(clinicDailyTrend.length/10)===0)||i===clinicDailyTrend.length-1;
+                                return(<g key={d.date}><rect x={x-barW/2} y={y} width={barW} height={Math.max(bh,2)} fill={isMax?'#CAE8C1':'#BB99FF'} opacity="0.85" rx="2"/><text x={x} y={y-4} textAnchor="middle" fontSize="11" fill={isMax?'#CAE8C1':'#BB99FF'} fontWeight="700">{d.count}</text>{showLabel&&<text x={x} y={H+BOT-4} textAnchor="middle" fontSize="10" fill="#777">{new Date(d.date+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}</text>}</g>);
+                              })}
+                              <line x1={PADX} y1={H} x2={W-PADX} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
+                            </svg>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+                {iaView==='summary'&&(
+                  <div className="perf-slot">
+                    <div className="perf-slot-head">
+                      <span className="perf-slot-title" style={{color:'#BB99FF'}}>Initial Assessments by Practitioner</span>
+                      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,color:'#BB99FF',fontWeight:800}}>{totalIA} total</span>
+                    </div>
+                    {sorted.length===0?(
+                      <div className="empty" style={{padding:40}}><div className="empty-ico">🩺</div><p>No data for this date range. Import Appointments CSV to track initial assessments.</p></div>
+                    ):(
+                      <div>
+                        <div style={{overflowX:'auto'}}>
+                          <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                            <thead>
+                              <tr style={{borderBottom:'1px solid var(--border)'}}>
+                                <SortTh label="Practitioner" k="name" align="left"/>
+                                <SortTh label="Initial Assessments" k="total"/>
+                                <SortTh label="Completed Visits" k="completed"/>
+                                <SortTh label="IA Rate %" k="iaRate"/>
+                                <SortTh label="Site" k="site"/>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sorted.map(s=>{
+                                const pct=s.total>0?(s.total/maxIA*100):0;
+                                const rateColor=s.iaRate!=null?(s.iaRate>=15?'#CAE8C1':s.iaRate>=10?'#44CCAA':s.iaRate>=5?'#F4DB71':'#aaa'):'#555';
+                                return(
+                                  <tr key={s.staffId} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer',background:iaSelectedStaff===s.staffId?'rgba(187,153,255,.04)':'transparent'}} onClick={()=>setIaSelectedStaff(iaSelectedStaff===s.staffId?null:s.staffId)}>
+                                    <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{DISC.find(d=>d.id===s.discipline)?.abbr||s.discipline}</div></div></div></td>
+                                    <td style={{padding:'9px 12px',textAlign:'right'}}>
+                                      <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}>
+                                        <div style={{width:80,height:5,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:'#BB99FF',width:pct+'%'}}/></div>
+                                        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:s.total>0?'#BB99FF':'#555',minWidth:28,textAlign:'right'}}>{s.total||0}</span>
+                                      </div>
+                                    </td>
+                                    <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa'}}>{s.completed||0}</td>
+                                    <td style={{padding:'9px 12px',textAlign:'right'}}>
+                                      {s.iaRate!=null?(<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:rateColor,background:rateColor+'18',border:'1px solid '+rateColor+'33',borderRadius:3,padding:'2px 7px'}}>{s.iaRate}%</span>):<span style={{color:'#555'}}>—</span>}
+                                    </td>
+                                    <td style={{padding:'9px 12px',textAlign:'right',color:'#777',fontSize:13}}>{s.site}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                            <tfoot>
+                              <tr style={{borderTop:'2px solid var(--border)',background:'var(--surface2)'}}>
+                                <td style={{padding:'8px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777'}}>Total</td>
+                                <td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#BB99FF'}}>{totalIA}</td>
+                                <td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:'#aaa'}}>{totalCompleted}</td>
+                                <td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:'#F4DB71'}}>{totalCompleted>0?(totalIA/totalCompleted*100).toFixed(1)+'%':'—'}</td>
+                                <td/>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                        {selectedData&&hasDailyData&&Object.keys(selectedData.dailyBreakdown).length>0&&(
+                          <div style={{borderTop:'1px solid var(--border)',padding:'16px',background:'rgba(187,153,255,.03)'}}>
+                            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#BB99FF',marginBottom:12,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                              {selectedData.name} — Daily Breakdown
+                              <button className="btn btn-ghost btn-xs" onClick={()=>setIaSelectedStaff(null)}>✕</button>
+                            </div>
+                            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                              {Object.entries(selectedData.dailyBreakdown).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>(
+                                <div key={date} style={{background:'rgba(187,153,255,.1)',border:'1px solid rgba(187,153,255,.25)',borderRadius:4,padding:'6px 10px',textAlign:'center',minWidth:70}}>
+                                  <div style={{fontSize:13,color:'#999',marginBottom:2}}>{new Date(date+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}</div>
+                                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#BB99FF'}}>{count}</div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {!hasDailyData&&sorted.length===0&&(
+                  <div style={{background:'rgba(244,219,113,.05)',border:'1px solid rgba(244,219,113,.15)',borderRadius:6,padding:'14px 18px',fontSize:14,color:'#F4DB71'}}>
+                    <strong>Tip:</strong> Import an Appointments CSV in the Jane Import tab. Initial assessments are auto-detected from treatment names starting with "Initial".
+                  </div>
+                )}
+              </div>
+            );
           })()}
         </div>
       )}
@@ -3578,75 +3669,195 @@ function PerformancePage({staff,perfData,setPerfData}){
           )}
           <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:14,color:'#aaa',lineHeight:1.7}}>
             <strong style={{color:'var(--lime)'}}>Member Retention</strong> — Import Jane's Member Retention report to auto-populate.
-            Jane: <strong style={{color:'#aaa'}}>Reports → Member Retention → Export CSV</strong>.  
-            <strong style={{color:'#CAE8C1'}}>• % Returning</strong> = patients who came back · <strong style={{color:'#44CCAA'}}>• % Repeat Visits</strong> = repeat visits as % of total.
+            Jane: <strong style={{color:'#aaa'}}>Reports → Member Retention → Export CSV</strong>.
+            {' '}<strong style={{color:'#CAE8C1'}}>• % Returning</strong> = patients who came back · <strong style={{color:'#44CCAA'}}>• % Repeat Visits</strong> = repeat visits as % of total.
             {data.retentionImportDate&&<span style={{marginLeft:8,color:'#555'}}>Last imported: {data.retentionImportDate}</span>}
           </div>
           {(()=>{
             const[retDragging,setRetDragging]=React.useState(false);
             const hasRetData=data.retentionFull&&Object.keys(data.retentionFull).length>0;
-            return(<div style={{marginBottom:16}}>
-              <div className={`perf-drop${retDragging?' drag':''}`} style={{padding:'16px 20px'}}
-                onDragOver={e=>{e.preventDefault();setRetDragging(true);}} onDragLeave={()=>setRetDragging(false)}
-                onDrop={e=>{e.preventDefault();setRetDragging(false);const f=e.dataTransfer.files[0];if(f)handleFile(f);}}
-                onClick={()=>document.getElementById('ret-csv-in').click()}>
-                <input id="ret-csv-in" type="file" accept=".csv" style={{display:'none'}} onChange={e=>{handleFile(e.target.files[0]);e.target.value='';}}/>
-                <div style={{fontSize:22,marginBottom:5}}>📊</div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:'var(--lime)',letterSpacing:'1px',marginBottom:3}}>{importing?'Processing…':hasRetData?'Re-import Member Retention CSV':'Drop Jane Member Retention CSV here'}</div>
-                <div style={{fontSize:13,color:'#777'}}>Jane → Reports → Member Retention → Export CSV</div>
+            return(
+              <div style={{marginBottom:16}}>
+                <div className={`perf-drop${retDragging?' drag':''}`} style={{padding:'16px 20px'}}
+                  onDragOver={e=>{e.preventDefault();setRetDragging(true);}}
+                  onDragLeave={()=>setRetDragging(false)}
+                  onDrop={e=>{e.preventDefault();setRetDragging(false);const f=e.dataTransfer.files[0];if(f)handleFile(f);}}
+                  onClick={()=>document.getElementById('ret-csv-in').click()}>
+                  <input id="ret-csv-in" type="file" accept=".csv" style={{display:'none'}} onChange={e=>{handleFile(e.target.files[0]);e.target.value='';}}/>
+                  <div style={{fontSize:22,marginBottom:5}}>📊</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:'var(--lime)',letterSpacing:'1px',marginBottom:3}}>
+                    {importing?'Processing…':hasRetData?'Re-import Member Retention CSV':'Drop Jane Member Retention CSV here'}
+                  </div>
+                  <div style={{fontSize:13,color:'#777'}}>Jane → Reports → Member Retention → Export CSV</div>
+                </div>
+                {importMsg&&(
+                  <div style={{marginTop:8,padding:'9px 13px',borderRadius:5,fontSize:14,lineHeight:1.6,
+                    background:importMsg.type==='success'?'rgba(68,204,170,.08)':'rgba(224,82,82,.08)',
+                    border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':'rgba(224,82,82,.2)'}`,
+                    color:importMsg.type==='success'?'#44CCAA':'#E05252'}}>
+                    {importMsg.msg}
+                  </div>
+                )}
               </div>
-              {importMsg&&<div style={{marginTop:8,padding:'9px 13px',borderRadius:5,fontSize:14,lineHeight:1.6,background:importMsg.type==='success'?'rgba(68,204,170,.08)':'rgba(224,82,82,.08)',border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':'rgba(224,82,82,.2)'}`,color:importMsg.type==='success'?'#44CCAA':'#E05252'}}>{importMsg.msg}</div>}
-            </div>);
+            );
           })()}
           {(()=>{
             const[sortKey,setSortKey]=React.useState('pctReturning');
             const[sortDir,setSortDir]=React.useState('desc');
             const toggleSort=(key)=>{if(sortKey===key)setSortDir(d=>d==='desc'?'asc':'desc');else{setSortKey(key);setSortDir('desc');}};
             const retRows=staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{
-              const full=(data.retentionFull||{})[s.id]||null;const pctRet=(data.retention||{})[s.id]||null;
+              const full=(data.retentionFull||{})[s.id]||null;
+              const pctRet=(data.retention||{})[s.id]||null;
               return{...s,pctReturning:full?full.pctReturning:pctRet,pctRepeatVisits:full?.pctRepeatVisits??null,newPatients:full?.newPatients??null,returningPatients:full?.returningPatients??null,totalPatients:full?.totalPatients??null,totalVisits:full?.totalVisits??null};
             }).filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null);
-            const sorted=[...retRows].sort((a,b)=>{const av=a[sortKey]??-1,bv=b[sortKey]??-1;if(typeof av==='string')return sortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);return sortDir==='desc'?bv-av:av-bv;});
-            if(!sorted.length)return(<div className="perf-slot"><div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner</span></div><div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import the Jane Member Retention CSV above to see per-practitioner data.</p></div></div>);
-            const withRet=sorted.filter(s=>s.pctReturning!=null);const withRep=sorted.filter(s=>s.pctRepeatVisits!=null);
+            const sorted=[...retRows].sort((a,b)=>{
+              const av=a[sortKey]??-1,bv=b[sortKey]??-1;
+              if(typeof av==='string')return sortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);
+              return sortDir==='desc'?bv-av:av-bv;
+            });
+            if(!sorted.length)return(
+              <div className="perf-slot">
+                <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner</span></div>
+                <div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import the Jane Member Retention CSV above to see per-practitioner data.</p></div>
+              </div>
+            );
+            const withRet=sorted.filter(s=>s.pctReturning!=null);
+            const withRep=sorted.filter(s=>s.pctRepeatVisits!=null);
             const avgRet=withRet.length?withRet.reduce((a,s)=>a+s.pctReturning,0)/withRet.length:0;
             const avgRepeat=withRep.length?withRep.reduce((a,s)=>a+s.pctRepeatVisits,0)/withRep.length:0;
-            const SortTh=({label,k,align='right'})=>{const active=sortKey===k;return(<th style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleSort(k)}>{label}{active?(sortDir==='desc'?' ▼':' ▲'):''}</th>);};
+            const SortTh=({label,k,align='right'})=>{
+              const active=sortKey===k;
+              return(<th style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleSort(k)}>{label}{active?(sortDir==='desc'?' ▼':' ▲'):''}</th>);
+            };
             const retColor=(v)=>v>=90?'#CAE8C1':v>=80?'#44CCAA':v>=70?'#F4DB71':'#E05252';
             const repColor=(v)=>v>=85?'#CAE8C1':v>=75?'#44CCAA':v>=65?'#F4DB71':'#E05252';
-            return(<div className="perf-slot">
-              <div className="perf-slot-head">
-                <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — {sorted.length} Practitioners</span>
-                <div style={{display:'flex',gap:18,fontSize:13,color:'#777',alignItems:'center'}}><span>Avg % Returning: <strong style={{color:'#CAE8C1'}}>{avgRet.toFixed(1)}%</strong></span><span>Avg % Repeat Visits: <strong style={{color:'#44CCAA'}}>{avgRepeat.toFixed(1)}%</strong></span></div>
+            return(
+              <div className="perf-slot">
+                <div className="perf-slot-head">
+                  <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — {sorted.length} Practitioners</span>
+                  <div style={{display:'flex',gap:18,fontSize:13,color:'#777',alignItems:'center'}}>
+                    <span>Avg % Returning: <strong style={{color:'#CAE8C1'}}>{avgRet.toFixed(1)}%</strong></span>
+                    <span>Avg % Repeat Visits: <strong style={{color:'#44CCAA'}}>{avgRepeat.toFixed(1)}%</strong></span>
+                  </div>
+                </div>
+                <div style={{overflowX:'auto'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                    <thead>
+                      <tr style={{borderBottom:'1px solid var(--border)'}}>
+                        <SortTh label="Practitioner" k="name" align="left"/>
+                        <SortTh label="% Returning" k="pctReturning"/>
+                        <SortTh label="% Repeat Visits" k="pctRepeatVisits"/>
+                        <SortTh label="New Members" k="newPatients"/>
+                        <SortTh label="Returning Members" k="returningPatients"/>
+                        <SortTh label="Total Members" k="totalPatients"/>
+                        <SortTh label="Total Visits" k="totalVisits"/>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sorted.map(s=>{
+                        const rc=s.pctReturning!=null?retColor(s.pctReturning):'#555';
+                        const rpc=s.pctRepeatVisits!=null?repColor(s.pctRepeatVisits):'#555';
+                        return(
+                          <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)'}}>
+                            <td style={{padding:'9px 12px'}}>
+                              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                <Av name={s.name} sz="sm"/>
+                                <div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div>
+                              </div>
+                            </td>
+                            <td style={{padding:'9px 12px',textAlign:'right'}}>
+                              {s.pctReturning!=null?(
+                                <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}>
+                                  <div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rc,width:Math.min(100,s.pctReturning)+'%'}}/></div>
+                                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rc,minWidth:46,textAlign:'right'}}>{s.pctReturning}%</span>
+                                </div>
+                              ):<span style={{color:'#555'}}>—</span>}
+                            </td>
+                            <td style={{padding:'9px 12px',textAlign:'right'}}>
+                              {s.pctRepeatVisits!=null?(
+                                <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}>
+                                  <div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rpc,width:Math.min(100,s.pctRepeatVisits)+'%'}}/></div>
+                                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rpc,minWidth:46,textAlign:'right'}}>{s.pctRepeatVisits}%</span>
+                                </div>
+                              ):<span style={{color:'#555'}}>—</span>}
+                            </td>
+                            <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.newPatients??'—'}</td>
+                            <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.returningPatients??'—'}</td>
+                            <td style={{padding:'9px 12px',textAlign:'right',color:'#ddd',fontWeight:600,fontSize:14}}>{s.totalPatients??'—'}</td>
+                            <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.totalVisits!=null?s.totalVisits.toLocaleString():'—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{borderTop:'2px solid var(--border)',background:'var(--surface2)'}}>
+                        <td style={{padding:'8px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777'}}>Average</td>
+                        <td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#CAE8C1'}}>{avgRet.toFixed(1)}%</td>
+                        <td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#44CCAA'}}>{avgRepeat.toFixed(1)}%</td>
+                        <td colSpan={4}/>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                  <thead><tr style={{borderBottom:'1px solid var(--border)'}}><SortTh label="Practitioner" k="name" align="left"/><SortTh label="% Returning" k="pctReturning"/><SortTh label="% Repeat Visits" k="pctRepeatVisits"/><SortTh label="New Members" k="newPatients"/><SortTh label="Returning Members" k="returningPatients"/><SortTh label="Total Members" k="totalPatients"/><SortTh label="Total Visits" k="totalVisits"/></tr></thead>
-                  <tbody>{sorted.map(s=>{
-                    const rc=s.pctReturning!=null?retColor(s.pctReturning):'#555';const rpc=s.pctRepeatVisits!=null?repColor(s.pctRepeatVisits):'#555';
-                    return(<tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)'}}>
-                      <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
-                      <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctReturning!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rc,width:Math.min(100,s.pctReturning)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rc,minWidth:46,textAlign:'right'}}>{s.pctReturning}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
-                      <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctRepeatVisits!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rpc,width:Math.min(100,s.pctRepeatVisits)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rpc,minWidth:46,textAlign:'right'}}>{s.pctRepeatVisits}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
-                      <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.newPatients??'—'}</td>
-                      <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.returningPatients??'—'}</td>
-                      <td style={{padding:'9px 12px',textAlign:'right',color:'#ddd',fontWeight:600,fontSize:14}}>{s.totalPatients??'—'}</td>
-                      <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.totalVisits!=null?s.totalVisits.toLocaleString():'—'}</td>
-                    </tr>);
-                  })}</tbody>
-                  <tfoot><tr style={{borderTop:'2px solid var(--border)',background:'var(--surface2)'}}><td style={{padding:'8px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777'}}>Average</td><td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#CAE8C1'}}>{avgRet.toFixed(1)}%</td><td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#44CCAA'}}>{avgRepeat.toFixed(1)}%</td><td colSpan={4}/></tr></tfoot>
-                </table>
-              </div>
-            </div>);
+            );
           })()}
           {(()=>{
             const[showManual,setShowManual]=React.useState(false);
             const[retentionEdits,setRetentionEdits]=React.useState({});
             const[retSaved,setRetSaved]=React.useState(false);
-            return(<div style={{marginTop:14}}><button className="btn btn-ghost btn-sm" style={{fontSize:13,color:'#555'}} onClick={()=>setShowManual(v=>!v)}>{showManual?'▲ Hide':'▼ Show'} Manual Override</button>{showManual&&(<div style={{marginTop:10}}><div className="perf-slot"><div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Manual Override</span><button className="btn btn-lime btn-sm" onClick={async()=>{const nr={...data.retention||{}};const entries=Object.entries(retentionEdits);entries.forEach(([k,v])=>{if(v!=='')nr[k]=parseFloat(v)||0;});save({...data,retention:nr});for(const[staffId,val] of entries){if(val!=='')await saveRetentionToSB(staffId,parseFloat(val)||0,'management');}setRetentionEdits({});setRetSaved(true);setTimeout(()=>setRetSaved(false),2000);}} disabled={!Object.keys(retentionEdits).length}>{retSaved?'✓ Saved':'Save Overrides'}</button></div><div className="perf-slot-body">{staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{const editing=retentionEdits[s.id]!==undefined;const val=editing?retentionEdits[s.id]:((data.retention||{})[s.id]||'');const num=parseFloat(val)||null;const c=num?num>=85?'#CAE8C1':num>=75?'#44ccaa':num>=65?'#F4DB71':'#E05252':'#555';return(<div key={s.id} className="gva-input-row"><div style={{flex:1,display:'flex',alignItems:'center',gap:10}}><Av name={s.name} sz="sm"/><div style={{fontSize:14,color:'#ddd'}}>{s.name}</div></div><input type="number" min="0" max="100" step="0.1" value={val} placeholder="—" onChange={e=>setRetentionEdits(p=>({...p,[s.id]:e.target.value}))} style={{width:62,textAlign:'center',background:'var(--surface3)',border:'1px solid',borderColor:editing?'var(--go)':'var(--border2)',borderRadius:5,color:num?c:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,padding:'5px 0',outline:'none'}}/>{num&&<span style={{fontSize:14,background:c+'18',color:c,border:'1px solid '+c+'33',borderRadius:3,padding:'2px 7px',minWidth:64,textAlign:'center'}}>{num>=85?'Strong':num>=75?'Good':num>=65?'Fair':'Low'}</span>}</div>);})}</div></div></div>)}</div>);
+            return(
+              <div style={{marginTop:14}}>
+                <button className="btn btn-ghost btn-sm" style={{fontSize:13,color:'#555'}} onClick={()=>setShowManual(v=>!v)}>
+                  {showManual?'▲ Hide':'▼ Show'} Manual Override
+                </button>
+                {showManual&&(
+                  <div style={{marginTop:10}}>
+                    <div className="perf-slot">
+                      <div className="perf-slot-head">
+                        <span className="perf-slot-title" style={{color:'#BB99FF'}}>Manual Override</span>
+                        <button className="btn btn-lime btn-sm" onClick={async()=>{
+                          const nr={...data.retention||{}};
+                          const entries=Object.entries(retentionEdits);
+                          entries.forEach(([k,v])=>{if(v!=='')nr[k]=parseFloat(v)||0;});
+                          save({...data,retention:nr});
+                          for(const[staffId,val] of entries){
+                            if(val!=='')await saveRetentionToSB(staffId,parseFloat(val)||0,'management');
+                          }
+                          setRetentionEdits({});setRetSaved(true);
+                          setTimeout(()=>setRetSaved(false),2000);
+                        }} disabled={!Object.keys(retentionEdits).length}>{retSaved?'✓ Saved':'Save Overrides'}</button>
+                      </div>
+                      <div className="perf-slot-body">
+                        {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{
+                          const editing=retentionEdits[s.id]!==undefined;
+                          const val=editing?retentionEdits[s.id]:((data.retention||{})[s.id]||'');
+                          const num=parseFloat(val)||null;
+                          const c=num?num>=85?'#CAE8C1':num>=75?'#44ccaa':num>=65?'#F4DB71':'#E05252':'#555';
+                          return(
+                            <div key={s.id} className="gva-input-row">
+                              <div style={{flex:1,display:'flex',alignItems:'center',gap:10}}>
+                                <Av name={s.name} sz="sm"/>
+                                <div style={{fontSize:14,color:'#ddd'}}>{s.name}</div>
+                              </div>
+                              <input type="number" min="0" max="100" step="0.1" value={val} placeholder="—"
+                                onChange={e=>setRetentionEdits(p=>({...p,[s.id]:e.target.value}))}
+                                style={{width:62,textAlign:'center',background:'var(--surface3)',border:'1px solid',borderColor:editing?'var(--go)':'var(--border2)',borderRadius:5,color:num?c:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,padding:'5px 0',outline:'none'}}/>
+                              {num&&<span style={{fontSize:14,background:c+'18',color:c,border:'1px solid '+c+'33',borderRadius:3,padding:'2px 7px',minWidth:64,textAlign:'center'}}>{num>=85?'Strong':num>=75?'Good':num>=65?'Fair':'Low'}</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
           })()}
         </div>
       )}
+
+
       {/* ── TRENDS ── */}
       {tab==='trends'&&(
         <div>
