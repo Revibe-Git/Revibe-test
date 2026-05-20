@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- v20260520c -->
+<!DOCTYPE html><!-- v20260520d -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2329,10 +2329,12 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
+  // Retention tab
   const[retSortKey,setRetSortKey]=useState('pctReturning');
   const[retSortDir,setRetSortDir]=useState('desc');
   const[retDragging,setRetDragging]=useState(false);
   const[showManualRet,setShowManualRet]=useState(false);
+  // IA tab
   const[iaFrom,setIaFrom]=useState(()=>{const d=new Date();d.setDate(1);return d.toISOString().slice(0,10);});
   const[iaTo,setIaTo]=useState(()=>new Date().toISOString().slice(0,10));
   const[iaSortKey,setIaSortKey]=useState('total');
@@ -2851,6 +2853,54 @@ function PerformancePage({staff,perfData,setPerfData}){
   const compareBRows=useMemo(()=>aggregateRows(filterSnaps(compareB)),[data.snapshots,compareB]);
 
   /* ── Merged staff with period-filtered data ── */
+  // IA tab computed data (hooks must be at component level)
+  const iaByStaff=useMemo(()=>{
+    const byStaff={};
+    if(dailyAppts.length>0){
+      dailyAppts.forEach(r=>{
+        if(iaFrom&&r.date<iaFrom)return;
+        if(iaTo&&r.date>iaTo)return;
+        const s=staff.find(x=>x.id===r.staff_id);
+        if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
+        if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
+        const ia=r.initial_assessments||0;
+        byStaff[r.staff_id].total+=ia;
+        byStaff[r.staff_id].completed+=(r.completed||0);
+        if(ia>0)byStaff[r.staff_id].dailyBreakdown[r.date]=(byStaff[r.staff_id].dailyBreakdown[r.date]||0)+ia;
+      });
+    }else{
+      data.snapshots.forEach(snap=>{
+        const m=snap.date.slice(0,7);
+        if(iaFrom&&m<iaFrom.slice(0,7))return;
+        if(iaTo&&m>iaTo.slice(0,7))return;
+        (snap.rows||[]).forEach(r=>{
+          if(!r.staffId)return;
+          const s=staff.find(x=>x.id===r.staffId);
+          if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
+          const ia=parseFloat(r.initialAssessments)||0;
+          if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
+          byStaff[r.staffId].total+=ia;
+          byStaff[r.staffId].completed+=(parseFloat(r.completed)||0);
+        });
+      });
+    }
+    return Object.values(byStaff).map(r=>({...r,iaRate:r.completed>0?Math.round((r.total/r.completed)*100):null}));
+  },[iaFrom,iaTo,dailyAppts,data.snapshots,staff]);
+
+  const clinicDailyTrend=useMemo(()=>{
+    if(!dailyAppts.length)return[];
+    const byDate={};
+    dailyAppts.forEach(r=>{
+      if(iaFrom&&r.date<iaFrom)return;
+      if(iaTo&&r.date>iaTo)return;
+      const s=staff.find(x=>x.id===r.staff_id);
+      if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
+      const ia=r.initial_assessments||0;
+      if(ia>0)byDate[r.date]=(byDate[r.date]||0)+ia;
+    });
+    return Object.entries(byDate).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count}));
+  },[iaFrom,iaTo,dailyAppts,staff]);
+
   const mergedStaff=useMemo(()=>
     staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'
       &&(filterDisc==='all'||s.discipline===filterDisc)
@@ -3385,51 +3435,6 @@ function PerformancePage({staff,perfData,setPerfData}){
               {l:'Last 30d',f:(()=>{const d=new Date();d.setDate(d.getDate()-29);return d.toISOString().slice(0,10);})(),t:new Date().toISOString().slice(0,10)},
               {l:'YTD',f:new Date().getFullYear()+'-01-01',t:new Date().toISOString().slice(0,10)},
             ];
-            const iaByStaff=useMemo(()=>{
-              const byStaff={};
-              if(dailyAppts.length>0){
-                dailyAppts.forEach(r=>{
-                  if(iaFrom&&r.date<iaFrom)return;
-                  if(iaTo&&r.date>iaTo)return;
-                  const s=staff.find(x=>x.id===r.staff_id);
-                  if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
-                  if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
-                  const ia=r.initial_assessments||0;
-                  byStaff[r.staff_id].total+=ia;
-                  byStaff[r.staff_id].completed+=(r.completed||0);
-                  if(ia>0)byStaff[r.staff_id].dailyBreakdown[r.date]=(byStaff[r.staff_id].dailyBreakdown[r.date]||0)+ia;
-                });
-              }else{
-                data.snapshots.forEach(snap=>{
-                  const m=snap.date.slice(0,7);
-                  if(iaFrom&&m<iaFrom.slice(0,7))return;
-                  if(iaTo&&m>iaTo.slice(0,7))return;
-                  (snap.rows||[]).forEach(r=>{
-                    if(!r.staffId)return;
-                    const s=staff.find(x=>x.id===r.staffId);
-                    if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
-                    const ia=parseFloat(r.initialAssessments)||0;
-                    if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
-                    byStaff[r.staffId].total+=ia;
-                    byStaff[r.staffId].completed+=(parseFloat(r.completed)||0);
-                  });
-                });
-              }
-              return Object.values(byStaff).map(r=>({...r,iaRate:r.completed>0?Math.round((r.total/r.completed)*100):null}));
-            },[iaFrom,iaTo,dailyAppts,data.snapshots,staff]);
-            const clinicDailyTrend=useMemo(()=>{
-              if(!dailyAppts.length)return[];
-              const byDate={};
-              dailyAppts.forEach(r=>{
-                if(iaFrom&&r.date<iaFrom)return;
-                if(iaTo&&r.date>iaTo)return;
-                const s=staff.find(x=>x.id===r.staff_id);
-                if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
-                const ia=r.initial_assessments||0;
-                if(ia>0)byDate[r.date]=(byDate[r.date]||0)+ia;
-              });
-              return Object.entries(byDate).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count}));
-            },[iaFrom,iaTo,dailyAppts,staff]);
             const iaSorted=[...iaByStaff].sort((a,b)=>{const av=a[iaSortKey]??-1,bv=b[iaSortKey]??-1;if(typeof av==='string')return iaSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);return iaSortDir==='desc'?bv-av:av-bv;});
             const totalIA=iaSorted.reduce((a,s)=>a+s.total,0);
             const totalCompleted=iaSorted.reduce((a,s)=>a+s.completed,0);
