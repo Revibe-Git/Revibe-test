@@ -3282,11 +3282,11 @@ function PerformancePage({staff,perfData,setPerfData}){
           })():(()=>{
             const revSorted=[...withRev].sort((a,b)=>{const av=a[revSort.k]??-1,bv=b[revSort.k]??-1;return revSort.d==='desc'?bv-av:av-bv;});
             const sortRevBy=(k)=>setRevSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
-            const RevTh=({label,k})=>{const active=revSort.k===k;return(<th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',padding:'8px 12px',whiteSpace:'nowrap'}} onClick={()=>sortRevBy(k)}>{label}{active?(revSort.d==='desc'?' ▼':' ▲'):''}</th>);};
+            const revTh=(label,k,align='right')=>{const active=revSort.k===k;return(<th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',padding:'8px 12px',whiteSpace:'nowrap'}} onClick={()=>sortRevBy(k)}>{label}{active?(revSort.d==='desc'?' ▼':' ▲'):''}</th>);};
             return revSorted.length?(
               <div style={{overflowX:'auto'}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                  <thead><tr style={{borderBottom:'1px solid var(--border)'}}><th style={{textAlign:'left',padding:'8px 12px',color:'#888',cursor:'pointer',userSelect:'none',color:revSort.k==='name'?'var(--lime)':'#888'}} onClick={()=>sortRevBy('name')}>Practitioner{revSort.k==='name'?(revSort.d==='desc'?' ▼':' ▲'):''}</th><RevTh label="Revenue" k="revenue"/><th style={{textAlign:'right',padding:'8px 12px',color:'#888'}}>Site</th></tr></thead>
+                  <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{revTh('Practitioner','name','left')}{revTh('Revenue','revenue')}{revTh('Site','site')}</tr></thead>
                   <tbody>{revSorted.map(s=>(
                     <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
                       <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div></div></div></td>
@@ -3364,14 +3364,14 @@ function PerformancePage({staff,perfData,setPerfData}){
             const isFiltered=periodFilter!=='all'&&withUtil.length===0&&fallbackStaff.length>0;
             const utilSorted=[...baseList].sort((a,b)=>{const av=a[utilSort.k]??-1,bv=b[utilSort.k]??-1;if(typeof av==='string')return utilSort.d==='desc'?av.localeCompare(bv):bv.localeCompare(av);return utilSort.d==='desc'?bv-av:av-bv;});
             const sortUtilBy=(k)=>setUtilSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
-            const UtilTh=({label,k,align='right'})=>{const active=utilSort.k===k;return(<th style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',padding:'8px 12px',whiteSpace:'nowrap'}} onClick={()=>sortUtilBy(k)}>{label}{active?(utilSort.d==='desc'?' ▼':' ▲'):''}</th>);};
+            const utTh=(label,k,align='right')=>{const active=utilSort.k===k;return(<th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',padding:'8px 12px',whiteSpace:'nowrap'}} onClick={()=>sortUtilBy(k)}>{label}{active?(utilSort.d==='desc'?' ▼':' ▲'):''}</th>);};
             return(
               <div>
                 {isFiltered&&<div style={{padding:'8px 14px',background:'rgba(244,219,113,.06)',border:'1px solid rgba(244,219,113,.18)',borderRadius:5,fontSize:14,color:'#F4DB71',marginBottom:8}}>No shift report for this period — showing most recent available utilization.</div>}
                 {utilSorted.length?(
                   <div style={{overflowX:'auto'}}>
                     <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                      <thead><tr style={{borderBottom:'1px solid var(--border)'}}><UtilTh label="Practitioner" k="name" align="left"/><UtilTh label="Utilization %" k="utilization"/><UtilTh label="Site" k="site"/></tr></thead>
+                      <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{utTh('Practitioner','name','left')}{utTh('Utilization %','utilization')}{utTh('Site','site')}</tr></thead>
                       <tbody>{utilSorted.map(s=>{
                         const c=s.utilization>=85?'#CAE8C1':s.utilization>=70?'#44ccaa':s.utilization>50?'#F4DB71':'#E05252';
                         const lbl=s.utilization>=85?'Strong':s.utilization>=70?'Good':s.utilization>50?'Fair':'Low';
@@ -3442,10 +3442,10 @@ function PerformancePage({staff,perfData,setPerfData}){
               return apptSort.d==='desc'?bv-av:av-bv;
             });
             const sortApptBy=(k)=>setApptSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
-            const ApptTh=({label,k,align='right'})=>{const active=apptSort.k===k;return(<th style={{padding:'8px 10px',textAlign:align,fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',textTransform:'uppercase',color:active?'var(--lime)':'#999',fontWeight:600,cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>sortApptBy(k)}>{label}{active?(apptSort.d==='desc'?' ▼':' ▲'):''}</th>);};
+            const apTh=(label,k,align='right')=>{const active=apptSort.k===k;return(<th key={k} style={{padding:'8px 10px',textAlign:align,fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',textTransform:'uppercase',color:active?'var(--lime)':'#999',fontWeight:600,cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>sortApptBy(k)}>{label}{active?(apptSort.d==='desc'?' ▼':' ▲'):''}</th>);};
             return apptSorted.length?(
               <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                <thead><tr style={{borderBottom:'1px solid var(--border)'}}><ApptTh label="Practitioner" k="name" align="left"/><ApptTh label="Completed" k="completed"/><ApptTh label="Initial Assessments" k="initialAssessments"/><ApptTh label="No-Shows" k="noShows"/><ApptTh label="Cancellations" k="cancellations"/><ApptTh label="Rescheduled" k="rescheduled"/><ApptTh label="Cancel Rate" k="cancelRate"/></tr></thead>
+                <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{apTh('Practitioner','name','left')}{apTh('Completed','completed')}{apTh('Initial Assessments','initialAssessments')}{apTh('No-Shows','noShows')}{apTh('Cancellations','cancellations')}{apTh('Rescheduled','rescheduled')}{apTh('Cancel Rate','cancelRate')}</tr></thead>
                 <tbody>{apptSorted.map(s=>{
                   const total=(s.completed||0)+(s.noShows||0)+(s.cancellations||0)+(s.rescheduled||0);
                   const cancelRate=total>0?Math.round(((s.cancellations||0)/total)*100):0;
@@ -3479,10 +3479,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             const avgIA=iaSorted.filter(s=>s.total>0).length?(totalIA/iaSorted.filter(s=>s.total>0).length).toFixed(1):0;
             const maxIA=Math.max(...iaSorted.map(s=>s.total),1);
             const hasDailyData=dailyAppts.length>0;
-            const IASortTh=({label,k,align='right'})=>{
-              const active=iaSortKey===k;
-              return(<th style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleIaSort(k)}>{label}{active?(iaSortDir==='desc'?' ▼':' ▲'):''}</th>);
-            };
+            const iaTh=(label,k,align='right')=>{const active=iaSortKey===k;return(<th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleIaSort(k)}>{label}{active?(iaSortDir==='desc'?' ▼':' ▲'):''}</th>);};
             const selectedData=iaSelectedStaff?iaSorted.find(s=>s.staffId===iaSelectedStaff):null;
             const rangeLabel=(()=>{
               if(customFrom||customTo)return `${customFrom||'…'} → ${customTo||'…'}`;
@@ -3568,11 +3565,11 @@ function PerformancePage({staff,perfData,setPerfData}){
                           <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
                             <thead>
                               <tr style={{borderBottom:'1px solid var(--border)'}}>
-                                <IASortTh label="Practitioner" k="name" align="left"/>
-                                <IASortTh label="Initial Assessments" k="total"/>
-                                <IASortTh label="Completed Visits" k="completed"/>
-                                <IASortTh label="IA Rate %" k="iaRate"/>
-                                <IASortTh label="Site" k="site"/>
+                                {iaTh('Practitioner','name','left')}
+                                {iaTh('Initial Assessments','total')}
+                                {iaTh('Completed Visits','completed')}
+                                {iaTh('IA Rate %','iaRate')}
+                                {iaTh('Site','site')}
                               </tr>
                             </thead>
                             <tbody>
@@ -3754,10 +3751,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             const avgRepeat=withRep.length?withRep.reduce((a,s)=>a+s.pctRepeatVisits,0)/withRep.length:0;
             const retColor=(v)=>v>=90?'#CAE8C1':v>=80?'#44CCAA':v>=70?'#F4DB71':'#E05252';
             const repColor=(v)=>v>=85?'#CAE8C1':v>=75?'#44CCAA':v>=65?'#F4DB71':'#E05252';
-            const RetSortTh=({label,k,align='right'})=>{
-              const active=retSortKey===k;
-              return(<th style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleRetSort(k)}>{label}{active?(retSortDir==='desc'?' ▼':' ▲'):''}</th>);
-            };
+            const rsTh=(label,k,align='right')=>{const active=retSortKey===k;return(<th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleRetSort(k)}>{label}{active?(retSortDir==='desc'?' ▼':' ▲'):''}</th>);};
             return(
               <div className="perf-slot">
                 <div className="perf-slot-head">
@@ -3771,13 +3765,13 @@ function PerformancePage({staff,perfData,setPerfData}){
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
                     <thead>
                       <tr style={{borderBottom:'1px solid var(--border)'}}>
-                        <RetSortTh label="Practitioner" k="name" align="left"/>
-                        <RetSortTh label="% Returning" k="pctReturning"/>
-                        <RetSortTh label="% Repeat Visits" k="pctRepeatVisits"/>
-                        <RetSortTh label="New Members" k="newPatients"/>
-                        <RetSortTh label="Returning Members" k="returningPatients"/>
-                        <RetSortTh label="Total Members" k="totalPatients"/>
-                        <RetSortTh label="Total Visits" k="totalVisits"/>
+                        {rsTh('Practitioner','name','left')}
+                        {rsTh('% Returning','pctReturning')}
+                        {rsTh('% Repeat Visits','pctRepeatVisits')}
+                        {rsTh('New Members','newPatients')}
+                        {rsTh('Returning Members','returningPatients')}
+                        {rsTh('Total Members','totalPatients')}
+                        {rsTh('Total Visits','totalVisits')}
                       </tr>
                     </thead>
                     <tbody>
