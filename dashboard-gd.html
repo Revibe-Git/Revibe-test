@@ -2299,6 +2299,9 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
   const[periodFilter,setPeriodFilter]=useState(()=>new Date().toISOString().slice(0,7));
+  const curMonth=new Date().toISOString().slice(0,7);
+  const[dateFrom,setDateFrom]=useState(curMonth);
+  const[dateTo,setDateTo]=useState(curMonth);
   const[compareA,setCompareA]=useState('');
   const[compareB,setCompareB]=useState('');
   // Per-section compare state
@@ -2647,7 +2650,10 @@ function PerformancePage({staff,perfData,setPerfData}){
   };
 
   // Active filtered rows
-  const filteredSnaps=useMemo(()=>filterSnaps(periodFilter),[data.snapshots,periodFilter]);
+  const filteredSnaps=useMemo(()=>data.snapshots.filter(s=>{
+    const m=s.date.slice(0,7);
+    return(!dateFrom||m>=dateFrom)&&(!dateTo||m<=dateTo);
+  }),[data.snapshots,dateFrom,dateTo]);
   const filteredRows=useMemo(()=>aggregateRows(filteredSnaps),[filteredSnaps]);
 
   // Compare mode rows
@@ -2745,7 +2751,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           <div style={{fontSize:14,color:'#777'}}>Jane data (Appointments + Shift reports) · GVA · Retention · {data.snapshots.length} snapshot{data.snapshots.length!==1?'s':''} stored</div>
         </div>
         <div className="flex aic g5" style={{flexWrap:'wrap'}}>
-          {[['overview','▣ Overview'],['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['appointments','📋 Appointments'],['gva','📈 GVA'],['retention','🔄 Retention'],['trends','↗ Trends'],['data','⊞ Data'],['import','📂 Jane Import']].map(([k,l])=>(
+          {[['overview','▣ Overview'],['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['appointments','📋 Appointments'],['gva','📈 GVA'],['retention','🔄 Retention'],['trends','↗ Trends'],['import','📂 Jane Import']].map(([k,l])=>(
             <button key={k} className={`btn btn-sm ${tab===k?'btn-go':'btn-ghost'}`} onClick={()=>setTab(k)}>{l}</button>
           ))}
         </div>
@@ -2760,32 +2766,35 @@ function PerformancePage({staff,perfData,setPerfData}){
         <div className="sc gray"><div className="sc-lbl">Snapshots</div><div className="sc-val">{data.snapshots.length}</div><div className="sc-sub">{data.lastImport?new Date(data.lastImport).toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'No imports yet'}</div></div>
       </div>
 
-      {/* Period filter bar */}
-      {!['import','gva','retention','trends','data'].includes(tab)&&data.snapshots.length>0&&(
-        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#777',flexShrink:0}}>Viewing</div>
-          <select value={periodFilter} onChange={e=>setPeriodFilter(e.target.value)}
-            style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:260}}>
-            <option value="all">All Time</option>
-            {availYears.map(y=>(
-              <optgroup key={y} label={'── '+y+' ──'}>
-                <option value={y}>{y} (Full Year)</option>
-                {['Q1','Q2','Q3','Q4'].filter(q=>{
-                  const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];
-                  return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));
-                }).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}
-                {availMonths.filter(m=>m.startsWith(y)).map(m=>(
-                  <option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>
-                ))}
-              </optgroup>
-            ))}
+      {/* Date range filter bar */}
+      {!['import','gva','retention','trends'].includes(tab)&&data.snapshots.length>0&&(
+        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',flexShrink:0}}>Date Range</div>
+          <select value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
+            style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer'}}>
+            <option value="">From: Earliest</option>
+            {availMonths.map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</option>)}
           </select>
-          <div style={{display:'flex',alignItems:'center',gap:8,fontSize:14,color:'var(--lime)'}}>
+          <span style={{color:'#555',fontSize:14}}>→</span>
+          <select value={dateTo} onChange={e=>setDateTo(e.target.value)}
+            style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer'}}>
+            <option value="">To: Latest</option>
+            {availMonths.map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</option>)}
+          </select>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginLeft:4}}>
+            {[['This Month',new Date().toISOString().slice(0,7),new Date().toISOString().slice(0,7)],
+              ['YTD',new Date().getFullYear()+'-01',new Date().toISOString().slice(0,7)],
+              ['Last 3mo',(()=>{const d=new Date();d.setMonth(d.getMonth()-2);return d.toISOString().slice(0,7)})(),new Date().toISOString().slice(0,7)],
+              ['2026','2026-01','2026-12'],
+              ['2025','2025-01','2025-12'],
+              ['All','','']
+            ].map(([l,f,t])=>(
+              <button key={l} className={`btn btn-xs ${dateFrom===(f||'')&&dateTo===(t||'')?'btn-go':'btn-ghost'}`}
+                onClick={()=>{setDateFrom(f||'');setDateTo(t||'');}}>{l}</button>
+            ))}
+          </div>
+          <div style={{marginLeft:'auto',fontSize:13,color:'var(--lime)'}}>
             {filteredSnaps.length} snapshot{filteredSnaps.length!==1?'s':''} in view
-            {periodFilter===new Date().toISOString().slice(0,7)&&<span style={{color:'#F4DB71'}}>· current month</span>}
-            {periodFilter!=='all'&&periodFilter!==new Date().toISOString().slice(0,7)&&(
-              <button className="btn btn-ghost btn-xs" style={{fontSize:13}} onClick={()=>setPeriodFilter(new Date().toISOString().slice(0,7))}>← This Month</button>
-            )}
           </div>
         </div>
       )}
@@ -2910,21 +2919,13 @@ function PerformancePage({staff,perfData,setPerfData}){
               <select value={sectionA.revenue||''} onChange={e=>setSectionA(p=>({...p,revenue:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(202,232,193,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
                 <option value="">Select period…</option>
-                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}>
-                  <option value={y}>{y} (Full Year)</option>
-                  {['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}
-                  {availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}
-                </optgroup>)}
+                {availYears.map(y=><optgroup key={y} label={y}>{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</option>)}</optgroup>)}
               </select>
               <span style={{color:'#555',fontSize:15}}>vs</span>
               <select value={sectionB.revenue||''} onChange={e=>setSectionB(p=>({...p,revenue:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(107,159,212,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
                 <option value="">Select period…</option>
-                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}>
-                  <option value={y}>{y} (Full Year)</option>
-                  {['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}
-                  {availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}
-                </optgroup>)}
+                {availYears.map(y=><optgroup key={y} label={y}>{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</option>)}</optgroup>)}
               </select>
             </div>
           )}
@@ -2997,13 +2998,13 @@ function PerformancePage({staff,perfData,setPerfData}){
               <select value={sectionA.utilization||''} onChange={e=>setSectionA(p=>({...p,utilization:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(68,204,170,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
                 <option value="">Select period…</option>
-                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
+                {availYears.map(y=><optgroup key={y} label={y}>{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</option>)}</optgroup>)}
               </select>
               <span style={{color:'#555',fontSize:15}}>vs</span>
               <select value={sectionB.utilization||''} onChange={e=>setSectionB(p=>({...p,utilization:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(107,159,212,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
                 <option value="">Select period…</option>
-                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
+                {availYears.map(y=><optgroup key={y} label={y}>{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</option>)}</optgroup>)}
               </select>
             </div>
           )}
@@ -3085,13 +3086,13 @@ function PerformancePage({staff,perfData,setPerfData}){
               <select value={sectionA.appointments||''} onChange={e=>setSectionA(p=>({...p,appointments:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(202,232,193,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
                 <option value="">Select period…</option>
-                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
+                {availYears.map(y=><optgroup key={y} label={y}>{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</option>)}</optgroup>)}
               </select>
               <span style={{color:'#555',fontSize:15}}>vs</span>
               <select value={sectionB.appointments||''} onChange={e=>setSectionB(p=>({...p,appointments:e.target.value}))}
                 style={{background:'var(--surface3)',border:'1px solid rgba(107,159,212,.3)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',flex:1,maxWidth:220}}>
                 <option value="">Select period…</option>
-                {availYears.map(y=><optgroup key={y} label={'── '+y+' ──'}><option value={y}>{y} (Full Year)</option>{['Q1','Q2','Q3','Q4'].filter(q=>{const mn={'Q1':['01','02','03'],'Q2':['04','05','06'],'Q3':['07','08','09'],'Q4':['10','11','12']}[q];return allSnapDates.some(d=>d.slice(0,4)===y&&mn.includes(d.slice(5,7)));}).map(q=><option key={y+q} value={y+'-'+q}>{q} {y}</option>)}{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}</optgroup>)}
+                {availYears.map(y=><optgroup key={y} label={y}>{availMonths.filter(m=>m.startsWith(y)).map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</option>)}</optgroup>)}
               </select>
             </div>
           )}
@@ -3325,180 +3326,6 @@ function PerformancePage({staff,perfData,setPerfData}){
           )}
         </div>
       )}
-
-      {/* ── DATA TABLE ── */}
-      {tab==='data'&&(()=>{
-        const[dateFrom,setDateFrom]=useState('');
-        const[dateTo,setDateTo]=useState('');
-        const[sortCol,setSortCol]=useState('name');
-        const[sortDir,setSortDir]=useState('asc');
-        const[filterSite,setFilterSite]=useState('all');
-        const[filterStaff,setFilterStaff]=useState('all');
-
-        // Get all available months from snapshots
-        const allMonths=[...new Set(data.snapshots.map(s=>s.date.slice(0,7)))].sort();
-        const fromDate=dateFrom||allMonths[0]||'';
-        const toDate=dateTo||allMonths[allMonths.length-1]||'';
-
-        // Filter snapshots by date range
-        const rangeSnaps=data.snapshots.filter(s=>{
-          const m=s.date.slice(0,7);
-          return(!fromDate||m>=fromDate)&&(!toDate||m<=toDate);
-        });
-
-        // Build flat rows — one row per practitioner per month
-        const rows=[];
-        rangeSnaps.forEach(snap=>{
-          (snap.rows||[]).forEach(r=>{
-            if(!r.staffId)return;
-            const s=staff.find(x=>x.id===r.staffId);
-            if(!s||s.discipline==='mgmt'||s.discipline==='ops'||s.discipline==='edu')return;
-            rows.push({
-              staffId:r.staffId,
-              name:s.name,
-              site:s.site||'',
-              discipline:s.discipline||'',
-              month:snap.date.slice(0,7),
-              monthLabel:new Date(snap.date.slice(0,7)+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}),
-              revenue:r.revenue||null,
-              completed:r.completed||null,
-              initialAssessments:r.initialAssessments||null,
-              utilization:r.utilization||null,
-              noShows:r.noShows||null,
-              cancellations:r.cancellations||null,
-            });
-          });
-        });
-
-        // Filter by site/staff
-        const filtered=rows.filter(r=>
-          (filterSite==='all'||r.site===filterSite)&&
-          (filterStaff==='all'||r.staffId===filterStaff)
-        );
-
-        // Sort
-        const sorted=[...filtered].sort((a,b)=>{
-          let va=a[sortCol],vb=b[sortCol];
-          if(sortCol==='month'){va=a.month;vb=b.month;}
-          if(va==null&&vb==null)return 0;
-          if(va==null)return 1;
-          if(vb==null)return -1;
-          if(typeof va==='string')return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);
-          return sortDir==='asc'?va-vb:vb-va;
-        });
-
-        // Totals row
-        const totals={revenue:0,completed:0,initialAssessments:0,noShows:0,cancellations:0};
-        filtered.forEach(r=>{
-          totals.revenue+=(r.revenue||0);
-          totals.completed+=(r.completed||0);
-          totals.initialAssessments+=(r.initialAssessments||0);
-          totals.noShows+=(r.noShows||0);
-          totals.cancellations+=(r.cancellations||0);
-        });
-
-        const sites=[...new Set(staff.map(s=>s.site).filter(Boolean))].sort();
-        const practitionerList=[...new Set(rows.map(r=>r.staffId))].map(id=>staff.find(s=>s.id===id)).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name));
-
-        const SortHdr=({col,label,right})=>(
-          <th onClick={()=>{if(sortCol===col)setSortDir(d=>d==='asc'?'desc':'asc');else{setSortCol(col);setSortDir('asc');}}}
-            style={{padding:'10px 12px',textAlign:right?'right':'left',cursor:'pointer',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:sortCol===col?'var(--lime)':'#777',fontWeight:600,userSelect:'none',whiteSpace:'nowrap',borderBottom:'1px solid var(--border)'}}>
-            {label}{sortCol===col?sortDir==='asc'?' ↑':' ↓':''}
-          </th>
-        );
-
-        return(
-          <div>
-            {/* Controls */}
-            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'12px 14px',marginBottom:14,display:'flex',gap:12,flexWrap:'wrap',alignItems:'flex-end'}}>
-              <div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:5}}>From</div>
-                <select value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
-                  style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'6px 10px',outline:'none'}}>
-                  <option value="">Earliest</option>
-                  {allMonths.map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}
-                </select>
-              </div>
-              <div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:5}}>To</div>
-                <select value={dateTo} onChange={e=>setDateTo(e.target.value)}
-                  style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'6px 10px',outline:'none'}}>
-                  <option value="">Latest</option>
-                  {allMonths.map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</option>)}
-                </select>
-              </div>
-              <div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:5}}>Site</div>
-                <select value={filterSite} onChange={e=>setFilterSite(e.target.value)}
-                  style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'6px 10px',outline:'none'}}>
-                  <option value="all">All Sites</option>
-                  {sites.map(s=><option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:5}}>Practitioner</div>
-                <select value={filterStaff} onChange={e=>setFilterStaff(e.target.value)}
-                  style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'6px 10px',outline:'none',maxWidth:200}}>
-                  <option value="all">All Practitioners</option>
-                  {practitionerList.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
-              </div>
-              <div style={{marginLeft:'auto',fontSize:13,color:'#777',alignSelf:'center'}}>
-                {sorted.length} rows · {[...new Set(sorted.map(r=>r.staffId))].length} practitioners · {[...new Set(sorted.map(r=>r.month))].length} months
-              </div>
-            </div>
-
-            {/* Table */}
-            <div style={{overflowX:'auto',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                <thead>
-                  <tr>
-                    <SortHdr col="month" label="Month"/>
-                    <SortHdr col="name" label="Practitioner"/>
-                    <SortHdr col="site" label="Site"/>
-                    <SortHdr col="revenue" label="Revenue" right/>
-                    <SortHdr col="completed" label="Visits" right/>
-                    <SortHdr col="initialAssessments" label="Initials" right/>
-                    <SortHdr col="utilization" label="Util %" right/>
-                    <SortHdr col="noShows" label="No-Shows" right/>
-                    <SortHdr col="cancellations" label="Cancels" right/>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map((r,i)=>(
-                    <tr key={r.staffId+r.month} style={{borderBottom:'1px solid rgba(255,255,255,.04)',background:i%2===0?'transparent':'rgba(255,255,255,.015)',cursor:'pointer'}}
-                      onClick={()=>{const s=staff.find(x=>x.id===r.staffId);if(s){setTrendStaff(s);setTab('trends');}}}>
-                      <td style={{padding:'9px 12px',color:'#aaa',whiteSpace:'nowrap'}}>{r.monthLabel}</td>
-                      <td style={{padding:'9px 12px',fontWeight:600,color:'#ddd'}}>{r.name}</td>
-                      <td style={{padding:'9px 12px',color:'#777'}}>{r.site}</td>
-                      <td style={{padding:'9px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,color:'#CAE8C1'}}>{r.revenue!=null?fmtRev(r.revenue):'—'}</td>
-                      <td style={{padding:'9px 12px',textAlign:'right',color:'#6B9FD4'}}>{r.completed??'—'}</td>
-                      <td style={{padding:'9px 12px',textAlign:'right',color:'#BB99FF',fontWeight:700}}>{r.initialAssessments??'—'}</td>
-                      <td style={{padding:'9px 12px',textAlign:'right',color:r.utilization>=85?'#CAE8C1':r.utilization>=70?'#44ccaa':r.utilization>50?'#F4DB71':r.utilization!=null?'#E05252':'#777'}}>{r.utilization!=null?r.utilization+'%':'—'}</td>
-                      <td style={{padding:'9px 12px',textAlign:'right',color:r.noShows>5?'#E05252':'#888'}}>{r.noShows??'—'}</td>
-                      <td style={{padding:'9px 12px',textAlign:'right',color:'#888'}}>{r.cancellations??'—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                {sorted.length>0&&(
-                  <tfoot>
-                    <tr style={{borderTop:'2px solid var(--border)',background:'var(--surface3)'}}>
-                      <td colSpan={3} style={{padding:'10px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:'#777',fontWeight:700}}>Totals / Averages</td>
-                      <td style={{padding:'10px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,fontSize:15,color:'#CAE8C1'}}>{fmtRev(totals.revenue)}</td>
-                      <td style={{padding:'10px 12px',textAlign:'right',fontWeight:700,color:'#6B9FD4'}}>{totals.completed}</td>
-                      <td style={{padding:'10px 12px',textAlign:'right',fontWeight:700,color:'#BB99FF'}}>{totals.initialAssessments}</td>
-                      <td style={{padding:'10px 12px',textAlign:'right',color:'#44ccaa'}}>{filtered.filter(r=>r.utilization!=null).length?Math.round(filtered.filter(r=>r.utilization!=null).reduce((a,r)=>a+r.utilization,0)/filtered.filter(r=>r.utilization!=null).length)+'%':'—'}</td>
-                      <td style={{padding:'10px 12px',textAlign:'right',color:'#888'}}>{totals.noShows}</td>
-                      <td style={{padding:'10px 12px',textAlign:'right',color:'#888'}}>{totals.cancellations}</td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-              {!sorted.length&&<div style={{textAlign:'center',padding:'40px',color:'#555',fontSize:15}}>No data for selected range. Import CSVs to populate.</div>}
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ── IMPORT ── */}
       {tab==='import'&&(
