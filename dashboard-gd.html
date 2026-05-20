@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- v20260520d -->
+<!DOCTYPE html><!-- v20260520f -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2329,12 +2329,14 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
-  // Retention tab
+  // Per-tab sort state
+  const[revSort,setRevSort]=useState({k:'revenue',d:'desc'});
+  const[utilSort,setUtilSort]=useState({k:'utilization',d:'desc'});
+  const[apptSort,setApptSort]=useState({k:'completed',d:'desc'});
   const[retSortKey,setRetSortKey]=useState('pctReturning');
   const[retSortDir,setRetSortDir]=useState('desc');
   const[retDragging,setRetDragging]=useState(false);
   const[showManualRet,setShowManualRet]=useState(false);
-  // IA tab
   const[iaFrom,setIaFrom]=useState(()=>{const d=new Date();d.setDate(1);return d.toISOString().slice(0,10);});
   const[iaTo,setIaTo]=useState(()=>new Date().toISOString().slice(0,10));
   const[iaSortKey,setIaSortKey]=useState('total');
@@ -2853,34 +2855,26 @@ function PerformancePage({staff,perfData,setPerfData}){
   const compareBRows=useMemo(()=>aggregateRows(filterSnaps(compareB)),[data.snapshots,compareB]);
 
   /* ── Merged staff with period-filtered data ── */
-  // IA tab computed data (hooks must be at component level)
   const iaByStaff=useMemo(()=>{
     const byStaff={};
     if(dailyAppts.length>0){
       dailyAppts.forEach(r=>{
-        if(iaFrom&&r.date<iaFrom)return;
-        if(iaTo&&r.date>iaTo)return;
+        if(iaFrom&&r.date<iaFrom)return;if(iaTo&&r.date>iaTo)return;
         const s=staff.find(x=>x.id===r.staff_id);
         if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
         if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
-        const ia=r.initial_assessments||0;
-        byStaff[r.staff_id].total+=ia;
-        byStaff[r.staff_id].completed+=(r.completed||0);
+        const ia=r.initial_assessments||0;byStaff[r.staff_id].total+=ia;byStaff[r.staff_id].completed+=(r.completed||0);
         if(ia>0)byStaff[r.staff_id].dailyBreakdown[r.date]=(byStaff[r.staff_id].dailyBreakdown[r.date]||0)+ia;
       });
     }else{
       data.snapshots.forEach(snap=>{
-        const m=snap.date.slice(0,7);
-        if(iaFrom&&m<iaFrom.slice(0,7))return;
-        if(iaTo&&m>iaTo.slice(0,7))return;
+        const m=snap.date.slice(0,7);if(iaFrom&&m<iaFrom.slice(0,7))return;if(iaTo&&m>iaTo.slice(0,7))return;
         (snap.rows||[]).forEach(r=>{
-          if(!r.staffId)return;
-          const s=staff.find(x=>x.id===r.staffId);
+          if(!r.staffId)return;const s=staff.find(x=>x.id===r.staffId);
           if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
           const ia=parseFloat(r.initialAssessments)||0;
           if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
-          byStaff[r.staffId].total+=ia;
-          byStaff[r.staffId].completed+=(parseFloat(r.completed)||0);
+          byStaff[r.staffId].total+=ia;byStaff[r.staffId].completed+=(parseFloat(r.completed)||0);
         });
       });
     }
@@ -2888,15 +2882,12 @@ function PerformancePage({staff,perfData,setPerfData}){
   },[iaFrom,iaTo,dailyAppts,data.snapshots,staff]);
 
   const clinicDailyTrend=useMemo(()=>{
-    if(!dailyAppts.length)return[];
-    const byDate={};
+    if(!dailyAppts.length)return[];const byDate={};
     dailyAppts.forEach(r=>{
-      if(iaFrom&&r.date<iaFrom)return;
-      if(iaTo&&r.date>iaTo)return;
+      if(iaFrom&&r.date<iaFrom)return;if(iaTo&&r.date>iaTo)return;
       const s=staff.find(x=>x.id===r.staff_id);
       if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
-      const ia=r.initial_assessments||0;
-      if(ia>0)byDate[r.date]=(byDate[r.date]||0)+ia;
+      const ia=r.initial_assessments||0;if(ia>0)byDate[r.date]=(byDate[r.date]||0)+ia;
     });
     return Object.entries(byDate).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count}));
   },[iaFrom,iaTo,dailyAppts,staff]);
@@ -3251,15 +3242,31 @@ function PerformancePage({staff,perfData,setPerfData}){
                 </div>);
               })}
             </div>);
-          })():(<div className="perf-slot-body">{withRev.length?withRev.map(s=>(
-            <div key={s.id} className="perf-bar-row" style={{padding:'9px 0',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
-              <div style={{minWidth:180}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777',marginTop:2}}>{s.site}</div></div>
-              <div className="perf-bar-track" style={{height:6}}><div className="perf-bar-fill" style={{width:(s.revenue/maxRev*100)+'%',background:'#CAE8C1'}}/></div>
-              <div style={{display:'flex',alignItems:'center',gap:8,minWidth:120,justifyContent:'flex-end'}}>
-                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(s.revenue)}</span>
+          })():(()=>{
+            const revSorted=[...withRev].sort((a,b)=>{const av=a[revSort.k]??-1,bv=b[revSort.k]??-1;return revSort.d==='desc'?bv-av:av-bv;});
+            const sortRevBy=(k)=>setRevSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
+            const RevTh=({label,k})=>{const active=revSort.k===k;return(<th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',padding:'8px 12px',whiteSpace:'nowrap'}} onClick={()=>sortRevBy(k)}>{label}{active?(revSort.d==='desc'?' ▼':' ▲'):''}</th>);};
+            return revSorted.length?(
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                  <thead><tr style={{borderBottom:'1px solid var(--border)'}}><th style={{textAlign:'left',padding:'8px 12px',color:'#888',cursor:'pointer',userSelect:'none',color:revSort.k==='name'?'var(--lime)':'#888'}} onClick={()=>sortRevBy('name')}>Practitioner{revSort.k==='name'?(revSort.d==='desc'?' ▼':' ▲'):''}</th><RevTh label="Revenue" k="revenue"/><th style={{textAlign:'right',padding:'8px 12px',color:'#888'}}>Site</th></tr></thead>
+                  <tbody>{revSorted.map(s=>(
+                    <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+                      <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div></div></div></td>
+                      <td style={{padding:'9px 12px',textAlign:'right'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}>
+                          <div style={{width:80,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:'#CAE8C1',width:(s.revenue/maxRev*100)+'%'}}/></div>
+                          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#CAE8C1',minWidth:64,textAlign:'right'}}>{fmtRev(s.revenue)}</span>
+                        </div>
+                      </td>
+                      <td style={{padding:'9px 12px',textAlign:'right',color:'#777',fontSize:13}}>{s.site}</td>
+                    </tr>
+                  ))}</tbody>
+                  <tfoot><tr style={{borderTop:'2px solid var(--border)',background:'var(--surface2)'}}><td style={{padding:'8px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777'}}>Total</td><td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(totalRev)}</td><td/></tr></tfoot>
+                </table>
               </div>
-            </div>
-          )):<div className="empty" style={{padding:40}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue data.</p></div>}</div>)}
+            ):<div className="empty" style={{padding:40}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue data.</p></div>;
+          })()}
         </div>
       )}
 
@@ -3314,40 +3321,32 @@ function PerformancePage({staff,perfData,setPerfData}){
               </div>);
             })}</div>);
           })():(()=>{
-            // Always show utilization — fall back to all snapshots if filtered period has none
-            const allUtilRows=data.snapshots
-              .flatMap(sn=>(sn.rows||[]).filter(r=>r.utilization!=null))
-              .reduce((acc,r)=>{
-                if(!acc[r.staffId]||r.utilization>0)acc[r.staffId]=r;
-                return acc;
-              },{});
-            const fallbackStaff=Object.values(allUtilRows).map(r=>{
-              const s=staff.find(st=>st.id===r.staffId);
-              return s?{...s,utilization:parseFloat(r.utilization)||null}:null;
-            }).filter(Boolean).filter(s=>s.utilization!=null).sort((a,b)=>b.utilization-a.utilization);
-            const showing=withUtil.length>0?withUtil:fallbackStaff;
+            const allUtilRows=data.snapshots.flatMap(sn=>(sn.rows||[]).filter(r=>r.utilization!=null)).reduce((acc,r)=>{if(!acc[r.staffId]||r.utilization>0)acc[r.staffId]=r;return acc;},{});
+            const fallbackStaff=Object.values(allUtilRows).map(r=>{const s=staff.find(st=>st.id===r.staffId);return s?{...s,utilization:parseFloat(r.utilization)||null}:null;}).filter(Boolean).filter(s=>s.utilization!=null);
+            const baseList=withUtil.length>0?withUtil:fallbackStaff;
             const isFiltered=periodFilter!=='all'&&withUtil.length===0&&fallbackStaff.length>0;
+            const utilSorted=[...baseList].sort((a,b)=>{const av=a[utilSort.k]??-1,bv=b[utilSort.k]??-1;if(typeof av==='string')return utilSort.d==='desc'?av.localeCompare(bv):bv.localeCompare(av);return utilSort.d==='desc'?bv-av:av-bv;});
+            const sortUtilBy=(k)=>setUtilSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
+            const UtilTh=({label,k,align='right'})=>{const active=utilSort.k===k;return(<th style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',padding:'8px 12px',whiteSpace:'nowrap'}} onClick={()=>sortUtilBy(k)}>{label}{active?(utilSort.d==='desc'?' ▼':' ▲'):''}</th>);};
             return(
               <div>
-                {isFiltered&&(
-                  <div style={{padding:'8px 14px',background:'rgba(244,219,113,.06)',border:'1px solid rgba(244,219,113,.18)',borderRadius:5,fontSize:14,color:'#F4DB71',marginBottom:8}}>
-                    No shift report for this period — showing most recent available utilization. Import a monthly Shift Report to track per-period utilization.
+                {isFiltered&&<div style={{padding:'8px 14px',background:'rgba(244,219,113,.06)',border:'1px solid rgba(244,219,113,.18)',borderRadius:5,fontSize:14,color:'#F4DB71',marginBottom:8}}>No shift report for this period — showing most recent available utilization.</div>}
+                {utilSorted.length?(
+                  <div style={{overflowX:'auto'}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                      <thead><tr style={{borderBottom:'1px solid var(--border)'}}><UtilTh label="Practitioner" k="name" align="left"/><UtilTh label="Utilization %" k="utilization"/><UtilTh label="Site" k="site"/></tr></thead>
+                      <tbody>{utilSorted.map(s=>{
+                        const c=s.utilization>=85?'#CAE8C1':s.utilization>=70?'#44ccaa':s.utilization>50?'#F4DB71':'#E05252';
+                        const lbl=s.utilization>=85?'Strong':s.utilization>=70?'Good':s.utilization>50?'Fair':'Low';
+                        return(<tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+                          <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
+                          <td style={{padding:'9px 12px',textAlign:'right'}}><div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:80,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:c,width:Math.min(100,s.utilization)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:c,minWidth:42,textAlign:'right'}}>{s.utilization}%</span><span style={{fontSize:13,background:c+'22',color:c,border:'1px solid '+c+'44',borderRadius:3,padding:'2px 5px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{lbl}</span></div></td>
+                          <td style={{padding:'9px 12px',textAlign:'right',color:'#777',fontSize:13}}>{s.site}</td>
+                        </tr>);
+                      })}</tbody>
+                    </table>
                   </div>
-                )}
-                <div className="perf-slot-body">{showing.length?showing.map(s=>{
-                  const c=s.utilization>=85?'#CAE8C1':s.utilization>=70?'#44ccaa':s.utilization>50?'#F4DB71':'#E05252';
-                  const lbl=s.utilization>=85?'Strong':s.utilization>=70?'Good':s.utilization>50?'Fair':'Low';
-                  return(
-                    <div key={s.id} className="perf-bar-row" style={{padding:'9px 0',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
-                      <div style={{minWidth:180}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777',marginTop:2}}>{s.site}</div></div>
-                      <div className="perf-bar-track" style={{height:6}}><div className="perf-bar-fill" style={{width:s.utilization+'%',background:c}}/></div>
-                      <div style={{display:'flex',alignItems:'center',gap:8,minWidth:130,justifyContent:'flex-end'}}>
-                        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:c}}>{s.utilization}%</span>
-                        <span style={{fontSize:13,background:c+'22',color:c,border:'1px solid '+c+'44',borderRadius:3,padding:'2px 5px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{lbl}</span>
-                      </div>
-                    </div>
-                  );
-                }):<div className="empty" style={{padding:40}}><div className="empty-ico">⏱</div><p>Import a Shift Report CSV to see utilization data.</p></div>}</div>
+                ):<div className="empty" style={{padding:40}}><div className="empty-ico">⏱</div><p>Import a Shift Report CSV to see utilization data.</p></div>}
               </div>
             );
           })()}
@@ -3399,30 +3398,40 @@ function PerformancePage({staff,perfData,setPerfData}){
                 </tr>);
               })}</tbody>
             </table></div>);
-          })():(<div className="perf-slot-body">{withAppts.length?(
-            <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-              <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{['Practitioner','Completed','Initial Assessments','No-Shows','Cancellations','Rescheduled','Cancel Rate'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:h==='Practitioner'?'left':'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',textTransform:'uppercase',color:'#999',fontWeight:600}}>{h}</th>)}</tr></thead>
-              <tbody>{withAppts.map(s=>{
-                const total=(s.completed||0)+(s.noShows||0)+(s.cancellations||0)+(s.rescheduled||0);
-                const cancelRate=total>0?Math.round(((s.cancellations||0)/total)*100):0;
-                return(
-                  <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
-                    <td style={{padding:'8px 10px'}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777'}}>{s.site}</div></td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.completed||0}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:'#BB99FF',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.initialAssessments||0}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:(s.noShows||0)>8?'#E05252':'#888'}}>{s.noShows||0}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:(s.cancellations||0)>15?'#F4DB71':'#888'}}>{s.cancellations||0}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:'#888'}}>{s.rescheduled||0}</td>
-                    <td style={{padding:'8px 10px',textAlign:'right',color:cancelRate>15?'#E05252':cancelRate>10?'#F4DB71':'#44ccaa',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{cancelRate}%</td>
-                  </tr>
-                );
-              })}</tbody>
-            </table></div>
-          ):<div className="empty" style={{padding:40}}><div className="empty-ico">📋</div><p>Import an Appointments CSV to see per-practitioner breakdown.</p></div>}</div>)}
+          })():(()=>{
+            const apptSorted=[...withAppts].sort((a,b)=>{
+              const av=a[apptSort.k]??-1,bv=b[apptSort.k]??-1;
+              if(typeof av==='string')return apptSort.d==='desc'?av.localeCompare(bv):bv.localeCompare(av);
+              return apptSort.d==='desc'?bv-av:av-bv;
+            });
+            const sortApptBy=(k)=>setApptSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
+            const ApptTh=({label,k,align='right'})=>{const active=apptSort.k===k;return(<th style={{padding:'8px 10px',textAlign:align,fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',textTransform:'uppercase',color:active?'var(--lime)':'#999',fontWeight:600,cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>sortApptBy(k)}>{label}{active?(apptSort.d==='desc'?' ▼':' ▲'):''}</th>);};
+            return apptSorted.length?(
+              <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                <thead><tr style={{borderBottom:'1px solid var(--border)'}}><ApptTh label="Practitioner" k="name" align="left"/><ApptTh label="Completed" k="completed"/><ApptTh label="Initial Assessments" k="initialAssessments"/><ApptTh label="No-Shows" k="noShows"/><ApptTh label="Cancellations" k="cancellations"/><ApptTh label="Rescheduled" k="rescheduled"/><ApptTh label="Cancel Rate" k="cancelRate"/></tr></thead>
+                <tbody>{apptSorted.map(s=>{
+                  const total=(s.completed||0)+(s.noShows||0)+(s.cancellations||0)+(s.rescheduled||0);
+                  const cancelRate=total>0?Math.round(((s.cancellations||0)/total)*100):0;
+                  return(
+                    <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+                      <td style={{padding:'8px 10px'}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777'}}>{s.site}</div></td>
+                      <td style={{padding:'8px 10px',textAlign:'right',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.completed||0}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',color:'#BB99FF',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.initialAssessments||0}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',color:(s.noShows||0)>8?'#E05252':'#888'}}>{s.noShows||0}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',color:(s.cancellations||0)>15?'#F4DB71':'#888'}}>{s.cancellations||0}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',color:'#888'}}>{s.rescheduled||0}</td>
+                      <td style={{padding:'8px 10px',textAlign:'right',color:cancelRate>15?'#E05252':cancelRate>10?'#F4DB71':'#44ccaa',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{cancelRate}%</td>
+                    </tr>
+                  );
+                })}</tbody>
+              </table></div>
+            ):<div className="empty" style={{padding:40}}><div className="empty-ico">📋</div><p>Import an Appointments CSV to see per-practitioner breakdown.</p></div>;
+          })()}
         </div>
       )}
 
-      {/* ── INITIAL ASSESSMENTS ── */}
+
+            {/* ── INITIAL ASSESSMENTS ── */}
       {tab==='ia'&&(
         <div>
           {(()=>{
@@ -3597,7 +3606,7 @@ function PerformancePage({staff,perfData,setPerfData}){
         </div>
       )}
 
-      {/* ── GVA ── */}
+{/* ── GVA ── */}
       {tab==='gva'&&(
         <div>
           <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:14,color:'#aaa',lineHeight:1.7}}>
@@ -3648,7 +3657,7 @@ function PerformancePage({staff,perfData,setPerfData}){
         </div>
       )}
 
-      {/* ── RETENTION ── */}
+            {/* ── RETENTION ── */}
       {tab==='retention'&&(
         <div>
           {data.retentionClinic&&Object.keys(data.retentionClinic).length>0&&(
