@@ -2944,26 +2944,17 @@ function PerformancePage({staff,perfData,setPerfData}){
               {usingCustomRange?'Custom range · daily data':(filteredSnaps.length+' month'+(filteredSnaps.length!==1?'s':''))}
             </span>
           </div>
-          {/* Custom date range — only shown when daily data available */}
-          {hasDailyData&&(
-            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-              <span style={{fontSize:13,color:'#888',flexShrink:0}}>Custom range:</span>
-              <input type="date" value={customFrom} onChange={e=>{setCustomFrom(e.target.value);if(e.target.value)setDateFrom('');}}
-                min={dailyDateRange.min} max={dailyDateRange.max}
-                style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customFrom?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer'}}/>
-              <span style={{fontSize:13,color:'#555'}}>→</span>
-              <input type="date" value={customTo} onChange={e=>{setCustomTo(e.target.value);if(e.target.value)setDateTo('');}}
-                min={dailyDateRange.min} max={dailyDateRange.max}
-                style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customTo?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer'}}/>
-              {usingCustomRange&&(
-                <button className="btn btn-xs btn-ghost" onClick={()=>{setCustomFrom('');setCustomTo('');}}>✕ Clear</button>
-              )}
-              {usingCustomRange&&customFrom&&customTo&&(()=>{
-                const days=Math.round((new Date(customTo)-new Date(customFrom))/(1000*60*60*24))+1;
-                return<span style={{fontSize:13,color:'var(--lime)'}}>{days} day{days!==1?'s':''}</span>;
-              })()}
-            </div>
-          )}
+          {/* Custom date range — always visible */}
+          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            <span style={{fontSize:13,color:'#888',flexShrink:0}}>Custom:</span>
+            <input type="date" value={customFrom} onChange={e=>{setCustomFrom(e.target.value);if(e.target.value){setDateFrom('');setDateTo('');}}}
+              style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customFrom?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer'}}/>
+            <span style={{fontSize:13,color:'#555'}}>{'→'}</span>
+            <input type="date" value={customTo} onChange={e=>{setCustomTo(e.target.value);if(e.target.value){setDateFrom('');setDateTo('');}}}
+              style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customTo?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer'}}/>
+            {usingCustomRange&&<button className="btn btn-xs btn-ghost" onClick={()=>{setCustomFrom('');setCustomTo('');}}>Clear</button>}
+            {usingCustomRange&&customFrom&&customTo&&<span style={{fontSize:13,color:hasDailyData?'var(--lime)':'#F4DB71'}}>{Math.round((new Date(customTo)-new Date(customFrom))/(86400000))+1} days{!hasDailyData?' (re-import to activate)':''}</span>}
+          </div>
         </div>
       )}
 
