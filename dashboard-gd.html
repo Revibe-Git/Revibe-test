@@ -2337,6 +2337,8 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[customFrom,setCustomFrom]=useState('');
   const[customTo,setCustomTo]=useState('');
   const usingCustomRange=!!(customFrom||customTo);
+  const[filterDisc,setFilterDisc]=useState('all');
+  const[filterSite,setFilterSite]=useState('all');
   const[compareA,setCompareA]=useState('');
   const[compareB,setCompareB]=useState('');
   // Per-section compare state
@@ -2495,6 +2497,8 @@ function PerformancePage({staff,perfData,setPerfData}){
       if(toDate&&r.date>toDate)return;
       const s=staff.find(x=>x.id===r.staff_id);
       if(!s||s.discipline==='mgmt'||s.discipline==='ops'||s.discipline==='edu')return;
+      if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
+      if(filterSite!=='all'&&s.site!==filterSite)return;
       if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',completed:0,initialAssessments:0,noShows:0,cancellations:0,revenue:0};
       byStaff[r.staff_id].completed+=(r.completed||0);
       byStaff[r.staff_id].initialAssessments+=(r.initial_assessments||0);
@@ -2507,6 +2511,8 @@ function PerformancePage({staff,perfData,setPerfData}){
       if(toDate&&r.date>toDate)return;
       const s=staff.find(x=>x.id===r.staff_id);
       if(!s||s.discipline==='mgmt'||s.discipline==='ops'||s.discipline==='edu')return;
+      if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
+      if(filterSite!=='all'&&s.site!==filterSite)return;
       if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',completed:0,initialAssessments:0,noShows:0,cancellations:0,revenue:0};
       byStaff[r.staff_id].revenue+=(r.revenue||0);
     });
@@ -2816,7 +2822,10 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   /* ── Merged staff with period-filtered data ── */
   const mergedStaff=useMemo(()=>
-    staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{
+    staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'
+      &&(filterDisc==='all'||s.discipline===filterDisc)
+      &&(filterSite==='all'||s.site===filterSite)
+    ).map(s=>{
       const jr=filteredRows.find(r=>r.staffId===s.id);
       const gvaVal=parseFloat(gvaEdits[s.id]!==undefined?gvaEdits[s.id]:data.gva[s.id])||null;
       const retVal=data.retention?.[s.id]||null;
@@ -2920,16 +2929,16 @@ function PerformancePage({staff,perfData,setPerfData}){
         <div className="sc gray"><div className="sc-lbl">Snapshots</div><div className="sc-val">{data.snapshots.length}</div><div className="sc-sub">{data.lastImport?new Date(data.lastImport).toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'No imports yet'}</div></div>
       </div>
 
-      {/* Period filter bar */}
+      {/* Filter bar */}
       {!['import','gva','retention','trends'].includes(tab)&&data.snapshots.length>0&&(
-        <div style={{marginBottom:14}}>
-          {/* Quick period buttons */}
-          <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:hasDailyData?8:0}}>
-            <span style={{fontSize:13,color:'#777',marginRight:2,flexShrink:0}}>Showing</span>
+        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+
+          {/* Quick period pills */}
+          <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
             {[
               {l:'This Month',f:curMonth,t:curMonth},
-              {l:'Last 3 Months',f:(()=>{const d=new Date();d.setMonth(d.getMonth()-2);return d.toISOString().slice(0,7)})(),t:curMonth},
-              {l:'Last 6 Months',f:(()=>{const d=new Date();d.setMonth(d.getMonth()-5);return d.toISOString().slice(0,7)})(),t:curMonth},
+              {l:'Last 3 Mo',f:(()=>{const d=new Date();d.setMonth(d.getMonth()-2);return d.toISOString().slice(0,7)})(),t:curMonth},
+              {l:'Last 6 Mo',f:(()=>{const d=new Date();d.setMonth(d.getMonth()-5);return d.toISOString().slice(0,7)})(),t:curMonth},
               {l:'YTD',f:new Date().getFullYear()+'-01',t:curMonth},
               {l:'2025',f:'2025-01',t:'2025-12'},
               {l:'All Time',f:'',t:''},
@@ -2940,21 +2949,54 @@ function PerformancePage({staff,perfData,setPerfData}){
                 {l}
               </button>
             ))}
-            <span style={{fontSize:13,color:'#555',marginLeft:4,flexShrink:0}}>
-              {usingCustomRange?'Custom range · daily data':(filteredSnaps.length+' month'+(filteredSnaps.length!==1?'s':''))}
-            </span>
           </div>
-          {/* Custom date range — always visible */}
-          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-            <span style={{fontSize:13,color:'#888',flexShrink:0}}>Custom:</span>
-            <input type="date" value={customFrom} onChange={e=>{setCustomFrom(e.target.value);if(e.target.value){setDateFrom('');setDateTo('');}}}
-              style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customFrom?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer'}}/>
-            <span style={{fontSize:13,color:'#555'}}>{'→'}</span>
-            <input type="date" value={customTo} onChange={e=>{setCustomTo(e.target.value);if(e.target.value){setDateFrom('');setDateTo('');}}}
-              style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customTo?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer'}}/>
-            {usingCustomRange&&<button className="btn btn-xs btn-ghost" onClick={()=>{setCustomFrom('');setCustomTo('');}}>Clear</button>}
-            {usingCustomRange&&customFrom&&customTo&&<span style={{fontSize:13,color:hasDailyData?'var(--lime)':'#F4DB71'}}>{Math.round((new Date(customTo)-new Date(customFrom))/(86400000))+1} days{!hasDailyData?' (re-import to activate)':''}</span>}
+
+          {/* Divider */}
+          <div style={{width:1,height:22,background:'var(--border2)',margin:'0 4px',flexShrink:0}}/>
+
+          {/* Custom date inputs */}
+          <div style={{display:'flex',alignItems:'center',gap:6}}>
+            <span style={{fontSize:12,color:'#777',flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>From</span>
+            <input type="date" value={customFrom}
+              onChange={e=>{setCustomFrom(e.target.value);if(e.target.value){setDateFrom('');setDateTo('');}}}
+              style={{background:'var(--surface3)',border:'2px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customFrom?'var(--text)':'#888',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',minWidth:140}}/>
+            <span style={{fontSize:13,color:'#555',flexShrink:0}}>→</span>
+            <span style={{fontSize:12,color:'#777',flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>To</span>
+            <input type="date" value={customTo}
+              onChange={e=>{setCustomTo(e.target.value);if(e.target.value){setDateFrom('');setDateTo('');}}}
+              style={{background:'var(--surface3)',border:'2px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customTo?'var(--text)':'#888',fontSize:14,padding:'5px 10px',outline:'none',cursor:'pointer',minWidth:140}}/>
+            {usingCustomRange&&<button className="btn btn-xs btn-ghost" onClick={()=>{setCustomFrom('');setCustomTo('');}} style={{flexShrink:0}}>✕</button>}
+            {usingCustomRange&&customFrom&&customTo&&<span style={{fontSize:13,color:hasDailyData?'var(--lime)':'#F4DB71',flexShrink:0}}>{Math.round((new Date(customTo)-new Date(customFrom))/(86400000))+1}d{!hasDailyData?' ·re-import':''}</span>}
           </div>
+
+          {/* Divider */}
+          <div style={{width:1,height:22,background:'var(--border2)',margin:'0 4px',flexShrink:0}}/>
+
+          {/* Discipline filter */}
+          <select value={filterDisc} onChange={e=>setFilterDisc(e.target.value)}
+            style={{background:'var(--surface3)',border:'1px solid '+(filterDisc!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:filterDisc!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer'}}>
+            <option value="all">All Disciplines</option>
+            {[...new Set(staff.filter(s=>s.discipline&&!['mgmt','ops','edu'].includes(s.discipline)).map(s=>s.discipline))].sort().map(d=>(
+              <option key={d} value={d}>{DISC.find(x=>x.id===d)?.label||d}</option>
+            ))}
+          </select>
+
+          {/* Site filter */}
+          <select value={filterSite} onChange={e=>setFilterSite(e.target.value)}
+            style={{background:'var(--surface3)',border:'1px solid '+(filterSite!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:filterSite!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer'}}>
+            <option value="all">All Locations</option>
+            {[...new Set(staff.map(s=>s.site).filter(Boolean))].sort().map(s=>(
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+
+          {/* Active filter summary */}
+          <span style={{fontSize:13,color:'#555',marginLeft:'auto'}}>
+            {usingCustomRange?'Custom range':(filteredSnaps.length+' mo')}
+            {filterDisc!=='all'?' · '+DISC.find(x=>x.id===filterDisc)?.label:''}
+            {filterSite!=='all'?' · '+filterSite:''}
+            {(filterDisc!=='all'||filterSite!=='all')&&<button className="btn btn-xs btn-ghost" style={{marginLeft:6}} onClick={()=>{setFilterDisc('all');setFilterSite('all');}}>Clear filters</button>}
+          </span>
         </div>
       )}
 
