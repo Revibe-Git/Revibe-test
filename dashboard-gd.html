@@ -2249,11 +2249,18 @@ function PerformancePage({staff,perfData,setPerfData}){
           const retention={};
           (retRows||[]).forEach(r=>{if(!retention[r.staff_id])retention[r.staff_id]=r.value;});
           const loaded={snapshots:snaps.map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:snaps[snaps.length-1]?.created_at||null};
+          // Also load retentionFull from retention_full singleton
+          const{data:retFullRow}=await SB.from('retention_full').select('*').eq('id','singleton').single().catch(()=>({data:null}));
+          if(retFullRow?.data){
+            loaded.retentionFull=retFullRow.data.retentionFull||{};
+            loaded.retentionClinic=retFullRow.data.retentionClinic||{};
+            loaded.retentionImportDate=retFullRow.data.importDate||null;
+          }
           // Supabase data is fresher — update state and localStorage
           setPerfData(loaded);
           try{localStorage.setItem('rvgd3_perf3',JSON.stringify(loaded));}catch(e){}
         }
-        // If Supabase is empty but localStorage has data, save localStorage to Supabase
+        // If Supabase is empty but localStorage has data, push localStorage to Supabase
         else if(!se&&snaps&&snaps.length===0){
           const local=perfData;
           if(local.snapshots&&local.snapshots.length>0){
@@ -2262,6 +2269,17 @@ function PerformancePage({staff,perfData,setPerfData}){
                 id:snap.id,date:snap.date,rows:snap.rows,files:snap.files||[],type:snap.type||'sales'
               });
             }
+          }
+          // Still try to load retentionFull even with no snapshots
+          const{data:retFullRow2}=await SB.from('retention_full').select('*').eq('id','singleton').single().catch(()=>({data:null}));
+          if(retFullRow2?.data){
+            const merged2={...perfData,
+              retentionFull:retFullRow2.data.retentionFull||{},
+              retentionClinic:retFullRow2.data.retentionClinic||{},
+              retentionImportDate:retFullRow2.data.importDate||null
+            };
+            setPerfData(merged2);
+            try{localStorage.setItem('rvgd3_perf3',JSON.stringify(merged2));}catch(e){}
           }
         }
       }catch(e){console.warn('[Perf] Supabase sync error:',e);}
@@ -2315,8 +2333,16 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   const save=(d)=>{
     setPerfData(d);
-    // Write to localStorage as primary (instant, survives refresh)
     try{localStorage.setItem('rvgd3_perf3',JSON.stringify(d));}catch(e){}
+    // Also persist retentionFull/retentionClinic to Supabase so other devices see it
+    const SB2=window.__SB;
+    if(SB2&&(d.retentionFull||d.retentionClinic)){
+      SB2.from('retention_full').upsert({id:'singleton',data:{
+        retentionFull:d.retentionFull||{},
+        retentionClinic:d.retentionClinic||{},
+        importDate:d.retentionImportDate||null
+      }}).then();
+    }
   };
   const[tab,setTab]=useState('overview');
   const[dragging,setDragging]=useState(false);
@@ -2337,8 +2363,7 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[retSortDir,setRetSortDir]=useState('desc');
   const[retDragging,setRetDragging]=useState(false);
   const[showManualRet,setShowManualRet]=useState(false);
-  const[iaFrom,setIaFrom]=useState(()=>{const d=new Date();d.setDate(1);return d.toISOString().slice(0,10);});
-  const[iaTo,setIaTo]=useState(()=>new Date().toISOString().slice(0,10));
+
   const[iaSortKey,setIaSortKey]=useState('total');
   const[iaSortDir,setIaSortDir]=useState('desc');
   const[iaView,setIaView]=useState('summary');
@@ -2848,7 +2873,7 @@ function PerformancePage({staff,perfData,setPerfData}){
   const filteredRows=useMemo(()=>{
     if(usingCustomRange&&hasDailyData)return aggregateDaily(customFrom,customTo);
     return aggregateRows(filteredSnaps);
-  },[filteredSnaps,usingCustomRange,hasDailyData,customFrom,customTo,dailyAppts,dailyRevenue]);
+  },[filteredSnaps,usingCustomRange,hasDailyData,customFrom,customTo,dailyAppts,dailyRevenue,filterDisc,filterSite]);
 
   // Compare mode rows
   const compareARows=useMemo(()=>aggregateRows(filterSnaps(compareA)),[data.snapshots,compareA]);
@@ -2856,22 +2881,30 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   /* ── Merged staff with period-filtered data ── */
   const iaByStaff=useMemo(()=>{
+    // Derive day-level range from global filters
+    const dFrom=customFrom||(dateFrom?dateFrom+'-01':null);
+    const dTo=customTo||(dateTo?(()=>{const d=new Date(dateTo+'-01');d.setMonth(d.getMonth()+1);d.setDate(0);return d.toISOString().slice(0,10);})():null);
     const byStaff={};
     if(dailyAppts.length>0){
       dailyAppts.forEach(r=>{
-        if(iaFrom&&r.date<iaFrom)return;if(iaTo&&r.date>iaTo)return;
+        if(dFrom&&r.date<dFrom)return;if(dTo&&r.date>dTo)return;
         const s=staff.find(x=>x.id===r.staff_id);
         if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
+        if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
+        if(filterSite!=='all'&&s.site!==filterSite)return;
         if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
         const ia=r.initial_assessments||0;byStaff[r.staff_id].total+=ia;byStaff[r.staff_id].completed+=(r.completed||0);
         if(ia>0)byStaff[r.staff_id].dailyBreakdown[r.date]=(byStaff[r.staff_id].dailyBreakdown[r.date]||0)+ia;
       });
     }else{
       data.snapshots.forEach(snap=>{
-        const m=snap.date.slice(0,7);if(iaFrom&&m<iaFrom.slice(0,7))return;if(iaTo&&m>iaTo.slice(0,7))return;
+        const m=snap.date.slice(0,7);
+        if(dateFrom&&m<dateFrom)return;if(dateTo&&m>dateTo)return;
         (snap.rows||[]).forEach(r=>{
           if(!r.staffId)return;const s=staff.find(x=>x.id===r.staffId);
           if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
+          if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
+          if(filterSite!=='all'&&s.site!==filterSite)return;
           const ia=parseFloat(r.initialAssessments)||0;
           if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
           byStaff[r.staffId].total+=ia;byStaff[r.staffId].completed+=(parseFloat(r.completed)||0);
@@ -2879,18 +2912,22 @@ function PerformancePage({staff,perfData,setPerfData}){
       });
     }
     return Object.values(byStaff).map(r=>({...r,iaRate:r.completed>0?Math.round((r.total/r.completed)*100):null}));
-  },[iaFrom,iaTo,dailyAppts,data.snapshots,staff]);
+  },[customFrom,customTo,dateFrom,dateTo,filterDisc,filterSite,dailyAppts,data.snapshots,staff]);
 
   const clinicDailyTrend=useMemo(()=>{
+    const dFrom=customFrom||(dateFrom?dateFrom+'-01':null);
+    const dTo=customTo||(dateTo?(()=>{const d=new Date(dateTo+'-01');d.setMonth(d.getMonth()+1);d.setDate(0);return d.toISOString().slice(0,10);})():null);
     if(!dailyAppts.length)return[];const byDate={};
     dailyAppts.forEach(r=>{
-      if(iaFrom&&r.date<iaFrom)return;if(iaTo&&r.date>iaTo)return;
+      if(dFrom&&r.date<dFrom)return;if(dTo&&r.date>dTo)return;
       const s=staff.find(x=>x.id===r.staff_id);
       if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
+      if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
+      if(filterSite!=='all'&&s.site!==filterSite)return;
       const ia=r.initial_assessments||0;if(ia>0)byDate[r.date]=(byDate[r.date]||0)+ia;
     });
     return Object.entries(byDate).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count}));
-  },[iaFrom,iaTo,dailyAppts,staff]);
+  },[customFrom,customTo,dateFrom,dateTo,filterDisc,filterSite,dailyAppts,staff]);
 
   const mergedStaff=useMemo(()=>
     staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'
@@ -2907,7 +2944,7 @@ function PerformancePage({staff,perfData,setPerfData}){
         revenue:jr?.revenue||null,initialAssessments:jr?.initialAssessments||null,
         gva:gvaVal,retention:retVal};
     })
-  ,[staff,filteredRows,data.gva,data.retention,gvaEdits]);
+  ,[staff,filteredRows,data.gva,data.retention,gvaEdits,filterDisc,filterSite]);
 
   const withUtil  =mergedStaff.filter(s=>s.utilization!=null).sort((a,b)=>b.utilization-a.utilization);
   const withAppts =mergedStaff.filter(s=>s.completed!=null).sort((a,b)=>b.completed-a.completed);
@@ -3431,19 +3468,11 @@ function PerformancePage({staff,perfData,setPerfData}){
       )}
 
 
-            {/* ── INITIAL ASSESSMENTS ── */}
+                  {/* ── INITIAL ASSESSMENTS ── */}
       {tab==='ia'&&(
         <div>
           {(()=>{
             const toggleIaSort=(key)=>{if(iaSortKey===key)setIaSortDir(d=>d==='desc'?'asc':'desc');else{setIaSortKey(key);setIaSortDir('desc');}};
-            const quickRanges=[
-              {l:'Today',f:new Date().toISOString().slice(0,10),t:new Date().toISOString().slice(0,10)},
-              {l:'This Week',f:(()=>{const d=new Date();d.setDate(d.getDate()-d.getDay()+1);return d.toISOString().slice(0,10);})(),t:new Date().toISOString().slice(0,10)},
-              {l:'Last 7d',f:(()=>{const d=new Date();d.setDate(d.getDate()-6);return d.toISOString().slice(0,10);})(),t:new Date().toISOString().slice(0,10)},
-              {l:'This Month',f:new Date().toISOString().slice(0,7)+'-01',t:new Date().toISOString().slice(0,10)},
-              {l:'Last 30d',f:(()=>{const d=new Date();d.setDate(d.getDate()-29);return d.toISOString().slice(0,10);})(),t:new Date().toISOString().slice(0,10)},
-              {l:'YTD',f:new Date().getFullYear()+'-01-01',t:new Date().toISOString().slice(0,10)},
-            ];
             const iaSorted=[...iaByStaff].sort((a,b)=>{const av=a[iaSortKey]??-1,bv=b[iaSortKey]??-1;if(typeof av==='string')return iaSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);return iaSortDir==='desc'?bv-av:av-bv;});
             const totalIA=iaSorted.reduce((a,s)=>a+s.total,0);
             const totalCompleted=iaSorted.reduce((a,s)=>a+s.completed,0);
@@ -3455,12 +3484,22 @@ function PerformancePage({staff,perfData,setPerfData}){
               return(<th style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleIaSort(k)}>{label}{active?(iaSortDir==='desc'?' ▼':' ▲'):''}</th>);
             };
             const selectedData=iaSelectedStaff?iaSorted.find(s=>s.staffId===iaSelectedStaff):null;
+            const rangeLabel=(()=>{
+              if(customFrom||customTo)return `${customFrom||'…'} → ${customTo||'…'}`;
+              if(dateFrom===dateTo)return new Date(dateFrom+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
+              return `${new Date(dateFrom+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})} – ${new Date(dateTo+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}`;
+            })();
             return(
               <div>
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
                   <div>
                     <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#aaa',marginBottom:2}}>Initial Assessments</div>
-                    <div style={{fontSize:14,color:'#777'}}>{hasDailyData?'Daily granular data — any date range':'Monthly snapshot data'}{!hasDailyData&&<span style={{marginLeft:8,color:'#F4DB71',fontSize:13}}>⚠ Re-import Appointments CSV for day-level tracking</span>}</div>
+                    <div style={{fontSize:14,color:'#777'}}>
+                      {hasDailyData?'Daily granular data':'Monthly snapshot'} · {rangeLabel}
+                      {filterDisc!=='all'&&<span style={{marginLeft:6,color:'var(--lime)'}}>· {filterDisc}</span>}
+                      {filterSite!=='all'&&<span style={{marginLeft:6,color:'var(--lime)'}}>· {filterSite}</span>}
+                      {!hasDailyData&&<span style={{marginLeft:8,color:'#F4DB71',fontSize:13}}>⚠ Re-import Appointments CSV for day-level tracking</span>}
+                    </div>
                   </div>
                   <div style={{display:'flex',gap:6}}>
                     <button className={`btn btn-sm ${iaView==='summary'?'btn-go':'btn-ghost'}`} onClick={()=>setIaView('summary')}>Summary</button>
@@ -3475,19 +3514,6 @@ function PerformancePage({staff,perfData,setPerfData}){
                     {label:'Practitioners w/ IAs',val:iaSorted.filter(s=>s.total>0).length+' / '+iaSorted.length,color:'#6B9FD4'},
                   ].map(s=>(<div key={s.label} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'12px 14px'}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#999',marginBottom:5}}>{s.label}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:s.color,lineHeight:1}}>{s.val}</div>{s.sub&&<div style={{fontSize:13,color:'#777',marginTop:3}}>{s.sub}</div>}</div>))}
                 </div>
-                <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 14px',marginBottom:14}}>
-                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                    {quickRanges.map(({l,f,t})=>(<button key={l} className={'btn btn-sm '+(iaFrom===f&&iaTo===t?'btn-go':'btn-ghost')} onClick={()=>{setIaFrom(f);setIaTo(t);}}>{l}</button>))}
-                    <div style={{width:1,height:22,background:'var(--border2)',margin:'0 4px',flexShrink:0}}/>
-                    <div style={{display:'flex',alignItems:'center',gap:6}}>
-                      <span style={{fontSize:12,color:'#777',fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>From</span>
-                      <input type="date" value={iaFrom} onChange={e=>setIaFrom(e.target.value)} style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:4,color:'var(--text)',fontSize:13,padding:'4px 8px',outline:'none'}}/>
-                      <span style={{fontSize:13,color:'#555'}}>→</span>
-                      <span style={{fontSize:12,color:'#777',fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>To</span>
-                      <input type="date" value={iaTo} onChange={e=>setIaTo(e.target.value)} style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:4,color:'var(--text)',fontSize:13,padding:'4px 8px',outline:'none'}}/>
-                    </div>
-                  </div>
-                </div>
                 {iaView==='daily'&&hasDailyData&&(
                   <div className="perf-slot" style={{marginBottom:14}}>
                     <div className="perf-slot-head">
@@ -3495,7 +3521,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                       {clinicDailyTrend.length>0&&<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#BB99FF'}}>{clinicDailyTrend.reduce((a,d)=>a+d.count,0)} total</span>}
                     </div>
                     <div style={{padding:'8px 16px 16px'}}>
-                      {clinicDailyTrend.length<1?(<div style={{fontSize:14,color:'#777',padding:'16px 0',textAlign:'center',fontStyle:'italic'}}>No initial assessments found in this date range.</div>):(()=>{
+                      {clinicDailyTrend.length<1?(<div style={{fontSize:14,color:'#777',padding:'16px 0',textAlign:'center',fontStyle:'italic'}}>No initial assessments found for this period.</div>):(()=>{
                         const vals=clinicDailyTrend.map(d=>d.count);
                         const maxV=Math.max(...vals,1);
                         const W=600,H=120,PADX=32,PADY=12,BOT=28;
@@ -3535,7 +3561,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                       <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,color:'#BB99FF',fontWeight:800}}>{totalIA} total</span>
                     </div>
                     {iaSorted.length===0?(
-                      <div className="empty" style={{padding:40}}><div className="empty-ico">🩺</div><p>No data for this date range. Import Appointments CSV to track initial assessments.</p></div>
+                      <div className="empty" style={{padding:40}}><div className="empty-ico">🩺</div><p>No initial assessment data for this period. Import Appointments CSV or adjust your filters.</p></div>
                     ):(
                       <div>
                         <div style={{overflowX:'auto'}}>
@@ -3839,7 +3865,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             <div style={{flex:1,minWidth:200}}>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:8}}>Practitioner</div>
               <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                {mergedStaff.map(s=>(
+                {staff.filter(s=>!['mgmt','ops','edu'].includes(s.discipline)).map(s=>(
                   <button key={s.id} className={`btn btn-sm ${trendStaff?.id===s.id?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendStaff(s)}>
                     {s.name.split(' ')[0]}
                   </button>
