@@ -2327,8 +2327,6 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[trendStaff,setTrendStaff]=useState(null);
   const[trendTimeframe,setTrendTimeframe]=useState('12m');
   const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
-  const[retentionEdits,setRetentionEdits]=useState({});
-  const[retSaved,setRetSaved]=useState(false);
   const[periodFilter,setPeriodFilter]=useState(()=>new Date().toISOString().slice(0,7));
   const curMonth=new Date().toISOString().slice(0,7);
   const[dateFrom,setDateFrom]=useState(curMonth);
