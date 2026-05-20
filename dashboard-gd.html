@@ -1814,7 +1814,7 @@ const avColor=n=>{const p=['#CAE8C1','#6B9FD4','#F4DB71','#BB99FF','#44ccaa','#F
 const fmt=d=>d?new Date(d).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):'—';
 const fmtSz=b=>b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB';
 const ld=(k,fb)=>{try{const v=localStorage.getItem('rvgd3_'+k);return v?JSON.parse(v):fb;}catch{return fb;}};
-const sv=(k,v)=>{try{localStorage.setItem('rvgd3_'+k,JSON.stringify(v));}catch{}};
+const sv=(k,v)=>{try{localStorage.setItem('rvgd3_'+k,JSON.stringify(v));}catch(e){}};
 const calcScore=(scores,rubricId)=>{
   if(!scores||!rubricId||!RUBRIC_SYSTEMS[rubricId])return null;
   const cats=RUBRIC_SYSTEMS[rubricId].cats;
@@ -1860,9 +1860,9 @@ function App(){
   const[modal,setModal]=useState(null);
   const[activeId,setActiveId]=useState(null);
   const{notifs,addNotif,markRead,markAllRead}=useNotifications();
-  const[meetings,setMeetings]=useState(()=>{try{const s=localStorage.getItem('rvgd3_meetings');if(s)return JSON.parse(s);}catch{}return [];});
+  const[meetings,setMeetings]=useState(()=>{try{const s=localStorage.getItem('rvgd3_meetings');if(s)return JSON.parse(s);}catch(e){}return [];});
   const[perfData,setPerfData]=useState(()=>{try{const s=localStorage.getItem('rvgd3_perf3');return s?JSON.parse(s):{snapshots:[],gva:{},retention:{},lastImport:null};}catch{return{snapshots:[],gva:{},retention:{},lastImport:null};}});
-  useEffect(()=>{try{localStorage.setItem('rvgd3_meetings',JSON.stringify(meetings));}catch{}},[meetings]);
+  useEffect(()=>{try{localStorage.setItem('rvgd3_meetings',JSON.stringify(meetings));}catch(e){}},[meetings]);
 
   useEffect(()=>sv('staff',staff),[staff]);
   useEffect(()=>sv('evals',evals),[evals]);
@@ -1921,7 +1921,7 @@ function App(){
           // If Supabase empty but localStorage has data, push up
           else{const local=ld('evals',[]);if(local.length>0)local.forEach(e=>{if(e.id)sbUpsert('evaluations',e.id,e);});}
         }
-      }catch{}
+      }catch(e){}
       // Education sessions
       try{
         const rows=await sbLoad('education_sessions');
@@ -1929,15 +1929,15 @@ function App(){
           if(rows&&rows.length>0){const d=rows.map(r=>r.data);setSessions(d);sv('sessions',d);}
           else{const local=ld('sessions',[]);if(local.length>0)local.forEach(s=>{if(s.id)sbUpsert('education_sessions',s.id,s);});}
         }
-      }catch{}
+      }catch(e){}
       // Meetings
       try{
         const rows=await sbLoad('meetings');
         if(!cancelled){
           if(rows&&rows.length>0){const d=rows.map(r=>r.data);setMeetings(d);localStorage.setItem('rvgd3_meetings',JSON.stringify(d));}
-          else{try{const local=JSON.parse(localStorage.getItem('rvgd3_meetings')||'[]');if(local.length>0)local.forEach(m=>{if(m.id)sbUpsert('meetings',m.id,m);});}catch{}}
+          else{try{const local=JSON.parse(localStorage.getItem('rvgd3_meetings')||'[]');if(local.length>0)local.forEach(m=>{if(m.id)sbUpsert('meetings',m.id,m);});}catch(e){}}
         }
-      }catch{}
+      }catch(e){}
       if(!cancelled)setSbLoaded(true);
     };
     load();
@@ -2198,8 +2198,14 @@ function PerformancePage({staff,perfData,setPerfData}){
   const data=perfData||{snapshots:[],gva:{},retention:{},lastImport:null};
 
   // Daily granular data — stores per-staff per-day aggregates
-  const[dailyAppts,setDailyAppts]=useState(()=>{try{const s=localStorage.getItem('rvgd3_daily_appts');return s?JSON.parse(s);}catch{}return[];});
-  const[dailyRevenue,setDailyRevenue]=useState(()=>{try{const s=localStorage.getItem('rvgd3_daily_rev');return s?JSON.parse(s);}catch{}return[];});
+  const[dailyAppts,setDailyAppts]=useState([]);
+  const[dailyRevenue,setDailyRevenue]=useState([]);
+
+  // Load daily data from localStorage on mount
+  useEffect(()=>{
+    try{const s=localStorage.getItem('rvgd3_daily_appts');if(s)setDailyAppts(JSON.parse(s));}catch(e){}
+    try{const s=localStorage.getItem('rvgd3_daily_rev');if(s)setDailyRevenue(JSON.parse(s));}catch(e){}
+  },[]);
 
   // Load daily data from Supabase
   useEffect(()=>{
@@ -2213,8 +2219,8 @@ function PerformancePage({staff,perfData,setPerfData}){
           SB.from('daily_revenue').select('*')
         ]);
         if(!cancelled){
-          if(appts&&appts.length>0){setDailyAppts(appts);try{localStorage.setItem('rvgd3_daily_appts',JSON.stringify(appts));}catch{}}
-          if(rev&&rev.length>0){setDailyRevenue(rev);try{localStorage.setItem('rvgd3_daily_rev',JSON.stringify(rev));}catch{}}
+          if(appts&&appts.length>0){setDailyAppts(appts);try{localStorage.setItem('rvgd3_daily_appts',JSON.stringify(appts));}catch(e){}}
+          if(rev&&rev.length>0){setDailyRevenue(rev);try{localStorage.setItem('rvgd3_daily_rev',JSON.stringify(rev));}catch(e){}}
         }
       }catch(e){console.warn('[Daily] Load error:',e);}
     };
@@ -2245,7 +2251,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           const loaded={snapshots:snaps.map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:snaps[snaps.length-1]?.created_at||null};
           // Supabase data is fresher — update state and localStorage
           setPerfData(loaded);
-          try{localStorage.setItem('rvgd3_perf3',JSON.stringify(loaded));}catch{}
+          try{localStorage.setItem('rvgd3_perf3',JSON.stringify(loaded));}catch(e){}
         }
         // If Supabase is empty but localStorage has data, save localStorage to Supabase
         else if(!se&&snaps&&snaps.length===0){
@@ -2294,7 +2300,7 @@ function PerformancePage({staff,perfData,setPerfData}){
   // Delete snapshot from Supabase
   const deleteSnapshot=async(id)=>{
     const SB=window.__SB;if(!SB)return;
-    try{await SB.from('performance_snapshots').delete().eq('id',id);}catch{}
+    try{await SB.from('performance_snapshots').delete().eq('id',id);}catch(e){}
   };
 
   // Clear all from Supabase
@@ -2310,7 +2316,7 @@ function PerformancePage({staff,perfData,setPerfData}){
   const save=(d)=>{
     setPerfData(d);
     // Write to localStorage as primary (instant, survives refresh)
-    try{localStorage.setItem('rvgd3_perf3',JSON.stringify(d));}catch{}
+    try{localStorage.setItem('rvgd3_perf3',JSON.stringify(d));}catch(e){}
   };
   const[tab,setTab]=useState('overview');
   const[dragging,setDragging]=useState(false);
@@ -2635,7 +2641,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           newDailyAppts.forEach(r=>existing.set(r.id,r));
           const merged=[...existing.values()];
           setDailyAppts(merged);
-          try{localStorage.setItem('rvgd3_daily_appts',JSON.stringify(merged));}catch{}
+          try{localStorage.setItem('rvgd3_daily_appts',JSON.stringify(merged));}catch(e){}
           // Save to Supabase
           const SB=window.__SB;
           if(SB){
@@ -2674,7 +2680,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           newDailyRev.forEach(r=>existing.set(r.id,r));
           const merged=[...existing.values()];
           setDailyRevenue(merged);
-          try{localStorage.setItem('rvgd3_daily_rev',JSON.stringify(merged));}catch{}
+          try{localStorage.setItem('rvgd3_daily_rev',JSON.stringify(merged));}catch(e){}
           const SB=window.__SB;
           if(SB){
             const chunks=[];
@@ -2929,13 +2935,13 @@ function PerformancePage({staff,perfData,setPerfData}){
               {l:'All Time',f:'',t:''},
             ].map(({l,f,t})=>(
               <button key={l}
-                className={`btn btn-sm ${!usingCustomRange&&dateFrom===f&&dateTo===t?'btn-go':'btn-ghost'}`}
+                className={'btn btn-sm '+(!usingCustomRange&&dateFrom===f&&dateTo===t?'btn-go':'btn-ghost')}
                 onClick={()=>{setDateFrom(f);setDateTo(t);setCustomFrom('');setCustomTo('');}}>
                 {l}
               </button>
             ))}
             <span style={{fontSize:13,color:'#555',marginLeft:4,flexShrink:0}}>
-              {usingCustomRange?`Custom range · daily data`:`${filteredSnaps.length} month${filteredSnaps.length!==1?'s':''}${filteredSnaps.length>0?` · ${new Date((dateFrom||availMonths[0]||curMonth)+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}${dateFrom!==dateTo&&dateTo?' – '+new Date((dateTo||availMonths[availMonths.length-1]||curMonth)+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):''}`:''}`}
+              {usingCustomRange?'Custom range · daily data':(filteredSnaps.length+' month'+(filteredSnaps.length!==1?'s':''))}
             </span>
           </div>
           {/* Custom date range — only shown when daily data available */}
@@ -2944,11 +2950,11 @@ function PerformancePage({staff,perfData,setPerfData}){
               <span style={{fontSize:13,color:'#888',flexShrink:0}}>Custom range:</span>
               <input type="date" value={customFrom} onChange={e=>{setCustomFrom(e.target.value);if(e.target.value)setDateFrom('');}}
                 min={dailyDateRange.min} max={dailyDateRange.max}
-                style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customFrom?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer',colorScheme:'dark'}}/>
+                style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customFrom?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer'}}/>
               <span style={{fontSize:13,color:'#555'}}>→</span>
               <input type="date" value={customTo} onChange={e=>{setCustomTo(e.target.value);if(e.target.value)setDateTo('');}}
                 min={dailyDateRange.min} max={dailyDateRange.max}
-                style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customTo?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer',colorScheme:'dark'}}/>
+                style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customTo?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer'}}/>
               {usingCustomRange&&(
                 <button className="btn btn-xs btn-ghost" onClick={()=>{setCustomFrom('');setCustomTo('');}}>✕ Clear</button>
               )}
@@ -3526,7 +3532,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               onClick={async()=>{if(confirm('Reset ALL performance data? This clears all snapshots, GVA, and retention entries. Cannot be undone.')){
                 await clearAllFromSB();
                 const empty={snapshots:[],gva:{},retention:{},lastImport:null};
-                try{localStorage.removeItem('rvgd3_perf3');localStorage.removeItem('rvgd3_perf2');localStorage.removeItem('rvgd3_perf');}catch{}
+                try{localStorage.removeItem('rvgd3_perf3');localStorage.removeItem('rvgd3_perf2');localStorage.removeItem('rvgd3_perf');}catch(e){}
                 save(empty);
                 setImportMsg({type:'success',msg:'✓ All data cleared. Import fresh CSVs to start over.'});
               }}}>
@@ -4877,7 +4883,7 @@ function FormsPage({staff, evals}){
 
   const saveSubmissions = subs => {
     setSubmissions(subs);
-    try{localStorage.setItem('rvgd3_formSubs', JSON.stringify(subs));}catch{}
+    try{localStorage.setItem('rvgd3_formSubs', JSON.stringify(subs));}catch(e){}
   };
 
   const handleSubmit = data => {
@@ -6882,7 +6888,7 @@ function AddLtProfileModal({onClose,onAdd}){
 }
 
 function LeadershipPage(){
-  const[ltData,setLtData]=useState(()=>{try{const s=localStorage.getItem('rvgd3_leadership');if(s)return JSON.parse(s);}catch{}return SEED_LEADERSHIP;});
+  const[ltData,setLtData]=useState(()=>{try{const s=localStorage.getItem('rvgd3_leadership');if(s)return JSON.parse(s);}catch(e){}return SEED_LEADERSHIP;});
   const[activeTab,setActiveTab]=useState('roster');
   const[selectedPerson,setSelectedPerson]=useState(null);
   const[filterLoc,setFilterLoc]=useState('all');
@@ -6897,7 +6903,7 @@ function LeadershipPage(){
   },[]);
   const save=(data)=>{
     setLtData(data);
-    try{localStorage.setItem('rvgd3_leadership',JSON.stringify(data));}catch{}
+    try{localStorage.setItem('rvgd3_leadership',JSON.stringify(data));}catch(e){}
     const sb=window.__SB;if(!sb)return;
     data.forEach(p=>{if(p.id)sb.from('leadership_entries').upsert({id:p.id,data:p}).then();});
   };
@@ -7613,7 +7619,7 @@ const SEED_CLIN_RESOURCES = [
 
 function ClinResourcesPage({staff, addNotif, currentUser}){
   const[resources,setResources]=React.useState(()=>{
-    try{const s=localStorage.getItem('rvgd3_clinres');if(s)return JSON.parse(s);}catch{}
+    try{const s=localStorage.getItem('rvgd3_clinres');if(s)return JSON.parse(s);}catch(e){}
     return SEED_CLIN_RESOURCES;
   });
   React.useEffect(()=>{
@@ -7627,11 +7633,11 @@ function ClinResourcesPage({staff, addNotif, currentUser}){
   },[]);
   const saveResources=(data)=>{
     setResources(data);
-    try{localStorage.setItem('rvgd3_clinres',JSON.stringify(data));}catch{}
+    try{localStorage.setItem('rvgd3_clinres',JSON.stringify(data));}catch(e){}
     const sb=window.__SB;if(!sb)return;
     data.forEach(r=>{if(r.id)sb.from('resources').upsert({id:r.id,data:r}).then();});
   };
-  React.useEffect(()=>{try{localStorage.setItem('rvgd3_clinres',JSON.stringify(resources));}catch{}},[resources]);
+  React.useEffect(()=>{try{localStorage.setItem('rvgd3_clinres',JSON.stringify(resources));}catch(e){}},[resources]);
 
   const[search,setSearch]=React.useState('');
   const[filterCat,setFilterCat]=React.useState('all');
@@ -8085,7 +8091,7 @@ function useNotifications(){
   const[notifs,setNotifs]=useState(()=>{
     try{const s=localStorage.getItem('rvgd3_notifs');return s?JSON.parse(s):[];}catch{return[];}
   });
-  useEffect(()=>{try{localStorage.setItem('rvgd3_notifs',JSON.stringify(notifs));}catch{}},[notifs]);
+  useEffect(()=>{try{localStorage.setItem('rvgd3_notifs',JSON.stringify(notifs));}catch(e){}},[notifs]);
   const addNotif=(n)=>setNotifs(p=>[{...n,id:'n'+Date.now()+Math.random(),ts:new Date().toISOString(),read:false},...p].slice(0,100));
   const markRead=(id)=>setNotifs(p=>p.map(n=>n.id===id?{...n,read:true}:n));
   const markAllRead=()=>setNotifs(p=>p.map(n=>({...n,read:true})));
@@ -8106,11 +8112,11 @@ function ResourceThreadModal({resource, onClose, staff, currentUser, addNotif}){
   },[]);
   const saveComments=(data)=>{
     setComments(data);
-    try{localStorage.setItem(storageKey,JSON.stringify(data));}catch{}
+    try{localStorage.setItem(storageKey,JSON.stringify(data));}catch(e){}
     const sb=window.__SB;if(!sb)return;
     data.forEach(c=>{if(c.id)sb.from('staff_comments').upsert({id:c.id,staff_id:resource.id,data:c}).then();});
   };
-  React.useEffect(()=>{try{localStorage.setItem(storageKey,JSON.stringify(comments));}catch{}},[comments]);
+  React.useEffect(()=>{try{localStorage.setItem(storageKey,JSON.stringify(comments));}catch(e){}},[comments]);
 
   const[text,setText]=React.useState('');
   const[replyTo,setReplyTo]=React.useState(null);
@@ -8479,7 +8485,7 @@ function NotificationBell({notifs, markRead, markAllRead, setPage}){
                   {!n.read&&n.gcalPrompt&&(
                     <div style={{marginTop:5}}>
                       <button className="btn btn-xs btn-ghost" style={{fontSize:13,color:'#44CCAA'}}
-                        onClick={async(e)=>{e.stopPropagation();try{await navigator.clipboard.writeText(n.gcalPrompt);}catch{}alert('Copied! Paste into Claude chat to send the email notification.');}}>
+                        onClick={async(e)=>{e.stopPropagation();try{await navigator.clipboard.writeText(n.gcalPrompt);}catch(e){}alert('Copied! Paste into Claude chat to send the email notification.');}}>
                         📋 Copy email prompt for Claude
                       </button>
                     </div>
@@ -8584,7 +8590,7 @@ function gdFmt(dateStr){
 // ── Main Page ─────────────────────────────────────────────────────────────────
 function GDTrackerPage(){
   const[records,setRecords]=useState(()=>{
-    try{const s=localStorage.getItem('rvgd3_gdtracker');if(s)return JSON.parse(s);}catch{}
+    try{const s=localStorage.getItem('rvgd3_gdtracker');if(s)return JSON.parse(s);}catch(e){}
     return GD_SEED;
   });
   useEffect(()=>{
@@ -8595,11 +8601,11 @@ function GDTrackerPage(){
   },[]);
   const saveRecords=(data)=>{
     setRecords(data);
-    try{localStorage.setItem('rvgd3_gdtracker',JSON.stringify(data));}catch{}
+    try{localStorage.setItem('rvgd3_gdtracker',JSON.stringify(data));}catch(e){}
     const sb=window.__SB;if(!sb)return;
     sb.from('gd_tracker').upsert({id:'singleton',data,updated_at:new Date().toISOString()}).then();
   };
-  useEffect(()=>{try{localStorage.setItem('rvgd3_gdtracker',JSON.stringify(records));}catch{}},[records]);
+  useEffect(()=>{try{localStorage.setItem('rvgd3_gdtracker',JSON.stringify(records));}catch(e){}},[records]);
 
   const[editId,setEditId]=useState(null);
   const[filterSite,setFilterSite]=useState('all');
@@ -8995,12 +9001,12 @@ function SystematicPage(){
   const save=(s,c)=>{
     if(s!==undefined){
       setSessions(s);
-      try{localStorage.setItem(SK,JSON.stringify(s));}catch{}
+      try{localStorage.setItem(SK,JSON.stringify(s));}catch(e){}
       const sb=window.__SB;if(sb)s.forEach(item=>{if(item.id)sb.from('systematic_sessions').upsert({id:item.id,data:item}).then();});
     }
     if(c!==undefined){
       setConcepts(c);
-      try{localStorage.setItem(SK+'_concepts',JSON.stringify(c));}catch{}
+      try{localStorage.setItem(SK+'_concepts',JSON.stringify(c));}catch(e){}
       const sb=window.__SB;if(sb)c.forEach(item=>{if(item.id)sb.from('systematic_concepts').upsert({id:item.id,data:item}).then();});
     }
   };
