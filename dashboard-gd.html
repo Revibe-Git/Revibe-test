@@ -2197,6 +2197,31 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[loading,setLoading]=useState(true);
   const data=perfData||{snapshots:[],gva:{},retention:{},lastImport:null};
 
+  // Daily granular data — stores per-staff per-day aggregates
+  const[dailyAppts,setDailyAppts]=useState(()=>{try{const s=localStorage.getItem('rvgd3_daily_appts');return s?JSON.parse(s);}catch{}return[];});
+  const[dailyRevenue,setDailyRevenue]=useState(()=>{try{const s=localStorage.getItem('rvgd3_daily_rev');return s?JSON.parse(s);}catch{}return[];});
+
+  // Load daily data from Supabase
+  useEffect(()=>{
+    let cancelled=false;
+    const tryLoad=async()=>{
+      const SB=window.__SB;
+      if(!SB){setTimeout(tryLoad,400);return;}
+      try{
+        const[{data:appts},{data:rev}]=await Promise.all([
+          SB.from('daily_appointments').select('*'),
+          SB.from('daily_revenue').select('*')
+        ]);
+        if(!cancelled){
+          if(appts&&appts.length>0){setDailyAppts(appts);try{localStorage.setItem('rvgd3_daily_appts',JSON.stringify(appts));}catch{}}
+          if(rev&&rev.length>0){setDailyRevenue(rev);try{localStorage.setItem('rvgd3_daily_rev',JSON.stringify(rev));}catch{}}
+        }
+      }catch(e){console.warn('[Daily] Load error:',e);}
+    };
+    setTimeout(tryLoad,600);
+    return()=>{cancelled=true;};
+  },[]);
+
   // Load from Supabase on mount — merge with localStorage, Supabase wins
   useEffect(()=>{
     let attempts=0;
@@ -2302,6 +2327,10 @@ function PerformancePage({staff,perfData,setPerfData}){
   const curMonth=new Date().toISOString().slice(0,7);
   const[dateFrom,setDateFrom]=useState(curMonth);
   const[dateTo,setDateTo]=useState(curMonth);
+  // Custom date range for daily granular data (null = use monthly snapshots)
+  const[customFrom,setCustomFrom]=useState('');
+  const[customTo,setCustomTo]=useState('');
+  const usingCustomRange=!!(customFrom||customTo);
   const[compareA,setCompareA]=useState('');
   const[compareB,setCompareB]=useState('');
   // Per-section compare state
@@ -2405,6 +2434,87 @@ function PerformancePage({staff,perfData,setPerfData}){
     return m?m[1]:null;
   };
 
+  /* ── Parse daily appointments ─────────────── */
+  const parseDailyAppointments=(rows)=>{
+    const byKey={};
+    rows.forEach(r=>{
+      const name=r['staff_member_name']||'';
+      if(!name)return;
+      const matched=matchStaff(name);
+      if(!matched)return;
+      const dateStr=(r['start_at']||'').slice(0,10);
+      if(!dateStr||dateStr.length!==10)return;
+      const key=matched.id+'_'+dateStr;
+      if(!byKey[key])byKey[key]={id:key,staff_id:matched.id,date:dateStr,completed:0,initial_assessments:0,no_shows:0,cancellations:0};
+      const state=(r['state']||'').toLowerCase();
+      const treatmentName=(r['treatment_name']||'').toLowerCase();
+      const isInitial=treatmentName.startsWith('initial');
+      if(state==='arrived'){
+        byKey[key].completed++;
+        if(isInitial)byKey[key].initial_assessments++;
+      } else if(state==='no_show')byKey[key].no_shows++;
+      else if(state==='cancelled')byKey[key].cancellations++;
+    });
+    return Object.values(byKey);
+  };
+
+  /* ── Parse daily revenue ───────────────────── */
+  const parseDailyRevenue=(rows)=>{
+    const byKey={};
+    rows.forEach(r=>{
+      const name=r['staff member']||'';
+      if(!name)return;
+      const matched=matchStaff(name);
+      if(!matched)return;
+      const status=(r['status']||'').toLowerCase();
+      if(!['paid','partially_paid','partially_paid_and_written_off'].includes(status))return;
+      if((r['income category']||'').toLowerCase()!=='treatment income')return;
+      const collected=parseFloat((r['collected']||'0').toString().replace(/[$,]/g,''))||0;
+      if(collected<=0)return;
+      const dateStr=(r['purchase date']||'').slice(0,10);
+      if(!dateStr||dateStr.length!==10)return;
+      const key=matched.id+'_'+dateStr;
+      if(!byKey[key])byKey[key]={id:key,staff_id:matched.id,date:dateStr,revenue:0};
+      byKey[key].revenue+=collected;
+    });
+    return Object.values(byKey).map(r=>({...r,revenue:Math.round(r.revenue*100)/100}));
+  };
+
+  /* ── Aggregate daily data for any date range ── */
+  const aggregateDaily=(fromDate,toDate)=>{
+    const byStaff={};
+    // Appointments
+    dailyAppts.forEach(r=>{
+      if(fromDate&&r.date<fromDate)return;
+      if(toDate&&r.date>toDate)return;
+      const s=staff.find(x=>x.id===r.staff_id);
+      if(!s||s.discipline==='mgmt'||s.discipline==='ops'||s.discipline==='edu')return;
+      if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',completed:0,initialAssessments:0,noShows:0,cancellations:0,revenue:0};
+      byStaff[r.staff_id].completed+=(r.completed||0);
+      byStaff[r.staff_id].initialAssessments+=(r.initial_assessments||0);
+      byStaff[r.staff_id].noShows+=(r.no_shows||0);
+      byStaff[r.staff_id].cancellations+=(r.cancellations||0);
+    });
+    // Revenue
+    dailyRevenue.forEach(r=>{
+      if(fromDate&&r.date<fromDate)return;
+      if(toDate&&r.date>toDate)return;
+      const s=staff.find(x=>x.id===r.staff_id);
+      if(!s||s.discipline==='mgmt'||s.discipline==='ops'||s.discipline==='edu')return;
+      if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',completed:0,initialAssessments:0,noShows:0,cancellations:0,revenue:0};
+      byStaff[r.staff_id].revenue+=(r.revenue||0);
+    });
+    return Object.values(byStaff);
+  };
+
+  /* ── Get date range of daily data ─────────── */
+  const dailyDateRange=useMemo(()=>{
+    const allDates=[...dailyAppts.map(r=>r.date),...dailyRevenue.map(r=>r.date)].filter(Boolean).sort();
+    return{min:allDates[0]||'',max:allDates[allDates.length-1]||''};
+  },[dailyAppts,dailyRevenue]);
+
+  const hasDailyData=dailyAppts.length>0||dailyRevenue.length>0;
+
   /* ── Aggregate appointments by month ────────── */
   const aggregateAppointmentsByMonth=(rows)=>{
     const byMonth={};
@@ -2505,7 +2615,6 @@ function PerformancePage({staff,perfData,setPerfData}){
           const snapDate=month+'-01';
           const existingIdx=newSnapshots.findIndex(s=>s.date.startsWith(month));
           if(existingIdx>=0){
-            // Merge appointments into existing snapshot for this month
             const existing=newSnapshots[existingIdx];
             const mergedRows=[...existing.rows];
             parsed.forEach(nr=>{
@@ -2518,6 +2627,25 @@ function PerformancePage({staff,perfData,setPerfData}){
             newSnapshots.push({id:'snap_'+month+'_appt',date:snapDate,rows:parsed,files:[file.name],type:'appointments'});
           }
         });
+        // Also build daily granular data
+        const newDailyAppts=parseDailyAppointments(rows);
+        if(newDailyAppts.length>0){
+          // Merge with existing daily data (upsert by id)
+          const existing=new Map(dailyAppts.map(r=>[r.id,r]));
+          newDailyAppts.forEach(r=>existing.set(r.id,r));
+          const merged=[...existing.values()];
+          setDailyAppts(merged);
+          try{localStorage.setItem('rvgd3_daily_appts',JSON.stringify(merged));}catch{}
+          // Save to Supabase
+          const SB=window.__SB;
+          if(SB){
+            const chunks=[];
+            for(let i=0;i<newDailyAppts.length;i+=100)chunks.push(newDailyAppts.slice(i,i+100));
+            for(const chunk of chunks){
+              await SB.from('daily_appointments').upsert(chunk);
+            }
+          }
+        }
       }else if(type==='sales'){
         const byMonth=parseSalesByMonth(rows);
         Object.entries(byMonth).forEach(([month,parsed])=>{
@@ -2539,6 +2667,23 @@ function PerformancePage({staff,perfData,setPerfData}){
             newSnapshots.push({id:'snap_'+month+'_sales',date:snapDate,rows:parsed,files:[file.name],type:'sales'});
           }
         });
+        // Also build daily revenue data
+        const newDailyRev=parseDailyRevenue(rows);
+        if(newDailyRev.length>0){
+          const existing=new Map(dailyRevenue.map(r=>[r.id,r]));
+          newDailyRev.forEach(r=>existing.set(r.id,r));
+          const merged=[...existing.values()];
+          setDailyRevenue(merged);
+          try{localStorage.setItem('rvgd3_daily_rev',JSON.stringify(merged));}catch{}
+          const SB=window.__SB;
+          if(SB){
+            const chunks=[];
+            for(let i=0;i<newDailyRev.length;i+=100)chunks.push(newDailyRev.slice(i,i+100));
+            for(const chunk of chunks){
+              await SB.from('daily_revenue').upsert(chunk);
+            }
+          }
+        }
       }else if(type==='shift'){
         // Shift report has no date column — use the snapDate picker as before
         const parsed=parseShiftReport(rows);
@@ -2654,7 +2799,10 @@ function PerformancePage({staff,perfData,setPerfData}){
     const m=s.date.slice(0,7);
     return(!dateFrom||m>=dateFrom)&&(!dateTo||m<=dateTo);
   }),[data.snapshots,dateFrom,dateTo]);
-  const filteredRows=useMemo(()=>aggregateRows(filteredSnaps),[filteredSnaps]);
+  const filteredRows=useMemo(()=>{
+    if(usingCustomRange&&hasDailyData)return aggregateDaily(customFrom,customTo);
+    return aggregateRows(filteredSnaps);
+  },[filteredSnaps,usingCustomRange,hasDailyData,customFrom,customTo,dailyAppts,dailyRevenue]);
 
   // Compare mode rows
   const compareARows=useMemo(()=>aggregateRows(filterSnaps(compareA)),[data.snapshots,compareA]);
@@ -2768,35 +2916,48 @@ function PerformancePage({staff,perfData,setPerfData}){
 
       {/* Period filter bar */}
       {!['import','gva','retention','trends'].includes(tab)&&data.snapshots.length>0&&(
-        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:14,flexWrap:'wrap'}}>
-          <span style={{fontSize:13,color:'#777',marginRight:2}}>Showing</span>
-          {[
-            {l:'This Month', f:new Date().toISOString().slice(0,7), t:new Date().toISOString().slice(0,7)},
-            {l:'Last 3 Months', f:(()=>{const d=new Date();d.setMonth(d.getMonth()-2);return d.toISOString().slice(0,7)})(), t:new Date().toISOString().slice(0,7)},
-            {l:'Last 6 Months', f:(()=>{const d=new Date();d.setMonth(d.getMonth()-5);return d.toISOString().slice(0,7)})(), t:new Date().toISOString().slice(0,7)},
-            {l:'YTD', f:new Date().getFullYear()+'-01', t:new Date().toISOString().slice(0,7)},
-            {l:'2025', f:'2025-01', t:'2025-12'},
-            {l:'All Time', f:'', t:''},
-          ].map(({l,f,t})=>(
-            <button key={l}
-              className={`btn btn-sm ${dateFrom===(f)&&dateTo===(t)?'btn-go':'btn-ghost'}`}
-              onClick={()=>{setDateFrom(f);setDateTo(t);}}>
-              {l}
-            </button>
-          ))}
-          <span style={{fontSize:13,color:'#555',margin:'0 4px'}}>or</span>
-          <select value={dateFrom} onChange={e=>setDateFrom(e.target.value)}
-            style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:dateFrom?'var(--text)':'#666',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer'}}>
-            <option value="">From…</option>
-            {availMonths.map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</option>)}
-          </select>
-          <span style={{fontSize:13,color:'#555'}}>→</span>
-          <select value={dateTo} onChange={e=>setDateTo(e.target.value)}
-            style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:dateTo?'var(--text)':'#666',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer'}}>
-            <option value="">To…</option>
-            {availMonths.map(m=><option key={m} value={m}>{new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}</option>)}
-          </select>
-          <span style={{fontSize:13,color:'#555',marginLeft:4}}>{filteredSnaps.length} month{filteredSnaps.length!==1?'s':''}</span>
+        <div style={{marginBottom:14}}>
+          {/* Quick period buttons */}
+          <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',marginBottom:hasDailyData?8:0}}>
+            <span style={{fontSize:13,color:'#777',marginRight:2,flexShrink:0}}>Showing</span>
+            {[
+              {l:'This Month',f:curMonth,t:curMonth},
+              {l:'Last 3 Months',f:(()=>{const d=new Date();d.setMonth(d.getMonth()-2);return d.toISOString().slice(0,7)})(),t:curMonth},
+              {l:'Last 6 Months',f:(()=>{const d=new Date();d.setMonth(d.getMonth()-5);return d.toISOString().slice(0,7)})(),t:curMonth},
+              {l:'YTD',f:new Date().getFullYear()+'-01',t:curMonth},
+              {l:'2025',f:'2025-01',t:'2025-12'},
+              {l:'All Time',f:'',t:''},
+            ].map(({l,f,t})=>(
+              <button key={l}
+                className={`btn btn-sm ${!usingCustomRange&&dateFrom===f&&dateTo===t?'btn-go':'btn-ghost'}`}
+                onClick={()=>{setDateFrom(f);setDateTo(t);setCustomFrom('');setCustomTo('');}}>
+                {l}
+              </button>
+            ))}
+            <span style={{fontSize:13,color:'#555',marginLeft:4,flexShrink:0}}>
+              {usingCustomRange?`Custom range · daily data`:`${filteredSnaps.length} month${filteredSnaps.length!==1?'s':''}${filteredSnaps.length>0?` · ${new Date((dateFrom||availMonths[0]||curMonth)+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}${dateFrom!==dateTo&&dateTo?' – '+new Date((dateTo||availMonths[availMonths.length-1]||curMonth)+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):''}`:''}`}
+            </span>
+          </div>
+          {/* Custom date range — only shown when daily data available */}
+          {hasDailyData&&(
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              <span style={{fontSize:13,color:'#888',flexShrink:0}}>Custom range:</span>
+              <input type="date" value={customFrom} onChange={e=>{setCustomFrom(e.target.value);if(e.target.value)setDateFrom('');}}
+                min={dailyDateRange.min} max={dailyDateRange.max}
+                style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customFrom?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer',colorScheme:'dark'}}/>
+              <span style={{fontSize:13,color:'#555'}}>→</span>
+              <input type="date" value={customTo} onChange={e=>{setCustomTo(e.target.value);if(e.target.value)setDateTo('');}}
+                min={dailyDateRange.min} max={dailyDateRange.max}
+                style={{background:'var(--surface3)',border:'1px solid '+(usingCustomRange?'var(--go)':'var(--border2)'),borderRadius:5,color:customTo?'var(--text)':'#666',fontSize:13,padding:'4px 8px',outline:'none',cursor:'pointer',colorScheme:'dark'}}/>
+              {usingCustomRange&&(
+                <button className="btn btn-xs btn-ghost" onClick={()=>{setCustomFrom('');setCustomTo('');}}>✕ Clear</button>
+              )}
+              {usingCustomRange&&customFrom&&customTo&&(()=>{
+                const days=Math.round((new Date(customTo)-new Date(customFrom))/(1000*60*60*24))+1;
+                return<span style={{fontSize:13,color:'var(--lime)'}}>{days} day{days!==1?'s':''}</span>;
+              })()}
+            </div>
+          )}
         </div>
       )}
 
