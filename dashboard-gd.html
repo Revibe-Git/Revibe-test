@@ -2896,14 +2896,21 @@ function PerformancePage({staff,perfData,setPerfData}){
       const jr=filteredRows.find(r=>r.staffId===s.id);
       const gvaVal=parseFloat(gvaEdits[s.id]!==undefined?gvaEdits[s.id]:data.gva[s.id])||null;
       const retVal=data.retention?.[s.id]||null;
+      const retFull=(data.retentionFull||{})[s.id]||null;
       return{...s,
         completed:jr?.completed||null,utilization:jr?.utilization||null,
         appointments:jr?.appointments||null,noShows:jr?.noShows||null,
         cancellations:jr?.cancellations||null,rescheduled:jr?.rescheduled||null,
         revenue:jr?.revenue||null,initialAssessments:jr?.initialAssessments||null,
-        gva:gvaVal,retention:retVal};
+        gva:gvaVal,retention:retVal,
+        pctReturning:retFull?retFull.pctReturning:retVal,
+        pctRepeatVisits:retFull?.pctRepeatVisits??null,
+        newPatients:retFull?.newPatients??null,
+        returningPatients:retFull?.returningPatients??null,
+        totalPatients:retFull?.totalPatients??null,
+        totalVisits:retFull?.totalVisits??null};
     })
-  ,[staff,filteredRows,data.gva,data.retention,gvaEdits,filterDisc,filterSite]);
+  ,[staff,filteredRows,data.gva,data.retention,data.retentionFull,gvaEdits,filterDisc,filterSite]);
 
   const withUtil  =mergedStaff.filter(s=>s.utilization!=null).sort((a,b)=>b.utilization-a.utilization);
   const withAppts =mergedStaff.filter(s=>s.completed!=null).sort((a,b)=>b.completed-a.completed);
@@ -3654,7 +3661,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               {importMsg.msg}
             </div>
           )}
-          {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'&&(filterDisc==='all'||s.discipline===filterDisc)&&(filterSite==='all'||s.site===filterSite)).map(s=>{const full=(data.retentionFull||{})[s.id]||null;const pctRet=(data.retention||{})[s.id]||null;return{...s,pctReturning:full?full.pctReturning:pctRet,pctRepeatVisits:full?.pctRepeatVisits??null,newPatients:full?.newPatients??null,returningPatients:full?.returningPatients??null,totalPatients:full?.totalPatients??null,totalVisits:full?.totalVisits??null};}).filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null).length===0?(
+          {mergedStaff.filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null).length===0?(
             <div className="perf-slot">
               <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner</span></div>
               <div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import the Jane Member Retention CSV via the Jane Import tab.</p></div>
@@ -3663,7 +3670,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             <div className="perf-slot">
               <div className="perf-slot-head">
                 <span className="perf-slot-title" style={{color:'#BB99FF'}}>
-                  Retention — {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'&&(filterDisc==='all'||s.discipline===filterDisc)&&(filterSite==='all'||s.site===filterSite)).filter(s=>{const full=(data.retentionFull||{})[s.id]||null;const pctRet=(data.retention||{})[s.id]||null;return full?full.pctReturning:pctRet;}).length} Practitioners
+                  Retention — {mergedStaff.filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null).length} Practitioners
                 </span>
               </div>
               <div style={{overflowX:'auto'}}>
@@ -3680,9 +3687,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                     </tr>
                   </thead>
                   <tbody>
-                    {[...staff
-                      .filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'&&(filterDisc==='all'||s.discipline===filterDisc)&&(filterSite==='all'||s.site===filterSite))
-                      .map(s=>{const full=(data.retentionFull||{})[s.id]||null;const pctRet=(data.retention||{})[s.id]||null;return{...s,pctReturning:full?full.pctReturning:pctRet,pctRepeatVisits:full?.pctRepeatVisits??null,newPatients:full?.newPatients??null,returningPatients:full?.returningPatients??null,totalPatients:full?.totalPatients??null,totalVisits:full?.totalVisits??null};})
+                    {[...mergedStaff
                       .filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null)
                       .sort((a,b)=>{const av=a[retSortKey]??-1,bv=b[retSortKey]??-1;if(typeof av==='string')return retSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);return retSortDir==='desc'?bv-av:av-bv;})
                     ].map(s=>{
