@@ -2746,9 +2746,24 @@ function PerformancePage({staff,perfData,setPerfData}){
         const retFull={};
         practitioners.forEach(p=>{const s=matchStaff(p.name);if(s){retFull[s.id]={pctReturning:p.pctReturning,pctRepeatVisits:p.pctRepeatVisits,newPatients:p.newPatients||0,returningPatients:p.returningPatients||0,totalPatients:p.totalPatients||0,totalVisits:p.totalVisits||0};matched++;}});
         const clinicData={};Object.entries(clinicSummaries).forEach(([name,d])=>{const key=name.toLowerCase().includes('mississauga')?'Mississauga':'Markham';clinicData[key]=d;});
-        setPendingRetentionData({retFull,clinicData,matched,total:practitioners.length});
-        setRetentionMonthPicker(new Date().toISOString().slice(0,7));
-        setImportMsg({type:'info',msg:`Parsed ${matched}/${practitioners.length} practitioners. Select the month this data covers, then click Confirm.`});
+        // Auto-detect month from filename e.g. Member_Retention_20260520.csv → 2026-05
+        let autoMonth='';
+        const fnMatch=file.name.match(/(\d{4})(\d{2})\d{2}/);
+        if(fnMatch){autoMonth=fnMatch[1]+'-'+fnMatch[2];}
+        else{const d=new Date();d.setDate(0);autoMonth=d.toISOString().slice(0,7);}
+        // Save immediately — no confirm step
+        await saveRetentionSnapshot(autoMonth,retFull,clinicData);
+        const newRetention={...data.retention||{}};
+        Object.entries(retFull).forEach(([id,d])=>{newRetention[id]=d.pctReturning;});
+        const newData={...data,retention:newRetention,retentionFull:retFull,retentionClinic:clinicData,retentionImportDate:autoMonth};
+        save(newData);
+        const SB2=window.__SB;
+        if(SB2)SB2.from('retention_full').upsert({id:'singleton',data:{retentionFull:retFull,retentionClinic:clinicData,importDate:autoMonth}}).then();
+        setRetentionSnapshots(prev=>{
+          const filtered=prev.filter(s=>s.month!==autoMonth);
+          return[...filtered,{id:autoMonth,month:autoMonth,staff_data:retFull,clinic_data:clinicData}].sort((a,b)=>a.month.localeCompare(b.month));
+        });
+        setImportMsg({type:'success',msg:`✓ Retention saved for ${autoMonth} · ${matched}/${practitioners.length} practitioners matched`});
         setImporting(false);return;
       }else{
         setImportMsg({type:'error',msg:'Could not identify this file type. Columns found: '+Object.keys(rows[0]).join(', ')});
@@ -3750,37 +3765,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             </div>
           </div>
 
-          {/* ── Pending import confirmation ── */}
-          {pendingRetentionData&&(
-            <div style={{background:'var(--surface2)',border:'2px solid var(--go)',borderRadius:8,padding:'16px 20px',marginBottom:16}}>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',fontWeight:700,marginBottom:8}}>
-                📋 Retention CSV Ready — {pendingRetentionData.matched}/{pendingRetentionData.total} matched
-              </div>
-              <div style={{fontSize:14,color:'#aaa',marginBottom:12}}>Which month does this data cover?</div>
-              <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-                <input type="month" value={retentionMonthPicker} onChange={e=>setRetentionMonthPicker(e.target.value)}
-                  style={{background:'var(--surface3)',border:'2px solid var(--go)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'6px 10px',outline:'none'}}/>
-                <button className="btn btn-lime" onClick={async()=>{
-                  if(!retentionMonthPicker){alert('Select a month first.');return;}
-                  const{retFull,clinicData,matched,total}=pendingRetentionData;
-                  await saveRetentionSnapshot(retentionMonthPicker,retFull,clinicData);
-                  const newRetention={...data.retention||{}};
-                  Object.entries(retFull).forEach(([id,d])=>{newRetention[id]=d.pctReturning;});
-                  const newData={...data,retention:newRetention,retentionFull:retFull,retentionClinic:clinicData,retentionImportDate:retentionMonthPicker};
-                  save(newData);
-                  const SB2=window.__SB;
-                  if(SB2)SB2.from('retention_full').upsert({id:'singleton',data:{retentionFull:retFull,retentionClinic:clinicData,importDate:retentionMonthPicker}}).then();
-                  setRetentionSnapshots(prev=>{
-                    const filtered=prev.filter(s=>s.month!==retentionMonthPicker);
-                    return[...filtered,{id:retentionMonthPicker,month:retentionMonthPicker,staff_data:retFull,clinic_data:clinicData}].sort((a,b)=>a.month.localeCompare(b.month));
-                  });
-                  setPendingRetentionData(null);setRetentionMonthPicker('');
-                  setImportMsg({type:'success',msg:`✓ Saved retention for ${retentionMonthPicker}. ${matched}/${total} practitioners.`});
-                }}>✓ Save for {retentionMonthPicker||'…'}</button>
-                <button className="btn btn-ghost btn-sm" style={{color:'#555'}} onClick={()=>{setPendingRetentionData(null);setImportMsg(null);}}>Cancel</button>
-              </div>
-            </div>
-          )}
+
           {importMsg&&tab==='retention'&&(
             <div style={{marginBottom:14,padding:'9px 13px',borderRadius:5,fontSize:14,
               background:importMsg.type==='success'?'rgba(68,204,170,.08)':importMsg.type==='info'?'rgba(107,159,212,.08)':'rgba(224,82,82,.08)',
