@@ -3615,28 +3615,28 @@ function PerformancePage({staff,perfData,setPerfData}){
         </div>
       )}
 
-                  {/* ── RETENTION ── */}
+                        {/* ── RETENTION ── */}
       {tab==='retention'&&(
         <div>
           {data.retentionClinic&&Object.keys(data.retentionClinic).length>0&&(
             <div>
-            {data.retentionImportDate&&<div style={{fontSize:12,color:'#555',marginBottom:6,textAlign:'right'}}>Last imported: {data.retentionImportDate}</div>}
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:10,marginBottom:16}}>
-              {Object.entries(data.retentionClinic).map(([loc,d])=>(
-                <div key={loc} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'14px 18px',borderLeft:'3px solid var(--go)'}}>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',fontWeight:700,marginBottom:10}}>{loc}</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:8}}>
-                    <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:3}}>% Returning</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color:'#CAE8C1',lineHeight:1}}>{d.pctReturning}%</div></div>
-                    <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:3}}>% Repeat Visits</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color:'#44CCAA',lineHeight:1}}>{d.pctRepeatVisits}%</div></div>
+              {data.retentionImportDate&&<div style={{fontSize:12,color:'#555',marginBottom:6,textAlign:'right'}}>Last imported: {data.retentionImportDate}</div>}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:10,marginBottom:16}}>
+                {Object.entries(data.retentionClinic).map(([loc,d])=>(
+                  <div key={loc} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'14px 18px',borderLeft:'3px solid var(--go)'}}>
+                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',fontWeight:700,marginBottom:10}}>{loc}</div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:8}}>
+                      <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:3}}>% Returning</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color:'#CAE8C1',lineHeight:1}}>{d.pctReturning}%</div></div>
+                      <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:3}}>% Repeat Visits</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color:'#44CCAA',lineHeight:1}}>{d.pctRepeatVisits}%</div></div>
+                    </div>
+                    <div style={{display:'flex',gap:16,fontSize:14,color:'#777'}}>
+                      <span>New: <strong style={{color:'#ddd'}}>{(d.newPatients||0).toLocaleString()}</strong></span>
+                      <span>Returning: <strong style={{color:'#ddd'}}>{(d.returningPatients||0).toLocaleString()}</strong></span>
+                      <span>Visits: <strong style={{color:'#ddd'}}>{(d.totalVisits||0).toLocaleString()}</strong></span>
+                    </div>
                   </div>
-                  <div style={{display:'flex',gap:16,fontSize:14,color:'#777'}}>
-                    <span>New: <strong style={{color:'#ddd'}}>{(d.newPatients||0).toLocaleString()}</strong></span>
-                    <span>Returning: <strong style={{color:'#ddd'}}>{(d.returningPatients||0).toLocaleString()}</strong></span>
-                    <span>Visits: <strong style={{color:'#ddd'}}>{(d.totalVisits||0).toLocaleString()}</strong></span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
             </div>
           )}
           {(filterDisc!=='all'||filterSite!=='all')&&(
@@ -3646,7 +3646,6 @@ function PerformancePage({staff,perfData,setPerfData}){
               {filterSite!=='all'&&<span style={{marginLeft:4,color:'var(--lime)',fontWeight:600}}>{filterSite}</span>}
             </div>
           )}
-
           {importMsg&&tab==='retention'&&(
             <div style={{marginBottom:14,padding:'9px 13px',borderRadius:5,fontSize:14,
               background:importMsg.type==='success'?'rgba(68,204,170,.08)':'rgba(224,82,82,.08)',
@@ -3655,137 +3654,57 @@ function PerformancePage({staff,perfData,setPerfData}){
               {importMsg.msg}
             </div>
           )}
-          {(()=>{
-            const retRows=staff
-              .filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'
-                &&(filterDisc==='all'||s.discipline===filterDisc)
-                &&(filterSite==='all'||s.site===filterSite))
-              .map(s=>{
-                const full=(data.retentionFull||{})[s.id]||null;
-                const pctRet=(data.retention||{})[s.id]||null;
-                return{...s,
-                  pctReturning:full?full.pctReturning:pctRet,
-                  pctRepeatVisits:full?.pctRepeatVisits??null,
-                  newPatients:full?.newPatients??null,
-                  returningPatients:full?.returningPatients??null,
-                  totalPatients:full?.totalPatients??null,
-                  totalVisits:full?.totalVisits??null
-                };
-              })
-              .filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null);
-            if(!retRows.length) return(
-              <div className="perf-slot">
-                <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner</span></div>
-                <div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import the Jane Member Retention CSV via the Jane Import tab to see per-practitioner data.</p></div>
+          {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'&&(filterDisc==='all'||s.discipline===filterDisc)&&(filterSite==='all'||s.site===filterSite)).map(s=>{const full=(data.retentionFull||{})[s.id]||null;const pctRet=(data.retention||{})[s.id]||null;return{...s,pctReturning:full?full.pctReturning:pctRet,pctRepeatVisits:full?.pctRepeatVisits??null,newPatients:full?.newPatients??null,returningPatients:full?.returningPatients??null,totalPatients:full?.totalPatients??null,totalVisits:full?.totalVisits??null};}).filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null).length===0?(
+            <div className="perf-slot">
+              <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner</span></div>
+              <div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import the Jane Member Retention CSV via the Jane Import tab.</p></div>
+            </div>
+          ):(
+            <div className="perf-slot">
+              <div className="perf-slot-head">
+                <span className="perf-slot-title" style={{color:'#BB99FF'}}>
+                  Retention — {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'&&(filterDisc==='all'||s.discipline===filterDisc)&&(filterSite==='all'||s.site===filterSite)).filter(s=>{const full=(data.retentionFull||{})[s.id]||null;const pctRet=(data.retention||{})[s.id]||null;return full?full.pctReturning:pctRet;}).length} Practitioners
+                </span>
               </div>
-            );
-            const retSorted=[...retRows].sort((a,b)=>{
-              const av=a[retSortKey]??-1,bv=b[retSortKey]??-1;
-              if(typeof av==='string')return retSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);
-              return retSortDir==='desc'?bv-av:av-bv;
-            });
-            const withRet2=retSorted.filter(s=>s.pctReturning!=null);
-            const withRep2=retSorted.filter(s=>s.pctRepeatVisits!=null);
-            const avgRet=withRet2.length?withRet2.reduce((a,s)=>a+s.pctReturning,0)/withRet2.length:0;
-            const avgRepeat=withRep2.length?withRep2.reduce((a,s)=>a+s.pctRepeatVisits,0)/withRep2.length:0;
-            const retColor=(v)=>v>=90?'#CAE8C1':v>=80?'#44CCAA':v>=70?'#F4DB71':'#E05252';
-            const repColor=(v)=>v>=85?'#CAE8C1':v>=75?'#44CCAA':v>=65?'#F4DB71':'#E05252';
-            return(
-              <div className="perf-slot">
-                <div className="perf-slot-head">
-                  <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — {retSorted.length} Practitioners</span>
-                  <div style={{display:'flex',gap:18,fontSize:13,color:'#777',alignItems:'center'}}>
-                    <span>Avg % Returning: <strong style={{color:'#CAE8C1'}}>{avgRet.toFixed(1)}%</strong></span>
-                    <span>Avg % Repeat Visits: <strong style={{color:'#44CCAA'}}>{avgRepeat.toFixed(1)}%</strong></span>
-                  </div>
-                </div>
-                <div style={{overflowX:'auto'}}>
-                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                    <thead>
-                      <tr style={{borderBottom:'1px solid var(--border)'}}>
-                        <th style={{textAlign:'left',cursor:'pointer',userSelect:'none',color:retSortKey==='name'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('name');setRetSortDir(d=>retSortKey==='name'?(d==='desc'?'asc':'desc'):'desc');}}>Practitioner{retSortKey==='name'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='pctReturning'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('pctReturning');setRetSortDir(d=>retSortKey==='pctReturning'?(d==='desc'?'asc':'desc'):'desc');}}>% Returning{retSortKey==='pctReturning'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='pctRepeatVisits'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('pctRepeatVisits');setRetSortDir(d=>retSortKey==='pctRepeatVisits'?(d==='desc'?'asc':'desc'):'desc');}}>% Repeat Visits{retSortKey==='pctRepeatVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='newPatients'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('newPatients');setRetSortDir(d=>retSortKey==='newPatients'?(d==='desc'?'asc':'desc'):'desc');}}>New Members{retSortKey==='newPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='returningPatients'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('returningPatients');setRetSortDir(d=>retSortKey==='returningPatients'?(d==='desc'?'asc':'desc'):'desc');}}>Returning Members{retSortKey==='returningPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='totalPatients'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('totalPatients');setRetSortDir(d=>retSortKey==='totalPatients'?(d==='desc'?'asc':'desc'):'desc');}}>Total Members{retSortKey==='totalPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='totalVisits'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('totalVisits');setRetSortDir(d=>retSortKey==='totalVisits'?(d==='desc'?'asc':'desc'):'desc');}}>Total Visits{retSortKey==='totalVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {retSorted.map(s=>{
-                        const rc=s.pctReturning!=null?retColor(s.pctReturning):'#555';
-                        const rpc=s.pctRepeatVisits!=null?repColor(s.pctRepeatVisits):'#555';
-                        return(
-                          <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)'}}>
-                            <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
-                            <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctReturning!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rc,width:Math.min(100,s.pctReturning)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rc,minWidth:46,textAlign:'right'}}>{s.pctReturning}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
-                            <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctRepeatVisits!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rpc,width:Math.min(100,s.pctRepeatVisits)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rpc,minWidth:46,textAlign:'right'}}>{s.pctRepeatVisits}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
-                            <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.newPatients??'—'}</td>
-                            <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.returningPatients??'—'}</td>
-                            <td style={{padding:'9px 12px',textAlign:'right',color:'#ddd',fontWeight:600,fontSize:14}}>{s.totalPatients??'—'}</td>
-                            <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.totalVisits!=null?s.totalVisits.toLocaleString():'—'}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr style={{borderTop:'2px solid var(--border)',background:'var(--surface2)'}}>
-                        <td style={{padding:'8px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777'}}>Average</td>
-                        <td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#CAE8C1'}}>{avgRet.toFixed(1)}%</td>
-                        <td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#44CCAA'}}>{avgRepeat.toFixed(1)}%</td>
-                        <td colSpan={4}/>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                  <thead>
+                    <tr style={{borderBottom:'1px solid var(--border)'}}>
+                      <th style={{textAlign:'left',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='name'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='name'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('name');}}>Practitioner{retSortKey==='name'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='pctReturning'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='pctReturning'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('pctReturning');}}>% Returning{retSortKey==='pctReturning'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='pctRepeatVisits'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='pctRepeatVisits'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('pctRepeatVisits');}}>% Repeat Visits{retSortKey==='pctRepeatVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='newPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='newPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('newPatients');}}>New Members{retSortKey==='newPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='returningPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='returningPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('returningPatients');}}>Returning Members{retSortKey==='returningPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='totalPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='totalPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('totalPatients');}}>Total Members{retSortKey==='totalPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='totalVisits'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='totalVisits'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('totalVisits');}}>Total Visits{retSortKey==='totalVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...staff
+                      .filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'&&(filterDisc==='all'||s.discipline===filterDisc)&&(filterSite==='all'||s.site===filterSite))
+                      .map(s=>{const full=(data.retentionFull||{})[s.id]||null;const pctRet=(data.retention||{})[s.id]||null;return{...s,pctReturning:full?full.pctReturning:pctRet,pctRepeatVisits:full?.pctRepeatVisits??null,newPatients:full?.newPatients??null,returningPatients:full?.returningPatients??null,totalPatients:full?.totalPatients??null,totalVisits:full?.totalVisits??null};})
+                      .filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null)
+                      .sort((a,b)=>{const av=a[retSortKey]??-1,bv=b[retSortKey]??-1;if(typeof av==='string')return retSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);return retSortDir==='desc'?bv-av:av-bv;})
+                    ].map(s=>{
+                      const rc=s.pctReturning!=null?(s.pctReturning>=90?'#CAE8C1':s.pctReturning>=80?'#44CCAA':s.pctReturning>=70?'#F4DB71':'#E05252'):'#555';
+                      const rpc=s.pctRepeatVisits!=null?(s.pctRepeatVisits>=85?'#CAE8C1':s.pctRepeatVisits>=75?'#44CCAA':s.pctRepeatVisits>=65?'#F4DB71':'#E05252'):'#555';
+                      return(
+                        <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)'}}>
+                          <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
+                          <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctReturning!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rc,width:Math.min(100,s.pctReturning)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rc,minWidth:46,textAlign:'right'}}>{s.pctReturning}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
+                          <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctRepeatVisits!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rpc,width:Math.min(100,s.pctRepeatVisits)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rpc,minWidth:46,textAlign:'right'}}>{s.pctRepeatVisits}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
+                          <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.newPatients??'—'}</td>
+                          <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.returningPatients??'—'}</td>
+                          <td style={{padding:'9px 12px',textAlign:'right',color:'#ddd',fontWeight:600,fontSize:14}}>{s.totalPatients??'—'}</td>
+                          <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.totalVisits!=null?s.totalVisits.toLocaleString():'—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            );
-          })()}
-          <div style={{marginTop:14}}>
-            <button className="btn btn-ghost btn-sm" style={{fontSize:13,color:'#555'}} onClick={()=>setShowManualRet(v=>!v)}>
-              {showManualRet?'▲ Hide':'▼ Show'} Manual Override
-            </button>
-            {showManualRet&&(
-              <div style={{marginTop:10}} className="perf-slot">
-                <div className="perf-slot-head">
-                  <span className="perf-slot-title" style={{color:'#BB99FF'}}>Manual Override</span>
-                  <span style={{fontSize:13,color:'#777'}}>Enter % values manually if not using Jane CSV import</span>
-                  <button className="btn btn-lime btn-sm" onClick={async()=>{
-                    const nr={...data.retention||{}};
-                    const entries=Object.entries(retentionEdits);
-                    entries.forEach(([k,v])=>{if(v!=='')nr[k]=parseFloat(v)||0;});
-                    save({...data,retention:nr});
-                    for(const[staffId,val] of entries){
-                      if(val!=='')await saveRetentionToSB(staffId,parseFloat(val)||0,'management');
-                    }
-                    setRetentionEdits({});setRetSaved(true);
-                    setTimeout(()=>setRetSaved(false),2000);
-                  }} disabled={!Object.keys(retentionEdits).length}>{retSaved?'✓ Saved':'Save Overrides'}</button>
-                </div>
-                <div className="perf-slot-body">
-                  {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{
-                    const editing=retentionEdits[s.id]!==undefined;
-                    const val=editing?retentionEdits[s.id]:((data.retention||{})[s.id]||'');
-                    const num=parseFloat(val)||null;
-                    const c=num?num>=85?'#CAE8C1':num>=75?'#44ccaa':num>=65?'#F4DB71':'#E05252':'#555';
-                    return(
-                      <div key={s.id} className="gva-input-row">
-                        <div style={{flex:1,display:'flex',alignItems:'center',gap:10}}>
-                          <Av name={s.name} sz="sm"/>
-                          <div style={{fontSize:14,color:'#ddd'}}>{s.name}</div>
-                        </div>
-                        <input type="number" min="0" max="100" step="0.1" value={val} placeholder="—"
-                          onChange={e=>setRetentionEdits(p=>({...p,[s.id]:e.target.value}))}
-                          style={{width:62,textAlign:'center',background:'var(--surface3)',border:'1px solid',borderColor:editing?'var(--go)':'var(--border2)',borderRadius:5,color:num?c:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,padding:'5px 0',outline:'none'}}/>
-                        {num&&<span style={{fontSize:14,background:c+'18',color:c,border:'1px solid '+c+'33',borderRadius:3,padding:'2px 7px',minWidth:64,textAlign:'center'}}>{num>=85?'Strong':num>=75?'Good':num>=65?'Fair':'Low'}</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
