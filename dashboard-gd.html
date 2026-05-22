@@ -3615,10 +3615,12 @@ function PerformancePage({staff,perfData,setPerfData}){
         </div>
       )}
 
-            {/* ── RETENTION ── */}
+                  {/* ── RETENTION ── */}
       {tab==='retention'&&(
         <div>
           {data.retentionClinic&&Object.keys(data.retentionClinic).length>0&&(
+            <div>
+            {data.retentionImportDate&&<div style={{fontSize:12,color:'#555',marginBottom:6,textAlign:'right'}}>Last imported: {data.retentionImportDate}</div>}
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:10,marginBottom:16}}>
               {Object.entries(data.retentionClinic).map(([loc,d])=>(
                 <div key={loc} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'14px 18px',borderLeft:'3px solid var(--go)'}}>
@@ -3635,6 +3637,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                 </div>
               ))}
             </div>
+            </div>
           )}
           {(filterDisc!=='all'||filterSite!=='all')&&(
             <div style={{padding:'6px 12px',marginBottom:10,fontSize:13,color:'#888',background:'var(--surface2)',borderRadius:4,border:'1px solid var(--border)',display:'flex',alignItems:'center',gap:8}}>
@@ -3643,13 +3646,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               {filterSite!=='all'&&<span style={{marginLeft:4,color:'var(--lime)',fontWeight:600}}>{filterSite}</span>}
             </div>
           )}
-          <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:14,color:'#aaa',lineHeight:1.7,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
-            <div>
-              <strong style={{color:'var(--lime)'}}>Member Retention</strong> — Import via the <strong style={{color:'#aaa'}}>Jane Import</strong> tab (Reports → Member Retention → Export CSV).
-              {' '}<strong style={{color:'#CAE8C1'}}>% Returning</strong> = patients who came back · <strong style={{color:'#44CCAA'}}>% Repeat Visits</strong> = repeat visits as % of total.
-              {data.retentionImportDate&&<span style={{marginLeft:8,color:'#666',fontSize:13}}>Last imported: {data.retentionImportDate}</span>}
-            </div>
-          </div>
+
           {importMsg&&tab==='retention'&&(
             <div style={{marginBottom:14,padding:'9px 13px',borderRadius:5,fontSize:14,
               background:importMsg.type==='success'?'rgba(68,204,170,.08)':'rgba(224,82,82,.08)',
@@ -3676,10 +3673,10 @@ function PerformancePage({staff,perfData,setPerfData}){
                 };
               })
               .filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null);
-            if(!retRows.length)return(
+            if(!retRows.length) return(
               <div className="perf-slot">
                 <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner</span></div>
-                <div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import the Jane Member Retention CSV above to see per-practitioner data.</p></div>
+                <div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import the Jane Member Retention CSV via the Jane Import tab to see per-practitioner data.</p></div>
               </div>
             );
             const retSorted=[...retRows].sort((a,b)=>{
@@ -3693,11 +3690,6 @@ function PerformancePage({staff,perfData,setPerfData}){
             const avgRepeat=withRep2.length?withRep2.reduce((a,s)=>a+s.pctRepeatVisits,0)/withRep2.length:0;
             const retColor=(v)=>v>=90?'#CAE8C1':v>=80?'#44CCAA':v>=70?'#F4DB71':'#E05252';
             const repColor=(v)=>v>=85?'#CAE8C1':v>=75?'#44CCAA':v>=65?'#F4DB71':'#E05252';
-            const toggleSort=(k)=>{if(retSortKey===k)setRetSortDir(d=>d==='desc'?'asc':'desc');else{setRetSortKey(k);setRetSortDir('desc');}};
-            const th=(label,k,align='right')=>{
-              const active=retSortKey===k;
-              return <th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleSort(k)}>{label}{active?(retSortDir==='desc'?' ▼':' ▲'):''}</th>;
-            };
             return(
               <div className="perf-slot">
                 <div className="perf-slot-head">
@@ -3711,13 +3703,13 @@ function PerformancePage({staff,perfData,setPerfData}){
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
                     <thead>
                       <tr style={{borderBottom:'1px solid var(--border)'}}>
-                        {th('Practitioner','name','left')}
-                        {th('% Returning','pctReturning')}
-                        {th('% Repeat Visits','pctRepeatVisits')}
-                        {th('New Members','newPatients')}
-                        {th('Returning Members','returningPatients')}
-                        {th('Total Members','totalPatients')}
-                        {th('Total Visits','totalVisits')}
+                        <th style={{textAlign:'left',cursor:'pointer',userSelect:'none',color:retSortKey==='name'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('name');setRetSortDir(d=>retSortKey==='name'?(d==='desc'?'asc':'desc'):'desc');}}>Practitioner{retSortKey==='name'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='pctReturning'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('pctReturning');setRetSortDir(d=>retSortKey==='pctReturning'?(d==='desc'?'asc':'desc'):'desc');}}>% Returning{retSortKey==='pctReturning'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='pctRepeatVisits'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('pctRepeatVisits');setRetSortDir(d=>retSortKey==='pctRepeatVisits'?(d==='desc'?'asc':'desc'):'desc');}}>% Repeat Visits{retSortKey==='pctRepeatVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='newPatients'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('newPatients');setRetSortDir(d=>retSortKey==='newPatients'?(d==='desc'?'asc':'desc'):'desc');}}>New Members{retSortKey==='newPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='returningPatients'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('returningPatients');setRetSortDir(d=>retSortKey==='returningPatients'?(d==='desc'?'asc':'desc'):'desc');}}>Returning Members{retSortKey==='returningPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='totalPatients'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('totalPatients');setRetSortDir(d=>retSortKey==='totalPatients'?(d==='desc'?'asc':'desc'):'desc');}}>Total Members{retSortKey==='totalPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                        <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',color:retSortKey==='totalVisits'?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>{setRetSortKey('totalVisits');setRetSortDir(d=>retSortKey==='totalVisits'?(d==='desc'?'asc':'desc'):'desc');}}>Total Visits{retSortKey==='totalVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3758,6 +3750,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               <div style={{marginTop:10}} className="perf-slot">
                 <div className="perf-slot-head">
                   <span className="perf-slot-title" style={{color:'#BB99FF'}}>Manual Override</span>
+                  <span style={{fontSize:13,color:'#777'}}>Enter % values manually if not using Jane CSV import</span>
                   <button className="btn btn-lime btn-sm" onClick={async()=>{
                     const nr={...data.retention||{}};
                     const entries=Object.entries(retentionEdits);
@@ -3796,8 +3789,7 @@ function PerformancePage({staff,perfData,setPerfData}){
         </div>
       )}
 
-
-      {/* ── TRENDS ── */}
+{/* ── TRENDS ── */}
       {tab==='trends'&&(
         <div>
           {/* Controls */}
@@ -3885,11 +3877,12 @@ function PerformancePage({staff,perfData,setPerfData}){
         <div>
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'16px 18px',marginBottom:14}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',fontWeight:700,marginBottom:10}}>How to Export from Jane</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
               {[
                 {n:1,title:'Appointments Report',where:'Reports → Appointments',action:'Set date range → ··· menu → Export CSV',cols:'staff_member_name, state, no_show_at, cancelled_at',note:'Gives: completed visits, no-shows, cancellations per practitioner'},
                 {n:2,title:'Shift Report',where:'Reports → Payroll → Timesheets',action:'Set date range → Export CSV',cols:'Staff Name, Appointment Total Hours, Shift Total Hours',note:'Gives: utilization % (Appt Hours ÷ Shift Hours)'},
                 {n:3,title:'Sales Report',where:'Reports → Sales',action:'Set date range → Export CSV',cols:'Staff Member, Status, Income Category, Collected',note:'Gives: revenue per practitioner (paid treatment income only)'},
+                {n:4,title:'Member Retention Report',where:'Reports → Member Retention',action:'Set date range → Export CSV',cols:'Practitioner name block + 6 data rows each',note:'Gives: % Returning, % Repeat Visits, new/returning patient counts per practitioner'},
               ].map(s=>(
                 <div key={s.n} style={{background:'var(--surface3)',borderRadius:5,padding:'12px 14px',border:'1px solid var(--border)'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
