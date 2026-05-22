@@ -2236,8 +2236,6 @@ function PerformancePage({staff,perfData,setPerfData}){
           const loaded={snapshots:snaps.map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:snaps[snaps.length-1]?.created_at||null};
           const{data:retFullRow}=await SB.from('retention_full').select('*').eq('id','singleton').single().catch(()=>({data:null}));
           if(retFullRow?.data){loaded.retentionFull=retFullRow.data.retentionFull||{};loaded.retentionClinic=retFullRow.data.retentionClinic||{};loaded.retentionImportDate=retFullRow.data.importDate||null;}
-          const{data:retSnaps}=await SB.from('retention_snapshots').select('*').order('month',{ascending:true}).catch(()=>({data:[]}));
-          if(retSnaps&&retSnaps.length>0)setRetentionSnapshots(retSnaps);
           // Supabase data is fresher — update state and localStorage
           setPerfData(loaded);
           try{localStorage.setItem('rvgd3_perf3',JSON.stringify(loaded));}catch(e){}
@@ -2253,6 +2251,11 @@ function PerformancePage({staff,perfData,setPerfData}){
             }
           }
         }
+      // Load retention snapshots unconditionally (separate Supabase table)
+      try{
+        const{data:retSnaps}=await SB.from('retention_snapshots').select('*').order('month',{ascending:true});
+        if(retSnaps&&retSnaps.length>0)setRetentionSnapshots(retSnaps);
+      }catch(e){console.warn('retention_snapshots table not yet created',e);}
       }catch(e){console.warn('[Perf] Supabase sync error:',e);}
       setLoading(false);
     };
@@ -2746,24 +2749,15 @@ function PerformancePage({staff,perfData,setPerfData}){
         const retFull={};
         practitioners.forEach(p=>{const s=matchStaff(p.name);if(s){retFull[s.id]={pctReturning:p.pctReturning,pctRepeatVisits:p.pctRepeatVisits,newPatients:p.newPatients||0,returningPatients:p.returningPatients||0,totalPatients:p.totalPatients||0,totalVisits:p.totalVisits||0};matched++;}});
         const clinicData={};Object.entries(clinicSummaries).forEach(([name,d])=>{const key=name.toLowerCase().includes('mississauga')?'Mississauga':'Markham';clinicData[key]=d;});
-        // Auto-detect month from filename e.g. Member_Retention_20260520.csv → 2026-05
+        // Try to detect month from filename e.g. Member_Retention_20260120.csv → 2026-01
         let autoMonth='';
         const fnMatch=file.name.match(/(\d{4})(\d{2})\d{2}/);
         if(fnMatch){autoMonth=fnMatch[1]+'-'+fnMatch[2];}
         else{const d=new Date();d.setDate(0);autoMonth=d.toISOString().slice(0,7);}
-        // Save immediately — no confirm step
-        await saveRetentionSnapshot(autoMonth,retFull,clinicData);
-        const newRetention={...data.retention||{}};
-        Object.entries(retFull).forEach(([id,d])=>{newRetention[id]=d.pctReturning;});
-        const newData={...data,retention:newRetention,retentionFull:retFull,retentionClinic:clinicData,retentionImportDate:autoMonth};
-        save(newData);
-        const SB2=window.__SB;
-        if(SB2)SB2.from('retention_full').upsert({id:'singleton',data:{retentionFull:retFull,retentionClinic:clinicData,importDate:autoMonth}}).then();
-        setRetentionSnapshots(prev=>{
-          const filtered=prev.filter(s=>s.month!==autoMonth);
-          return[...filtered,{id:autoMonth,month:autoMonth,staff_data:retFull,clinic_data:clinicData}].sort((a,b)=>a.month.localeCompare(b.month));
-        });
-        setImportMsg({type:'success',msg:`✓ Retention saved for ${autoMonth} · ${matched}/${practitioners.length} practitioners matched`});
+        // Store pending so user can confirm/correct the detected month
+        setPendingRetentionData({retFull,clinicData,matched,total:practitioners.length});
+        setRetentionMonthPicker(autoMonth);
+        setImportMsg({type:'info',msg:`Parsed ${matched}/${practitioners.length} practitioners. Confirm the month below then click Save.`});
         setImporting(false);return;
       }else{
         setImportMsg({type:'error',msg:'Could not identify this file type. Columns found: '+Object.keys(rows[0]).join(', ')});
@@ -3774,6 +3768,34 @@ function PerformancePage({staff,perfData,setPerfData}){
               {importMsg.msg}
             </div>
           )}
+          {pendingRetentionData&&(
+            <div style={{background:'var(--surface2)',border:'2px solid var(--go)',borderRadius:7,padding:'14px 18px',marginBottom:14,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+              <div style={{flex:1,fontSize:14,color:'#aaa'}}>
+                <strong style={{color:'var(--lime)'}}>Which month does this file cover?</strong>
+                <span style={{marginLeft:8,color:'#555',fontSize:13}}>Auto-detected from filename — correct if needed</span>
+              </div>
+              <input type="month" value={retentionMonthPicker} onChange={e=>setRetentionMonthPicker(e.target.value)}
+                style={{background:'var(--surface3)',border:'2px solid var(--go)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'6px 10px',outline:'none'}}/>
+              <button className="btn btn-lime" onClick={async()=>{
+                if(!retentionMonthPicker){alert('Select a month first.');return;}
+                const{retFull,clinicData,matched,total}=pendingRetentionData;
+                await saveRetentionSnapshot(retentionMonthPicker,retFull,clinicData);
+                const newRetention={...data.retention||{}};
+                Object.entries(retFull).forEach(([id,d])=>{newRetention[id]=d.pctReturning;});
+                const newData={...data,retention:newRetention,retentionFull:retFull,retentionClinic:clinicData,retentionImportDate:retentionMonthPicker};
+                save(newData);
+                const SB2=window.__SB;
+                if(SB2)SB2.from('retention_full').upsert({id:'singleton',data:{retentionFull:retFull,retentionClinic:clinicData,importDate:retentionMonthPicker}}).then();
+                setRetentionSnapshots(prev=>{
+                  const filtered=prev.filter(s=>s.month!==retentionMonthPicker);
+                  return[...filtered,{id:retentionMonthPicker,month:retentionMonthPicker,staff_data:retFull,clinic_data:clinicData}].sort((a,b)=>a.month.localeCompare(b.month));
+                });
+                setPendingRetentionData(null);setRetentionMonthPicker('');
+                setImportMsg({type:'success',msg:`✓ Saved for ${retentionMonthPicker} · ${matched}/${total} matched`});
+              }}>✓ Save</button>
+              <button className="btn btn-ghost btn-sm" style={{color:'#555'}} onClick={()=>{setPendingRetentionData(null);setImportMsg(null);}}>Cancel</button>
+            </div>
+          )}
 
           {(()=>{
             // Snapshot selection — runs on every render (state changes trigger re-render)
@@ -3982,9 +4004,8 @@ function PerformancePage({staff,perfData,setPerfData}){
             if(!allVals.length)return null;
             const minV=Math.max(0,Math.min(...allVals)-5);
             const maxV=Math.min(100,Math.max(...allVals)+3);
-            const toY=v=>PADY+Math.round((1-(v-minV)/(maxV-minV))*(H-PADY*2));
+            const toY=v=>PADY+Math.round((1-(v-minV)/(maxV-minV||1))*(H-PADY*2));
             const toX=i=>snaps.length>1?PADX+Math.round(i*(W-PADX*2)/(snaps.length-1)):W/2;
-            const yGridVals=[minV,Math.round((minV+maxV)/2),maxV];
             return(
               <div>
                 <div className="perf-slot" style={{marginTop:14}}>
@@ -3998,72 +4019,61 @@ function PerformancePage({staff,perfData,setPerfData}){
                   </div>
                   <div style={{padding:'12px 16px 8px'}}>
                     <svg width="100%" viewBox={`0 0 ${W} ${H+BOT}`} style={{display:'block',overflow:'visible'}}>
-                      {yGridVals.map((v,i)=>(
+                      {[minV,Math.round((minV+maxV)/2),maxV].map((v,i)=>(
                         <g key={i}>
                           <line x1={PADX} y1={toY(v)} x2={W-PADX} y2={toY(v)} stroke="#1e1e1e" strokeWidth="1"/>
                           <text x={PADX-6} y={toY(v)+4} textAnchor="end" fontSize="11" fill="#555">{v}%</text>
                         </g>
                       ))}
-                      {/* Mississauga line */}
                       {missPts.filter(v=>v!=null).length>1&&(
-                        <polyline
-                          points={missPts.map((v,i)=>v!=null?`${toX(i)},${toY(v)}`:null).filter(Boolean).join(' ')}
-                          fill="none" stroke="#CAE8C1" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
+                        <polyline points={missPts.map((v,i)=>v!=null?`${toX(i)},${toY(v)}`:null).filter(Boolean).join(' ')} fill="none" stroke="#CAE8C1" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
                       )}
                       {missPts.map((v,i)=>v!=null&&(
-                        <g key={i}>
+                        <g key={`m${i}`}>
                           <circle cx={toX(i)} cy={toY(v)} r="4" fill="#CAE8C1"/>
                           <text x={toX(i)} y={toY(v)-8} textAnchor="middle" fontSize="10" fill="#CAE8C1" fontWeight="700">{v}%</text>
                         </g>
                       ))}
-                      {/* Markham line */}
                       {markPts.filter(v=>v!=null).length>1&&(
-                        <polyline
-                          points={markPts.map((v,i)=>v!=null?`${toX(i)},${toY(v)}`:null).filter(Boolean).join(' ')}
-                          fill="none" stroke="#44CCAA" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
+                        <polyline points={markPts.map((v,i)=>v!=null?`${toX(i)},${toY(v)}`:null).filter(Boolean).join(' ')} fill="none" stroke="#44CCAA" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
                       )}
                       {markPts.map((v,i)=>v!=null&&(
-                        <g key={i}>
+                        <g key={`k${i}`}>
                           <circle cx={toX(i)} cy={toY(v)} r="4" fill="#44CCAA"/>
                           <text x={toX(i)} y={toY(v)+18} textAnchor="middle" fontSize="10" fill="#44CCAA" fontWeight="700">{v}%</text>
                         </g>
                       ))}
-                      {/* X axis labels */}
                       {snaps.map((_,i)=>(
-                        <text key={i} x={toX(i)} y={H+BOT} textAnchor="middle" fontSize="11" fill="#666">
-                          {snaps[i].month}
-                        </text>
+                        <text key={i} x={toX(i)} y={H+BOT} textAnchor="middle" fontSize="11" fill="#666">{snaps[i].month}</text>
                       ))}
                       <line x1={PADX} y1={H} x2={W-PADX} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
                     </svg>
                   </div>
-                  {/* Month-over-month summary */}
-                  <div style={{padding:'0 16px 14px',display:'flex',gap:24,flexWrap:'wrap'}}>
+                  <div style={{padding:'0 16px 14px',display:'flex',gap:16,flexWrap:'wrap'}}>
                     {['Mississauga','Markham'].map(loc=>{
                       const pts=snaps.map(s=>(s.clinic_data||{})[loc]?.pctReturning).filter(v=>v!=null);
-                      if(pts.length<1)return null;
+                      if(!pts.length)return null;
                       const latest=pts[pts.length-1];
                       const prev=pts.length>1?pts[pts.length-2]:null;
                       const delta=prev!=null?+(latest-prev).toFixed(1):null;
-                      const trend=pts.length>=3?(pts[pts.length-1]-pts[0]).toFixed(1):null;
+                      const trend=pts.length>=2?+(pts[pts.length-1]-pts[0]).toFixed(1):null;
+                      const c=latest>=90?'#CAE8C1':latest>=80?'#44CCAA':'#F4DB71';
                       return(
                         <div key={loc} style={{background:'var(--surface3)',borderRadius:5,padding:'10px 14px',minWidth:160}}>
-                          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:6}}>{loc}</div>
-                          <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:4}}>
-                            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,color:latest>=90?'#CAE8C1':latest>=80?'#44CCAA':'#F4DB71'}}>{latest}%</span>
-                            {delta!=null&&<span style={{fontSize:13,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777'}}>{delta>0?'+':''}{delta}% MoM</span>}
+                          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:4}}>{loc}</div>
+                          <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:2}}>
+                            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,color:c}}>{latest}%</span>
+                            {delta!=null&&<span style={{fontSize:12,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777'}}>{delta>0?'+':''}{delta}% MoM</span>}
                           </div>
-                          {trend!=null&&<div style={{fontSize:12,color:'#555'}}>{+(trend)>0?'↑':'↓'} {Math.abs(trend)}% since {snaps[0].month}</div>}
+                          {trend!=null&&<div style={{fontSize:12,color:'#555'}}>{trend>0?'↑':'↓'} {Math.abs(trend)}% since {snaps[0].month}</div>}
                         </div>
                       );
                     })}
                   </div>
                 </div>
-
-                {/* Per-practitioner retention trend — top movers */}
                 <div className="perf-slot" style={{marginTop:14}}>
                   <div className="perf-slot-head">
-                    <span className="perf-slot-title" style={{color:'#BB99FF'}}>Practitioner Retention Trend — % Returning</span>
+                    <span className="perf-slot-title" style={{color:'#BB99FF'}}>Practitioner Retention — % Returning by Month</span>
                     <span style={{fontSize:13,color:'#555'}}>{snaps.length} months</span>
                   </div>
                   <div style={{overflowX:'auto'}}>
@@ -4071,9 +4081,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                       <thead>
                         <tr style={{borderBottom:'1px solid var(--border)'}}>
                           <th style={{textAlign:'left',padding:'8px 12px',color:'#888',whiteSpace:'nowrap'}}>Practitioner</th>
-                          {snaps.map(s=>(
-                            <th key={s.month} style={{textAlign:'right',padding:'8px 12px',color:'#888',whiteSpace:'nowrap',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px'}}>{s.month}</th>
-                          ))}
+                          {snaps.map(s=>(<th key={s.month} style={{textAlign:'right',padding:'8px 12px',color:'#888',whiteSpace:'nowrap',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13}}>{s.month}</th>))}
                           <th style={{textAlign:'right',padding:'8px 12px',color:'#888',whiteSpace:'nowrap'}}>Change</th>
                         </tr>
                       </thead>
@@ -4085,7 +4093,6 @@ function PerformancePage({staff,perfData,setPerfData}){
                           const latest=nonNull[nonNull.length-1];
                           const first=nonNull[0];
                           const delta=nonNull.length>1?+(latest-first).toFixed(1):null;
-                          const c=latest>=90?'#CAE8C1':latest>=80?'#44CCAA':latest>=70?'#F4DB71':'#E05252';
                           return(
                             <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.4)'}}>
                               <td style={{padding:'8px 12px'}}><div style={{display:'flex',alignItems:'center',gap:7}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:12,color:'#777'}}>{s.site}</div></div></div></td>
