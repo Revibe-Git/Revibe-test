@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- v20260520f -->
+<!DOCTYPE html><!-- v20260520g -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -910,36 +910,13 @@ const RUBRIC_SYSTEMS = {
     "col7Label": "7 (Competent: Revibe Standard)",
     "col810Label": "8–10 (Advanced / Elite / Mastery)",
     "cats": [
-      {
-        "id": "comm",
-        "label": "Communication & Trust",
-        "weight": 25
-      },
-      {
-        "id": "awareness",
-        "label": "Awareness & Athlete Reading",
-        "weight": 20
-      },
-      {
-        "id": "structure",
-        "label": "Session Structure, Intent & Flow",
-        "weight": 20
-      },
-      {
-        "id": "cueing",
-        "label": "Movement Coaching & Cueing",
-        "weight": 20
-      },
-      {
-        "id": "energy",
-        "label": "Energy, Leadership & Environment Control",
-        "weight": 10
-      },
-      {
-        "id": "brand",
-        "label": "Brand Presence & Community Involvement",
-        "weight": 5
-      }
+      {"id":"comm","label":"Communication & Trust","weight":20},
+      {"id":"rehab","label":"Performance Rehab Integration","weight":20},
+      {"id":"awareness","label":"Awareness & Athlete Reading","weight":15},
+      {"id":"structure","label":"Session Structure, Intent & Flow","weight":20},
+      {"id":"cueing","label":"Movement Coaching & Cueing","weight":15},
+      {"id":"energy","label":"Energy, Leadership & Environment Control","weight":5},
+      {"id":"brand","label":"Brand Presence & Community Involvement","weight":5}
     ],
     "catDefs": [
       {
@@ -949,6 +926,14 @@ const RUBRIC_SYSTEMS = {
         "col56": "Basic rapport established; checks in but inconsistent; limited emotional intelligence; accountability is reactive",
         "col7": "Clear and concise; builds trust consistently; explains session intent and 'why'; adapts communication style to athlete",
         "col810": "Intuitive communicator; inspires ownership; drives accountability through trust; natural relationship builder; athletes self-correct"
+      },
+      {
+        "id": "rehab",
+        "label": "Performance Rehab Integration",
+        "col04": "No awareness of injury limitations; cannot modify exercises; ignores pain signals; no communication with therapy staff",
+        "col56": "Basic modifications attempted; inconsistent progression decisions; limited rehab understanding; occasional therapist communication",
+        "col7": "Modifies exercises without losing session intent; understands performance rehab principles; communicates effectively with therapists; builds athlete confidence during recovery; makes appropriate progression/regression decisions in real time",
+        "col810": "Bridges rehab into performance seamlessly; anticipates compensation patterns; confidently guides return-to-play; proactively collaborates with clinical staff; athletes fully trust them through recovery"
       },
       {
         "id": "awareness",
@@ -2249,18 +2234,13 @@ function PerformancePage({staff,perfData,setPerfData}){
           const retention={};
           (retRows||[]).forEach(r=>{if(!retention[r.staff_id])retention[r.staff_id]=r.value;});
           const loaded={snapshots:snaps.map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:snaps[snaps.length-1]?.created_at||null};
-          // Also load retentionFull from retention_full singleton
           const{data:retFullRow}=await SB.from('retention_full').select('*').eq('id','singleton').single().catch(()=>({data:null}));
-          if(retFullRow?.data){
-            loaded.retentionFull=retFullRow.data.retentionFull||{};
-            loaded.retentionClinic=retFullRow.data.retentionClinic||{};
-            loaded.retentionImportDate=retFullRow.data.importDate||null;
-          }
+          if(retFullRow?.data){loaded.retentionFull=retFullRow.data.retentionFull||{};loaded.retentionClinic=retFullRow.data.retentionClinic||{};loaded.retentionImportDate=retFullRow.data.importDate||null;}
           // Supabase data is fresher — update state and localStorage
           setPerfData(loaded);
           try{localStorage.setItem('rvgd3_perf3',JSON.stringify(loaded));}catch(e){}
         }
-        // If Supabase is empty but localStorage has data, push localStorage to Supabase
+        // If Supabase is empty but localStorage has data, save localStorage to Supabase
         else if(!se&&snaps&&snaps.length===0){
           const local=perfData;
           if(local.snapshots&&local.snapshots.length>0){
@@ -2269,17 +2249,6 @@ function PerformancePage({staff,perfData,setPerfData}){
                 id:snap.id,date:snap.date,rows:snap.rows,files:snap.files||[],type:snap.type||'sales'
               });
             }
-          }
-          // Still try to load retentionFull even with no snapshots
-          const{data:retFullRow2}=await SB.from('retention_full').select('*').eq('id','singleton').single().catch(()=>({data:null}));
-          if(retFullRow2?.data){
-            const merged2={...perfData,
-              retentionFull:retFullRow2.data.retentionFull||{},
-              retentionClinic:retFullRow2.data.retentionClinic||{},
-              retentionImportDate:retFullRow2.data.importDate||null
-            };
-            setPerfData(merged2);
-            try{localStorage.setItem('rvgd3_perf3',JSON.stringify(merged2));}catch(e){}
           }
         }
       }catch(e){console.warn('[Perf] Supabase sync error:',e);}
@@ -2334,14 +2303,9 @@ function PerformancePage({staff,perfData,setPerfData}){
   const save=(d)=>{
     setPerfData(d);
     try{localStorage.setItem('rvgd3_perf3',JSON.stringify(d));}catch(e){}
-    // Also persist retentionFull/retentionClinic to Supabase so other devices see it
     const SB2=window.__SB;
     if(SB2&&(d.retentionFull||d.retentionClinic)){
-      SB2.from('retention_full').upsert({id:'singleton',data:{
-        retentionFull:d.retentionFull||{},
-        retentionClinic:d.retentionClinic||{},
-        importDate:d.retentionImportDate||null
-      }}).then();
+      SB2.from('retention_full').upsert({id:'singleton',data:{retentionFull:d.retentionFull||{},retentionClinic:d.retentionClinic||{},importDate:d.retentionImportDate||null}}).then();
     }
   };
   const[tab,setTab]=useState('overview');
@@ -2355,15 +2319,12 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
-  // Per-tab sort state
   const[revSort,setRevSort]=useState({k:'revenue',d:'desc'});
   const[utilSort,setUtilSort]=useState({k:'utilization',d:'desc'});
   const[apptSort,setApptSort]=useState({k:'completed',d:'desc'});
   const[retSortKey,setRetSortKey]=useState('pctReturning');
   const[retSortDir,setRetSortDir]=useState('desc');
-  const[retDragging,setRetDragging]=useState(false);
   const[showManualRet,setShowManualRet]=useState(false);
-
   const[iaSortKey,setIaSortKey]=useState('total');
   const[iaSortDir,setIaSortDir]=useState('desc');
   const[iaView,setIaView]=useState('summary');
@@ -2881,7 +2842,6 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   /* ── Merged staff with period-filtered data ── */
   const iaByStaff=useMemo(()=>{
-    // Derive day-level range from global filters
     const dFrom=customFrom||(dateFrom?dateFrom+'-01':null);
     const dTo=customTo||(dateTo?(()=>{const d=new Date(dateTo+'-01');d.setMonth(d.getMonth()+1);d.setDate(0);return d.toISOString().slice(0,10);})():null);
     const byStaff={};
@@ -2898,8 +2858,7 @@ function PerformancePage({staff,perfData,setPerfData}){
       });
     }else{
       data.snapshots.forEach(snap=>{
-        const m=snap.date.slice(0,7);
-        if(dateFrom&&m<dateFrom)return;if(dateTo&&m>dateTo)return;
+        const m=snap.date.slice(0,7);if(dFrom&&m<dFrom.slice(0,7))return;if(dTo&&m>dTo.slice(0,7))return;
         (snap.rows||[]).forEach(r=>{
           if(!r.staffId)return;const s=staff.find(x=>x.id===r.staffId);
           if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
@@ -3280,28 +3239,19 @@ function PerformancePage({staff,perfData,setPerfData}){
               })}
             </div>);
           })():(()=>{
-            const revSorted=[...withRev].sort((a,b)=>{const av=a[revSort.k]??-1,bv=b[revSort.k]??-1;return revSort.d==='desc'?bv-av:av-bv;});
+            const revSorted=[...withRev].sort((a,b)=>{const av=a[revSort.k]??-1,bv=b[revSort.k]??-1;if(typeof av==='string')return revSort.d==='desc'?av.localeCompare(bv):bv.localeCompare(av);return revSort.d==='desc'?bv-av:av-bv;});
             const sortRevBy=(k)=>setRevSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
             const revTh=(label,k,align='right')=>{const active=revSort.k===k;return(<th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',padding:'8px 12px',whiteSpace:'nowrap'}} onClick={()=>sortRevBy(k)}>{label}{active?(revSort.d==='desc'?' ▼':' ▲'):''}</th>);};
             return revSorted.length?(
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                  <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{revTh('Practitioner','name','left')}{revTh('Revenue','revenue')}{revTh('Site','site')}</tr></thead>
-                  <tbody>{revSorted.map(s=>(
-                    <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
-                      <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div></div></div></td>
-                      <td style={{padding:'9px 12px',textAlign:'right'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}>
-                          <div style={{width:80,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:'#CAE8C1',width:(s.revenue/maxRev*100)+'%'}}/></div>
-                          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#CAE8C1',minWidth:64,textAlign:'right'}}>{fmtRev(s.revenue)}</span>
-                        </div>
-                      </td>
-                      <td style={{padding:'9px 12px',textAlign:'right',color:'#777',fontSize:13}}>{s.site}</td>
-                    </tr>
-                  ))}</tbody>
-                  <tfoot><tr style={{borderTop:'2px solid var(--border)',background:'var(--surface2)'}}><td style={{padding:'8px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777'}}>Total</td><td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(totalRev)}</td><td/></tr></tfoot>
-                </table>
-              </div>
+              <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{revTh('Practitioner','name','left')}{revTh('Revenue','revenue')}{revTh('Site','site')}</tr></thead>
+                <tbody>{revSorted.map(s=>(<tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+                  <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div></div></td>
+                  <td style={{padding:'9px 12px',textAlign:'right'}}><div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:80,height:4,background:'var(--surface3)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:'#CAE8C1',width:(s.revenue/maxRev*100)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(s.revenue)}</span></div></td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#777',fontSize:13}}>{s.site}</td>
+                </tr>))}</tbody>
+                <tfoot><tr style={{borderTop:'2px solid var(--border)',background:'var(--surface2)'}}><td style={{padding:'8px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777'}}>Total</td><td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(totalRev)}</td><td/></tr></tfoot>
+              </table></div>
             ):<div className="empty" style={{padding:40}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue data.</p></div>;
           })()}
         </div>
@@ -3365,27 +3315,17 @@ function PerformancePage({staff,perfData,setPerfData}){
             const utilSorted=[...baseList].sort((a,b)=>{const av=a[utilSort.k]??-1,bv=b[utilSort.k]??-1;if(typeof av==='string')return utilSort.d==='desc'?av.localeCompare(bv):bv.localeCompare(av);return utilSort.d==='desc'?bv-av:av-bv;});
             const sortUtilBy=(k)=>setUtilSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
             const utTh=(label,k,align='right')=>{const active=utilSort.k===k;return(<th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',padding:'8px 12px',whiteSpace:'nowrap'}} onClick={()=>sortUtilBy(k)}>{label}{active?(utilSort.d==='desc'?' ▼':' ▲'):''}</th>);};
-            return(
-              <div>
-                {isFiltered&&<div style={{padding:'8px 14px',background:'rgba(244,219,113,.06)',border:'1px solid rgba(244,219,113,.18)',borderRadius:5,fontSize:14,color:'#F4DB71',marginBottom:8}}>No shift report for this period — showing most recent available utilization.</div>}
-                {utilSorted.length?(
-                  <div style={{overflowX:'auto'}}>
-                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                      <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{utTh('Practitioner','name','left')}{utTh('Utilization %','utilization')}{utTh('Site','site')}</tr></thead>
-                      <tbody>{utilSorted.map(s=>{
-                        const c=s.utilization>=85?'#CAE8C1':s.utilization>=70?'#44ccaa':s.utilization>50?'#F4DB71':'#E05252';
-                        const lbl=s.utilization>=85?'Strong':s.utilization>=70?'Good':s.utilization>50?'Fair':'Low';
-                        return(<tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
-                          <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
-                          <td style={{padding:'9px 12px',textAlign:'right'}}><div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:80,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:c,width:Math.min(100,s.utilization)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:c,minWidth:42,textAlign:'right'}}>{s.utilization}%</span><span style={{fontSize:13,background:c+'22',color:c,border:'1px solid '+c+'44',borderRadius:3,padding:'2px 5px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{lbl}</span></div></td>
-                          <td style={{padding:'9px 12px',textAlign:'right',color:'#777',fontSize:13}}>{s.site}</td>
-                        </tr>);
-                      })}</tbody>
-                    </table>
-                  </div>
-                ):<div className="empty" style={{padding:40}}><div className="empty-ico">⏱</div><p>Import a Shift Report CSV to see utilization data.</p></div>}
-              </div>
-            );
+            return(<div>
+              {isFiltered&&<div style={{padding:'8px 14px',background:'rgba(244,219,113,.06)',border:'1px solid rgba(244,219,113,.18)',borderRadius:5,fontSize:14,color:'#F4DB71',marginBottom:8}}>No shift report for this period — showing most recent available utilization.</div>}
+              {utilSorted.length?(<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{utTh('Practitioner','name','left')}{utTh('Utilization %','utilization')}{utTh('Site','site')}</tr></thead>
+                <tbody>{utilSorted.map(s=>{const c=s.utilization>=85?'#CAE8C1':s.utilization>=70?'#44ccaa':s.utilization>50?'#F4DB71':'#E05252';const lbl=s.utilization>=85?'Strong':s.utilization>=70?'Good':s.utilization>50?'Fair':'Low';return(<tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+                  <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
+                  <td style={{padding:'9px 12px',textAlign:'right'}}><div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:80,height:4,background:'var(--surface3)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:c,width:Math.min(100,s.utilization)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:c}}>{s.utilization}%</span><span style={{fontSize:13,background:c+'22',color:c,border:'1px solid '+c+'44',borderRadius:3,padding:'2px 5px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{lbl}</span></div></td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#777',fontSize:13}}>{s.site}</td>
+                </tr>);})}</tbody>
+              </table></div>):<div className="empty" style={{padding:40}}><div className="empty-ico">⏱</div><p>Import a Shift Report CSV to see utilization data.</p></div>}
+            </div>);
           })()}
         </div>
       )}
@@ -3436,39 +3376,31 @@ function PerformancePage({staff,perfData,setPerfData}){
               })}</tbody>
             </table></div>);
           })():(()=>{
-            const apptSorted=[...withAppts].sort((a,b)=>{
-              const av=a[apptSort.k]??-1,bv=b[apptSort.k]??-1;
-              if(typeof av==='string')return apptSort.d==='desc'?av.localeCompare(bv):bv.localeCompare(av);
-              return apptSort.d==='desc'?bv-av:av-bv;
-            });
+            const apptSorted=[...withAppts].sort((a,b)=>{const av=a[apptSort.k]??-1,bv=b[apptSort.k]??-1;if(typeof av==='string')return apptSort.d==='desc'?av.localeCompare(bv):bv.localeCompare(av);return apptSort.d==='desc'?bv-av:av-bv;});
             const sortApptBy=(k)=>setApptSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
             const apTh=(label,k,align='right')=>{const active=apptSort.k===k;return(<th key={k} style={{padding:'8px 10px',textAlign:align,fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',textTransform:'uppercase',color:active?'var(--lime)':'#999',fontWeight:600,cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>sortApptBy(k)}>{label}{active?(apptSort.d==='desc'?' ▼':' ▲'):''}</th>);};
-            return apptSorted.length?(
-              <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{apTh('Practitioner','name','left')}{apTh('Completed','completed')}{apTh('Initial Assessments','initialAssessments')}{apTh('No-Shows','noShows')}{apTh('Cancellations','cancellations')}{apTh('Rescheduled','rescheduled')}{apTh('Cancel Rate','cancelRate')}</tr></thead>
-                <tbody>{apptSorted.map(s=>{
-                  const total=(s.completed||0)+(s.noShows||0)+(s.cancellations||0)+(s.rescheduled||0);
-                  const cancelRate=total>0?Math.round(((s.cancellations||0)/total)*100):0;
-                  return(
-                    <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
-                      <td style={{padding:'8px 10px'}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777'}}>{s.site}</div></td>
-                      <td style={{padding:'8px 10px',textAlign:'right',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.completed||0}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',color:'#BB99FF',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.initialAssessments||0}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',color:(s.noShows||0)>8?'#E05252':'#888'}}>{s.noShows||0}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',color:(s.cancellations||0)>15?'#F4DB71':'#888'}}>{s.cancellations||0}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',color:'#888'}}>{s.rescheduled||0}</td>
-                      <td style={{padding:'8px 10px',textAlign:'right',color:cancelRate>15?'#E05252':cancelRate>10?'#F4DB71':'#44ccaa',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{cancelRate}%</td>
-                    </tr>
-                  );
-                })}</tbody>
-              </table></div>
-            ):<div className="empty" style={{padding:40}}><div className="empty-ico">📋</div><p>Import an Appointments CSV to see per-practitioner breakdown.</p></div>;
+            return apptSorted.length?(<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+              <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{apTh('Practitioner','name','left')}{apTh('Completed','completed')}{apTh('Initial Assessments','initialAssessments')}{apTh('No-Shows','noShows')}{apTh('Cancellations','cancellations')}{apTh('Rescheduled','rescheduled')}{apTh('Cancel Rate','cancelRate')}</tr></thead>
+              <tbody>{apptSorted.map(s=>{
+                const total=(s.completed||0)+(s.noShows||0)+(s.cancellations||0)+(s.rescheduled||0);
+                const cancelRate=total>0?Math.round(((s.cancellations||0)/total)*100):0;
+                return(<tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+                  <td style={{padding:'8px 10px'}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777'}}>{s.site}</div></td>
+                  <td style={{padding:'8px 10px',textAlign:'right',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.completed||0}</td>
+                  <td style={{padding:'8px 10px',textAlign:'right',color:'#BB99FF',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.initialAssessments||0}</td>
+                  <td style={{padding:'8px 10px',textAlign:'right',color:(s.noShows||0)>8?'#E05252':'#888'}}>{s.noShows||0}</td>
+                  <td style={{padding:'8px 10px',textAlign:'right',color:(s.cancellations||0)>15?'#F4DB71':'#888'}}>{s.cancellations||0}</td>
+                  <td style={{padding:'8px 10px',textAlign:'right',color:'#888'}}>{s.rescheduled||0}</td>
+                  <td style={{padding:'8px 10px',textAlign:'right',color:cancelRate>15?'#E05252':cancelRate>10?'#F4DB71':'#44ccaa',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{cancelRate}%</td>
+                </tr>);
+              })}</tbody>
+            </table></div>):<div className="empty" style={{padding:40}}><div className="empty-ico">📋</div><p>Import an Appointments CSV to see per-practitioner breakdown.</p></div>;
           })()}
         </div>
       )}
 
 
-                  {/* ── INITIAL ASSESSMENTS ── */}
+            {/* ── INITIAL ASSESSMENTS ── */}
       {tab==='ia'&&(
         <div>
           {(()=>{
@@ -3479,7 +3411,10 @@ function PerformancePage({staff,perfData,setPerfData}){
             const avgIA=iaSorted.filter(s=>s.total>0).length?(totalIA/iaSorted.filter(s=>s.total>0).length).toFixed(1):0;
             const maxIA=Math.max(...iaSorted.map(s=>s.total),1);
             const hasDailyData=dailyAppts.length>0;
-            const iaTh=(label,k,align='right')=>{const active=iaSortKey===k;return(<th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleIaSort(k)}>{label}{active?(iaSortDir==='desc'?' ▼':' ▲'):''}</th>);};
+            const IASortTh=({label,k,align='right'})=>{
+              const active=iaSortKey===k;
+              return(<th style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleIaSort(k)}>{label}{active?(iaSortDir==='desc'?' ▼':' ▲'):''}</th>);
+            };
             const selectedData=iaSelectedStaff?iaSorted.find(s=>s.staffId===iaSelectedStaff):null;
             const rangeLabel=(()=>{
               if(customFrom||customTo)return `${customFrom||'…'} → ${customTo||'…'}`;
@@ -3565,11 +3500,11 @@ function PerformancePage({staff,perfData,setPerfData}){
                           <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
                             <thead>
                               <tr style={{borderBottom:'1px solid var(--border)'}}>
-                                {iaTh('Practitioner','name','left')}
-                                {iaTh('Initial Assessments','total')}
-                                {iaTh('Completed Visits','completed')}
-                                {iaTh('IA Rate %','iaRate')}
-                                {iaTh('Site','site')}
+                                <IASortTh label="Practitioner" k="name" align="left"/>
+                                <IASortTh label="Initial Assessments" k="total"/>
+                                <IASortTh label="Completed Visits" k="completed"/>
+                                <IASortTh label="IA Rate %" k="iaRate"/>
+                                <IASortTh label="Site" k="site"/>
                               </tr>
                             </thead>
                             <tbody>
@@ -3701,26 +3636,22 @@ function PerformancePage({staff,perfData,setPerfData}){
               ))}
             </div>
           )}
-          <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:14,color:'#aaa',lineHeight:1.7}}>
-            <strong style={{color:'var(--lime)'}}>Member Retention</strong> — Import Jane's Member Retention report to auto-populate.
-            Jane: <strong style={{color:'#aaa'}}>Reports → Member Retention → Export CSV</strong>.
-            {' '}<strong style={{color:'#CAE8C1'}}>% Returning</strong> = patients who came back · <strong style={{color:'#44CCAA'}}>% Repeat Visits</strong> = repeat visits as % of total.
-            {data.retentionImportDate&&<span style={{marginLeft:8,color:'#555'}}>Last imported: {data.retentionImportDate}</span>}
-          </div>
-          <div className={`perf-drop${retDragging?' drag':''}`} style={{padding:'16px 20px',marginBottom:16}}
-            onDragOver={e=>{e.preventDefault();setRetDragging(true);}}
-            onDragLeave={()=>setRetDragging(false)}
-            onDrop={e=>{e.preventDefault();setRetDragging(false);const f=e.dataTransfer.files[0];if(f)handleFile(f);}}
-            onClick={()=>document.getElementById('ret-csv-in').click()}>
-            <input id="ret-csv-in" type="file" accept=".csv" style={{display:'none'}} onChange={e=>{handleFile(e.target.files[0]);e.target.value='';}}/>
-            <div style={{fontSize:22,marginBottom:5}}>📊</div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:'var(--lime)',letterSpacing:'1px',marginBottom:3}}>
-              {importing?'Processing…':(data.retentionFull&&Object.keys(data.retentionFull).length>0)?'Re-import Member Retention CSV':'Drop Jane Member Retention CSV here'}
+          {(filterDisc!=='all'||filterSite!=='all')&&(
+            <div style={{padding:'6px 12px',marginBottom:10,fontSize:13,color:'#888',background:'var(--surface2)',borderRadius:4,border:'1px solid var(--border)',display:'flex',alignItems:'center',gap:8}}>
+              <span>Filtering by:</span>
+              {filterDisc!=='all'&&<span style={{marginLeft:4,color:'var(--lime)',fontWeight:600}}>{filterDisc}</span>}
+              {filterSite!=='all'&&<span style={{marginLeft:4,color:'var(--lime)',fontWeight:600}}>{filterSite}</span>}
             </div>
-            <div style={{fontSize:13,color:'#777'}}>Jane → Reports → Member Retention → Export CSV</div>
+          )}
+          <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:14,color:'#aaa',lineHeight:1.7,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+            <div>
+              <strong style={{color:'var(--lime)'}}>Member Retention</strong> — Import via the <strong style={{color:'#aaa'}}>Jane Import</strong> tab (Reports → Member Retention → Export CSV).
+              {' '}<strong style={{color:'#CAE8C1'}}>% Returning</strong> = patients who came back · <strong style={{color:'#44CCAA'}}>% Repeat Visits</strong> = repeat visits as % of total.
+              {data.retentionImportDate&&<span style={{marginLeft:8,color:'#666',fontSize:13}}>Last imported: {data.retentionImportDate}</span>}
+            </div>
           </div>
           {importMsg&&tab==='retention'&&(
-            <div style={{marginBottom:14,padding:'9px 13px',borderRadius:5,fontSize:14,lineHeight:1.6,
+            <div style={{marginBottom:14,padding:'9px 13px',borderRadius:5,fontSize:14,
               background:importMsg.type==='success'?'rgba(68,204,170,.08)':'rgba(224,82,82,.08)',
               border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':'rgba(224,82,82,.2)'}`,
               color:importMsg.type==='success'?'#44CCAA':'#E05252'}}>
@@ -3728,30 +3659,45 @@ function PerformancePage({staff,perfData,setPerfData}){
             </div>
           )}
           {(()=>{
-            const retRows=staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{
-              const full=(data.retentionFull||{})[s.id]||null;
-              const pctRet=(data.retention||{})[s.id]||null;
-              return{...s,pctReturning:full?full.pctReturning:pctRet,pctRepeatVisits:full?.pctRepeatVisits??null,newPatients:full?.newPatients??null,returningPatients:full?.returningPatients??null,totalPatients:full?.totalPatients??null,totalVisits:full?.totalVisits??null};
-            }).filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null);
-            const retSorted=[...retRows].sort((a,b)=>{
-              const av=a[retSortKey]??-1,bv=b[retSortKey]??-1;
-              if(typeof av==='string')return retSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);
-              return retSortDir==='desc'?bv-av:av-bv;
-            });
-            const toggleRetSort=(key)=>{if(retSortKey===key)setRetSortDir(d=>d==='desc'?'asc':'desc');else{setRetSortKey(key);setRetSortDir('desc');}};
-            if(!retSorted.length)return(
+            const retRows=staff
+              .filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'
+                &&(filterDisc==='all'||s.discipline===filterDisc)
+                &&(filterSite==='all'||s.site===filterSite))
+              .map(s=>{
+                const full=(data.retentionFull||{})[s.id]||null;
+                const pctRet=(data.retention||{})[s.id]||null;
+                return{...s,
+                  pctReturning:full?full.pctReturning:pctRet,
+                  pctRepeatVisits:full?.pctRepeatVisits??null,
+                  newPatients:full?.newPatients??null,
+                  returningPatients:full?.returningPatients??null,
+                  totalPatients:full?.totalPatients??null,
+                  totalVisits:full?.totalVisits??null
+                };
+              })
+              .filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null);
+            if(!retRows.length)return(
               <div className="perf-slot">
                 <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner</span></div>
                 <div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import the Jane Member Retention CSV above to see per-practitioner data.</p></div>
               </div>
             );
-            const withRet=retSorted.filter(s=>s.pctReturning!=null);
-            const withRep=retSorted.filter(s=>s.pctRepeatVisits!=null);
-            const avgRet=withRet.length?withRet.reduce((a,s)=>a+s.pctReturning,0)/withRet.length:0;
-            const avgRepeat=withRep.length?withRep.reduce((a,s)=>a+s.pctRepeatVisits,0)/withRep.length:0;
+            const retSorted=[...retRows].sort((a,b)=>{
+              const av=a[retSortKey]??-1,bv=b[retSortKey]??-1;
+              if(typeof av==='string')return retSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);
+              return retSortDir==='desc'?bv-av:av-bv;
+            });
+            const withRet2=retSorted.filter(s=>s.pctReturning!=null);
+            const withRep2=retSorted.filter(s=>s.pctRepeatVisits!=null);
+            const avgRet=withRet2.length?withRet2.reduce((a,s)=>a+s.pctReturning,0)/withRet2.length:0;
+            const avgRepeat=withRep2.length?withRep2.reduce((a,s)=>a+s.pctRepeatVisits,0)/withRep2.length:0;
             const retColor=(v)=>v>=90?'#CAE8C1':v>=80?'#44CCAA':v>=70?'#F4DB71':'#E05252';
             const repColor=(v)=>v>=85?'#CAE8C1':v>=75?'#44CCAA':v>=65?'#F4DB71':'#E05252';
-            const rsTh=(label,k,align='right')=>{const active=retSortKey===k;return(<th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleRetSort(k)}>{label}{active?(retSortDir==='desc'?' ▼':' ▲'):''}</th>);};
+            const toggleSort=(k)=>{if(retSortKey===k)setRetSortDir(d=>d==='desc'?'asc':'desc');else{setRetSortKey(k);setRetSortDir('desc');}};
+            const th=(label,k,align='right')=>{
+              const active=retSortKey===k;
+              return <th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleSort(k)}>{label}{active?(retSortDir==='desc'?' ▼':' ▲'):''}</th>;
+            };
             return(
               <div className="perf-slot">
                 <div className="perf-slot-head">
@@ -3765,13 +3711,13 @@ function PerformancePage({staff,perfData,setPerfData}){
                   <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
                     <thead>
                       <tr style={{borderBottom:'1px solid var(--border)'}}>
-                        {rsTh('Practitioner','name','left')}
-                        {rsTh('% Returning','pctReturning')}
-                        {rsTh('% Repeat Visits','pctRepeatVisits')}
-                        {rsTh('New Members','newPatients')}
-                        {rsTh('Returning Members','returningPatients')}
-                        {rsTh('Total Members','totalPatients')}
-                        {rsTh('Total Visits','totalVisits')}
+                        {th('Practitioner','name','left')}
+                        {th('% Returning','pctReturning')}
+                        {th('% Repeat Visits','pctRepeatVisits')}
+                        {th('New Members','newPatients')}
+                        {th('Returning Members','returningPatients')}
+                        {th('Total Members','totalPatients')}
+                        {th('Total Visits','totalVisits')}
                       </tr>
                     </thead>
                     <tbody>
@@ -3992,7 +3938,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             <input id="jane-csv-in" type="file" accept=".csv" onChange={e=>{handleFile(e.target.files[0]);e.target.value='';}}/>
             <div style={{fontSize:32,marginBottom:10}}>📊</div>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:'var(--lime)',letterSpacing:'1px',marginBottom:4}}>
-              {importing?'Processing…':'Drop Appointments or Shift Report CSV here'}
+              {importing?'Processing…':'Drop any Jane CSV here (Appointments, Shift Report, Sales, or Member Retention)'}
             </div>
             <div style={{fontSize:14,color:'#777'}}>Auto-detects file type · Both files can be imported for the same snapshot date</div>
           </div>
