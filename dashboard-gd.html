@@ -3192,6 +3192,71 @@ function PerformancePage({staff,perfData,setPerfData}){
               </div>
             </>);
           })()}
+
+          {/* Retention overview card */}
+          {(retentionSnapshots.length>0||data.retentionClinic)&&(()=>{
+            const snaps=[...retentionSnapshots].sort((a,b)=>a.month.localeCompare(b.month));
+            const latestSnap=snaps.length>0?snaps[snaps.length-1]:null;
+            const clinicData=latestSnap?latestSnap.clinic_data:(data.retentionClinic||{});
+            const missRet=clinicData['Mississauga']?.pctReturning??null;
+            const markRet=clinicData['Markham']?.pctReturning??null;
+            const missRep=clinicData['Mississauga']?.pctRepeatVisits??null;
+            const markRep=clinicData['Markham']?.pctRepeatVisits??null;
+            const missTrend=snaps.map(s=>s.clinic_data?.['Mississauga']?.pctReturning??null);
+            const markTrend=snaps.map(s=>s.clinic_data?.['Markham']?.pctReturning??null);
+            const allVals=[...missTrend,...markTrend].filter(v=>v!=null);
+            const minV=allVals.length?Math.max(0,Math.min(...allVals)-3):70;
+            const maxV=allVals.length?Math.min(100,Math.max(...allVals)+2):100;
+            const W=320,H=50,PAD=4;
+            const toY=v=>PAD+Math.round((1-(v-minV)/(maxV-minV||1))*(H-PAD*2));
+            const toX=(i,len)=>len>1?Math.round(i*(W-1)/(len-1)):W/2;
+            const sparkLine=(pts,color)=>{
+              const valid=pts.map((v,i)=>v!=null?{v,i}:null).filter(Boolean);
+              if(valid.length<2)return null;
+              const d=valid.map(({v,i})=>`${toX(i,pts.length)},${toY(v)}`).join(' ');
+              return <polyline points={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/>;
+            };
+            const latest=latestSnap?latestSnap.month:data.retentionImportDate;
+            const prev=snaps.length>=2?snaps[snaps.length-2]:null;
+            const missDelta=prev&&prev.clinic_data?.['Mississauga']&&missRet?+(missRet-prev.clinic_data['Mississauga'].pctReturning).toFixed(1):null;
+            return(
+              <div className="perf-slot" style={{gridColumn:'1/-1'}}>
+                <div className="perf-slot-head">
+                  <span className="perf-slot-title" style={{color:'#BB99FF'}}>Member Retention</span>
+                  <div style={{display:'flex',gap:16,fontSize:13,color:'#777',alignItems:'center'}}>
+                    {latest&&<span>{latest}</span>}
+                    {snaps.length>0&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('retention')}>View all →</button>}
+                  </div>
+                </div>
+                <div style={{padding:'12px 16px'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:snaps.length>=2?12:0}}>
+                    {[['Mississauga',missRet,missRep,missDelta,'#CAE8C1'],['Markham',markRet,markRep,null,'#44CCAA']].map(([loc,ret,rep,delta,color])=>(
+                      <div key={loc} style={{background:'var(--surface3)',borderRadius:5,padding:'10px 14px'}}>
+                        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:6}}>{loc}</div>
+                        <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:4}}>
+                          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:ret>=90?'#CAE8C1':ret>=80?'#44CCAA':ret>=70?'#F4DB71':'#888',lineHeight:1}}>{ret!=null?ret+'%':'—'}</span>
+                          <span style={{fontSize:12,color:'#666'}}>returning</span>
+                          {delta!=null&&<span style={{fontSize:12,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777',marginLeft:4}}>{delta>0?'+':''}{delta}%</span>}
+                        </div>
+                        <div style={{fontSize:12,color:'#555'}}>Repeat visits: <strong style={{color:rep>=85?color:rep>=75?'#F4DB71':'#888'}}>{rep!=null?rep+'%':'—'}</strong></div>
+                      </div>
+                    ))}
+                  </div>
+                  {snaps.length>=2&&(
+                    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{display:'block',overflow:'visible'}}>
+                      {sparkLine(missTrend,'#CAE8C1')}
+                      {sparkLine(markTrend,'#44CCAA')}
+                      {missTrend.map((v,i)=>v!=null&&<circle key={i} cx={toX(i,missTrend.length)} cy={toY(v)} r="2.5" fill="#CAE8C1"/>)}
+                      {markTrend.map((v,i)=>v!=null&&<circle key={i} cx={toX(i,markTrend.length)} cy={toY(v)} r="2.5" fill="#44CCAA"/>)}
+                      {snaps.map((_,i)=>(
+                        <text key={i} x={toX(i,snaps.length)} y={H} textAnchor="middle" fontSize="9" fill="#444">{snaps[i].month.slice(5)}</text>
+                      ))}
+                    </svg>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -3726,40 +3791,32 @@ function PerformancePage({staff,perfData,setPerfData}){
           )}
 
           {(()=>{
-            // Determine which snapshot(s) to show based on period filter
-            const now = new Date();
-            const curM = now.toISOString().slice(0,7);
-            let snapToShow = null; // single snapshot for the table
-            let clinicToShow = data.retentionClinic;
-
+            // Snapshot selection — runs on every render (state changes trigger re-render)
+            const _snaps=[...retentionSnapshots].sort((a,b)=>a.month.localeCompare(b.month));
+            let _snapToShow=null;
             if(retSelectedMonth){
-              snapToShow = retentionSnapshots.find(s=>s.month===retSelectedMonth);
-            } else {
-              const sorted = [...retentionSnapshots].sort((a,b)=>b.month.localeCompare(a.month));
-              if(retPeriod==='latest'||sorted.length===0){
-                snapToShow = sorted[0]||null;
-              } else {
-                // For multi-month periods show latest snapshot in table
-                let monthsBack = retPeriod==='1m'?1:retPeriod==='3m'?3:retPeriod==='6m'?6:999;
-                const cutoff = new Date(now);
-                cutoff.setMonth(cutoff.getMonth()-monthsBack);
-                const cutM = cutoff.toISOString().slice(0,7);
-                const inRange = sorted.filter(s=>s.month>=cutM);
-                snapToShow = inRange[0]||null;
+              _snapToShow=_snaps.find(s=>s.month===retSelectedMonth)||null;
+            }else{
+              const _sorted=[..._snaps].reverse();
+              if(retPeriod==='latest'||_sorted.length===0){
+                _snapToShow=_sorted[0]||null;
+              }else{
+                const _now=new Date();
+                const _mb=retPeriod==='1m'?1:retPeriod==='3m'?3:retPeriod==='6m'?6:999;
+                _now.setMonth(_now.getMonth()-_mb);
+                const _cut=_now.toISOString().slice(0,7);
+                _snapToShow=_sorted.find(s=>s.month>=_cut)||_sorted[0]||null;
               }
             }
-
-            // Build staff rows from the selected snapshot
-            const snapFull = snapToShow ? (snapToShow.staff_data||{}) : (data.retentionFull||{});
-            const snapClinic = snapToShow ? (snapToShow.clinic_data||{}) : (data.retentionClinic||{});
-            const snapMonth = snapToShow ? snapToShow.month : data.retentionImportDate;
-
-            const retRows = staff
+            const _snapFull=_snapToShow?(_snapToShow.staff_data||{}):(data.retentionFull||{});
+            const _snapClinic=_snapToShow?(_snapToShow.clinic_data||{}):(data.retentionClinic||{});
+            const _snapMonth=_snapToShow?_snapToShow.month:data.retentionImportDate;
+            const _retRows=staff
               .filter(s=>!['mgmt','ops','edu'].includes(s.discipline)
                 &&(retFilterDisc==='all'||s.discipline===retFilterDisc)
                 &&(retFilterSite==='all'||s.site===retFilterSite))
               .map(s=>{
-                const d=snapFull[s.id]||null;
+                const d=_snapFull[s.id]||null;
                 const pctRet=(data.retention||{})[s.id]||null;
                 return{...s,
                   pctReturning:d?d.pctReturning:pctRet,
@@ -3767,8 +3824,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                   newPatients:d?.newPatients??null,
                   returningPatients:d?.returningPatients??null,
                   totalPatients:d?.totalPatients??null,
-                  totalVisits:d?.totalVisits??null
-                };
+                  totalVisits:d?.totalVisits??null};
               })
               .filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null)
               .sort((a,b)=>{
@@ -3776,15 +3832,13 @@ function PerformancePage({staff,perfData,setPerfData}){
                 if(typeof av==='string')return retSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);
                 return retSortDir==='desc'?bv-av:av-bv;
               });
-
             return(
               <div>
-                {/* Clinic summary cards */}
-                {Object.keys(snapClinic).length>0&&(
+                {Object.keys(_snapClinic).length>0&&(
                   <div>
-                    {snapMonth&&<div style={{fontSize:12,color:'#555',marginBottom:6,textAlign:'right'}}>Showing: {snapMonth}</div>}
+                    {_snapMonth&&<div style={{fontSize:12,color:'#555',marginBottom:6,textAlign:'right'}}>Showing: {_snapMonth}</div>}
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:10,marginBottom:16}}>
-                      {Object.entries(snapClinic).map(([loc,d])=>(
+                      {Object.entries(_snapClinic).map(([loc,d])=>(
                         <div key={loc} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'14px 18px',borderLeft:'3px solid var(--go)'}}>
                           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',fontWeight:700,marginBottom:10}}>{loc}</div>
                           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:8}}>
@@ -3801,9 +3855,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                     </div>
                   </div>
                 )}
-
-                {/* Practitioner table */}
-                {retRows.length===0?(
+                {_retRows.length===0?(
                   <div className="perf-slot">
                     <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner</span></div>
                     <div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import a Member Retention CSV via the Jane Import tab. Upload one file per month.</p></div>
@@ -3811,7 +3863,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                 ):(
                   <div className="perf-slot">
                     <div className="perf-slot-head">
-                      <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — {retRows.length} Practitioners</span>
+                      <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — {_retRows.length} Practitioners</span>
                       <div style={{fontSize:13,color:'#555'}}>{retentionSnapshots.length} month{retentionSnapshots.length!==1?'s':''} stored</div>
                     </div>
                     <div style={{overflowX:'auto'}}>
@@ -3828,7 +3880,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                           </tr>
                         </thead>
                         <tbody>
-                          {retRows.map(s=>{
+                          {_retRows.map(s=>{
                             const rc=s.pctReturning!=null?(s.pctReturning>=90?'#CAE8C1':s.pctReturning>=80?'#44CCAA':s.pctReturning>=70?'#F4DB71':'#E05252'):'#555';
                             const rpc=s.pctRepeatVisits!=null?(s.pctRepeatVisits>=85?'#CAE8C1':s.pctRepeatVisits>=75?'#44CCAA':s.pctRepeatVisits>=65?'#F4DB71':'#E05252'):'#555';
                             return(
@@ -4146,9 +4198,9 @@ function PerformancePage({staff,perfData,setPerfData}){
 
           {importMsg&&(
             <div style={{marginTop:10,padding:'10px 14px',borderRadius:5,fontSize:14,lineHeight:1.6,
-              background:importMsg.type==='success'?'rgba(68,204,170,.08)':'rgba(224,82,82,.08)',
-              border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':'rgba(224,82,82,.2)'}`,
-              color:importMsg.type==='success'?'#44CCAA':'#E05252'}}>
+              background:importMsg.type==='success'?'rgba(68,204,170,.08)':importMsg.type==='info'?'rgba(107,159,212,.08)':'rgba(224,82,82,.08)',
+              border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':importMsg.type==='info'?'rgba(107,159,212,.2)':'rgba(224,82,82,.2)'}`,
+              color:importMsg.type==='success'?'#44CCAA':importMsg.type==='info'?'#6B9FD4':'#E05252'}}>
               {importMsg.msg}
             </div>
           )}
