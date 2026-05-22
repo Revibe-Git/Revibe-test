@@ -3968,15 +3968,20 @@ function PerformancePage({staff,perfData,setPerfData}){
           )}
 
           {/* ── Clinic Retention Trend ── */}
-          {retentionSnapshots.length>=2&&(()=>{
+          {retentionSnapshots.length===0?(
+            <div style={{marginTop:14,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'24px',textAlign:'center'}}>
+              <div style={{fontSize:22,marginBottom:8}}>🔄</div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#BB99FF',marginBottom:6}}>Retention Trends</div>
+              <div style={{fontSize:14,color:'#555'}}>Upload monthly Member Retention CSVs via the Jane Import tab to build your trend history.</div>
+            </div>
+          ):(()=>{
             const snaps=[...retentionSnapshots].sort((a,b)=>a.month.localeCompare(b.month));
             const W=640,H=120,PADX=44,PADY=10,BOT=28;
             const missPts=snaps.map(s=>(s.clinic_data||{})['Mississauga']?.pctReturning??null);
             const markPts=snaps.map(s=>(s.clinic_data||{})['Markham']?.pctReturning??null);
             const allVals=[...missPts,...markPts].filter(v=>v!=null);
-            if(!allVals.length)return null;
-            const minV=Math.max(0,Math.min(...allVals)-5);
-            const maxV=Math.min(100,Math.max(...allVals)+3);
+            const minV=allVals.length?Math.max(0,Math.min(...allVals)-5):70;
+            const maxV=allVals.length?Math.min(100,Math.max(...allVals)+3):100;
             const toY=v=>PADY+Math.round((1-(v-minV)/(maxV-minV||1))*(H-PADY*2));
             const toX=i=>snaps.length>1?PADX+Math.round(i*(W-PADX*2)/(snaps.length-1)):W/2;
             return(
@@ -3987,7 +3992,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                     <div style={{display:'flex',gap:16,fontSize:13,alignItems:'center'}}>
                       <span><span style={{color:'#CAE8C1'}}>●</span> Mississauga</span>
                       <span><span style={{color:'#44CCAA'}}>●</span> Markham</span>
-                      <span style={{color:'#555'}}>{snaps.length} months</span>
+                      <span style={{color:'#555'}}>{snaps.length} month{snaps.length!==1?'s':''}</span>
                     </div>
                   </div>
                   <div style={{padding:'12px 16px 8px'}}>
@@ -4047,42 +4052,46 @@ function PerformancePage({staff,perfData,setPerfData}){
                 <div className="perf-slot" style={{marginTop:14}}>
                   <div className="perf-slot-head">
                     <span className="perf-slot-title" style={{color:'#BB99FF'}}>Practitioner Retention — % Returning by Month</span>
-                    <span style={{fontSize:13,color:'#555'}}>{snaps.length} months</span>
+                    <span style={{fontSize:13,color:'#555'}}>{snaps.length} month{snaps.length!==1?'s':''}</span>
                   </div>
-                  <div style={{overflowX:'auto'}}>
-                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                      <thead>
-                        <tr style={{borderBottom:'1px solid var(--border)'}}>
-                          <th style={{textAlign:'left',padding:'8px 12px',color:'#888',whiteSpace:'nowrap'}}>Practitioner</th>
-                          {snaps.map(s=>(<th key={s.month} style={{textAlign:'right',padding:'8px 12px',color:'#888',whiteSpace:'nowrap',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13}}>{s.month}</th>))}
-                          <th style={{textAlign:'right',padding:'8px 12px',color:'#888',whiteSpace:'nowrap'}}>Change</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {staff.filter(s=>!['mgmt','ops','edu'].includes(s.discipline)).map(s=>{
-                          const vals=snaps.map(snap=>(snap.staff_data||{})[s.id]?.pctReturning??null);
-                          if(vals.every(v=>v===null))return null;
-                          const nonNull=vals.filter(v=>v!=null);
-                          const latest=nonNull[nonNull.length-1];
-                          const first=nonNull[0];
-                          const delta=nonNull.length>1?+(latest-first).toFixed(1):null;
-                          return(
-                            <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.4)'}}>
-                              <td style={{padding:'8px 12px'}}><div style={{display:'flex',alignItems:'center',gap:7}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:12,color:'#777'}}>{s.site}</div></div></div></td>
-                              {vals.map((v,i)=>(
-                                <td key={i} style={{padding:'8px 12px',textAlign:'right'}}>
-                                  {v!=null?<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:v>=90?'#CAE8C1':v>=80?'#44CCAA':v>=70?'#F4DB71':'#E05252'}}>{v}%</span>:<span style={{color:'#333'}}>—</span>}
+                  {snaps.length===1?(
+                    <div style={{padding:'16px',fontSize:14,color:'#555',fontStyle:'italic'}}>Upload more months to see trend comparisons.</div>
+                  ):(
+                    <div style={{overflowX:'auto'}}>
+                      <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                        <thead>
+                          <tr style={{borderBottom:'1px solid var(--border)'}}>
+                            <th style={{textAlign:'left',padding:'8px 12px',color:'#888',whiteSpace:'nowrap'}}>Practitioner</th>
+                            {snaps.map(s=>(<th key={s.month} style={{textAlign:'right',padding:'8px 12px',color:'#888',whiteSpace:'nowrap',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13}}>{s.month}</th>))}
+                            <th style={{textAlign:'right',padding:'8px 12px',color:'#888',whiteSpace:'nowrap'}}>Change</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {staff.filter(s=>!['mgmt','ops','edu'].includes(s.discipline)).map(s=>{
+                            const vals=snaps.map(snap=>(snap.staff_data||{})[s.id]?.pctReturning??null);
+                            if(vals.every(v=>v===null))return null;
+                            const nonNull=vals.filter(v=>v!=null);
+                            const latest=nonNull[nonNull.length-1];
+                            const first=nonNull[0];
+                            const delta=nonNull.length>1?+(latest-first).toFixed(1):null;
+                            return(
+                              <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.4)'}}>
+                                <td style={{padding:'8px 12px'}}><div style={{display:'flex',alignItems:'center',gap:7}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:12,color:'#777'}}>{s.site}</div></div></div></td>
+                                {vals.map((v,i)=>(
+                                  <td key={i} style={{padding:'8px 12px',textAlign:'right'}}>
+                                    {v!=null?<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:v>=90?'#CAE8C1':v>=80?'#44CCAA':v>=70?'#F4DB71':'#E05252'}}>{v}%</span>:<span style={{color:'#333'}}>—</span>}
+                                  </td>
+                                ))}
+                                <td style={{padding:'8px 12px',textAlign:'right'}}>
+                                  {delta!=null?<span style={{fontSize:13,fontWeight:700,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777'}}>{delta>0?'+':''}{delta}%</span>:<span style={{color:'#333'}}>—</span>}
                                 </td>
-                              ))}
-                              <td style={{padding:'8px 12px',textAlign:'right'}}>
-                                {delta!=null?<span style={{fontSize:13,fontWeight:700,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777'}}>{delta>0?'+':''}{delta}%</span>:<span style={{color:'#333'}}>—</span>}
-                              </td>
-                            </tr>
-                          );
-                        }).filter(Boolean)}
-                      </tbody>
-                    </table>
-                  </div>
+                              </tr>
+                            );
+                          }).filter(Boolean)}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -4118,12 +4127,8 @@ function PerformancePage({staff,perfData,setPerfData}){
               <strong style={{color:'var(--lime)'}}>Tip:</strong> Import both files for the same period — Appointments gives visit counts, Shift gives utilization. They merge into the same snapshot automatically. Import monthly to build trend history.
             </div>
           </div>
-          <div style={{background:'rgba(107,159,212,.06)',border:'1px solid rgba(107,159,212,.2)',borderRadius:6,padding:'12px 16px',marginTop:10,marginBottom:4,fontSize:14,color:'#aaa',lineHeight:1.8}}>
-            <strong style={{color:'#6B9FD4'}}>📅 Member Retention — Upload Month by Month</strong><br/>
-            The Member Retention report must be uploaded <strong style={{color:'#ddd'}}>one month at a time</strong> — not as a single all-time snapshot.
-            At the end of each month: Jane → Reports → Member Retention → set date range to <strong style={{color:'#ddd'}}>that month only</strong> → Export CSV → drop it here.
-            After importing you will be asked to confirm which month the file covers. Each monthly upload builds your retention trend history automatically.
-            <div style={{marginTop:6,fontSize:13,color:'rgba(107,159,212,.7)'}}>⚠ Uploading a multi-month range as one file will overwrite with averaged totals and lose per-month detail.</div>
+          <div style={{background:'rgba(107,159,212,.06)',border:'1px solid rgba(107,159,212,.2)',borderRadius:6,padding:'9px 14px',marginTop:10,marginBottom:4,fontSize:13,color:'#888'}}>
+            <strong style={{color:'#6B9FD4'}}>📅 Member Retention:</strong> Export one month at a time from Jane (Reports → Member Retention → set to that month only). After dropping the file below, select which month it covers.
           </div>
 
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
@@ -4170,30 +4175,45 @@ function PerformancePage({staff,perfData,setPerfData}){
             </div>
           )}
           {pendingRetentionData&&(
-            <div style={{marginTop:10,background:'var(--surface2)',border:'2px solid var(--go)',borderRadius:7,padding:'12px 16px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-              <span style={{fontSize:14,color:'var(--lime)',fontWeight:600}}>📋 Retention: {pendingRetentionData.matched}/{pendingRetentionData.total} matched — which month is this file for?</span>
-              <input type="month" value={retentionMonthPicker}
-                onChange={async e=>{
-                  const month=e.target.value;
-                  if(!month)return;
-                  setRetentionMonthPicker(month);
-                  const{retFull,clinicData,matched,total}=pendingRetentionData;
-                  await saveRetentionSnapshot(month,retFull,clinicData);
-                  const newRetention={...data.retention||{}};
-                  Object.entries(retFull).forEach(([id,d])=>{newRetention[id]=d.pctReturning;});
-                  const newData={...data,retention:newRetention,retentionFull:retFull,retentionClinic:clinicData,retentionImportDate:month};
-                  save(newData);
-                  const SB2=window.__SB;
-                  if(SB2)SB2.from('retention_full').upsert({id:'singleton',data:{retentionFull:retFull,retentionClinic:clinicData,importDate:month}}).then();
-                  setRetentionSnapshots(prev=>{
-                    const filtered=prev.filter(s=>s.month!==month);
-                    return[...filtered,{id:month,month,staff_data:retFull,clinic_data:clinicData}].sort((a,b)=>a.month.localeCompare(b.month));
-                  });
-                  setPendingRetentionData(null);setRetentionMonthPicker('');
-                  setImportMsg({type:'success',msg:`✓ Retention saved for ${month} · ${matched}/${total} matched`});
-                }}
-                style={{background:'var(--surface3)',border:'2px solid var(--go)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'6px 10px',outline:'none',cursor:'pointer'}}/>
-              <span style={{fontSize:13,color:'#555'}}>Picks month → saves instantly</span>
+            <div style={{marginTop:10,background:'var(--surface2)',border:'2px solid var(--go)',borderRadius:7,padding:'14px 18px'}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',marginBottom:10}}>
+                🔄 Retention file ready — {pendingRetentionData.matched}/{pendingRetentionData.total} practitioners matched
+              </div>
+              <div style={{fontSize:14,color:'#aaa',marginBottom:12}}>Which month does this file cover? Select below — saves automatically.</div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                {(()=>{
+                  const months=[];
+                  for(let i=0;i<12;i++){
+                    const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);
+                    const val=d.toISOString().slice(0,7);
+                    const lbl=d.toLocaleDateString('en-CA',{month:'short',year:'numeric'});
+                    months.push({val,lbl});
+                  }
+                  return months.map(({val,lbl})=>(
+                    <button key={val}
+                      className={`btn btn-sm ${retentionMonthPicker===val?'btn-lime':'btn-ghost'}`}
+                      onClick={async()=>{
+                        setRetentionMonthPicker(val);
+                        const{retFull,clinicData,matched,total}=pendingRetentionData;
+                        await saveRetentionSnapshot(val,retFull,clinicData);
+                        const newRetention={...data.retention||{}};
+                        Object.entries(retFull).forEach(([id,d])=>{newRetention[id]=d.pctReturning;});
+                        const newData={...data,retention:newRetention,retentionFull:retFull,retentionClinic:clinicData,retentionImportDate:val};
+                        save(newData);
+                        const SB2=window.__SB;
+                        if(SB2)SB2.from('retention_full').upsert({id:'singleton',data:{retentionFull:retFull,retentionClinic:clinicData,importDate:val}}).then();
+                        setRetentionSnapshots(prev=>{
+                          const filtered=prev.filter(s=>s.month!==val);
+                          return[...filtered,{id:val,month:val,staff_data:retFull,clinic_data:clinicData}].sort((a,b)=>a.month.localeCompare(b.month));
+                        });
+                        setPendingRetentionData(null);setRetentionMonthPicker('');
+                        setImportMsg({type:'success',msg:`✓ Retention saved for ${val} · ${matched}/${total} matched`});
+                      }}>
+                      {lbl}
+                    </button>
+                  ));
+                })()}
+              </div>
             </div>
           )}
 
