@@ -3992,140 +3992,94 @@ function PerformancePage({staff,perfData,setPerfData}){
                   </div>
                 );
               })()}
+
+              {/* ── Per-practitioner retention trend ── */}
+              {(()=>{
+                const staffSnaps=retentionSnapshots
+                  .filter(s=>(s.staff_data||{})[trendStaff.id]!=null)
+                  .sort((a,b)=>a.month.localeCompare(b.month));
+                if(!staffSnaps.length)return(
+                  <div className="perf-slot" style={{marginTop:14}}>
+                    <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention</span></div>
+                    <div style={{padding:'16px',fontSize:14,color:'#555',fontStyle:'italic'}}>No retention data yet. Upload monthly retention CSVs via the Jane Import tab.</div>
+                  </div>
+                );
+                const vals=staffSnaps.map(s=>s.staff_data[trendStaff.id]);
+                const retVals=vals.map(v=>v.pctReturning);
+                const repVals=vals.map(v=>v.pctRepeatVisits??null);
+                const latest=retVals[retVals.length-1];
+                const prev=retVals.length>1?retVals[retVals.length-2]:null;
+                const delta=prev!=null?+(latest-prev).toFixed(1):null;
+                const W=560,H=100,PADX=36,PADY=8,BOT=22;
+                const allV=[...retVals,...repVals].filter(v=>v!=null);
+                const minV=Math.max(0,Math.min(...allV)-5);
+                const maxV=Math.min(100,Math.max(...allV)+3);
+                const toY=v=>PADY+Math.round((1-(v-minV)/(maxV-minV||1))*(H-PADY*2));
+                const toX=i=>staffSnaps.length>1?PADX+Math.round(i*(W-PADX*2)/(staffSnaps.length-1)):W/2;
+                const retC=latest>=80?'#CAE8C1':latest>=60?'#F4DB71':'#E05252';
+                return(
+                  <div className="perf-slot" style={{marginTop:14}}>
+                    <div className="perf-slot-head">
+                      <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention</span>
+                      <div style={{display:'flex',gap:16,fontSize:13,alignItems:'center'}}>
+                        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:retC}}>{latest}%</span>
+                        {delta!=null&&<span style={{fontSize:13,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777'}}>{delta>0?'+':''}{delta}% MoM</span>}
+                        <span style={{color:'#555',fontSize:12}}>{staffSnaps.length} month{staffSnaps.length!==1?'s':''}</span>
+                      </div>
+                    </div>
+                    <div style={{padding:'12px 16px 4px'}}>
+                      <div style={{display:'flex',gap:8,marginBottom:10,fontSize:12}}>
+                        <span style={{color:'#CAE8C1'}}>─ % Returning</span>
+                        {repVals.some(v=>v!=null)&&<span style={{color:'#44CCAA'}}>─ % Repeat Visits</span>}
+                      </div>
+                      <svg width="100%" viewBox={`0 0 ${W} ${H+BOT}`} style={{display:'block',overflow:'visible'}}>
+                        {[minV,Math.round((minV+maxV)/2),maxV].map((v,i)=>(
+                          <g key={i}>
+                            <line x1={PADX} y1={toY(v)} x2={W-PADX} y2={toY(v)} stroke="#1e1e1e" strokeWidth="1"/>
+                            <text x={PADX-5} y={toY(v)+4} textAnchor="end" fontSize="10" fill="#555">{v}%</text>
+                          </g>
+                        ))}
+                        {retVals.length>1&&<polyline points={retVals.map((v,i)=>`${toX(i)},${toY(v)}`).join(' ')} fill="none" stroke="#CAE8C1" strokeWidth="2" strokeLinejoin="round"/>}
+                        {retVals.map((v,i)=>(
+                          <g key={`r${i}`}>
+                            <circle cx={toX(i)} cy={toY(v)} r="3.5" fill="#CAE8C1"/>
+                            <text x={toX(i)} y={toY(v)-7} textAnchor="middle" fontSize="10" fill="#CAE8C1" fontWeight="700">{v}%</text>
+                          </g>
+                        ))}
+                        {repVals.filter(v=>v!=null).length>1&&<polyline points={repVals.map((v,i)=>v!=null?`${toX(i)},${toY(v)}`:null).filter(Boolean).join(' ')} fill="none" stroke="#44CCAA" strokeWidth="2" strokeLinejoin="round" strokeDasharray="4,2"/>}
+                        {repVals.map((v,i)=>v!=null&&(
+                          <g key={`p${i}`}>
+                            <circle cx={toX(i)} cy={toY(v)} r="3.5" fill="#44CCAA"/>
+                            <text x={toX(i)} y={toY(v)+16} textAnchor="middle" fontSize="10" fill="#44CCAA">{v}%</text>
+                          </g>
+                        ))}
+                        {staffSnaps.map((_,i)=>(
+                          <text key={i} x={toX(i)} y={H+BOT} textAnchor="middle" fontSize="10" fill="#555">{staffSnaps[i].month}</text>
+                        ))}
+                        <line x1={PADX} y1={H} x2={W-PADX} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
+                      </svg>
+                    </div>
+                    <div style={{padding:'0 16px 14px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:8}}>
+                      {staffSnaps.map(s=>{
+                        const d=s.staff_data[trendStaff.id];
+                        const c=d.pctReturning>=80?'#CAE8C1':d.pctReturning>=60?'#F4DB71':'#E05252';
+                        return(
+                          <div key={s.month} style={{background:'var(--surface3)',borderRadius:4,padding:'8px 10px'}}>
+                            <div style={{fontSize:11,color:'#555',marginBottom:4}}>{s.month}</div>
+                            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:c}}>{d.pctReturning}%</div>
+                            {d.pctRepeatVisits!=null&&<div style={{fontSize:11,color:d.pctRepeatVisits>=50?'#44CCAA':d.pctRepeatVisits>=30?'#F4DB71':'#E05252'}}>{d.pctRepeatVisits}% repeat</div>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           ):(
             <div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to view their trends.</div>
           )}
 
-          {/* ── Clinic Retention Trend ── */}
-          {retentionSnapshots.length===0?(
-            <div style={{marginTop:14,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'24px',textAlign:'center'}}>
-              <div style={{fontSize:22,marginBottom:8}}>🔄</div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#BB99FF',marginBottom:6}}>Retention Trends</div>
-              <div style={{fontSize:14,color:'#555'}}>Upload monthly Member Retention CSVs via the Jane Import tab to build your trend history.</div>
-            </div>
-          ):(()=>{
-            const snaps=[...retentionSnapshots].sort((a,b)=>a.month.localeCompare(b.month));
-            const W=640,H=120,PADX=44,PADY=10,BOT=28;
-            const missPts=snaps.map(s=>(s.clinic_data||{})['Mississauga']?.pctReturning??null);
-            const markPts=snaps.map(s=>(s.clinic_data||{})['Markham']?.pctReturning??null);
-            const allVals=[...missPts,...markPts].filter(v=>v!=null);
-            const minV=allVals.length?Math.max(0,Math.min(...allVals)-5):70;
-            const maxV=allVals.length?Math.min(100,Math.max(...allVals)+3):100;
-            const toY=v=>PADY+Math.round((1-(v-minV)/(maxV-minV||1))*(H-PADY*2));
-            const toX=i=>snaps.length>1?PADX+Math.round(i*(W-PADX*2)/(snaps.length-1)):W/2;
-            return(
-              <div>
-                <div className="perf-slot" style={{marginTop:14}}>
-                  <div className="perf-slot-head">
-                    <span className="perf-slot-title" style={{color:'#BB99FF'}}>Clinic Retention — % Returning Over Time</span>
-                    <div style={{display:'flex',gap:16,fontSize:13,alignItems:'center'}}>
-                      <span><span style={{color:'#CAE8C1'}}>●</span> Mississauga</span>
-                      <span><span style={{color:'#44CCAA'}}>●</span> Markham</span>
-                      <span style={{color:'#555'}}>{snaps.length} month{snaps.length!==1?'s':''}</span>
-                    </div>
-                  </div>
-                  <div style={{padding:'12px 16px 8px'}}>
-                    <svg width="100%" viewBox={`0 0 ${W} ${H+BOT}`} style={{display:'block',overflow:'visible'}}>
-                      {[minV,Math.round((minV+maxV)/2),maxV].map((v,i)=>(
-                        <g key={i}>
-                          <line x1={PADX} y1={toY(v)} x2={W-PADX} y2={toY(v)} stroke="#1e1e1e" strokeWidth="1"/>
-                          <text x={PADX-6} y={toY(v)+4} textAnchor="end" fontSize="11" fill="#555">{v}%</text>
-                        </g>
-                      ))}
-                      {missPts.filter(v=>v!=null).length>1&&(
-                        <polyline points={missPts.map((v,i)=>v!=null?`${toX(i)},${toY(v)}`:null).filter(Boolean).join(' ')} fill="none" stroke="#CAE8C1" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
-                      )}
-                      {missPts.map((v,i)=>v!=null&&(
-                        <g key={`m${i}`}>
-                          <circle cx={toX(i)} cy={toY(v)} r="4" fill="#CAE8C1"/>
-                          <text x={toX(i)} y={toY(v)-8} textAnchor="middle" fontSize="10" fill="#CAE8C1" fontWeight="700">{v}%</text>
-                        </g>
-                      ))}
-                      {markPts.filter(v=>v!=null).length>1&&(
-                        <polyline points={markPts.map((v,i)=>v!=null?`${toX(i)},${toY(v)}`:null).filter(Boolean).join(' ')} fill="none" stroke="#44CCAA" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
-                      )}
-                      {markPts.map((v,i)=>v!=null&&(
-                        <g key={`k${i}`}>
-                          <circle cx={toX(i)} cy={toY(v)} r="4" fill="#44CCAA"/>
-                          <text x={toX(i)} y={toY(v)+18} textAnchor="middle" fontSize="10" fill="#44CCAA" fontWeight="700">{v}%</text>
-                        </g>
-                      ))}
-                      {snaps.map((_,i)=>(
-                        <text key={i} x={toX(i)} y={H+BOT} textAnchor="middle" fontSize="11" fill="#666">{snaps[i].month}</text>
-                      ))}
-                      <line x1={PADX} y1={H} x2={W-PADX} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
-                    </svg>
-                  </div>
-                  <div style={{padding:'0 16px 14px',display:'flex',gap:16,flexWrap:'wrap'}}>
-                    {['Mississauga','Markham'].map(loc=>{
-                      const pts=snaps.map(s=>(s.clinic_data||{})[loc]?.pctReturning).filter(v=>v!=null);
-                      if(!pts.length)return null;
-                      const latest=pts[pts.length-1];
-                      const prev=pts.length>1?pts[pts.length-2]:null;
-                      const delta=prev!=null?+(latest-prev).toFixed(1):null;
-                      const trend=pts.length>=2?+(pts[pts.length-1]-pts[0]).toFixed(1):null;
-                      const c=latest>=80?'#CAE8C1':latest>=60?'#F4DB71':'#E05252';
-                      return(
-                        <div key={loc} style={{background:'var(--surface3)',borderRadius:5,padding:'10px 14px',minWidth:160}}>
-                          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:4}}>{loc}</div>
-                          <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:2}}>
-                            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,color:c}}>{latest}%</span>
-                            {delta!=null&&<span style={{fontSize:12,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777'}}>{delta>0?'+':''}{delta}% MoM</span>}
-                          </div>
-                          {trend!=null&&<div style={{fontSize:12,color:'#555'}}>{trend>0?'↑':'↓'} {Math.abs(trend)}% since {snaps[0].month}</div>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="perf-slot" style={{marginTop:14}}>
-                  <div className="perf-slot-head">
-                    <span className="perf-slot-title" style={{color:'#BB99FF'}}>Practitioner Retention — % Returning by Month</span>
-                    <span style={{fontSize:13,color:'#555'}}>{snaps.length} month{snaps.length!==1?'s':''}</span>
-                  </div>
-                  {snaps.length===1?(
-                    <div style={{padding:'16px',fontSize:14,color:'#555',fontStyle:'italic'}}>Upload more months to see trend comparisons.</div>
-                  ):(
-                    <div style={{overflowX:'auto'}}>
-                      <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                        <thead>
-                          <tr style={{borderBottom:'1px solid var(--border)'}}>
-                            <th style={{textAlign:'left',padding:'8px 12px',color:'#888',whiteSpace:'nowrap'}}>Practitioner</th>
-                            {snaps.map(s=>(<th key={s.month} style={{textAlign:'right',padding:'8px 12px',color:'#888',whiteSpace:'nowrap',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13}}>{s.month}</th>))}
-                            <th style={{textAlign:'right',padding:'8px 12px',color:'#888',whiteSpace:'nowrap'}}>Change</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {staff.filter(s=>!['mgmt','ops','edu'].includes(s.discipline)).map(s=>{
-                            const vals=snaps.map(snap=>(snap.staff_data||{})[s.id]?.pctReturning??null);
-                            if(vals.every(v=>v===null))return null;
-                            const nonNull=vals.filter(v=>v!=null);
-                            const latest=nonNull[nonNull.length-1];
-                            const first=nonNull[0];
-                            const delta=nonNull.length>1?+(latest-first).toFixed(1):null;
-                            return(
-                              <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.4)'}}>
-                                <td style={{padding:'8px 12px'}}><div style={{display:'flex',alignItems:'center',gap:7}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:12,color:'#777'}}>{s.site}</div></div></div></td>
-                                {vals.map((v,i)=>(
-                                  <td key={i} style={{padding:'8px 12px',textAlign:'right'}}>
-                                    {v!=null?<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:v>=80?'#CAE8C1':v>=60?'#F4DB71':'#E05252'}}>{v}%</span>:<span style={{color:'#333'}}>—</span>}
-                                  </td>
-                                ))}
-                                <td style={{padding:'8px 12px',textAlign:'right'}}>
-                                  {delta!=null?<span style={{fontSize:13,fontWeight:700,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777'}}>{delta>0?'+':''}{delta}%</span>:<span style={{color:'#333'}}>—</span>}
-                                </td>
-                              </tr>
-                            );
-                          }).filter(Boolean)}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
         </div>
       )}
 
