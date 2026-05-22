@@ -3243,11 +3243,11 @@ function PerformancePage({staff,perfData,setPerfData}){
                       <div key={loc} style={{background:'var(--surface3)',borderRadius:5,padding:'10px 14px'}}>
                         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:6}}>{loc}</div>
                         <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:4}}>
-                          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:ret>=90?'#CAE8C1':ret>=80?'#44CCAA':ret>=70?'#F4DB71':'#888',lineHeight:1}}>{ret!=null?ret+'%':'—'}</span>
+                          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:ret!=null?(ret>=80?'#CAE8C1':ret>=60?'#F4DB71':'#E05252'):'#888',lineHeight:1}}>{ret!=null?ret+'%':'—'}</span>
                           <span style={{fontSize:12,color:'#666'}}>returning</span>
                           {delta!=null&&<span style={{fontSize:12,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777',marginLeft:4}}>{delta>0?'+':''}{delta}%</span>}
                         </div>
-                        <div style={{fontSize:12,color:'#555'}}>Repeat visits: <strong style={{color:rep>=85?color:rep>=75?'#F4DB71':'#888'}}>{rep!=null?rep+'%':'—'}</strong></div>
+                        <div style={{fontSize:12,color:'#555'}}>Repeat visits: <strong style={{color:rep>=50?color:rep>=30?'#F4DB71':'#E05252'}}>{rep!=null?rep+'%':'—'}</strong></div>
                       </div>
                     ))}
                   </div>
@@ -3773,24 +3773,54 @@ function PerformancePage({staff,perfData,setPerfData}){
           {(()=>{
             // Snapshot selection — runs on every render (state changes trigger re-render)
             const _snaps=[...retentionSnapshots].sort((a,b)=>a.month.localeCompare(b.month));
-            let _snapToShow=null;
+            // Filter snaps by period
+            let _filteredSnaps=_snaps;
             if(retSelectedMonth){
-              _snapToShow=_snaps.find(s=>s.month===retSelectedMonth)||null;
-            }else{
-              const _sorted=[..._snaps].reverse();
-              if(retPeriod==='latest'||_sorted.length===0){
-                _snapToShow=_sorted[0]||null;
+              _filteredSnaps=_snaps.filter(s=>s.month===retSelectedMonth);
+            }else if(retPeriod!=='all'){
+              const _now=new Date();
+              const _mb=retPeriod==='latest'?0:retPeriod==='1m'?1:retPeriod==='3m'?3:retPeriod==='6m'?6:999;
+              if(retPeriod==='latest'){
+                _filteredSnaps=_snaps.slice(-1);
               }else{
-                const _now=new Date();
-                const _mb=retPeriod==='1m'?1:retPeriod==='3m'?3:retPeriod==='6m'?6:999;
-                _now.setMonth(_now.getMonth()-_mb);
-                const _cut=_now.toISOString().slice(0,7);
-                _snapToShow=_sorted.find(s=>s.month>=_cut)||_sorted[0]||null;
+                const _cut=new Date(_now);_cut.setMonth(_cut.getMonth()-_mb);
+                const _cutM=_cut.toISOString().slice(0,7);
+                _filteredSnaps=_snaps.filter(s=>s.month>=_cutM);
               }
             }
-            const _snapFull=_snapToShow?(_snapToShow.staff_data||{}):(data.retentionFull||{});
-            const _snapClinic=_snapToShow?(_snapToShow.clinic_data||{}):(data.retentionClinic||{});
-            const _snapMonth=_snapToShow?_snapToShow.month:data.retentionImportDate;
+            if(_filteredSnaps.length===0)_filteredSnaps=_snaps.slice(-1);
+            // Aggregate: average each staff member's values across all filtered snapshots
+            const _snapFull={};
+            const _staffIds=new Set(_filteredSnaps.flatMap(s=>Object.keys(s.staff_data||{})));
+            _staffIds.forEach(id=>{
+              const vals=_filteredSnaps.map(s=>(s.staff_data||{})[id]).filter(Boolean);
+              if(!vals.length)return;
+              _snapFull[id]={
+                pctReturning:Math.round(vals.reduce((a,v)=>a+v.pctReturning,0)/vals.length*100)/100,
+                pctRepeatVisits:Math.round(vals.reduce((a,v)=>a+(v.pctRepeatVisits||0),0)/vals.length*100)/100,
+                newPatients:Math.round(vals.reduce((a,v)=>a+(v.newPatients||0),0)/vals.length),
+                returningPatients:Math.round(vals.reduce((a,v)=>a+(v.returningPatients||0),0)/vals.length),
+                totalPatients:Math.round(vals.reduce((a,v)=>a+(v.totalPatients||0),0)/vals.length),
+                totalVisits:Math.round(vals.reduce((a,v)=>a+(v.totalVisits||0),0)/vals.length),
+              };
+            });
+            // Aggregate clinic data
+            const _snapClinic={};
+            ['Mississauga','Markham'].forEach(loc=>{
+              const vals=_filteredSnaps.map(s=>(s.clinic_data||{})[loc]).filter(Boolean);
+              if(!vals.length)return;
+              _snapClinic[loc]={
+                pctReturning:Math.round(vals.reduce((a,v)=>a+v.pctReturning,0)/vals.length*100)/100,
+                pctRepeatVisits:Math.round(vals.reduce((a,v)=>a+(v.pctRepeatVisits||0),0)/vals.length*100)/100,
+                newPatients:Math.round(vals.reduce((a,v)=>a+(v.newPatients||0),0)/vals.length),
+                returningPatients:Math.round(vals.reduce((a,v)=>a+(v.returningPatients||0),0)/vals.length),
+                totalVisits:Math.round(vals.reduce((a,v)=>a+(v.totalVisits||0),0)/vals.length),
+              };
+            });
+            const _snapMonth=retSelectedMonth||(
+              _filteredSnaps.length===1?_filteredSnaps[0].month:
+              `${_filteredSnaps[0].month} – ${_filteredSnaps[_filteredSnaps.length-1].month} (${_filteredSnaps.length} mo avg)`
+            );
             const _retRows=staff
               .filter(s=>!['mgmt','ops','edu'].includes(s.discipline)
                 &&(retFilterDisc==='all'||s.discipline===retFilterDisc)
@@ -3861,8 +3891,8 @@ function PerformancePage({staff,perfData,setPerfData}){
                         </thead>
                         <tbody>
                           {_retRows.map(s=>{
-                            const rc=s.pctReturning!=null?(s.pctReturning>=90?'#CAE8C1':s.pctReturning>=80?'#44CCAA':s.pctReturning>=70?'#F4DB71':'#E05252'):'#555';
-                            const rpc=s.pctRepeatVisits!=null?(s.pctRepeatVisits>=85?'#CAE8C1':s.pctRepeatVisits>=75?'#44CCAA':s.pctRepeatVisits>=65?'#F4DB71':'#E05252'):'#555';
+                            const rc=s.pctReturning!=null?(s.pctReturning>=80?'#CAE8C1':s.pctReturning>=60?'#F4DB71':'#E05252'):'#555';
+                            const rpc=s.pctRepeatVisits!=null?(s.pctRepeatVisits>=50?'#CAE8C1':s.pctRepeatVisits>=30?'#F4DB71':'#E05252'):'#555';
                             return(
                               <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)'}}>
                                 <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
@@ -4035,7 +4065,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                       const prev=pts.length>1?pts[pts.length-2]:null;
                       const delta=prev!=null?+(latest-prev).toFixed(1):null;
                       const trend=pts.length>=2?+(pts[pts.length-1]-pts[0]).toFixed(1):null;
-                      const c=latest>=90?'#CAE8C1':latest>=80?'#44CCAA':'#F4DB71';
+                      const c=latest>=80?'#CAE8C1':latest>=60?'#F4DB71':'#E05252';
                       return(
                         <div key={loc} style={{background:'var(--surface3)',borderRadius:5,padding:'10px 14px',minWidth:160}}>
                           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:4}}>{loc}</div>
@@ -4079,7 +4109,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                                 <td style={{padding:'8px 12px'}}><div style={{display:'flex',alignItems:'center',gap:7}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:12,color:'#777'}}>{s.site}</div></div></div></td>
                                 {vals.map((v,i)=>(
                                   <td key={i} style={{padding:'8px 12px',textAlign:'right'}}>
-                                    {v!=null?<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:v>=90?'#CAE8C1':v>=80?'#44CCAA':v>=70?'#F4DB71':'#E05252'}}>{v}%</span>:<span style={{color:'#333'}}>—</span>}
+                                    {v!=null?<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:v>=80?'#CAE8C1':v>=60?'#F4DB71':'#E05252'}}>{v}%</span>:<span style={{color:'#333'}}>—</span>}
                                   </td>
                                 ))}
                                 <td style={{padding:'8px 12px',textAlign:'right'}}>
@@ -4133,8 +4163,8 @@ function PerformancePage({staff,perfData,setPerfData}){
 
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
             <div style={{fontSize:14,color:'#777',lineHeight:1.6}}>
-              <strong style={{color:'#aaa'}}>Appointments</strong> and <strong style={{color:'#aaa'}}>Sales</strong> CSVs auto-split by month from the row dates — just drop them in.<br/>
-              <strong style={{color:'#aaa'}}>Shift Report</strong> has no date column, so set the month it covers below.
+              <strong style={{color:'#aaa'}}>Appointments</strong>, <strong style={{color:'#aaa'}}>Sales</strong>, and <strong style={{color:'#aaa'}}>Shift Report</strong> — just drop them in, no date selection needed.<br/>
+              <strong style={{color:'#BB99FF'}}>Member Retention</strong> — drop it in and you'll be prompted to select which month it covers (since the file has no dates).
             </div>
             <button className="btn btn-ghost btn-xs" style={{color:'#E05252',marginLeft:'auto',flexShrink:0}}
               onClick={async()=>{if(confirm('Reset ALL performance data? This clears all snapshots, GVA, and retention entries. Cannot be undone.')){
