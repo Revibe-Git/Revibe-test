@@ -2997,7 +2997,7 @@ function PerformancePage({staff,perfData,setPerfData}){
       </div>
 
       {/* Filter bar */}
-      {!['import','gva','trends'].includes(tab)&&data.snapshots.length>0&&(
+      {!['import','gva','trends'].includes(tab)&&(data.snapshots.length>0||tab==='retention')&&(
         <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
 
           {/* Quick period pills */}
