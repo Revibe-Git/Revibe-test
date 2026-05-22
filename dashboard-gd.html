@@ -2329,6 +2329,10 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[utilSort,setUtilSort]=useState({k:'utilization',d:'desc'});
   const[apptSort,setApptSort]=useState({k:'completed',d:'desc'});
   const[retSortKey,setRetSortKey]=useState('pctReturning');
+  const[retPeriod,setRetPeriod]=useState('latest');
+  const[retFilterDisc,setRetFilterDisc]=useState('all');
+  const[retFilterSite,setRetFilterSite]=useState('all');
+  const[retSelectedMonth,setRetSelectedMonth]=useState('');
   const[retentionMonthPicker,setRetentionMonthPicker]=useState('');
   const[pendingRetentionData,setPendingRetentionData]=useState(null);
   const[retentionSnapshots,setRetentionSnapshots]=useState([]);
@@ -3014,7 +3018,7 @@ function PerformancePage({staff,perfData,setPerfData}){
       </div>
 
       {/* Filter bar */}
-      {!['import','gva','trends'].includes(tab)&&(data.snapshots.length>0||tab==='retention')&&(
+      {!['import','gva','trends','retention'].includes(tab)&&data.snapshots.length>0&&(
         <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
 
           {tab!=='retention'&&<>
@@ -3635,71 +3639,83 @@ function PerformancePage({staff,perfData,setPerfData}){
         </div>
       )}
 
-                              {/* ── RETENTION ── */}
+                                    {/* ── RETENTION ── */}
       {tab==='retention'&&(
         <div>
-          {/* Month picker + confirm — shown after a retention CSV is parsed */}
+          {/* ── Retention-specific filter bar ── */}
+          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 14px',marginBottom:14}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
+              {/* Period pills */}
+              {[['latest','Latest'],['1m','Last Month'],['3m','Last 3 Mo'],['6m','Last 6 Mo'],['all','All Time']].map(([v,l])=>(
+                <button key={v} className={`btn btn-sm ${retPeriod===v&&!retSelectedMonth?'btn-go':'btn-ghost'}`}
+                  onClick={()=>{setRetPeriod(v);setRetSelectedMonth('');}}>
+                  {l}
+                </button>
+              ))}
+              <div style={{width:1,height:22,background:'var(--border2)',margin:'0 4px',flexShrink:0}}/>
+              {/* Specific month picker */}
+              <select value={retSelectedMonth} onChange={e=>{setRetSelectedMonth(e.target.value);if(e.target.value)setRetPeriod('');}}
+                style={{background:'var(--surface3)',border:'1px solid '+(retSelectedMonth?'var(--go)':'var(--border2)'),borderRadius:5,color:retSelectedMonth?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer'}}>
+                <option value="">Specific Month…</option>
+                {[...retentionSnapshots].sort((a,b)=>b.month.localeCompare(a.month)).map(s=>(
+                  <option key={s.month} value={s.month}>{s.month}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              {/* Discipline */}
+              <select value={retFilterDisc} onChange={e=>setRetFilterDisc(e.target.value)}
+                style={{background:'var(--surface3)',border:'1px solid '+(retFilterDisc!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:retFilterDisc!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:160}}>
+                <option value="all">All Disciplines</option>
+                {[...new Set(staff.filter(s=>s.discipline&&!['mgmt','ops','edu'].includes(s.discipline)).map(s=>s.discipline))].sort().map(d=>(
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              {/* Location */}
+              <select value={retFilterSite} onChange={e=>setRetFilterSite(e.target.value)}
+                style={{background:'var(--surface3)',border:'1px solid '+(retFilterSite!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:retFilterSite!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:160}}>
+                <option value="all">All Locations</option>
+                {[...new Set(staff.filter(s=>s.site).map(s=>s.site))].sort().map(s=>(
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              {(retFilterDisc!=='all'||retFilterSite!=='all'||retSelectedMonth)&&(
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setRetFilterDisc('all');setRetFilterSite('all');setRetSelectedMonth('');setRetPeriod('latest');}}>Clear filters</button>
+              )}
+            </div>
+          </div>
+
+          {/* ── Pending import confirmation ── */}
           {pendingRetentionData&&(
             <div style={{background:'var(--surface2)',border:'2px solid var(--go)',borderRadius:8,padding:'16px 20px',marginBottom:16}}>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',fontWeight:700,marginBottom:10}}>
-                📋 Retention CSV Ready — {pendingRetentionData.matched} practitioners matched
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',fontWeight:700,marginBottom:8}}>
+                📋 Retention CSV Ready — {pendingRetentionData.matched}/{pendingRetentionData.total} matched
               </div>
-              <div style={{fontSize:14,color:'#aaa',marginBottom:14}}>
-                Which month does this data cover? Jane exports cover the date range you selected — pick the month below.
-              </div>
+              <div style={{fontSize:14,color:'#aaa',marginBottom:12}}>Which month does this data cover?</div>
               <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-                <div>
-                  <div style={{fontSize:12,color:'#777',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:4}}>Month</div>
-                  <input type="month" value={retentionMonthPicker} onChange={e=>setRetentionMonthPicker(e.target.value)}
-                    style={{background:'var(--surface3)',border:'2px solid var(--go)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'6px 10px',outline:'none'}}/>
-                </div>
-                <button className="btn btn-lime" style={{marginTop:20}} onClick={async()=>{
-                  if(!retentionMonthPicker){alert('Please select a month first.');return;}
+                <input type="month" value={retentionMonthPicker} onChange={e=>setRetentionMonthPicker(e.target.value)}
+                  style={{background:'var(--surface3)',border:'2px solid var(--go)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'6px 10px',outline:'none'}}/>
+                <button className="btn btn-lime" onClick={async()=>{
+                  if(!retentionMonthPicker){alert('Select a month first.');return;}
                   const{retFull,clinicData,matched,total}=pendingRetentionData;
-                  // Save as snapshot
                   await saveRetentionSnapshot(retentionMonthPicker,retFull,clinicData);
-                  // Also update the singleton (latest data)
                   const newRetention={...data.retention||{}};
                   Object.entries(retFull).forEach(([id,d])=>{newRetention[id]=d.pctReturning;});
                   const newData={...data,retention:newRetention,retentionFull:retFull,retentionClinic:clinicData,retentionImportDate:retentionMonthPicker};
                   save(newData);
                   const SB2=window.__SB;
                   if(SB2)SB2.from('retention_full').upsert({id:'singleton',data:{retentionFull:retFull,retentionClinic:clinicData,importDate:retentionMonthPicker}}).then();
-                  // Add to local snapshots list
-                  setRetentionSnapshots(prev=>{const filtered=prev.filter(s=>s.month!==retentionMonthPicker);return[...filtered,{id:retentionMonthPicker,month:retentionMonthPicker,staff_data:retFull,clinic_data:clinicData}].sort((a,b)=>a.month.localeCompare(b.month));});
-                  setPendingRetentionData(null);
-                  setRetentionMonthPicker('');
-                  setImportMsg({type:'success',msg:`✓ Retention saved for ${retentionMonthPicker}. ${matched}/${total} practitioners.`});
-                }}>✓ Confirm — Save for {retentionMonthPicker||'…'}</button>
-                <button className="btn btn-ghost btn-sm" style={{marginTop:20,color:'#555'}} onClick={()=>{setPendingRetentionData(null);setImportMsg(null);}}>Cancel</button>
+                  setRetentionSnapshots(prev=>{
+                    const filtered=prev.filter(s=>s.month!==retentionMonthPicker);
+                    return[...filtered,{id:retentionMonthPicker,month:retentionMonthPicker,staff_data:retFull,clinic_data:clinicData}].sort((a,b)=>a.month.localeCompare(b.month));
+                  });
+                  setPendingRetentionData(null);setRetentionMonthPicker('');
+                  setImportMsg({type:'success',msg:`✓ Saved retention for ${retentionMonthPicker}. ${matched}/${total} practitioners.`});
+                }}>✓ Save for {retentionMonthPicker||'…'}</button>
+                <button className="btn btn-ghost btn-sm" style={{color:'#555'}} onClick={()=>{setPendingRetentionData(null);setImportMsg(null);}}>Cancel</button>
               </div>
             </div>
           )}
-
-          {/* Clinic summary cards — from most recent snapshot */}
-          {data.retentionClinic&&Object.keys(data.retentionClinic).length>0&&(
-            <div>
-              {data.retentionImportDate&&<div style={{fontSize:12,color:'#555',marginBottom:6,textAlign:'right'}}>Latest import: {data.retentionImportDate}</div>}
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:10,marginBottom:16}}>
-                {Object.entries(data.retentionClinic).map(([loc,d])=>(
-                  <div key={loc} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'14px 18px',borderLeft:'3px solid var(--go)'}}>
-                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',fontWeight:700,marginBottom:10}}>{loc}</div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:8}}>
-                      <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:3}}>% Returning</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color:'#CAE8C1',lineHeight:1}}>{d.pctReturning}%</div></div>
-                      <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:3}}>% Repeat Visits</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color:'#44CCAA',lineHeight:1}}>{d.pctRepeatVisits}%</div></div>
-                    </div>
-                    <div style={{display:'flex',gap:16,fontSize:14,color:'#777'}}>
-                      <span>New: <strong style={{color:'#ddd'}}>{(d.newPatients||0).toLocaleString()}</strong></span>
-                      <span>Returning: <strong style={{color:'#ddd'}}>{(d.returningPatients||0).toLocaleString()}</strong></span>
-                      <span>Visits: <strong style={{color:'#ddd'}}>{(d.totalVisits||0).toLocaleString()}</strong></span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Import message */}
           {importMsg&&tab==='retention'&&(
             <div style={{marginBottom:14,padding:'9px 13px',borderRadius:5,fontSize:14,
               background:importMsg.type==='success'?'rgba(68,204,170,.08)':importMsg.type==='info'?'rgba(107,159,212,.08)':'rgba(224,82,82,.08)',
@@ -3709,128 +3725,132 @@ function PerformancePage({staff,perfData,setPerfData}){
             </div>
           )}
 
-          {/* Trend chart — only when 2+ months of data */}
-          {retentionSnapshots.length>=2&&(()=>{
-            const filtered=retentionSnapshots.filter(snap=>{
-              if(dateFrom&&snap.month<dateFrom)return false;
-              if(dateTo&&snap.month>dateTo)return false;
-              return true;
-            });
-            if(filtered.length<2)return null;
-            const W=600,H=100,PADX=40,PADY=10,BOT=24;
-            const allMiss=filtered.map(s=>(s.clinic_data||{})['Mississauga']?.pctReturning).filter(v=>v!=null);
-            const allMark=filtered.map(s=>(s.clinic_data||{})['Markham']?.pctReturning).filter(v=>v!=null);
-            const allVals=[...allMiss,...allMark].filter(v=>v!=null);
-            if(!allVals.length)return null;
-            const minV=Math.max(0,Math.min(...allVals)-5);
-            const maxV=Math.min(100,Math.max(...allVals)+3);
-            const toY=v=>PADY+Math.round((1-(v-minV)/(maxV-minV))*(H-PADY*2));
-            const toX=i=>PADX+Math.round(i*(W-PADX*2)/(filtered.length-1));
-            const linePoints=(dataArr)=>dataArr.map((v,i)=>`${toX(i)},${toY(v)}`).join(' ');
-            const missPts=filtered.map(s=>(s.clinic_data||{})['Mississauga']?.pctReturning);
-            const markPts=filtered.map(s=>(s.clinic_data||{})['Markham']?.pctReturning);
+          {(()=>{
+            // Determine which snapshot(s) to show based on period filter
+            const now = new Date();
+            const curM = now.toISOString().slice(0,7);
+            let snapToShow = null; // single snapshot for the table
+            let clinicToShow = data.retentionClinic;
+
+            if(retSelectedMonth){
+              snapToShow = retentionSnapshots.find(s=>s.month===retSelectedMonth);
+            } else {
+              const sorted = [...retentionSnapshots].sort((a,b)=>b.month.localeCompare(a.month));
+              if(retPeriod==='latest'||sorted.length===0){
+                snapToShow = sorted[0]||null;
+              } else {
+                // For multi-month periods show latest snapshot in table
+                let monthsBack = retPeriod==='1m'?1:retPeriod==='3m'?3:retPeriod==='6m'?6:999;
+                const cutoff = new Date(now);
+                cutoff.setMonth(cutoff.getMonth()-monthsBack);
+                const cutM = cutoff.toISOString().slice(0,7);
+                const inRange = sorted.filter(s=>s.month>=cutM);
+                snapToShow = inRange[0]||null;
+              }
+            }
+
+            // Build staff rows from the selected snapshot
+            const snapFull = snapToShow ? (snapToShow.staff_data||{}) : (data.retentionFull||{});
+            const snapClinic = snapToShow ? (snapToShow.clinic_data||{}) : (data.retentionClinic||{});
+            const snapMonth = snapToShow ? snapToShow.month : data.retentionImportDate;
+
+            const retRows = staff
+              .filter(s=>!['mgmt','ops','edu'].includes(s.discipline)
+                &&(retFilterDisc==='all'||s.discipline===retFilterDisc)
+                &&(retFilterSite==='all'||s.site===retFilterSite))
+              .map(s=>{
+                const d=snapFull[s.id]||null;
+                const pctRet=(data.retention||{})[s.id]||null;
+                return{...s,
+                  pctReturning:d?d.pctReturning:pctRet,
+                  pctRepeatVisits:d?.pctRepeatVisits??null,
+                  newPatients:d?.newPatients??null,
+                  returningPatients:d?.returningPatients??null,
+                  totalPatients:d?.totalPatients??null,
+                  totalVisits:d?.totalVisits??null
+                };
+              })
+              .filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null)
+              .sort((a,b)=>{
+                const av=a[retSortKey]??-1,bv=b[retSortKey]??-1;
+                if(typeof av==='string')return retSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);
+                return retSortDir==='desc'?bv-av:av-bv;
+              });
+
             return(
-              <div className="perf-slot" style={{marginBottom:14}}>
-                <div className="perf-slot-head">
-                  <span className="perf-slot-title" style={{color:'#BB99FF'}}>Clinic Retention Trend</span>
-                  <div style={{display:'flex',gap:16,fontSize:13}}>
-                    <span style={{color:'#CAE8C1'}}>■ Mississauga</span>
-                    <span style={{color:'#44CCAA'}}>■ Markham</span>
-                    <span style={{color:'#777',fontSize:12}}>{filtered.length} months</span>
+              <div>
+                {/* Clinic summary cards */}
+                {Object.keys(snapClinic).length>0&&(
+                  <div>
+                    {snapMonth&&<div style={{fontSize:12,color:'#555',marginBottom:6,textAlign:'right'}}>Showing: {snapMonth}</div>}
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:10,marginBottom:16}}>
+                      {Object.entries(snapClinic).map(([loc,d])=>(
+                        <div key={loc} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'14px 18px',borderLeft:'3px solid var(--go)'}}>
+                          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',fontWeight:700,marginBottom:10}}>{loc}</div>
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:8}}>
+                            <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:3}}>% Returning</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color:'#CAE8C1',lineHeight:1}}>{d.pctReturning}%</div></div>
+                            <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:3}}>% Repeat Visits</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color:'#44CCAA',lineHeight:1}}>{d.pctRepeatVisits}%</div></div>
+                          </div>
+                          <div style={{display:'flex',gap:16,fontSize:14,color:'#777'}}>
+                            <span>New: <strong style={{color:'#ddd'}}>{(d.newPatients||0).toLocaleString()}</strong></span>
+                            <span>Returning: <strong style={{color:'#ddd'}}>{(d.returningPatients||0).toLocaleString()}</strong></span>
+                            <span>Visits: <strong style={{color:'#ddd'}}>{(d.totalVisits||0).toLocaleString()}</strong></span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-                <div style={{padding:'8px 16px 4px'}}>
-                  <svg width="100%" viewBox={`0 0 ${W} ${H+BOT}`} style={{display:'block',overflow:'visible'}}>
-                    {[minV,Math.round((minV+maxV)/2),maxV].map((v,i)=>(
-                      <g key={i}>
-                        <line x1={PADX} y1={toY(v)} x2={W-PADX} y2={toY(v)} stroke="#1e1e1e" strokeWidth="1"/>
-                        <text x={PADX-5} y={toY(v)+4} textAnchor="end" fontSize="10" fill="#555">{v}%</text>
-                      </g>
-                    ))}
-                    {missPts.some(v=>v!=null)&&<polyline points={missPts.filter((_,i)=>missPts[i]!=null).map((_,ii)=>{const realI=missPts.findIndex((v,j)=>j>=ii&&v!=null);return `${toX(missPts.indexOf(missPts.filter(v=>v!=null)[ii]))},${toY(missPts.filter(v=>v!=null)[ii])}`}).join(' ')} fill="none" stroke="#CAE8C1" strokeWidth="2" strokeLinejoin="round"/>}
-                    {missPts.map((v,i)=>v!=null&&<circle key={i} cx={toX(i)} cy={toY(v)} r="3.5" fill="#CAE8C1"/>)}
-                    {markPts.some(v=>v!=null)&&<polyline points={markPts.filter((_,i)=>markPts[i]!=null).map((_,ii)=>{const realI=markPts.indexOf(markPts.filter(v=>v!=null)[ii]);return `${toX(realI)},${toY(markPts[realI])}`}).join(' ')} fill="none" stroke="#44CCAA" strokeWidth="2" strokeLinejoin="round"/>}
-                    {markPts.map((v,i)=>v!=null&&<circle key={i} cx={toX(i)} cy={toY(v)} r="3.5" fill="#44CCAA"/>)}
-                    {filtered.map((_,i)=>(
-                      <text key={i} x={toX(i)} y={H+BOT} textAnchor="middle" fontSize="10" fill="#666">
-                        {filtered[i].month.slice(5)}
-                      </text>
-                    ))}
-                  </svg>
-                </div>
-                <div style={{display:'flex',gap:24,padding:'0 16px 12px',fontSize:13,color:'#777',flexWrap:'wrap'}}>
-                  {['Mississauga','Markham'].map(loc=>{
-                    const vals=filtered.map(s=>(s.clinic_data||{})[loc]?.pctReturning).filter(v=>v!=null);
-                    if(!vals.length)return null;
-                    const latest=vals[vals.length-1];
-                    const prev=vals.length>1?vals[vals.length-2]:null;
-                    const delta=prev!=null?latest-prev:null;
-                    return(<div key={loc}><span style={{color:'#888'}}>{loc}: </span><strong style={{color:latest>=90?'#CAE8C1':latest>=80?'#44CCAA':'#F4DB71'}}>{latest}%</strong>{delta!=null&&<span style={{marginLeft:6,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777',fontSize:12}}>{delta>0?'+':''}{delta.toFixed(1)}%</span>}</div>);
-                  })}
-                </div>
+                )}
+
+                {/* Practitioner table */}
+                {retRows.length===0?(
+                  <div className="perf-slot">
+                    <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner</span></div>
+                    <div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import a Member Retention CSV via the Jane Import tab. Upload one file per month.</p></div>
+                  </div>
+                ):(
+                  <div className="perf-slot">
+                    <div className="perf-slot-head">
+                      <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — {retRows.length} Practitioners</span>
+                      <div style={{fontSize:13,color:'#555'}}>{retentionSnapshots.length} month{retentionSnapshots.length!==1?'s':''} stored</div>
+                    </div>
+                    <div style={{overflowX:'auto'}}>
+                      <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+                        <thead>
+                          <tr style={{borderBottom:'1px solid var(--border)'}}>
+                            <th style={{textAlign:'left',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='name'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='name'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('name');}}>Practitioner{retSortKey==='name'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='pctReturning'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='pctReturning'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('pctReturning');}}>% Returning{retSortKey==='pctReturning'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='pctRepeatVisits'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='pctRepeatVisits'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('pctRepeatVisits');}}>% Repeat Visits{retSortKey==='pctRepeatVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='newPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='newPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('newPatients');}}>New Members{retSortKey==='newPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='returningPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='returningPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('returningPatients');}}>Returning{retSortKey==='returningPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='totalPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='totalPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('totalPatients');}}>Total Members{retSortKey==='totalPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='totalVisits'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='totalVisits'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('totalVisits');}}>Total Visits{retSortKey==='totalVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {retRows.map(s=>{
+                            const rc=s.pctReturning!=null?(s.pctReturning>=90?'#CAE8C1':s.pctReturning>=80?'#44CCAA':s.pctReturning>=70?'#F4DB71':'#E05252'):'#555';
+                            const rpc=s.pctRepeatVisits!=null?(s.pctRepeatVisits>=85?'#CAE8C1':s.pctRepeatVisits>=75?'#44CCAA':s.pctRepeatVisits>=65?'#F4DB71':'#E05252'):'#555';
+                            return(
+                              <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)'}}>
+                                <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
+                                <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctReturning!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rc,width:Math.min(100,s.pctReturning)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rc,minWidth:46,textAlign:'right'}}>{s.pctReturning}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
+                                <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctRepeatVisits!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rpc,width:Math.min(100,s.pctRepeatVisits)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rpc,minWidth:46,textAlign:'right'}}>{s.pctRepeatVisits}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
+                                <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.newPatients??'—'}</td>
+                                <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.returningPatients??'—'}</td>
+                                <td style={{padding:'9px 12px',textAlign:'right',color:'#ddd',fontWeight:600,fontSize:14}}>{s.totalPatients??'—'}</td>
+                                <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.totalVisits!=null?s.totalVisits.toLocaleString():'—'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}
-
-          {/* Filter indicator */}
-          {(filterDisc!=='all'||filterSite!=='all')&&(
-            <div style={{padding:'6px 12px',marginBottom:10,fontSize:13,color:'#888',background:'var(--surface2)',borderRadius:4,border:'1px solid var(--border)',display:'flex',alignItems:'center',gap:8}}>
-              <span>Filtering by:</span>
-              {filterDisc!=='all'&&<span style={{marginLeft:4,color:'var(--lime)',fontWeight:600}}>{filterDisc}</span>}
-              {filterSite!=='all'&&<span style={{marginLeft:4,color:'var(--lime)',fontWeight:600}}>{filterSite}</span>}
-            </div>
-          )}
-
-          {/* Practitioner table */}
-          {mergedStaff.filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null).length===0?(
-            <div className="perf-slot">
-              <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner</span></div>
-              <div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import a Member Retention CSV via the Jane Import tab to get started. Each month builds your trend history.</p></div>
-            </div>
-          ):(
-            <div className="perf-slot">
-              <div className="perf-slot-head">
-                <span className="perf-slot-title" style={{color:'#BB99FF'}}>
-                  Retention — {mergedStaff.filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null).length} Practitioners
-                </span>
-              </div>
-              <div style={{overflowX:'auto'}}>
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                  <thead>
-                    <tr style={{borderBottom:'1px solid var(--border)'}}>
-                      <th style={{textAlign:'left',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='name'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='name'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('name');}}>Practitioner{retSortKey==='name'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='pctReturning'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='pctReturning'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('pctReturning');}}>% Returning{retSortKey==='pctReturning'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='pctRepeatVisits'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='pctRepeatVisits'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('pctRepeatVisits');}}>% Repeat Visits{retSortKey==='pctRepeatVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='newPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='newPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('newPatients');}}>New Members{retSortKey==='newPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='returningPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='returningPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('returningPatients');}}>Returning Members{retSortKey==='returningPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='totalPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='totalPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('totalPatients');}}>Total Members{retSortKey==='totalPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                      <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='totalVisits'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='totalVisits'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('totalVisits');}}>Total Visits{retSortKey==='totalVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...mergedStaff
-                      .filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null)
-                      .sort((a,b)=>{const av=a[retSortKey]??-1,bv=b[retSortKey]??-1;if(typeof av==='string')return retSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);return retSortDir==='desc'?bv-av:av-bv;})
-                    ].map(s=>{
-                      const rc=s.pctReturning!=null?(s.pctReturning>=90?'#CAE8C1':s.pctReturning>=80?'#44CCAA':s.pctReturning>=70?'#F4DB71':'#E05252'):'#555';
-                      const rpc=s.pctRepeatVisits!=null?(s.pctRepeatVisits>=85?'#CAE8C1':s.pctRepeatVisits>=75?'#44CCAA':s.pctRepeatVisits>=65?'#F4DB71':'#E05252'):'#555';
-                      return(
-                        <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)'}}>
-                          <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
-                          <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctReturning!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rc,width:Math.min(100,s.pctReturning)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rc,minWidth:46,textAlign:'right'}}>{s.pctReturning}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
-                          <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctRepeatVisits!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rpc,width:Math.min(100,s.pctRepeatVisits)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rpc,minWidth:46,textAlign:'right'}}>{s.pctRepeatVisits}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
-                          <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.newPatients??'—'}</td>
-                          <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.returningPatients??'—'}</td>
-                          <td style={{padding:'9px 12px',textAlign:'right',color:'#ddd',fontWeight:600,fontSize:14}}>{s.totalPatients??'—'}</td>
-                          <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.totalVisits!=null?s.totalVisits.toLocaleString():'—'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
