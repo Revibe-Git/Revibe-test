@@ -1838,6 +1838,8 @@ function Stars({n}){return<div style={{display:'flex',gap:3}}>{[1,2,3,4,5].map(i
    APP
 ══════════════════════════════════════════════ */
 function App(){
+  const[user,setUser]=useState(null);
+  const[authLoading,setAuthLoading]=useState(true);
   const[page,setPage]=useState('overview');
   const[staff,setStaff]=useState(()=>ld('staff',SEED_STAFF));
   const[evals,setEvals]=useState(()=>ld('evals',[]));
@@ -1965,6 +1967,40 @@ function App(){
 
   const PAGES={overview:Overview,staff:StaffPage,evals:EvalsPage,education:EduPage,mentors:MentorsPage,gaps:GapsPage,performance:PerformancePage,forms:FormsPage,resources:ResourcesPage,leadership:LeadershipPage,schedule:SchedulePage,clinresources:ClinResourcesPage,gdtracker:GDTrackerPage,systematic:SystematicPage};
   const PageComp=PAGES[page]||Overview;
+
+  const handleGoogleLogin=async()=>{
+    const SB=window.__SB;if(!SB)return;
+    await SB.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.href}});
+  };
+  const handleLogout=async()=>{
+    const SB=window.__SB;if(SB)await SB.auth.signOut();
+    setUser(null);
+  };
+
+  if(authLoading)return(
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'var(--bg)',flexDirection:'column',gap:16}}>
+      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,letterSpacing:'4px',color:'var(--lime)'}}>REVIBE</div>
+      <div style={{fontSize:13,color:'#555'}}>Loading…</div>
+    </div>
+  );
+
+  if(!user)return(
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh',background:'var(--bg)',flexDirection:'column',gap:24,padding:20}}>
+      <div style={{textAlign:'center',marginBottom:8}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:36,letterSpacing:'6px',fontWeight:800,color:'var(--lime)',marginBottom:6}}>REVIBE</div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'3px',color:'#555'}}>GROWTH &amp; DEVELOPMENT PORTAL</div>
+      </div>
+      <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'32px 40px',textAlign:'center',maxWidth:380,width:'100%'}}>
+        <div style={{fontSize:14,color:'#777',marginBottom:24,lineHeight:1.7}}>Sign in with your Revibe Google account to access the portal.</div>
+        <button onClick={handleGoogleLogin}
+          style={{display:'flex',alignItems:'center',gap:12,background:'#fff',color:'#222',border:'none',borderRadius:6,padding:'12px 20px',fontSize:15,fontWeight:600,cursor:'pointer',width:'100%',justifyContent:'center',boxShadow:'0 2px 6px rgba(0,0,0,.4)'}}>
+          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Sign in with Google
+        </button>
+      </div>
+      <div style={{fontSize:12,color:'#333'}}>Access restricted to Revibe team members</div>
+    </div>
+  );
 
   return(
     <div className="shell">
@@ -2193,6 +2229,34 @@ function PerformancePage({staff,perfData,setPerfData}){
   },[]);
 
   // Load daily data from Supabase
+  useEffect(()=>{
+    const SB0=window.__SB;
+    if(SB0){
+      SB0.auth.getSession().then(({data:{session}})=>{
+        setUser(session?.user||null);
+        setAuthLoading(false);
+      });
+      SB0.auth.onAuthStateChange((_,session)=>{
+        setUser(session?.user||null);
+        setAuthLoading(false);
+      });
+    }else{setAuthLoading(false);}
+  },[]);
+
+  useEffect(()=>{
+    const SB0=window.__SB;
+    if(SB0){
+      SB0.auth.getSession().then(({data:{session}})=>{
+        setUser(session?.user||null);
+        setAuthLoading(false);
+      });
+      SB0.auth.onAuthStateChange((_,session)=>{
+        setUser(session?.user||null);
+        setAuthLoading(false);
+      });
+    }else{setAuthLoading(false);}
+  },[]);
+
   useEffect(()=>{
     let cancelled=false;
     const tryLoad=async()=>{
@@ -3243,11 +3307,11 @@ function PerformancePage({staff,perfData,setPerfData}){
                       <div key={loc} style={{background:'var(--surface3)',borderRadius:5,padding:'10px 14px'}}>
                         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:6}}>{loc}</div>
                         <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:4}}>
-                          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:ret!=null?(ret>=80?'#CAE8C1':ret>=60?'#F4DB71':'#E05252'):'#888',lineHeight:1}}>{ret!=null?ret+'%':'—'}</span>
+                          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:ret!=null?(ret>=70?'#CAE8C1':ret>=55?'#F4DB71':'#E05252'):'#888',lineHeight:1}}>{ret!=null?ret+'%':'—'}</span>
                           <span style={{fontSize:12,color:'#666'}}>returning</span>
                           {delta!=null&&<span style={{fontSize:12,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777',marginLeft:4}}>{delta>0?'+':''}{delta}%</span>}
                         </div>
-                        <div style={{fontSize:12,color:'#555'}}>Repeat visits: <strong style={{color:rep>=50?color:rep>=30?'#F4DB71':'#E05252'}}>{rep!=null?rep+'%':'—'}</strong></div>
+                        <div style={{fontSize:12,color:'#555'}}>Repeat visits: <strong style={{color:rep>=45?color:rep>=25?'#F4DB71':'#E05252'}}>{rep!=null?rep+'%':'—'}</strong></div>
                       </div>
                     ))}
                   </div>
@@ -3891,8 +3955,8 @@ function PerformancePage({staff,perfData,setPerfData}){
                         </thead>
                         <tbody>
                           {_retRows.map(s=>{
-                            const rc=s.pctReturning!=null?(s.pctReturning>=80?'#CAE8C1':s.pctReturning>=60?'#F4DB71':'#E05252'):'#555';
-                            const rpc=s.pctRepeatVisits!=null?(s.pctRepeatVisits>=50?'#CAE8C1':s.pctRepeatVisits>=30?'#F4DB71':'#E05252'):'#555';
+                            const rc=s.pctReturning!=null?(s.pctReturning>=70?'#CAE8C1':s.pctReturning>=55?'#F4DB71':'#E05252'):'#555';
+                            const rpc=s.pctRepeatVisits!=null?(s.pctRepeatVisits>=45?'#CAE8C1':s.pctRepeatVisits>=25?'#F4DB71':'#E05252'):'#555';
                             return(
                               <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)'}}>
                                 <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
@@ -4016,7 +4080,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                 const maxV=Math.min(100,Math.max(...allV)+3);
                 const toY=v=>PADY+Math.round((1-(v-minV)/(maxV-minV||1))*(H-PADY*2));
                 const toX=i=>staffSnaps.length>1?PADX+Math.round(i*(W-PADX*2)/(staffSnaps.length-1)):W/2;
-                const retC=latest>=80?'#CAE8C1':latest>=60?'#F4DB71':'#E05252';
+                const retC=latest>=70?'#CAE8C1':latest>=55?'#F4DB71':'#E05252';
                 return(
                   <div className="perf-slot" style={{marginTop:14}}>
                     <div className="perf-slot-head">
@@ -4062,12 +4126,12 @@ function PerformancePage({staff,perfData,setPerfData}){
                     <div style={{padding:'0 16px 14px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:8}}>
                       {staffSnaps.map(s=>{
                         const d=s.staff_data[trendStaff.id];
-                        const c=d.pctReturning>=80?'#CAE8C1':d.pctReturning>=60?'#F4DB71':'#E05252';
+                        const c=d.pctReturning>=70?'#CAE8C1':d.pctReturning>=55?'#F4DB71':'#E05252';
                         return(
                           <div key={s.month} style={{background:'var(--surface3)',borderRadius:4,padding:'8px 10px'}}>
                             <div style={{fontSize:11,color:'#555',marginBottom:4}}>{s.month}</div>
                             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:c}}>{d.pctReturning}%</div>
-                            {d.pctRepeatVisits!=null&&<div style={{fontSize:11,color:d.pctRepeatVisits>=50?'#44CCAA':d.pctRepeatVisits>=30?'#F4DB71':'#E05252'}}>{d.pctRepeatVisits}% repeat</div>}
+                            {d.pctRepeatVisits!=null&&<div style={{fontSize:11,color:d.pctRepeatVisits>=45?'#44CCAA':d.pctRepeatVisits>=25?'#F4DB71':'#E05252'}}>{d.pctRepeatVisits}% repeat</div>}
                           </div>
                         );
                       })}
