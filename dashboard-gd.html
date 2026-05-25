@@ -2231,16 +2231,20 @@ function PerformancePage({staff,perfData,setPerfData}){
   // Load daily data from Supabase
   useEffect(()=>{
     const SB0=window.__SB;
+    // Fallback: never hang on loading screen
+    const fallback=setTimeout(()=>setAuthLoading(false),3000);
     if(SB0){
       SB0.auth.getSession().then(({data:{session}})=>{
+        clearTimeout(fallback);
         setUser(session?.user||null);
         setAuthLoading(false);
-      });
+      }).catch(()=>{clearTimeout(fallback);setAuthLoading(false);});
       SB0.auth.onAuthStateChange((_,session)=>{
+        clearTimeout(fallback);
         setUser(session?.user||null);
         setAuthLoading(false);
       });
-    }else{setAuthLoading(false);}
+    }else{clearTimeout(fallback);setAuthLoading(false);}
   },[]);
 
   useEffect(()=>{
