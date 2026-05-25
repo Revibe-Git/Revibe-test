@@ -2264,12 +2264,12 @@ function PerformancePage({staff,perfData,setPerfData}){
             }
           }
         }
-      // Load retention snapshots unconditionally (separate Supabase table)
+      }catch(e){console.warn('[Perf] Supabase sync error:',e);}
+      // Load retention snapshots unconditionally
       try{
         const{data:retSnaps}=await SB.from('retention_snapshots').select('*').order('month',{ascending:true});
         if(retSnaps&&retSnaps.length>0)setRetentionSnapshots(retSnaps);
-      }catch(e){console.warn('retention_snapshots table not yet created',e);}
-      }catch(e){console.warn('[Perf] Supabase sync error:',e);}
+      }catch(e){console.warn('retention_snapshots load failed',e);}
       setLoading(false);
     };
     setTimeout(tryLoad,500);
