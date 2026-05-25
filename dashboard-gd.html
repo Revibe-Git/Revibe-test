@@ -2238,8 +2238,6 @@ function PerformancePage({staff,perfData,setPerfData}){
       }
       try{
         const{data:snaps,error:se}=await SB.from('performance_snapshots').select('*').order('date',{ascending:true});
-        if(se){console.error('[Perf] Supabase error:',se);setImportMsg({type:'error',msg:'Supabase error: '+se.message});setLoading(false);return;}
-        console.log('[Perf] Loaded snaps:',snaps?.length,'error:',se);
         if(!se&&snaps&&snaps.length>0){
           const{data:gvaRows}=await SB.from('gva_entries').select('*').order('recorded_at',{ascending:false});
           const{data:retRows}=await SB.from('retention_entries').select('*').order('recorded_at',{ascending:false});
@@ -2248,7 +2246,8 @@ function PerformancePage({staff,perfData,setPerfData}){
           const retention={};
           (retRows||[]).forEach(r=>{if(!retention[r.staff_id])retention[r.staff_id]=r.value;});
           const loaded={snapshots:snaps.map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:snaps[snaps.length-1]?.created_at||null};
-          const{data:retFullRow}=await SB.from('retention_full').select('*').eq('id','singleton').single().catch(()=>({data:null}));
+          let retFullRow=null;
+          try{const{data:r}=await SB.from('retention_full').select('*').eq('id','singleton').single();retFullRow={data:r};}catch(e){retFullRow={data:null};}
           if(retFullRow?.data){loaded.retentionFull=retFullRow.data.retentionFull||{};loaded.retentionClinic=retFullRow.data.retentionClinic||{};loaded.retentionImportDate=retFullRow.data.importDate||null;}
           // Supabase data is fresher — update state and localStorage
           setPerfData(loaded);
