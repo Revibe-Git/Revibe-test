@@ -1839,7 +1839,7 @@ function Stars({n}){return<div style={{display:'flex',gap:3}}>{[1,2,3,4,5].map(i
 ══════════════════════════════════════════════ */
 function App(){
   const[user,setUser]=useState(null);
-  const[authLoading,setAuthLoading]=useState(true);
+  const[authLoading,setAuthLoading]=useState(false);
   const[page,setPage]=useState('overview');
   const[staff,setStaff]=useState(()=>ld('staff',SEED_STAFF));
   const[evals,setEvals]=useState(()=>ld('evals',[]));
