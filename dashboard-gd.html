@@ -2191,6 +2191,7 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
 function PerformancePage({staff,perfData,setPerfData}){
   const SK='rvgd3_perf3';
   const[loading,setLoading]=useState(true);
+  const[loadError,setLoadError]=useState('');
   const data=perfData||{snapshots:[],gva:{},retention:{},lastImport:null};
 
   // Daily granular data — stores per-staff per-day aggregates
@@ -2237,6 +2238,8 @@ function PerformancePage({staff,perfData,setPerfData}){
       }
       try{
         const{data:snaps,error:se}=await SB.from('performance_snapshots').select('*').order('date',{ascending:true});
+        if(se){console.error('[Perf] Supabase error:',se);setImportMsg({type:'error',msg:'Supabase error: '+se.message});setLoading(false);return;}
+        console.log('[Perf] Loaded snaps:',snaps?.length,'error:',se);
         if(!se&&snaps&&snaps.length>0){
           const{data:gvaRows}=await SB.from('gva_entries').select('*').order('recorded_at',{ascending:false});
           const{data:retRows}=await SB.from('retention_entries').select('*').order('recorded_at',{ascending:false});
