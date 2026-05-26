@@ -2212,8 +2212,8 @@ function PerformancePage({staff,perfData,setPerfData}){
       if(!SB){setTimeout(tryLoad,400);return;}
       try{
         const[{data:appts},{data:rev}]=await Promise.all([
-          SB.from('daily_appointments').select('*'),
-          SB.from('daily_revenue').select('*')
+          SB.from('daily_appointments').select('*').order('date',{ascending:false}).limit(5000),
+          SB.from('daily_revenue').select('*').order('date',{ascending:false}).limit(5000)
         ]);
         if(!cancelled){
           if(appts&&appts.length>0){setDailyAppts(appts);try{localStorage.setItem('rvgd3_daily_appts',JSON.stringify(appts));}catch(e){}}
