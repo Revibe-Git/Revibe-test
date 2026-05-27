@@ -2056,6 +2056,92 @@ function Sparkline({values,color,width=120,height=32}){
   </svg>);
 }
 
+function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,staffId}){
+  // Calculate current month projection
+  const now=new Date();
+  const curM=now.toISOString().slice(0,7);
+  const dayOfMonth=now.getDate();
+  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const remaining=daysInMonth-dayOfMonth;
+  const pct=Math.round((dayOfMonth/daysInMonth)*100);
+
+  // Filter to current month
+  const monthAppts=dailyAppts.filter(r=>{
+    if(!r.date.startsWith(curM))return false;
+    if(staffId)return r.staff_id===staffId;
+    const s=staff.find(x=>x.id===r.staff_id);
+    if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;
+    if(filterDisc!=='all'&&s.discipline!==filterDisc)return false;
+    if(filterSite!=='all'&&s.site!==filterSite)return false;
+    return true;
+  });
+  const monthRev=dailyRevenue.filter(r=>{
+    if(!r.date.startsWith(curM))return false;
+    if(staffId)return r.staff_id===staffId;
+    const s=staff.find(x=>x.id===r.staff_id);
+    if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;
+    if(filterDisc!=='all'&&s.discipline!==filterDisc)return false;
+    if(filterSite!=='all'&&s.site!==filterSite)return false;
+    return true;
+  });
+
+  const toDate=v=>Math.round(v);
+  const metrics=[
+    {
+      label:'Revenue',color:'#CAE8C1',
+      actual:monthRev.reduce((a,r)=>a+(r.revenue||0),0),
+      fmt:v=>'$'+Math.round(v).toLocaleString(),
+    },
+    {
+      label:'Completed Visits',color:'#BB99FF',
+      actual:monthAppts.reduce((a,r)=>a+(r.completed||0),0),
+      fmt:v=>Math.round(v).toLocaleString(),
+    },
+    {
+      label:'Initial Assessments',color:'#F4DB71',
+      actual:monthAppts.reduce((a,r)=>a+(r.initial_assessments||0),0),
+      fmt:v=>Math.round(v).toString(),
+    },
+  ].filter(m=>m.actual>0);
+
+  if(!metrics.length||dayOfMonth<3)return null;
+
+  return(
+    <div className="perf-slot" style={{marginBottom:14}}>
+      <div className="perf-slot-head">
+        <span className="perf-slot-title" style={{color:'#44CCAA'}}>📈 {now.toLocaleDateString('en-CA',{month:'long',year:'numeric'})} Projection</span>
+        <span style={{fontSize:13,color:'#555'}}>{dayOfMonth} of {daysInMonth} days ({pct}% through month)</span>
+      </div>
+      <div style={{padding:'12px 16px'}}>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12}}>
+          {metrics.map(({label,color,actual,fmt})=>{
+            const dailyRate=actual/dayOfMonth;
+            const projected=Math.round(dailyRate*daysInMonth);
+            const remaining=projected-actual;
+            return(
+              <div key={label} style={{background:'var(--surface3)',borderRadius:6,padding:'12px 14px'}}>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:8}}>{label}</div>
+                <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:6}}>
+                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color}}>{fmt(projected)}</span>
+                  <span style={{fontSize:12,color:'#555'}}>projected</span>
+                </div>
+                <div style={{fontSize:13,color:'#aaa',marginBottom:4}}>
+                  <span style={{color:'#ddd'}}>{fmt(actual)}</span> so far · <span style={{color:'#44CCAA'}}>{fmt(remaining)} remaining</span>
+                </div>
+                <div style={{fontSize:12,color:'#555'}}>{fmt(Math.round(dailyRate))}/day pace</div>
+                {/* Progress bar */}
+                <div style={{marginTop:8,height:4,background:'var(--surface2)',borderRadius:2}}>
+                  <div style={{height:'100%',borderRadius:2,background:color,width:Math.min(100,pct)+'%'}}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg,granularity,dateFrom,dateTo}){
   const allPts=snapshots.map(s=>{
     const r=s.rows?.find(r=>r.staffId===staffId);
@@ -3210,6 +3296,9 @@ function PerformancePage({staff,perfData,setPerfData}){
             </>);
           })()}
 
+          {/* Projections overview card */}
+          <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc="all" filterSite="all"/>
+
           {/* Retention overview card */}
           {(retentionSnapshots.length>0||data.retentionClinic)&&(()=>{
             const snaps=[...retentionSnapshots].sort((a,b)=>a.month.localeCompare(b.month));
@@ -4017,23 +4106,40 @@ function PerformancePage({staff,perfData,setPerfData}){
                 <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:12}}>
                   Clinic Totals — {filteredStaff.length} practitioners{trendDisc!=='all'?` · ${trendDisc}`:''}{trendSite!=='all'?` · ${trendSite}`:''}
                 </div>
+                <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite}/>
                 {clinicMetrics.map(({key,label,color,fmt})=>{
+                  const nowD=new Date();
+                  const curM=nowD.toISOString().slice(0,7);
+                  const dayOf=nowD.getDate();
+                  const daysIn=new Date(nowD.getFullYear(),nowD.getMonth()+1,0).getDate();
                   const pts=snaps.map(s=>{
                     const vals=filteredStaff.map(st=>{const row=s.rows?.find(r=>r.staffId===st.id);return row?parseFloat(row[key])||0:0;});
                     const val=key==='utilization'&&filteredStaff.length?Math.round(vals.reduce((a,b)=>a+b,0)/filteredStaff.length):Math.round(vals.reduce((a,b)=>a+b,0));
-                    return{date:s.date,val};
+                    const isPartial=s.date.startsWith(curM);
+                    return{date:s.date,val,isPartial};
                   }).filter(p=>p.val>0);
                   if(!pts.length)return null;
                   const pVals=pts.map(p=>p.val);
+                  const lastPt=pts[pts.length-1];
+                  const isCurrentMonthPartial=lastPt.isPartial&&dayOf<daysIn;
+                  // Projection for current month
+                  const projVal=isCurrentMonthPartial&&key!=='utilization'?Math.round((lastPt.val/dayOf)*daysIn):null;
                   const sumOrAvg=key==='utilization'?Math.round(pVals.reduce((a,b)=>a+b,0)/pVals.length):pVals.reduce((a,b)=>a+b,0);
                   const latest=pVals[pVals.length-1];const prev=pVals.length>1?pVals[pVals.length-2]:null;
-                  const delta=prev&&prev!==0?((latest-prev)/prev*100).toFixed(1):null;const up=delta>=0;
-                  const minV=Math.min(...pVals)*0.9,maxV=Math.max(...pVals)*1.1,rangeV=maxV-minV||1;
+                  // Compare against projected if partial month, else actual MoM
+                  const compareVal=isCurrentMonthPartial&&projVal?projVal:latest;
+                  const delta=prev&&prev!==0?((compareVal-prev)/prev*100).toFixed(1):null;const up=delta>=0;
+                  const allValsForScale=[...pVals,...(projVal?[projVal]:[])];
+                  const minV=Math.min(...allValsForScale)*0.9,maxV=Math.max(...allValsForScale)*1.1,rangeV=maxV-minV||1;
                   const W=500,H=120,PADX=52,PADY=12,BOTTOM=28;
                   const toY=v=>PADY+Math.round((1-(v-minV)/rangeV)*(H-PADY*2));
-                  const coords=pts.map((p,i)=>({x:PADX+Math.round((i/(pts.length-1||1))*(W-PADX-14)),y:toY(p.val),val:p.val,date:p.date}));
-                  const pathD=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
-                  const areaD=pathD+` L${coords[coords.length-1].x},${H} L${coords[0].x},${H} Z`;
+                  const coords=pts.map((p,i)=>({x:PADX+Math.round((i/(pts.length-1||1))*(W-PADX-14)),y:toY(p.val),val:p.val,date:p.date,isPartial:p.isPartial}));
+                  // Separate solid line (complete months) from partial
+                  const solidCoords=isCurrentMonthPartial?coords.slice(0,-1):coords;
+                  const pathD=solidCoords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
+                  const areaD=pathD+` L${solidCoords[solidCoords.length-1]?.x||coords[0].x},${H} L${coords[0].x},${H} Z`;
+                  const lastC=coords[coords.length-1];
+                  const projY=projVal?toY(projVal):null;
                   const showLbl=i=>pts.length<=6||(pts.length<=12&&i%2===0)||i===0||i===pts.length-1;
                   const fmtD=d=>new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'});
                   const yGrid=Array.from({length:4},(_,i)=>({y:PADY+Math.round((i/3)*(H-PADY*2)),val:maxV-((maxV-minV)*(i/3))}));
@@ -4042,10 +4148,17 @@ function PerformancePage({staff,perfData,setPerfData}){
                       <div className="perf-slot-head">
                         <span className="perf-slot-title" style={{color}}>{label}</span>
                         <div style={{display:'flex',gap:20,alignItems:'center'}}>
-                          <div>
-                            <span style={{fontSize:12,color:'#888',marginRight:6}}>{key==='utilization'?'Avg':'Total'}: </span>
-                            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color}}>{fmt(sumOrAvg)}</span>
-                            {delta!=null&&<span style={{marginLeft:8,fontSize:13,color:up?'#44CCAA':'#E05252',fontWeight:700}}>{up?'▲':'▼'}{Math.abs(delta)}% MoM</span>}
+                          <div style={{display:'flex',alignItems:'baseline',gap:12,flexWrap:'wrap'}}>
+                            <div>
+                              <span style={{fontSize:12,color:'#888',marginRight:6}}>{key==='utilization'?'Avg':'Total'}: </span>
+                              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color}}>{fmt(sumOrAvg)}</span>
+                              {delta!=null&&<span style={{marginLeft:8,fontSize:13,color:up?'#44CCAA':'#E05252',fontWeight:700}}>{up?'▲':'▼'}{Math.abs(delta)}% MoM</span>}
+                            </div>
+                            {projVal&&<div style={{background:'rgba(244,219,113,.08)',border:'1px solid rgba(244,219,113,.2)',borderRadius:4,padding:'3px 10px'}}>
+                              <span style={{fontSize:12,color:'#888',marginRight:6}}>Projected: </span>
+                              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#F4DB71'}}>{fmt(projVal)}</span>
+                              <span style={{fontSize:11,color:'#666',marginLeft:6}}>({dayOf}/{daysIn} days)</span>
+                            </div>}
                           </div>
                           <span style={{fontSize:12,color:'#555'}}>{pts.length} months</span>
                         </div>
@@ -4054,8 +4167,14 @@ function PerformancePage({staff,perfData,setPerfData}){
                         <svg width="100%" viewBox={`0 0 ${W} ${H+BOTTOM}`} style={{display:'block',overflow:'visible'}}>
                           {yGrid.map((g,i)=>(<g key={i}><line x1={PADX} y1={g.y} x2={W-14} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/><text x={PADX-6} y={g.y+4} textAnchor="end" fontSize="11" fill="#666">{fmt(Math.round(g.val))}</text></g>))}
                           <path d={areaD} fill={color} opacity="0.07"/>
-                          <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
-                          {coords.map((c,i)=>(<g key={i}><circle cx={c.x} cy={c.y} r="4" fill={color}/>{pts.length<=10&&<text x={c.x} y={c.y-9} textAnchor="middle" fontSize="10" fill={color} fontWeight="600">{fmt(c.val)}</text>}{showLbl(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">{fmtD(c.date)}</text>}</g>))}
+                          {solidCoords.length>1&&<path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>}
+                          {/* Partial month dotted segment */}
+                          {isCurrentMonthPartial&&solidCoords.length>0&&lastC&&<line x1={solidCoords[solidCoords.length-1].x} y1={solidCoords[solidCoords.length-1].y} x2={lastC.x} y2={lastC.y} stroke={color} strokeWidth="2" strokeDasharray="4,3" opacity="0.6"/>}
+                          {/* Projection dotted extension */}
+                          {projVal&&projY&&lastC&&<line x1={lastC.x} y1={lastC.y} x2={lastC.x+30} y2={projY} stroke="#F4DB71" strokeWidth="2" strokeDasharray="3,3" opacity="0.8"/>}
+                          {projVal&&projY&&<circle cx={lastC.x+30} cy={projY} r="4" fill="#F4DB71" opacity="0.8"/>}
+                          {projVal&&projY&&<text x={lastC.x+34} y={projY+4} fontSize="10" fill="#F4DB71" opacity="0.9">{fmt(projVal)} proj</text>}
+                          {coords.map((c,i)=>(<g key={i}><circle cx={c.x} cy={c.y} r={c.isPartial?3:4} fill={c.isPartial?'#888':color} opacity={c.isPartial?0.7:1}/>{pts.length<=10&&!c.isPartial&&<text x={c.x} y={c.y-9} textAnchor="middle" fontSize="10" fill={color} fontWeight="600">{fmt(c.val)}</text>}{c.isPartial&&<text x={c.x} y={c.y-9} textAnchor="middle" fontSize="10" fill="#888">partial</text>}{showLbl(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill={c.isPartial?'#888':'#777'}>{fmtD(c.date)}</text>}</g>))}
                           <line x1={PADX} y1={H} x2={W-14} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
                         </svg>
                       </div>
@@ -4115,6 +4234,9 @@ function PerformancePage({staff,perfData,setPerfData}){
                   </div>
                 );
               })()}
+
+              {/* ── Per-practitioner projection ── */}
+              <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc="all" filterSite="all" staffId={trendStaff.id}/>
 
               {/* ── Per-practitioner retention trend ── */}
               {(()=>{
