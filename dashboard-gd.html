@@ -2073,9 +2073,17 @@ function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,sta
     &&(!staffId||s.id===staffId);
 
   // Revenue from snapshots
-  const snapRevenue=curSnap?(curSnap.rows||[]).filter(r=>{
-    const s=staff.find(x=>x.id===r.staffId);return s&&filterStaff(s);
-  }).reduce((a,r)=>a+(parseFloat(r.revenue)||0),0):0;
+  // Sum all revenue rows including unmatched (_clinic bucket) for full clinic total
+  const snapRevenue=curSnap?(curSnap.rows||[]).reduce((a,r)=>{
+    if(!r.revenue)return a;
+    // If staffId filter active, only include matched staff
+    if(staffId&&r.staffId!==staffId)return a;
+    if(!staffId&&(filterDisc!=='all'||filterSite!=='all')){
+      const s=staff.find(x=>x.id===r.staffId);
+      if(r.staffId&&s&&!filterStaff(s))return a;
+    }
+    return a+(parseFloat(r.revenue)||0);
+  },0):0;
 
   // Visits + IAs from dailyAppts (more current)
   const monthAppts=dailyAppts.filter(r=>{
@@ -2967,9 +2975,16 @@ function PerformancePage({staff,perfData,setPerfData}){
       });
       // Add revenue from sales snapshot (separate pass to avoid double-counting)
       if(revenueSnap)(revenueSnap.rows||[]).forEach(r=>{
-        if(!r.staffId||!r.revenue)return;
-        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name||r.staffName,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
-        byStaff[r.staffId].revenue+=(parseFloat(r.revenue)||0);
+        if(!r.revenue)return;
+        if(r.staffId){
+          if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name||r.staffName,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
+          byStaff[r.staffId].revenue+=(parseFloat(r.revenue)||0);
+        }
+        // _clinic bucket: add to a special clinic-total entry
+        else if(r.name==='_clinic'){
+          if(!byStaff['_clinic'])byStaff['_clinic']={staffId:'_clinic',name:'Clinic (unassigned)',completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
+          byStaff['_clinic'].revenue+=(parseFloat(r.revenue)||0);
+        }
       });
     });
     return Object.values(byStaff).map(r=>({
