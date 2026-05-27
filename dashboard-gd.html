@@ -2790,6 +2790,8 @@ function PerformancePage({staff,perfData,setPerfData}){
           monthsCreated.push(month);
           const snapDate=month+'-01';
           const existingIdx=newSnapshots.findIndex(s=>s.date.startsWith(month));
+          // Also check already-loaded snapshots (e.g. appt snapshot from previous import)
+          const loadedIdx=existingIdx<0?data.snapshots.findIndex(s=>s.date.startsWith(month)):-1;
           if(existingIdx>=0){
             const existing=newSnapshots[existingIdx];
             const mergedRows=[...existing.rows];
@@ -2799,6 +2801,16 @@ function PerformancePage({staff,perfData,setPerfData}){
               else mergedRows.push(nr);
             });
             newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
+          }else if(loadedIdx>=0){
+            // Merge sales into existing loaded snapshot (appointments already saved)
+            const existing=data.snapshots[loadedIdx];
+            const mergedRows=[...existing.rows];
+            parsed.forEach(nr=>{
+              const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
+              if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
+              else mergedRows.push(nr);
+            });
+            newSnapshots.push({...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]});
           }else{
             newSnapshots.push({id:'snap_'+month+'_sales',date:snapDate,rows:parsed,files:[file.name],type:'sales'});
           }
