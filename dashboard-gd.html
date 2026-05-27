@@ -2708,16 +2708,17 @@ function PerformancePage({staff,perfData,setPerfData}){
     rows.forEach(row=>{
       const r=norm(row);
       const name=r['staff member']||r['staff_member']||'';
-      if(!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa')return;
       const category=(r['income category']||r['income_category']||'').toLowerCase();
-      // Total invoiced — all statuses, all income types
+      // Total invoiced — all statuses, all income types including GE/products
       const collected=parseFloat((r['total']||'0').toString().replace(/[$,\s]/g,''))||0;
       if(!collected)return;
       const month=getMonth(r['purchase date']||r['invoice date']);
       if(!month)return;
       if(!byMonth[month])byMonth[month]={};
-      if(!byMonth[month][name])byMonth[month][name]={name,revenue:0};
-      byMonth[month][name].revenue+=collected;
+      // GE/no-name/spa go into _clinic bucket for total tracking
+      const bucketName=(!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa')?'_clinic':name;
+      if(!byMonth[month][bucketName])byMonth[month][bucketName]={name:bucketName,revenue:0};
+      byMonth[month][bucketName].revenue+=collected;
     });
     const result={};
     Object.entries(byMonth).forEach(([month,staffMap])=>{
