@@ -3011,8 +3011,6 @@ function PerformancePage({staff,perfData,setPerfData}){
       const rows=parseCSV(text);
       if(!rows.length){setImportMsg({type:'error',msg:'File is empty or unreadable.'});setImporting(false);return;}
       const type=detectFileType(rows);
-      console.log('[Import] File:',file.name,'Type:',type,'Rows:',rows.length,'First row keys:',rows[0]?Object.keys(rows[0]).slice(0,5):[]);
-
       let newSnapshots=[...data.snapshots];
       let totalPractitioners=0,totalMatched=0,monthsCreated=[],unmatchedNames=new Set();
 
@@ -3058,10 +3056,6 @@ function PerformancePage({staff,perfData,setPerfData}){
         }
       }else if(type==='sales'){
         const byMonth=parseSalesByMonth(rows);
-        const mayRows=byMonth['2026-05']||[];
-        const matchedMay=mayRows.filter(r=>r.staffId);
-        console.log('[Sales] byMonth keys:',Object.keys(byMonth),'total rows:',Object.values(byMonth).reduce((a,v)=>a+v.length,0));
-        console.log('[Sales] May rows:',mayRows.length,'matched:',matchedMay.length,'staff loaded:',staff.length,'sample:',mayRows[0]?.name,mayRows[0]?.staffId,mayRows[0]?.revenue);
         Object.entries(byMonth).forEach(([month,parsed])=>{
           totalPractitioners=Math.max(totalPractitioners,parsed.length);
           totalMatched=Math.max(totalMatched,parsed.filter(r=>r.staffId).length);
@@ -3155,15 +3149,13 @@ function PerformancePage({staff,perfData,setPerfData}){
 
       // Sort snapshots by date, keep last 36
       newSnapshots=newSnapshots.sort((a,b)=>a.date.localeCompare(b.date)).slice(-36);
-      console.log('[PreSave] newSnapshots count:',newSnapshots.length,'sample revenue:',newSnapshots.find(s=>s.date.startsWith('2026-05'))?.rows?.find(r=>r.revenue)?.revenue);
       const newData={...data,snapshots:newSnapshots,lastImport:new Date().toISOString()};
       save(newData);
       // Save to Supabase
       let sbOk=true;
       if(window.__SB){
         for(const snap of newSnapshots){
-          const r=await saveSnapshot(snap);
-          console.log('[SB Save]',snap.id,'rows:',snap.rows?.length);
+          await saveSnapshot(snap);
         }
       }else{sbOk=false;}
 
@@ -3259,11 +3251,7 @@ function PerformancePage({staff,perfData,setPerfData}){
         }
       });
     });
-    const result=Object.values(byStaff);
-    const withRevCount=result.filter(r=>r.revenue>0).length;
-    if(withRevCount===0&&result.length>0)console.warn('[aggregateRows] No revenue found! Sample row:',JSON.stringify(result[0]));
-    else console.log('[aggregateRows] rows:',result.length,'with revenue:',withRevCount,'total rev:',result.reduce((a,r)=>a+(r.revenue||0),0));
-    return result.map(r=>({
+    return Object.values(byStaff).map(r=>({
       ...r,
       revenue:Math.round(r.revenue*100)/100,
       // Average the utilization across however many shift snapshots exist
