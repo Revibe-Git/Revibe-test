@@ -3058,7 +3058,10 @@ function PerformancePage({staff,perfData,setPerfData}){
         }
       }else if(type==='sales'){
         const byMonth=parseSalesByMonth(rows);
+        const mayRows=byMonth['2026-05']||[];
+        const matchedMay=mayRows.filter(r=>r.staffId);
         console.log('[Sales] byMonth keys:',Object.keys(byMonth),'total rows:',Object.values(byMonth).reduce((a,v)=>a+v.length,0));
+        console.log('[Sales] May rows:',mayRows.length,'matched:',matchedMay.length,'staff loaded:',staff.length,'sample:',mayRows[0]?.name,mayRows[0]?.staffId,mayRows[0]?.revenue);
         Object.entries(byMonth).forEach(([month,parsed])=>{
           totalPractitioners=Math.max(totalPractitioners,parsed.length);
           totalMatched=Math.max(totalMatched,parsed.filter(r=>r.staffId).length);
