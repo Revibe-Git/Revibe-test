@@ -2347,6 +2347,59 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
           </table>
         </div>
       )}
+
+      {/* Sparkline trend charts */}
+      {weeks.length>=2&&(
+        <div style={{marginTop:16}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:10}}>Weekly Trend</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:10}}>
+            {metrics.map(({key,label,color,fmt})=>{
+              const data=weeks.map(w=>({wk:w.wk,val:w[key]}));
+              const vals=data.map(d=>d.val);
+              if(!vals.some(v=>v>0))return null;
+              const avg=Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+              const latest=vals[vals.length-1];
+              const prev=vals.length>1?vals[vals.length-2]:null;
+              const delta=prev&&prev!==0?((latest-prev)/prev*100).toFixed(1):null;
+              const up=parseFloat(delta)>=0;
+              const maxV=Math.max(...vals,1);
+              const CHART_H=70;
+              const fmtD=d=>new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'});
+              // SVG line chart
+              const W=280,H=CHART_H,PX=4,PY=4;
+              const toY=v=>PY+Math.round((1-(v/maxV))*(H-PY*2));
+              const coords=data.map((d,i)=>({x:PX+Math.round(i/(data.length-1||1)*(W-PX*2)),y:toY(d.val),val:d.val,wk:d.wk}));
+              const path=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
+              const area=path+` L${coords[coords.length-1].x},${H} L${coords[0].x},${H} Z`;
+              return(
+                <div key={key} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'12px 14px'}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
+                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#666'}}>{label}</div>
+                    {delta!=null&&<span style={{fontSize:12,color:up?'#44CCAA':'#E05252',fontWeight:700}}>{up?'▲':'▼'}{Math.abs(delta)}% WoW</span>}
+                  </div>
+                  <div style={{display:'flex',gap:12,marginBottom:8,alignItems:'baseline'}}>
+                    <div><div style={{fontSize:10,color:'#555'}}>Latest</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color,lineHeight:1}}>{fmt(latest)}</div></div>
+                    <div><div style={{fontSize:10,color:'#555'}}>Avg/wk</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:'#666',lineHeight:1}}>{fmt(avg)}</div></div>
+                  </div>
+                  <svg width="100%" viewBox={`0 0 ${W} ${H+20}`} style={{display:'block',overflow:'visible'}}>
+                    <path d={area} fill={color} opacity="0.08"/>
+                    <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
+                    {coords.map((c,i)=>(
+                      <g key={i}>
+                        <circle cx={c.x} cy={c.y} r={c.wk===weekA||c.wk===weekB?5:3} fill={color} opacity={c.wk===weekA||c.wk===weekB?1:0.6}/>
+                        {(i===0||i===coords.length-1||c.wk===weekA||c.wk===weekB)&&(
+                          <text x={c.x} y={H+16} textAnchor="middle" fontSize="9" fill="#666">{fmtD(c.wk)}</text>
+                        )}
+                      </g>
+                    ))}
+                    <line x1={PX} y1={H} x2={W-PX} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
+                  </svg>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
