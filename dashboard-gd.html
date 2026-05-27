@@ -2178,18 +2178,9 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
     return d.toISOString().slice(0,10);
   };
 
-  const inRange=(dateStr)=>{
-    if(dateFrom&&dateStr<dateFrom)return false;
-    if(dateTo&&dateStr>dateTo)return false;
-    if(!dateFrom&&!dateTo){
-      const d=new Date(dateStr+'T12:00'),now=new Date();
-      if(timeframe==='3m'){const c=new Date(now);c.setMonth(c.getMonth()-3);return d>=c;}
-      if(timeframe==='6m'){const c=new Date(now);c.setMonth(c.getMonth()-6);return d>=c;}
-      if(timeframe==='12m'){const c=new Date(now);c.setMonth(c.getMonth()-12);return d>=c;}
-      if(timeframe==='ytd')return d.getFullYear()===now.getFullYear();
-    }
-    return true;
-  };
+  // In weekly compare mode, always load ALL available weeks for the dropdowns
+  // No date range filtering - user picks weeks manually via dropdowns
+  const inRange=()=>true;
 
   const filterRow=(r)=>{
     if(staffId)return r.staff_id===staffId;
@@ -4356,20 +4347,20 @@ function PerformancePage({staff,perfData,setPerfData}){
                 ))}
               </div>
               <div style={{width:1,height:20,background:'var(--border2)',flexShrink:0}}/>
-              <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+              {trendGranularity!=='weekly'&&<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                 {[['3m','3 Mo'],['6m','6 Mo'],['ytd','YTD'],['12m','12 Mo'],['all','All']].map(([v,l])=>(
                   <button key={v} className={`btn btn-sm ${trendTimeframe===v&&!trendFrom?'btn-go':'btn-ghost'}`}
                     onClick={()=>{setTrendTimeframe(v);setTrendFrom('');setTrendTo('');}}>{l}</button>
                 ))}
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:4}}>
+              </div>}
+              {trendGranularity!=='weekly'&&<div style={{display:'flex',alignItems:'center',gap:6,marginLeft:4}}>
                 <input type="date" value={trendFrom} onChange={e=>{setTrendFrom(e.target.value);setTrendTimeframe('');}}
                   style={{background:'var(--surface3)',border:'1px solid '+(trendFrom?'var(--go)':'var(--border2)'),borderRadius:4,color:trendFrom?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/>
                 <span style={{color:'#555',fontSize:12}}>→</span>
                 <input type="date" value={trendTo} onChange={e=>{setTrendTo(e.target.value);setTrendTimeframe('');}}
                   style={{background:'var(--surface3)',border:'1px solid '+(trendTo?'var(--go)':'var(--border2)'),borderRadius:4,color:trendTo?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/>
                 {(trendFrom||trendTo)&&<button className="btn btn-ghost btn-xs" onClick={()=>{setTrendFrom('');setTrendTo('');setTrendTimeframe('12m');}}>✕</button>}
-              </div>
+              </div>}
             </div>
             {/* Row 2: Filters */}
             <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -4402,7 +4393,16 @@ function PerformancePage({staff,perfData,setPerfData}){
           {data.snapshots.length<2&&<div style={{fontSize:14,color:'#777',padding:'12px 0',fontStyle:'italic'}}>Import at least 2 monthly snapshots to see trend lines.</div>}
 
           {/* Clinic Totals View */}
-          {trendView==='clinic'&&(()=>{
+          {trendView==='clinic'&&trendGranularity==='weekly'&&(
+            <div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:12}}>
+                Clinic Totals — Week-over-Week
+              </div>
+              <WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>
+            </div>
+          )}
+
+          {trendView==='clinic'&&trendGranularity==='monthly'&&(()=>{
             const filteredStaff=staff.filter(s=>!['mgmt','ops','edu'].includes(s.discipline)&&(trendDisc==='all'||s.discipline===trendDisc)&&(trendSite==='all'||s.site===trendSite));
             const clinicMetrics=[
               {key:'revenue',label:'Revenue',color:'#CAE8C1',fmt:v=>'$'+Math.round(v).toLocaleString()},
@@ -4478,15 +4478,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                     });
                   }
                   pts=pts.filter(p=>p.val>0);
-                  // For weekly clinic view, also show the comparison table
-                  if(trendGranularity==='weekly'&&key==='revenue'){return(
-                    <div key={key} style={{gridColumn:'1/-1'}}>
-                      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:12}}>
-                        Clinic Totals — Weekly Comparison
-                      </div>
-                      <WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>
-                    </div>
-                  );}
+
                   if(!pts.length)return null;
                   const pVals=pts.map(p=>p.val);
                   const lastPt=pts[pts.length-1];
@@ -4554,12 +4546,18 @@ function PerformancePage({staff,perfData,setPerfData}){
             );
           })()}
 
-          {trendView==='practitioner'&&trendStaff&&trendGranularity==='weekly'&&(
+          {trendView==='practitioner'&&trendGranularity==='weekly'&&(
             <div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:12}}>
-                {trendStaff.name} — Weekly Breakdown
-              </div>
-              <WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>
+              {trendStaff?(
+                <div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:12}}>
+                    {trendStaff.name} — Week-over-Week
+                  </div>
+                  <WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>
+                </div>
+              ):(
+                <div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to compare their weeks.</div>
+              )}
             </div>
           )}
 
