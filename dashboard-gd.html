@@ -2162,13 +2162,14 @@ function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,sta
 
 
 function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filterSite,dateFrom,dateTo,timeframe}){
-  // Build week buckets from daily data
+  const[activeMetric,setActiveMetric]=React.useState('revenue');
+  const[hoveredWeek,setHoveredWeek]=React.useState(null);
+
   const getWeekStart=(dateStr)=>{
     const d=new Date(dateStr+'T12:00');
     const day=d.getDay();
     const diff=d.getDate()-(day===0?6:day-1);
-    const mon=new Date(d.getFullYear(),d.getMonth(),diff);
-    return mon.toISOString().slice(0,10);
+    return new Date(d.getFullYear(),d.getMonth(),diff).toISOString().slice(0,10);
   };
 
   const inRange=(dateStr)=>{
@@ -2193,7 +2194,6 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
     return true;
   };
 
-  // Aggregate by week
   const weekMap={};
   (dailyAppts||[]).forEach(r=>{
     if(!inRange(r.date)||!filterRow(r))return;
@@ -2212,142 +2212,154 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
   });
 
   const weeks=Object.values(weekMap).sort((a,b)=>a.wk.localeCompare(b.wk));
-  if(!weeks.length)return<div style={{fontSize:14,color:'#777',padding:'20px',textAlign:'center'}}>No weekly data for this period. Import Appointments CSV to see weekly trends.</div>;
-
-  const fmtWk=(d)=>new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'});
-  const fmtRev=(v)=>'$'+Math.round(v).toLocaleString();
+  if(!weeks.length)return<div style={{fontSize:14,color:'#777',padding:'40px',textAlign:'center'}}>No weekly data for this period.<br/><span style={{fontSize:12,color:'#555'}}>Import Appointments CSV to enable weekly trends.</span></div>;
 
   const metrics=[
-    {key:'revenue',label:'Revenue',color:'#CAE8C1',fmt:fmtRev},
-    {key:'visits',label:'Completed Visits',color:'#BB99FF',fmt:v=>v},
-    {key:'ias',label:'Initial Assessments',color:'#F4DB71',fmt:v=>v},
-    {key:'noShows',label:'No-Shows',color:'#E05252',fmt:v=>v},
+    {key:'revenue',label:'Revenue',color:'#CAE8C1',fmt:v=>'$'+Math.round(v).toLocaleString()},
+    {key:'visits',label:'Visits',color:'#BB99FF',fmt:v=>String(v)},
+    {key:'ias',label:'IAs',color:'#F4DB71',fmt:v=>String(v)},
+    {key:'noShows',label:'No-Shows',color:'#E05252',fmt:v=>String(v)},
+    {key:'cancellations',label:'Cancels',color:'#888',fmt:v=>String(v)},
   ];
-
-  const MiniChart=({data,color,fmt})=>{
-    if(data.length<2)return null;
-    const vals=data.map(d=>d.val);
-    const min=Math.min(...vals)*0.85,max=Math.max(...vals)*1.1,range=max-min||1;
-    const W=300,H=70,PX=4,PY=4;
-    const toY=v=>PY+Math.round((1-(v-min)/range)*(H-PY*2));
-    const coords=data.map((d,i)=>({x:PX+Math.round(i/(data.length-1)*(W-PX*2)),y:toY(d.val),val:d.val,wk:d.wk}));
-    const path=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
-    const area=path+` L${coords[coords.length-1].x},${H} L${coords[0].x},${H} Z`;
-    const latest=vals[vals.length-1];
-    const prev=vals.length>1?vals[vals.length-2]:null;
-    const delta=prev&&prev!==0?((latest-prev)/prev*100).toFixed(1):null;
-    const up=parseFloat(delta)>=0;
-    return(
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{display:'block'}}>
-        <path d={area} fill={color} opacity="0.08"/>
-        <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
-        {coords.map((c,i)=>(
-          <g key={i}>
-            <circle cx={c.x} cy={c.y} r="3" fill={color}/>
-            {i===coords.length-1&&delta!=null&&(
-              <text x={c.x} y={c.y-8} textAnchor="middle" fontSize="10" fill={up?'#44CCAA':'#E05252'} fontWeight="700">
-                {up?'▲':'▼'}{Math.abs(delta)}%
-              </text>
-            )}
-          </g>
-        ))}
-      </svg>
-    );
+  const m=metrics.find(x=>x.key===activeMetric);
+  const vals=weeks.map(w=>w[activeMetric]);
+  const maxVal=Math.max(...vals,1);
+  const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
+  const fmtWk=(d,short)=>{
+    const dt=new Date(d+'T12:00');
+    return short?dt.toLocaleDateString('en-CA',{month:'short',day:'numeric'}):
+      `Week of ${dt.toLocaleDateString('en-CA',{month:'short',day:'numeric'})}`;
   };
+
+  // Bar chart dimensions
+  const BAR_W=Math.max(28,Math.min(60,Math.floor(460/weeks.length)-8));
+  const GAP=Math.max(4,Math.floor(460/weeks.length)-BAR_W);
+  const CHART_H=160;
+  const totalW=weeks.length*(BAR_W+GAP)+40;
 
   return(
     <div>
-      {/* Week summary table */}
-      <div style={{overflowX:'auto',marginBottom:16}}>
+      {/* Metric selector tabs */}
+      <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
+        {metrics.map(({key,label,color})=>(
+          <button key={key} onClick={()=>setActiveMetric(key)}
+            style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',
+              padding:'5px 14px',borderRadius:4,border:'1px solid '+(activeMetric===key?color:'var(--border2)'),
+              background:activeMetric===key?color+'18':'transparent',color:activeMetric===key?color:'#555',
+              cursor:'pointer',transition:'all .15s'}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Bar chart */}
+      <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'16px',marginBottom:12}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:12}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:m.color}}>
+            {m.label}
+            <span style={{fontSize:13,color:'#555',fontWeight:400,marginLeft:8}}>week-over-week</span>
+          </div>
+          <div style={{fontSize:12,color:'#555'}}>avg {m.fmt(Math.round(avg))}/wk</div>
+        </div>
+        <div style={{overflowX:'auto'}}>
+          <svg width={Math.max(totalW,500)} height={CHART_H+52} style={{display:'block',overflow:'visible'}}>
+            {/* Avg reference line */}
+            {(()=>{const avgY=CHART_H-(avg/maxVal)*CHART_H;return(
+              <g>
+                <line x1={20} y1={avgY} x2={totalW} y2={avgY} stroke={m.color} strokeWidth="1" strokeDasharray="4,3" opacity="0.3"/>
+                <text x={totalW+4} y={avgY+4} fontSize="10" fill={m.color} opacity="0.5">avg</text>
+              </g>
+            );})()}
+            {weeks.map((w,i)=>{
+              const val=w[activeMetric];
+              const barH=Math.max(2,Math.round((val/maxVal)*CHART_H));
+              const x=20+i*(BAR_W+GAP);
+              const y=CHART_H-barH;
+              const prev=i>0?weeks[i-1][activeMetric]:null;
+              const delta=prev&&prev!==0?((val-prev)/prev*100).toFixed(1):null;
+              const up=parseFloat(delta)>=0;
+              const isHov=hoveredWeek===w.wk;
+              const aboveAvg=val>=avg;
+              return(
+                <g key={w.wk} onMouseEnter={()=>setHoveredWeek(w.wk)} onMouseLeave={()=>setHoveredWeek(null)} style={{cursor:'pointer'}}>
+                  {/* Bar background */}
+                  <rect x={x} y={0} width={BAR_W} height={CHART_H} fill={isHov?'rgba(255,255,255,.03)':'transparent'} rx="2"/>
+                  {/* Bar */}
+                  <rect x={x} y={y} width={BAR_W} height={barH}
+                    fill={m.color} opacity={isHov?1:aboveAvg?0.85:0.45} rx="2"/>
+                  {/* Value label */}
+                  {(isHov||weeks.length<=12)&&<text x={x+BAR_W/2} y={y-5} textAnchor="middle" fontSize="11" fill={m.color} fontWeight="700" opacity={isHov?1:0.8}>{m.fmt(val)}</text>}
+                  {/* WoW delta */}
+                  {delta!=null&&isHov&&(
+                    <text x={x+BAR_W/2} y={y-18} textAnchor="middle" fontSize="10" fill={up?'#44CCAA':'#E05252'} fontWeight="700">
+                      {up?'▲':'▼'}{Math.abs(delta)}%
+                    </text>
+                  )}
+                  {/* Week label */}
+                  <text x={x+BAR_W/2} y={CHART_H+14} textAnchor="middle" fontSize="10" fill={isHov?'#ccc':'#555'}
+                    transform={weeks.length>8?`rotate(-35,${x+BAR_W/2},${CHART_H+14})`:''}>{fmtWk(w.wk,true)}</text>
+                </g>
+              );
+            })}
+            <line x1={20} y1={CHART_H} x2={totalW} y2={CHART_H} stroke="#2a2a2a" strokeWidth="1"/>
+          </svg>
+        </div>
+      </div>
+
+      {/* Comparison table */}
+      <div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
           <thead>
             <tr style={{borderBottom:'1px solid var(--border)'}}>
-              <th style={{textAlign:'left',padding:'8px 12px',color:'#666',fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',fontSize:12,textTransform:'uppercase'}}>Week of</th>
-              <th style={{textAlign:'right',padding:'8px 12px',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,textTransform:'uppercase'}}>Revenue</th>
-              <th style={{textAlign:'right',padding:'8px 12px',color:'#BB99FF',fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,textTransform:'uppercase'}}>Visits</th>
-              <th style={{textAlign:'right',padding:'8px 12px',color:'#F4DB71',fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,textTransform:'uppercase'}}>IAs</th>
-              <th style={{textAlign:'right',padding:'8px 12px',color:'#E05252',fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,textTransform:'uppercase'}}>No-shows</th>
-              <th style={{textAlign:'right',padding:'8px 12px',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,textTransform:'uppercase'}}>Cancels</th>
+              <th style={{textAlign:'left',padding:'8px 10px',color:'#555',fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.5px',textTransform:'uppercase'}}>Week</th>
+              {metrics.map(({key,label,color})=>(
+                <th key={key} style={{textAlign:'right',padding:'8px 10px',color:activeMetric===key?color:'#555',fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.5px',textTransform:'uppercase',cursor:'pointer'}} onClick={()=>setActiveMetric(key)}>{label}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {weeks.map((w,i)=>{
               const prev=i>0?weeks[i-1]:null;
-              const revDelta=prev&&prev.revenue?((w.revenue-prev.revenue)/prev.revenue*100).toFixed(1):null;
               return(
-                <tr key={w.wk} style={{borderBottom:'1px solid rgba(255,255,255,.04)',background:i%2===0?'transparent':'rgba(255,255,255,.02)'}}>
-                  <td style={{padding:'9px 12px',color:'#aaa',fontWeight:600}}>{fmtWk(w.wk)}</td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700}}>
-                    {fmtRev(w.revenue)}
-                    {revDelta!=null&&<span style={{fontSize:11,marginLeft:6,color:parseFloat(revDelta)>=0?'#44CCAA':'#E05252'}}>{parseFloat(revDelta)>=0?'▲':'▼'}{Math.abs(revDelta)}%</span>}
-                  </td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#BB99FF',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700}}>{w.visits}</td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#F4DB71',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700}}>{w.ias}</td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#E05252',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700}}>{w.noShows}</td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15}}>{w.cancellations}</td>
+                <tr key={w.wk}
+                  onMouseEnter={()=>setHoveredWeek(w.wk)}
+                  onMouseLeave={()=>setHoveredWeek(null)}
+                  style={{borderBottom:'1px solid rgba(255,255,255,.03)',background:hoveredWeek===w.wk?'rgba(255,255,255,.04)':'transparent',cursor:'default'}}>
+                  <td style={{padding:'8px 10px',color:'#aaa',fontWeight:600,whiteSpace:'nowrap'}}>{fmtWk(w.wk,false)}</td>
+                  {metrics.map(({key,color,fmt})=>{
+                    const val=w[key];
+                    const pv=prev?prev[key]:null;
+                    const delta=pv&&pv!==0?((val-pv)/pv*100).toFixed(1):null;
+                    const up=parseFloat(delta)>=0;
+                    return(
+                      <td key={key} style={{padding:'8px 10px',textAlign:'right'}}>
+                        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:activeMetric===key?color:'#888'}}>{fmt(val)}</span>
+                        {delta!=null&&<span style={{fontSize:10,marginLeft:5,color:up?'#44CCAA':'#E05252'}}>{up?'▲':'▼'}{Math.abs(delta)}%</span>}
+                      </td>
+                    );
+                  })}
                 </tr>
               );
             })}
           </tbody>
-          {weeks.length>1&&(()=>{
-            const avg=v=>Math.round(weeks.reduce((a,w)=>a+w[v],0)/weeks.length);
-            return(
-              <tfoot>
-                <tr style={{borderTop:'1px solid var(--border)',background:'rgba(255,255,255,.03)'}}>
-                  <td style={{padding:'9px 12px',color:'#555',fontSize:12,fontFamily:"'Barlow Condensed',sans-serif",textTransform:'uppercase',letterSpacing:'1px'}}>Avg / week</td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14}}>{fmtRev(avg('revenue'))}</td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14}}>{avg('visits')}</td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14}}>{avg('ias')}</td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14}}>{avg('noShows')}</td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14}}>{avg('cancellations')}</td>
-                </tr>
-              </tfoot>
-            );
-          })()}
+          {weeks.length>1&&(
+            <tfoot>
+              <tr style={{borderTop:'1px solid var(--border)'}}>
+                <td style={{padding:'8px 10px',color:'#444',fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,textTransform:'uppercase',letterSpacing:'1px'}}>Avg / week</td>
+                {metrics.map(({key,fmt,color})=>(
+                  <td key={key} style={{padding:'8px 10px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,color:activeMetric===key?color:'#555'}}>
+                    {fmt(Math.round(weeks.reduce((a,w)=>a+w[key],0)/weeks.length))}
+                  </td>
+                ))}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
-
-      {/* Mini sparkline charts per metric */}
-      {weeks.length>=2&&(
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:10}}>
-          {metrics.map(({key,label,color,fmt})=>{
-            const data=weeks.map(w=>({wk:w.wk,val:w[key]}));
-            const vals=data.map(d=>d.val);
-            const total=key==='revenue'?vals.reduce((a,b)=>a+b,0):null;
-            const avg=Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
-            const latest=vals[vals.length-1];
-            const prev=vals.length>1?vals[vals.length-2]:null;
-            const delta=prev&&prev!==0?((latest-prev)/prev*100).toFixed(1):null;
-            const up=parseFloat(delta)>=0;
-            return(
-              <div key={key} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'12px 14px'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#666'}}>{label}</div>
-                  {delta!=null&&<span style={{fontSize:12,color:up?'#44CCAA':'#E05252',fontWeight:700}}>{up?'▲':'▼'}{Math.abs(delta)}% WoW</span>}
-                </div>
-                <div style={{display:'flex',gap:16,marginBottom:8}}>
-                  <div>
-                    <div style={{fontSize:11,color:'#555',marginBottom:2}}>Latest</div>
-                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color,lineHeight:1}}>{fmt(latest)}</div>
-                  </div>
-                  <div>
-                    <div style={{fontSize:11,color:'#555',marginBottom:2}}>Avg/wk</div>
-                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:'#888',lineHeight:1}}>{fmt(avg)}</div>
-                  </div>
-                  {total!=null&&<div>
-                    <div style={{fontSize:11,color:'#555',marginBottom:2}}>Total</div>
-                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:'#888',lineHeight:1}}>{fmt(total)}</div>
-                  </div>}
-                </div>
-                <MiniChart data={data} color={color} fmt={fmt}/>
-              </div>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
+
 
 
 function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg,granularity,dateFrom,dateTo,dailyAppts,dailyRevenue,staff,filterDisc,filterSite}){
@@ -4711,32 +4723,44 @@ function PerformancePage({staff,perfData,setPerfData}){
                 onClick={async()=>{
                   if(!window.confirm(`Purge all ${type} data? You will need to re-import.`))return;
                   const SB=window.__SB;
+                  let purgeError=null;
                   if(type==='retention'){
-                    // Clear retention snapshots
                     if(SB){
-                      await SB.from('retention_snapshots').delete().neq('id','_none_').catch(()=>{});
-                      await SB.from('retention_full').delete().neq('id','_none_').catch(()=>{});
+                      const r1=await SB.from('retention_snapshots').delete().neq('id','_none_');
+                      const r2=await SB.from('retention_full').delete().neq('id','_none_');
+                      if(r1.error)purgeError=r1.error.message;
+                      if(r2.error)purgeError=r2.error.message;
                     }
                     setRetentionSnapshots([]);
                     const newData={...data,retentionFull:{},retentionClinic:{},retentionImportDate:null,retention:{}};
                     save(newData);
                   }else{
-                    // Clear performance snapshots of this type
                     const remaining=data.snapshots.filter(s=>s.type!==type);
                     if(SB){
                       const toDelete=data.snapshots.filter(s=>s.type===type);
                       for(const s of toDelete){
-                        await SB.from('performance_snapshots').delete().eq('id',s.id).catch(()=>{});
+                        const r=await SB.from('performance_snapshots').delete().eq('id',s.id);
+                        if(r.error)purgeError=r.error.message;
                       }
-                      // Also clear daily data for appointments/sales
                       if(type==='appointments'){
-                        await SB.from('daily_appointments').delete().neq('id','_none_').catch(()=>{});
+                        const r=await SB.from('daily_appointments').delete().neq('staff_id','_none_');
+                        if(r.error)purgeError=r.error.message;
                         setDailyAppts([]);
                         try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}
+                      }
+                      if(type==='sales'){
+                        const r=await SB.from('daily_revenue').delete().neq('staff_id','_none_');
+                        if(r.error)purgeError=r.error.message;
+                        setDailyRevenue([]);
+                        try{localStorage.removeItem('rvgd3_daily_rev');}catch(e){}
                       }
                     }
                     const newData={...data,snapshots:remaining};
                     save(newData);
+                  }
+                  if(purgeError){
+                    setImportMsg({type:'error',msg:`Purge error: ${purgeError} — run the SQL fix below.`});
+                    return;
                   }
                   setImportMsg({type:'success',msg:`✓ All ${type} data purged. Reloading…`});
                   setTimeout(()=>window.location.reload(),800);
