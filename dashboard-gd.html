@@ -4393,6 +4393,51 @@ function PerformancePage({staff,perfData,setPerfData}){
               ⚠ Reset All Data
             </button>
           </div>
+          {/* Per-type purge buttons */}
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:4}}>
+            {[
+              {label:'Purge Sales',type:'sales',color:'#E05252'},
+              {label:'Purge Appointments',type:'appointments',color:'#E05252'},
+              {label:'Purge Shift Reports',type:'shift',color:'#E05252'},
+              {label:'Purge Retention',type:'retention',color:'#E05252'},
+            ].map(({label,type,color})=>(
+              <button key={type} className="btn btn-ghost btn-sm" style={{color,border:'1px solid '+color+'44',fontSize:12}}
+                onClick={async()=>{
+                  if(!window.confirm(`Purge all ${type} data? You will need to re-import.`))return;
+                  const SB=window.__SB;
+                  if(type==='retention'){
+                    // Clear retention snapshots
+                    if(SB){
+                      await SB.from('retention_snapshots').delete().neq('id','_none_').catch(()=>{});
+                      await SB.from('retention_full').delete().neq('id','_none_').catch(()=>{});
+                    }
+                    setRetentionSnapshots([]);
+                    const newData={...data,retentionFull:{},retentionClinic:{},retentionImportDate:null,retention:{}};
+                    save(newData);
+                  }else{
+                    // Clear performance snapshots of this type
+                    const remaining=data.snapshots.filter(s=>s.type!==type);
+                    if(SB){
+                      const toDelete=data.snapshots.filter(s=>s.type===type);
+                      for(const s of toDelete){
+                        await SB.from('performance_snapshots').delete().eq('id',s.id).catch(()=>{});
+                      }
+                      // Also clear daily data for appointments/sales
+                      if(type==='appointments'){
+                        await SB.from('daily_appointments').delete().neq('id','_none_').catch(()=>{});
+                        setDailyAppts([]);
+                        try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}
+                      }
+                    }
+                    const newData={...data,snapshots:remaining};
+                    save(newData);
+                  }
+                  setImportMsg({type:'success',msg:`✓ All ${type} data purged. Re-import to restore.`});
+                }}>
+                🗑 {label}
+              </button>
+            ))}
+          </div>
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#777'}}>Shift Report Month</div>
             <input type="month" value={snapDate.slice(0,7)} onChange={e=>setSnapDate(e.target.value+'-01')}
