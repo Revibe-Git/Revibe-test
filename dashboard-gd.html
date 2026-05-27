@@ -2831,22 +2831,21 @@ function PerformancePage({staff,perfData,setPerfData}){
     if(!snaps.length)return[];
     const byStaff={};
     snaps.forEach(snap=>{
+      const isShift=snap.type==='shift';
       (snap.rows||[]).forEach(r=>{
         if(!r.staffId)return;
         if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
         const b=byStaff[r.staffId];
-        if(r.completed)b.completed+=(parseFloat(r.completed)||0);
-        if(r.noShows)b.noShows+=(parseFloat(r.noShows)||0);
-        if(r.cancellations)b.cancellations+=(parseFloat(r.cancellations)||0);
-        if(r.rescheduled)b.rescheduled+=(parseFloat(r.rescheduled)||0);
-        if(r.revenue)b.revenue+=(parseFloat(r.revenue)||0);
-        if(r.appointments)b.appointments+=(parseFloat(r.appointments)||0);
-        if(r.initialAssessments)b.initialAssessments+=(parseFloat(r.initialAssessments)||0);
-        // Average utilization across months rather than summing
-        if(r.utilization!=null){
-          b.utilization=(b.utilization||0)+(parseFloat(r.utilization)||0);
-          b.utilizationCount++;
+        if(!isShift){
+          if(r.completed)b.completed+=(parseFloat(r.completed)||0);
+          if(r.noShows)b.noShows+=(parseFloat(r.noShows)||0);
+          if(r.cancellations)b.cancellations+=(parseFloat(r.cancellations)||0);
+          if(r.rescheduled)b.rescheduled+=(parseFloat(r.rescheduled)||0);
+          if(r.revenue)b.revenue+=(parseFloat(r.revenue)||0);
+          if(r.appointments)b.appointments+=(parseFloat(r.appointments)||0);
+          if(r.initialAssessments)b.initialAssessments+=(parseFloat(r.initialAssessments)||0);
         }
+        if(r.utilization!=null){b.utilization=(b.utilization||0)+(parseFloat(r.utilization)||0);b.utilizationCount++;}
       });
     });
     return Object.values(byStaff).map(r=>({
