@@ -2161,32 +2161,67 @@ function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,sta
 }
 
 
-function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg,granularity,dateFrom,dateTo}){
-  const allPts=snapshots.map(s=>{
-    const r=s.rows?.find(r=>r.staffId===staffId);
-    return r&&r[metric]!=null?{date:s.date,val:parseFloat(r[metric])||0}:null;
-  }).filter(Boolean);
+function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg,granularity,dateFrom,dateTo,dailyAppts,dailyRevenue,staff,filterDisc,filterSite}){
+  // Helper: get week key (YYYY-Www) from date string
+  const getWeekKey=(dateStr)=>{
+    const d=new Date(dateStr+'T12:00');
+    const jan1=new Date(d.getFullYear(),0,1);
+    const week=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
+    return `${d.getFullYear()}-W${String(week).padStart(2,'0')}`;
+  };
+  const getWeekStart=(dateStr)=>{
+    const d=new Date(dateStr+'T12:00');
+    const day=d.getDay();
+    const diff=d.getDate()-(day===0?6:day-1);
+    const mon=new Date(d.setDate(diff));
+    return mon.toISOString().slice(0,10);
+  };
 
-  // Apply date filter
-  const now=new Date();
-  const filtered=allPts.filter(p=>{
-    const d=new Date(p.date+'T12:00');
-    if(dateFrom&&d<new Date(dateFrom))return false;
-    if(dateTo&&d>new Date(dateTo))return false;
+  // Date range filter helper
+  const inRange=(dateStr)=>{
+    if(dateFrom&&dateStr<dateFrom)return false;
+    if(dateTo&&dateStr>dateTo)return false;
     if(!dateFrom&&!dateTo){
-      if(!timeframe||timeframe==='all')return true;
+      const d=new Date(dateStr+'T12:00');const now=new Date();
       if(timeframe==='3m'){const c=new Date(now);c.setMonth(c.getMonth()-3);return d>=c;}
       if(timeframe==='6m'){const c=new Date(now);c.setMonth(c.getMonth()-6);return d>=c;}
       if(timeframe==='12m'){const c=new Date(now);c.setMonth(c.getMonth()-12);return d>=c;}
       if(timeframe==='ytd')return d.getFullYear()===now.getFullYear();
     }
     return true;
-  });
+  };
 
-  // Weekly aggregation from daily data (if available via dailySnaps prop)
-  let pts=filtered;
+  let pts=[];
 
-  if(pts.length<1)return<div style={{fontSize:14,color:'#777',padding:'20px 16px',textAlign:'center'}}>No {label.toLowerCase()} data for this period.</div>;
+  if(granularity==='weekly'){
+    // Use daily data for weekly aggregation
+    const dailySrc=metric==='revenue'?dailyRevenue:dailyAppts;
+    const metricField=metric==='revenue'?'revenue':metric==='completed'?'completed':metric==='initialAssessments'?'initial_assessments':metric;
+    const weekMap={};
+    (dailySrc||[]).forEach(r=>{
+      if(!inRange(r.date))return;
+      if(staffId&&r.staff_id!==staffId)return;
+      if(!staffId){
+        const s=(staff||[]).find(x=>x.id===r.staff_id);
+        if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
+        if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return;
+        if(filterSite&&filterSite!=='all'&&s.site!==filterSite)return;
+      }
+      const wk=getWeekStart(r.date);
+      if(!weekMap[wk])weekMap[wk]=0;
+      weekMap[wk]+=(parseFloat(r[metricField])||0);
+    });
+    pts=Object.entries(weekMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,val])=>({date,val:Math.round(val*100)/100}));
+  }else{
+    // Monthly from snapshots
+    const allPts=snapshots.map(s=>{
+      const r=s.rows?.find(r=>r.staffId===staffId);
+      return r&&r[metric]!=null?{date:s.date,val:parseFloat(r[metric])||0}:null;
+    }).filter(Boolean);
+    pts=allPts.filter(p=>inRange(p.date));
+  }
+
+  if(pts.length<1)return<div style={{fontSize:14,color:'#777',padding:'20px 16px',textAlign:'center'}}>No {label.toLowerCase()} data for this period.{granularity==='weekly'?' (Weekly view requires daily appointment/revenue data.)':''}</div>;
 
   const vals=pts.map(p=>p.val);
   const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
@@ -2197,18 +2232,14 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
         <div><div style={{fontSize:13,color:'#888',marginBottom:2}}>Latest</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color,lineHeight:1}}>{fmt(pts[0].val)}</div></div>
         {clinicAvg!=null&&<div><div style={{fontSize:13,color:'#888',marginBottom:2}}>Clinic Avg</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#555',lineHeight:1}}>{fmt(Math.round(clinicAvg))}</div></div>}
       </div>
-      <div style={{fontSize:13,color:'#888',fontStyle:'italic'}}>Import more snapshots to see a trend line.</div>
+      <div style={{fontSize:13,color:'#888',fontStyle:'italic'}}>Import more data to see a trend.</div>
     </div>
   );
 
-  const min=Math.min(...vals)*0.9,max=Math.max(...vals)*1.1;
-  const range=max-min||1;
+  const min=Math.min(...vals)*0.9,max=Math.max(...vals)*1.1,range=max-min||1;
   const W=500,H=140,PADX=52,PADY=16,BOTTOM=32;
   const toY=(v)=>PADY+Math.round((1-(v-min)/range)*(H-PADY*2));
-  const coords=pts.map((p,i)=>({
-    x:PADX+Math.round((i/(pts.length-1||1))*(W-PADX-14)),
-    y:toY(p.val),val:p.val,date:p.date
-  }));
+  const coords=pts.map((p,i)=>({x:PADX+Math.round((i/(pts.length-1||1))*(W-PADX-14)),y:toY(p.val),val:p.val,date:p.date}));
   const pathD=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
   const areaD=pathD+` L${coords[coords.length-1].x},${H} L${coords[0].x},${H} Z`;
   const latest=vals[vals.length-1];
@@ -2219,11 +2250,18 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
   const clinicAvgY=clinicAvg!=null?toY(Math.max(min,Math.min(max,clinicAvg))):null;
   const yGrid=Array.from({length:5},(_,i)=>({y:PADY+Math.round((i/4)*(H-PADY*2)),val:max-((max-min)*(i/4))}));
   const showLabel=(i)=>{
-    if(pts.length<=6)return true;
-    if(pts.length<=12)return i%2===0||i===pts.length-1;
+    if(pts.length<=8)return true;
+    if(pts.length<=16)return i%2===0||i===pts.length-1;
+    if(pts.length<=26)return i%4===0||i===pts.length-1;
     return i===0||i===Math.floor(pts.length/2)||i===pts.length-1;
   };
-  const fmtDate=(d)=>new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'});
+  const fmtDate=(d)=>{
+    if(granularity==='weekly'){
+      const dt=new Date(d+'T12:00');
+      return dt.toLocaleDateString('en-CA',{month:'short',day:'numeric'});
+    }
+    return new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'});
+  };
 
   return(
     <div>
@@ -2237,49 +2275,33 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
             </div>
           </div>
           <div>
-            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Avg / period</div>
+            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Avg / {granularity==='weekly'?'wk':'mo'}</div>
             <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#aaa',lineHeight:1}}>{fmt(Math.round(avg))}</span>
           </div>
           {clinicAvg!=null&&<div>
-            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Clinic Avg</div>
+            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Clinic Avg / {granularity==='weekly'?'wk':'mo'}</div>
             <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#555',lineHeight:1}}>{fmt(Math.round(clinicAvg))}</span>
           </div>}
         </div>
         <div style={{fontSize:13,color:'#777'}}>{pts.length} {granularity==='weekly'?'weeks':'months'}</div>
       </div>
       <svg width="100%" viewBox={`0 0 ${W} ${H+BOTTOM}`} style={{display:'block',overflow:'visible'}}>
-        {yGrid.map((g,i)=>(
-          <g key={i}>
-            <line x1={PADX} y1={g.y} x2={W-14} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/>
-            <text x={PADX-6} y={g.y+4} textAnchor="end" fontSize="11" fill="#666">{fmt(Math.round(g.val))}</text>
-          </g>
-        ))}
-        {clinicAvgY!=null&&clinicAvgY>PADY&&clinicAvgY<H&&(
-          <g>
-            <line x1={PADX} y1={clinicAvgY} x2={W-14} y2={clinicAvgY} stroke="#444" strokeWidth="1.5" strokeDasharray="5,4"/>
-            <text x={W-12} y={clinicAvgY+4} fontSize="11" fill="#555" textAnchor="start">clinic</text>
-          </g>
-        )}
-        {avgY>PADY&&avgY<H&&(
-          <g>
-            <line x1={PADX} y1={avgY} x2={W-14} y2={avgY} stroke={color} strokeWidth="1.5" strokeDasharray="4,3" opacity="0.4"/>
-            <text x={W-12} y={avgY+4} fontSize="11" fill={color} opacity="0.6" textAnchor="start">avg</text>
-          </g>
-        )}
+        {yGrid.map((g,i)=>(<g key={i}><line x1={PADX} y1={g.y} x2={W-14} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/><text x={PADX-6} y={g.y+4} textAnchor="end" fontSize="11" fill="#666">{fmt(Math.round(g.val))}</text></g>))}
+        {clinicAvgY!=null&&clinicAvgY>PADY&&clinicAvgY<H&&(<g><line x1={PADX} y1={clinicAvgY} x2={W-14} y2={clinicAvgY} stroke="#444" strokeWidth="1.5" strokeDasharray="5,4"/><text x={W-12} y={clinicAvgY+4} fontSize="11" fill="#555" textAnchor="start">clinic</text></g>)}
+        {avgY>PADY&&avgY<H&&(<g><line x1={PADX} y1={avgY} x2={W-14} y2={avgY} stroke={color} strokeWidth="1.5" strokeDasharray="4,3" opacity="0.4"/><text x={W-12} y={avgY+4} fontSize="11" fill={color} opacity="0.6" textAnchor="start">avg</text></g>)}
         <path d={areaD} fill={color} opacity="0.07"/>
         <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
-        {coords.map((c,i)=>(
-          <g key={i}>
-            <circle cx={c.x} cy={c.y} r="4.5" fill={color} opacity="0.9"/>
-            {pts.length<=10&&<text x={c.x} y={c.y-11} textAnchor="middle" fontSize="11" fill={color} opacity="0.85" fontWeight="600">{fmt(c.val)}</text>}
-            {showLabel(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">{fmtDate(c.date)}</text>}
-          </g>
-        ))}
+        {coords.map((c,i)=>(<g key={i}>
+          <circle cx={c.x} cy={c.y} r="4.5" fill={color} opacity="0.9"/>
+          {pts.length<=12&&<text x={c.x} y={c.y-11} textAnchor="middle" fontSize="11" fill={color} opacity="0.85" fontWeight="600">{fmt(c.val)}</text>}
+          {showLabel(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">{fmtDate(c.date)}</text>}
+        </g>))}
         <line x1={PADX} y1={H} x2={W-14} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
       </svg>
     </div>
   );
 }
+
 
 
 function PerformancePage({staff,perfData,setPerfData}){
@@ -4141,6 +4163,20 @@ function PerformancePage({staff,perfData,setPerfData}){
               {key:'utilization',label:'Avg Utilization %',color:'#44CCAA',fmt:v=>Math.round(v)+'%'},
             ];
             const now=new Date();
+            const inSnapsRange=(dateStr)=>{
+              const d=new Date(dateStr+'T12:00');
+              if(trendFrom&&d<new Date(trendFrom))return false;
+              if(trendTo&&d>new Date(trendTo))return false;
+              if(!trendFrom&&!trendTo){
+                const now2=new Date();
+                if(!trendTimeframe||trendTimeframe==='all')return true;
+                if(trendTimeframe==='3m'){const c=new Date(now2);c.setMonth(c.getMonth()-3);return d>=c;}
+                if(trendTimeframe==='6m'){const c=new Date(now2);c.setMonth(c.getMonth()-6);return d>=c;}
+                if(trendTimeframe==='12m'){const c=new Date(now2);c.setMonth(c.getMonth()-12);return d>=c;}
+                if(trendTimeframe==='ytd')return d.getFullYear()===now2.getFullYear();
+              }
+              return true;
+            };
             const snaps=data.snapshots.filter(s=>{
               const d=new Date(s.date+'T12:00');
               if(trendFrom&&d<new Date(trendFrom))return false;
@@ -4166,12 +4202,34 @@ function PerformancePage({staff,perfData,setPerfData}){
                   const curM=nowD.toISOString().slice(0,7);
                   const dayOf=nowD.getDate();
                   const daysIn=new Date(nowD.getFullYear(),nowD.getMonth()+1,0).getDate();
-                  const pts=snaps.map(s=>{
-                    const vals=filteredStaff.map(st=>{const row=s.rows?.find(r=>r.staffId===st.id);return row?parseFloat(row[key])||0:0;});
-                    const val=key==='utilization'&&filteredStaff.length?Math.round(vals.reduce((a,b)=>a+b,0)/filteredStaff.length):Math.round(vals.reduce((a,b)=>a+b,0));
-                    const isPartial=s.date.startsWith(curM);
-                    return{date:s.date,val,isPartial};
-                  }).filter(p=>p.val>0);
+                  let pts=[];
+                  if(trendGranularity==='weekly'){
+                    // Aggregate daily data into weeks for clinic totals
+                    const dailySrc=key==='revenue'?dailyRevenue:dailyAppts;
+                    const metricField=key==='revenue'?'revenue':key==='completed'?'completed':key==='initialAssessments'?'initial_assessments':key;
+                    const weekMap={};
+                    (dailySrc||[]).forEach(r=>{
+                      if(!inSnapsRange(r.date))return;
+                      const s=(staff||[]).find(x=>x.id===r.staff_id);
+                      if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
+                      if(trendDisc!=='all'&&s.discipline!==trendDisc)return;
+                      if(trendSite!=='all'&&s.site!==trendSite)return;
+                      const wkDate=(()=>{const d=new Date(r.date+'T12:00');const day=d.getDay();const diff=d.getDate()-(day===0?6:day-1);return new Date(d.setDate(diff)).toISOString().slice(0,10);})();
+                      if(!weekMap[wkDate])weekMap[wkDate]=0;
+                      if(key==='utilization'){
+                        // Skip utilization in weekly — no daily util data
+                      }else{weekMap[wkDate]+=(parseFloat(r[metricField])||0);}
+                    });
+                    pts=Object.entries(weekMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,val])=>({date,val:Math.round(val),isPartial:date.startsWith(curM)}));
+                  }else{
+                    pts=snaps.map(s=>{
+                      const vals=filteredStaff.map(st=>{const row=s.rows?.find(r=>r.staffId===st.id);return row?parseFloat(row[key])||0:0;});
+                      const val=key==='utilization'&&filteredStaff.length?Math.round(vals.reduce((a,b)=>a+b,0)/filteredStaff.length):Math.round(vals.reduce((a,b)=>a+b,0));
+                      const isPartial=s.date.startsWith(curM);
+                      return{date:s.date,val,isPartial};
+                    });
+                  }
+                  pts=pts.filter(p=>p.val>0);
                   if(!pts.length)return null;
                   const pVals=pts.map(p=>p.val);
                   const lastPt=pts[pts.length-1];
@@ -4195,7 +4253,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                   const lastC=coords[coords.length-1];
                   const projY=projVal?toY(projVal):null;
                   const showLbl=i=>pts.length<=6||(pts.length<=12&&i%2===0)||i===0||i===pts.length-1;
-                  const fmtD=d=>new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'});
+                  const fmtD=d=>trendGranularity==='weekly'?new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'}):new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'});
                   const yGrid=Array.from({length:4},(_,i)=>({y:PADY+Math.round((i/3)*(H-PADY*2)),val:maxV-((maxV-minV)*(i/3))}));
                   return(
                     <div key={key} className="perf-slot" style={{marginBottom:14}}>
