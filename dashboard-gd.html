@@ -2740,7 +2740,7 @@ function PerformancePage({staff,perfData,setPerfData}){
       const type=detectFileType(rows);
 
       let newSnapshots=[...data.snapshots];
-      let totalPractitioners=0,totalMatched=0,monthsCreated=[];
+      let totalPractitioners=0,totalMatched=0,monthsCreated=[],unmatchedNames=new Set();
 
       if(type==='appointments'){
         const byMonth=aggregateAppointmentsByMonth(rows);
@@ -2877,7 +2877,9 @@ function PerformancePage({staff,perfData,setPerfData}){
       const uniqMonths=[...new Set(monthsCreated)].sort();
       const monthNames=uniqMonths.map(m=>new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}));
       const totalIA=newSnapshots.flatMap(s=>s.rows||[]).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
+      const unmatched=[...unmatchedNames].filter(n=>n&&n!=='_clinic');
       let msg=`✓ ${type} report auto-split into ${uniqMonths.length} monthly snapshot${uniqMonths.length!==1?'s':''}: ${monthNames.join(', ')}. ${totalPractitioners} practitioners, ${totalMatched} matched.${totalIA>0?` ${totalIA} initial assessments detected.`:''}`;
+      if(unmatched.length>0)msg+=` ⚠ ${unmatched.length} unmatched name${unmatched.length!==1?'s':''}: ${unmatched.join(', ')} — add staff profiles and re-import.`;
       if(!sbOk)msg+=` (Saved locally — Supabase unavailable)`;
       else msg+=` Saved to Supabase ✓`;
       setImportMsg({type:'success',msg});
