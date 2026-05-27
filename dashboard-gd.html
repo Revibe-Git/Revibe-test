@@ -2934,24 +2934,42 @@ function PerformancePage({staff,perfData,setPerfData}){
   // For appointments: sum across snapshots. For utilization/revenue: use latest in period.
   const aggregateRows=(snaps)=>{
     if(!snaps.length)return[];
-    const byStaff={};
+    // Deduplicate: group by month, pick best snapshot per type
+    const byMonth={};
     snaps.forEach(snap=>{
-      (snap.rows||[]).forEach(r=>{
+      const m=snap.date.slice(0,7);
+      if(!byMonth[m])byMonth[m]={appt:null,sales:null,shift:[]};
+      if(snap.type==='appointments')byMonth[m].appt=snap;
+      else if(snap.type==='sales')byMonth[m].sales=snap;
+      else if(snap.type==='shift')byMonth[m].shift.push(snap);
+    });
+    const byStaff={};
+    Object.values(byMonth).forEach(({appt,sales,shift})=>{
+      // Use appt for visits/IAs, sales for revenue, latest shift for utilization
+      const visitSnap=appt||sales;
+      const shiftSnap=shift.length?shift[shift.length-1]:null;
+      const revenueSnap=sales||appt;
+      // Collect utilization from shift
+      const utilByStaff={};
+      if(shiftSnap)(shiftSnap.rows||[]).forEach(r=>{if(r.staffId&&r.utilization!=null)utilByStaff[r.staffId]=parseFloat(r.utilization)||0;});
+      // Collect visits/IAs from appt
+      if(visitSnap)(visitSnap.rows||[]).forEach(r=>{
         if(!r.staffId)return;
-        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
+        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name||r.staffName,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
         const b=byStaff[r.staffId];
         if(r.completed)b.completed+=(parseFloat(r.completed)||0);
         if(r.noShows)b.noShows+=(parseFloat(r.noShows)||0);
         if(r.cancellations)b.cancellations+=(parseFloat(r.cancellations)||0);
         if(r.rescheduled)b.rescheduled+=(parseFloat(r.rescheduled)||0);
-        if(r.revenue)b.revenue+=(parseFloat(r.revenue)||0);
         if(r.appointments)b.appointments+=(parseFloat(r.appointments)||0);
         if(r.initialAssessments)b.initialAssessments+=(parseFloat(r.initialAssessments)||0);
-        // Average utilization across months rather than summing
-        if(r.utilization!=null){
-          b.utilization=(b.utilization||0)+(parseFloat(r.utilization)||0);
-          b.utilizationCount++;
-        }
+        if(utilByStaff[r.staffId]!=null){b.utilization=(b.utilization||0)+utilByStaff[r.staffId];b.utilizationCount++;}
+      });
+      // Add revenue from sales snapshot (separate pass to avoid double-counting)
+      if(revenueSnap)(revenueSnap.rows||[]).forEach(r=>{
+        if(!r.staffId||!r.revenue)return;
+        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name||r.staffName,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
+        byStaff[r.staffId].revenue+=(parseFloat(r.revenue)||0);
       });
     });
     return Object.values(byStaff).map(r=>({
