@@ -2179,8 +2179,12 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
 
   // Date range filter helper
   const inRange=(dateStr)=>{
-    if(dateFrom&&dateStr<dateFrom)return false;
-    if(dateTo&&dateStr>dateTo)return false;
+    // For monthly mode, compare at month level so snapshot dates (YYYY-MM-01) match date range
+    const cmpDate=granularity==='monthly'?dateStr.slice(0,7):dateStr;
+    const cmpFrom=granularity==='monthly'&&dateFrom?dateFrom.slice(0,7):dateFrom;
+    const cmpTo=granularity==='monthly'&&dateTo?dateTo.slice(0,7):dateTo;
+    if(cmpFrom&&cmpDate<cmpFrom)return false;
+    if(cmpTo&&cmpDate>cmpTo)return false;
     if(!dateFrom&&!dateTo){
       const d=new Date(dateStr+'T12:00');const now=new Date();
       if(timeframe==='3m'){const c=new Date(now);c.setMonth(c.getMonth()-3);return d>=c;}
@@ -4339,7 +4343,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                       <div key={key} className="perf-slot">
                         <div className="perf-slot-head"><span className="perf-slot-title" style={{color}}>{label}</span></div>
                         <div style={{padding:'4px 16px 16px'}}>
-                          <LineChart snapshots={data.snapshots} staffId={trendStaff.id} metric={key} color={color} label={label} fmt={fmt} timeframe={trendTimeframe} clinicAvg={clinicAvg[key]}/>
+                          <LineChart snapshots={data.snapshots} staffId={trendStaff.id} metric={key} color={color} label={label} fmt={fmt} timeframe={trendTimeframe} clinicAvg={clinicAvg[key]} granularity={trendGranularity} dateFrom={trendFrom} dateTo={trendTo} dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite}/>
                         </div>
                       </div>
                     ))}
