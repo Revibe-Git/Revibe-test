@@ -2858,22 +2858,22 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   /* ── Parse daily revenue ───────────────────── */
   const parseDailyRevenue=(rows)=>{
+    const norm=(r)=>{const out={};Object.entries(r).forEach(([k,v])=>out[k.toLowerCase().trim()]=v?.toString().trim()||'');return out;};
     const byKey={};
-    rows.forEach(r=>{
-      const name=r['staff member']||'';
-      if(!name)return;
-      const matched=matchStaff(name);
-      if(!matched)return;
-      const status=(r['status']||'').toLowerCase();
-      if(!['paid','partially_paid','partially_paid_and_written_off'].includes(status))return;
-      if((r['income category']||'').toLowerCase()!=='treatment income')return;
-      const collected=parseFloat((r['collected']||'0').toString().replace(/[$,]/g,''))||0;
-      if(collected<=0)return;
-      const dateStr=(r['purchase date']||'').slice(0,10);
+    rows.forEach(row=>{
+      const r=norm(row);
+      const name=r['staff member']||r['staff_member']||'';
+      const bucketName=(!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa')?'_clinic':name;
+      const matched=bucketName==='_clinic'?null:matchStaff(bucketName);
+      if(bucketName!=='_clinic'&&!matched)return;
+      const total=parseFloat((r['total']||'0').toString().replace(/[$,\s]/g,''))||0;
+      if(!total)return;
+      const dateStr=(r['purchase date']||r['invoice date']||'').slice(0,10);
       if(!dateStr||dateStr.length!==10)return;
-      const key=matched.id+'_'+dateStr;
-      if(!byKey[key])byKey[key]={id:key,staff_id:matched.id,date:dateStr,revenue:0};
-      byKey[key].revenue+=collected;
+      const staffId=matched?matched.id:'_clinic';
+      const key=staffId+'_'+dateStr;
+      if(!byKey[key])byKey[key]={id:key,staff_id:staffId,date:dateStr,revenue:0};
+      byKey[key].revenue+=total;
     });
     return Object.values(byKey).map(r=>({...r,revenue:Math.round(r.revenue*100)/100}));
   };
@@ -3011,6 +3011,7 @@ function PerformancePage({staff,perfData,setPerfData}){
       const rows=parseCSV(text);
       if(!rows.length){setImportMsg({type:'error',msg:'File is empty or unreadable.'});setImporting(false);return;}
       const type=detectFileType(rows);
+      console.log('[Import] File:',file.name,'Type:',type,'Rows:',rows.length,'First row keys:',rows[0]?Object.keys(rows[0]).slice(0,5):[]);
 
       let newSnapshots=[...data.snapshots];
       let totalPractitioners=0,totalMatched=0,monthsCreated=[],unmatchedNames=new Set();
@@ -3057,6 +3058,7 @@ function PerformancePage({staff,perfData,setPerfData}){
         }
       }else if(type==='sales'){
         const byMonth=parseSalesByMonth(rows);
+        console.log('[Sales] byMonth keys:',Object.keys(byMonth),'total rows:',Object.values(byMonth).reduce((a,v)=>a+v.length,0));
         Object.entries(byMonth).forEach(([month,parsed])=>{
           totalPractitioners=Math.max(totalPractitioners,parsed.length);
           totalMatched=Math.max(totalMatched,parsed.filter(r=>r.staffId).length);
