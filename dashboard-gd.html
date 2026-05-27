@@ -2802,15 +2802,16 @@ function PerformancePage({staff,perfData,setPerfData}){
             });
             newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
           }else if(loadedIdx>=0){
-            // Merge sales into existing loaded snapshot (appointments already saved)
+            // Merge sales revenue into existing loaded appointments snapshot
             const existing=data.snapshots[loadedIdx];
-            const mergedRows=[...existing.rows];
+            const mergedRows=existing.rows.map(r=>({...r}));
             parsed.forEach(nr=>{
-              const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
-              if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
+              const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.staffId&&r.staffId===nr.staffId));
+              if(idx>=0){mergedRows[idx].revenue=(mergedRows[idx].revenue||0)+(nr.revenue||0);}
               else mergedRows.push(nr);
             });
-            newSnapshots.push({...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]});
+            // Save as new sales snapshot with merged data
+            newSnapshots.push({id:'snap_'+month+'_sales',date:snapDate,rows:mergedRows,files:[...(existing.files||[]),file.name],type:'sales'});
           }else{
             newSnapshots.push({id:'snap_'+month+'_sales',date:snapDate,rows:parsed,files:[file.name],type:'sales'});
           }
