@@ -2056,91 +2056,98 @@ function Sparkline({values,color,width=120,height=32}){
   </svg>);
 }
 
-function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,staffId}){
-  // Calculate current month projection
+function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,staffId,snapshots}){
   const now=new Date();
   const curM=now.toISOString().slice(0,7);
   const dayOfMonth=now.getDate();
   const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const remaining=daysInMonth-dayOfMonth;
   const pct=Math.round((dayOfMonth/daysInMonth)*100);
 
-  // Filter to current month
+  // Use snapshots for revenue (Sales CSV = source of truth)
+  // Use dailyAppts for visits and IAs (more granular)
+  const curSnap=snapshots?snapshots.find(s=>s.date&&s.date.startsWith(curM)):null;
+
+  const filterStaff=s=>!['mgmt','ops','edu'].includes(s.discipline)
+    &&(filterDisc==='all'||s.discipline===filterDisc)
+    &&(filterSite==='all'||s.site===filterSite)
+    &&(!staffId||s.id===staffId);
+
+  // Revenue from snapshots
+  const snapRevenue=curSnap?(curSnap.rows||[]).filter(r=>{
+    const s=staff.find(x=>x.id===r.staffId);return s&&filterStaff(s);
+  }).reduce((a,r)=>a+(parseFloat(r.revenue)||0),0):0;
+
+  // Visits + IAs from dailyAppts (more current)
   const monthAppts=dailyAppts.filter(r=>{
     if(!r.date.startsWith(curM))return false;
-    if(staffId)return r.staff_id===staffId;
+    if(staffId&&r.staff_id!==staffId)return false;
     const s=staff.find(x=>x.id===r.staff_id);
-    if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;
-    if(filterDisc!=='all'&&s.discipline!==filterDisc)return false;
-    if(filterSite!=='all'&&s.site!==filterSite)return false;
-    return true;
+    return s&&filterStaff(s);
   });
-  const monthRev=dailyRevenue.filter(r=>{
-    if(!r.date.startsWith(curM))return false;
-    if(staffId)return r.staff_id===staffId;
-    const s=staff.find(x=>x.id===r.staff_id);
-    if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;
-    if(filterDisc!=='all'&&s.discipline!==filterDisc)return false;
-    if(filterSite!=='all'&&s.site!==filterSite)return false;
-    return true;
-  });
+  const visits=monthAppts.reduce((a,r)=>a+(r.completed||0),0);
+  const ias=monthAppts.reduce((a,r)=>a+(r.initial_assessments||0),0);
 
-  const toDate=v=>Math.round(v);
+  // Use whichever revenue source has data
+  const revenueActual=snapRevenue>0?snapRevenue:dailyRevenue.filter(r=>{
+    if(!r.date.startsWith(curM))return false;
+    if(staffId&&r.staff_id!==staffId)return false;
+    const s=staff.find(x=>x.id===r.staff_id);return s&&filterStaff(s);
+  }).reduce((a,r)=>a+(r.revenue||0),0);
+
   const metrics=[
-    {
-      label:'Revenue',color:'#CAE8C1',
-      actual:monthRev.reduce((a,r)=>a+(r.revenue||0),0),
-      fmt:v=>'$'+Math.round(v).toLocaleString(),
-    },
-    {
-      label:'Completed Visits',color:'#BB99FF',
-      actual:monthAppts.reduce((a,r)=>a+(r.completed||0),0),
-      fmt:v=>Math.round(v).toLocaleString(),
-    },
-    {
-      label:'Initial Assessments',color:'#F4DB71',
-      actual:monthAppts.reduce((a,r)=>a+(r.initial_assessments||0),0),
-      fmt:v=>Math.round(v).toString(),
-    },
-  ].filter(m=>m.actual>0);
+    {key:'revenue',label:'Revenue',color:'#CAE8C1',actual:revenueActual,fmt:v=>'$'+Math.round(v).toLocaleString()},
+    {key:'visits',label:'Completed Visits',color:'#BB99FF',actual:visits,fmt:v=>Math.round(v).toLocaleString()},
+    {key:'ias',label:'Initial Assessments',color:'#F4DB71',actual:ias,fmt:v=>Math.round(v).toString()},
+  ].filter(m=>m.actual>0).map(m=>({
+    ...m,
+    dailyRate:m.actual/dayOfMonth,
+    projected:Math.round((m.actual/dayOfMonth)*daysInMonth),
+    remaining:Math.round(((m.actual/dayOfMonth)*daysInMonth)-m.actual),
+  }));
 
   if(!metrics.length||dayOfMonth<3)return null;
 
+  const monthName=now.toLocaleDateString('en-CA',{month:'long',year:'numeric'});
+
   return(
-    <div className="perf-slot" style={{marginBottom:14}}>
-      <div className="perf-slot-head">
-        <span className="perf-slot-title" style={{color:'#44CCAA'}}>📈 {now.toLocaleDateString('en-CA',{month:'long',year:'numeric'})} Projection</span>
-        <span style={{fontSize:13,color:'#555'}}>{dayOfMonth} of {daysInMonth} days ({pct}% through month)</span>
-      </div>
-      <div style={{padding:'12px 16px'}}>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12}}>
-          {metrics.map(({label,color,actual,fmt})=>{
-            const dailyRate=actual/dayOfMonth;
-            const projected=Math.round(dailyRate*daysInMonth);
-            const remaining=projected-actual;
-            return(
-              <div key={label} style={{background:'var(--surface3)',borderRadius:6,padding:'12px 14px'}}>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:8}}>{label}</div>
-                <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:6}}>
-                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color}}>{fmt(projected)}</span>
-                  <span style={{fontSize:12,color:'#555'}}>projected</span>
-                </div>
-                <div style={{fontSize:13,color:'#aaa',marginBottom:4}}>
-                  <span style={{color:'#ddd'}}>{fmt(actual)}</span> so far · <span style={{color:'#44CCAA'}}>{fmt(remaining)} remaining</span>
-                </div>
-                <div style={{fontSize:12,color:'#555'}}>{fmt(Math.round(dailyRate))}/day pace</div>
-                {/* Progress bar */}
-                <div style={{marginTop:8,height:4,background:'var(--surface2)',borderRadius:2}}>
-                  <div style={{height:'100%',borderRadius:2,background:color,width:Math.min(100,pct)+'%'}}/>
-                </div>
-              </div>
-            );
-          })}
+    <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'18px 20px',marginBottom:14}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA',fontWeight:700,marginBottom:2}}>
+            📈 {monthName} — Month-End Projection
+          </div>
+          <div style={{fontSize:13,color:'#555'}}>{dayOfMonth} of {daysInMonth} days complete ({pct}%)</div>
         </div>
+        {/* Progress bar */}
+        <div style={{flex:1,minWidth:120,maxWidth:200}}>
+          <div style={{height:6,background:'var(--surface3)',borderRadius:3}}>
+            <div style={{height:'100%',borderRadius:3,background:'#44CCAA',width:pct+'%'}}/>
+          </div>
+        </div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:12}}>
+        {metrics.map(({key,label,color,actual,projected,remaining,dailyRate,fmt})=>(
+          <div key={key} style={{background:'var(--surface3)',borderRadius:6,padding:'14px 16px',borderLeft:'3px solid '+color}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:8}}>{label}</div>
+            <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}>
+              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color,lineHeight:1}}>{fmt(projected)}</span>
+              <span style={{fontSize:12,color:'#555'}}>projected</span>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3,fontSize:13}}>
+              <div><span style={{color:'#888'}}>So far: </span><span style={{color:'#ddd',fontWeight:600}}>{fmt(actual)}</span></div>
+              <div><span style={{color:'#888'}}>Remaining: </span><span style={{color:'#44CCAA',fontWeight:600}}>{fmt(remaining)}</span></div>
+              <div style={{color:'#555',fontSize:12}}>{fmt(Math.round(dailyRate))}/day pace</div>
+            </div>
+            <div style={{marginTop:10,height:3,background:'var(--surface2)',borderRadius:2}}>
+              <div style={{height:'100%',borderRadius:2,background:color,width:Math.min(100,pct)+'%'}}/>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
 }
+
 
 function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg,granularity,dateFrom,dateTo}){
   const allPts=snapshots.map(s=>{
@@ -2708,7 +2715,7 @@ function PerformancePage({staff,perfData,setPerfData}){
       const category=(r['income category']||r['income_category']||'').toLowerCase();
       if(category.includes('product'))return;
       // Collected is already numeric in Jane's export
-      const collected=parseFloat((r['collected']||'0').toString().replace(/[$,\s]/g,''))||0;
+      const collected=parseFloat((r['total']||r['collected']||'0').toString().replace(/[$,\s]/g,''))||0;
       if(!collected)return;
       const month=getMonth(r['purchase date']||r['invoice date']);
       if(!month)return;
@@ -3196,6 +3203,7 @@ function PerformancePage({staff,perfData,setPerfData}){
 
       {tab==='overview'&&(
         <div className="grid2">
+          <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={filterDisc} filterSite={filterSite} snapshots={data.snapshots}/>
           <div className="perf-slot">
             <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#CAE8C1'}}>Revenue</span>{!withRev.length&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('import')}>Import →</button>}</div>
             <div className="perf-slot-body">{withRev.length?withRev.slice(0,12).map(s=><BarRow key={s.id} s={s} val={s.revenue} max={maxRev} color="#CAE8C1" sub={fmtRev(s.revenue)} metric="revenue"/>):<div className="empty" style={{padding:24}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue.</p></div>}</div>
@@ -3295,9 +3303,6 @@ function PerformancePage({staff,perfData,setPerfData}){
               </div>
             </>);
           })()}
-
-          {/* Projections overview card */}
-          <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc="all" filterSite="all"/>
 
           {/* Retention overview card */}
           {(retentionSnapshots.length>0||data.retentionClinic)&&(()=>{
@@ -4106,7 +4111,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                 <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:12}}>
                   Clinic Totals — {filteredStaff.length} practitioners{trendDisc!=='all'?` · ${trendDisc}`:''}{trendSite!=='all'?` · ${trendSite}`:''}
                 </div>
-                <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite}/>
+                <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} snapshots={data.snapshots}/>
                 {clinicMetrics.map(({key,label,color,fmt})=>{
                   const nowD=new Date();
                   const curM=nowD.toISOString().slice(0,7);
@@ -4236,7 +4241,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               })()}
 
               {/* ── Per-practitioner projection ── */}
-              <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc="all" filterSite="all" staffId={trendStaff.id}/>
+              <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc="all" filterSite="all" staffId={trendStaff.id} snapshots={data.snapshots}/>
 
               {/* ── Per-practitioner retention trend ── */}
               {(()=>{
@@ -4337,7 +4342,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               {[
                 {n:1,title:'Appointments Report',where:'Reports → Appointments',action:'Set date range → ··· menu → Export CSV',cols:'staff_member_name, state, no_show_at, cancelled_at',note:'Gives: completed visits, no-shows, cancellations per practitioner'},
                 {n:2,title:'Shift Report',where:'Reports → Payroll → Timesheets',action:'Set date range → Export CSV',cols:'Staff Name, Appointment Total Hours, Shift Total Hours',note:'Gives: utilization % (Appt Hours ÷ Shift Hours)'},
-                {n:3,title:'Sales Report',where:'Reports → Sales',action:'Set date range → Export CSV',cols:'Staff Member, Status, Income Category, Collected',note:'Gives: revenue per practitioner (paid treatment income only)'},
+                {n:3,title:'Sales Report',where:'Reports → Sales',action:'Set date range → Export CSV',cols:'Staff Member, Status, Income Category, Collected',note:'Gives: revenue per practitioner (total invoiced, treatment income)'},
                 {n:4,title:'Member Retention Report',where:'Reports → Member Retention',action:'Set date range → Export CSV',cols:'Practitioner name block + 6 data rows each',note:'Gives: % Returning, % Repeat Visits, new/returning patient counts per practitioner'},
               ].map(s=>(
                 <div key={s.n} style={{background:'var(--surface3)',borderRadius:5,padding:'12px 14px',border:'1px solid var(--border)'}}>
