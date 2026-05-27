@@ -3259,7 +3259,11 @@ function PerformancePage({staff,perfData,setPerfData}){
         }
       });
     });
-    return Object.values(byStaff).map(r=>({
+    const result=Object.values(byStaff);
+    const withRevCount=result.filter(r=>r.revenue>0).length;
+    if(withRevCount===0&&result.length>0)console.warn('[aggregateRows] No revenue found! Sample row:',JSON.stringify(result[0]));
+    else console.log('[aggregateRows] rows:',result.length,'with revenue:',withRevCount,'total rev:',result.reduce((a,r)=>a+(r.revenue||0),0));
+    return result.map(r=>({
       ...r,
       revenue:Math.round(r.revenue*100)/100,
       // Average the utilization across however many shift snapshots exist
