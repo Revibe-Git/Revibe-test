@@ -2161,6 +2161,195 @@ function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,sta
 }
 
 
+function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filterSite,dateFrom,dateTo,timeframe}){
+  // Build week buckets from daily data
+  const getWeekStart=(dateStr)=>{
+    const d=new Date(dateStr+'T12:00');
+    const day=d.getDay();
+    const diff=d.getDate()-(day===0?6:day-1);
+    const mon=new Date(d.getFullYear(),d.getMonth(),diff);
+    return mon.toISOString().slice(0,10);
+  };
+
+  const inRange=(dateStr)=>{
+    if(dateFrom&&dateStr<dateFrom)return false;
+    if(dateTo&&dateStr>dateTo)return false;
+    if(!dateFrom&&!dateTo){
+      const d=new Date(dateStr+'T12:00'),now=new Date();
+      if(timeframe==='3m'){const c=new Date(now);c.setMonth(c.getMonth()-3);return d>=c;}
+      if(timeframe==='6m'){const c=new Date(now);c.setMonth(c.getMonth()-6);return d>=c;}
+      if(timeframe==='12m'){const c=new Date(now);c.setMonth(c.getMonth()-12);return d>=c;}
+      if(timeframe==='ytd')return d.getFullYear()===now.getFullYear();
+    }
+    return true;
+  };
+
+  const filterRow=(r)=>{
+    if(staffId)return r.staff_id===staffId;
+    const s=(staff||[]).find(x=>x.id===r.staff_id);
+    if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;
+    if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;
+    if(filterSite&&filterSite!=='all'&&s.site!==filterSite)return false;
+    return true;
+  };
+
+  // Aggregate by week
+  const weekMap={};
+  (dailyAppts||[]).forEach(r=>{
+    if(!inRange(r.date)||!filterRow(r))return;
+    const wk=getWeekStart(r.date);
+    if(!weekMap[wk])weekMap[wk]={wk,revenue:0,visits:0,ias:0,noShows:0,cancellations:0};
+    weekMap[wk].visits+=(r.completed||0);
+    weekMap[wk].ias+=(r.initial_assessments||0);
+    weekMap[wk].noShows+=(r.no_shows||0);
+    weekMap[wk].cancellations+=(r.cancellations||0);
+  });
+  (dailyRevenue||[]).forEach(r=>{
+    if(!inRange(r.date)||!filterRow(r))return;
+    const wk=getWeekStart(r.date);
+    if(!weekMap[wk])weekMap[wk]={wk,revenue:0,visits:0,ias:0,noShows:0,cancellations:0};
+    weekMap[wk].revenue+=(r.revenue||0);
+  });
+
+  const weeks=Object.values(weekMap).sort((a,b)=>a.wk.localeCompare(b.wk));
+  if(!weeks.length)return<div style={{fontSize:14,color:'#777',padding:'20px',textAlign:'center'}}>No weekly data for this period. Import Appointments CSV to see weekly trends.</div>;
+
+  const fmtWk=(d)=>new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'});
+  const fmtRev=(v)=>'$'+Math.round(v).toLocaleString();
+
+  const metrics=[
+    {key:'revenue',label:'Revenue',color:'#CAE8C1',fmt:fmtRev},
+    {key:'visits',label:'Completed Visits',color:'#BB99FF',fmt:v=>v},
+    {key:'ias',label:'Initial Assessments',color:'#F4DB71',fmt:v=>v},
+    {key:'noShows',label:'No-Shows',color:'#E05252',fmt:v=>v},
+  ];
+
+  const MiniChart=({data,color,fmt})=>{
+    if(data.length<2)return null;
+    const vals=data.map(d=>d.val);
+    const min=Math.min(...vals)*0.85,max=Math.max(...vals)*1.1,range=max-min||1;
+    const W=300,H=70,PX=4,PY=4;
+    const toY=v=>PY+Math.round((1-(v-min)/range)*(H-PY*2));
+    const coords=data.map((d,i)=>({x:PX+Math.round(i/(data.length-1)*(W-PX*2)),y:toY(d.val),val:d.val,wk:d.wk}));
+    const path=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
+    const area=path+` L${coords[coords.length-1].x},${H} L${coords[0].x},${H} Z`;
+    const latest=vals[vals.length-1];
+    const prev=vals.length>1?vals[vals.length-2]:null;
+    const delta=prev&&prev!==0?((latest-prev)/prev*100).toFixed(1):null;
+    const up=parseFloat(delta)>=0;
+    return(
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{display:'block'}}>
+        <path d={area} fill={color} opacity="0.08"/>
+        <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
+        {coords.map((c,i)=>(
+          <g key={i}>
+            <circle cx={c.x} cy={c.y} r="3" fill={color}/>
+            {i===coords.length-1&&delta!=null&&(
+              <text x={c.x} y={c.y-8} textAnchor="middle" fontSize="10" fill={up?'#44CCAA':'#E05252'} fontWeight="700">
+                {up?'▲':'▼'}{Math.abs(delta)}%
+              </text>
+            )}
+          </g>
+        ))}
+      </svg>
+    );
+  };
+
+  return(
+    <div>
+      {/* Week summary table */}
+      <div style={{overflowX:'auto',marginBottom:16}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+          <thead>
+            <tr style={{borderBottom:'1px solid var(--border)'}}>
+              <th style={{textAlign:'left',padding:'8px 12px',color:'#666',fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',fontSize:12,textTransform:'uppercase'}}>Week of</th>
+              <th style={{textAlign:'right',padding:'8px 12px',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,textTransform:'uppercase'}}>Revenue</th>
+              <th style={{textAlign:'right',padding:'8px 12px',color:'#BB99FF',fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,textTransform:'uppercase'}}>Visits</th>
+              <th style={{textAlign:'right',padding:'8px 12px',color:'#F4DB71',fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,textTransform:'uppercase'}}>IAs</th>
+              <th style={{textAlign:'right',padding:'8px 12px',color:'#E05252',fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,textTransform:'uppercase'}}>No-shows</th>
+              <th style={{textAlign:'right',padding:'8px 12px',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,textTransform:'uppercase'}}>Cancels</th>
+            </tr>
+          </thead>
+          <tbody>
+            {weeks.map((w,i)=>{
+              const prev=i>0?weeks[i-1]:null;
+              const revDelta=prev&&prev.revenue?((w.revenue-prev.revenue)/prev.revenue*100).toFixed(1):null;
+              return(
+                <tr key={w.wk} style={{borderBottom:'1px solid rgba(255,255,255,.04)',background:i%2===0?'transparent':'rgba(255,255,255,.02)'}}>
+                  <td style={{padding:'9px 12px',color:'#aaa',fontWeight:600}}>{fmtWk(w.wk)}</td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700}}>
+                    {fmtRev(w.revenue)}
+                    {revDelta!=null&&<span style={{fontSize:11,marginLeft:6,color:parseFloat(revDelta)>=0?'#44CCAA':'#E05252'}}>{parseFloat(revDelta)>=0?'▲':'▼'}{Math.abs(revDelta)}%</span>}
+                  </td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#BB99FF',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700}}>{w.visits}</td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#F4DB71',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700}}>{w.ias}</td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#E05252',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700}}>{w.noShows}</td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15}}>{w.cancellations}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          {weeks.length>1&&(()=>{
+            const avg=v=>Math.round(weeks.reduce((a,w)=>a+w[v],0)/weeks.length);
+            return(
+              <tfoot>
+                <tr style={{borderTop:'1px solid var(--border)',background:'rgba(255,255,255,.03)'}}>
+                  <td style={{padding:'9px 12px',color:'#555',fontSize:12,fontFamily:"'Barlow Condensed',sans-serif",textTransform:'uppercase',letterSpacing:'1px'}}>Avg / week</td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14}}>{fmtRev(avg('revenue'))}</td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14}}>{avg('visits')}</td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14}}>{avg('ias')}</td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14}}>{avg('noShows')}</td>
+                  <td style={{padding:'9px 12px',textAlign:'right',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14}}>{avg('cancellations')}</td>
+                </tr>
+              </tfoot>
+            );
+          })()}
+        </table>
+      </div>
+
+      {/* Mini sparkline charts per metric */}
+      {weeks.length>=2&&(
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:10}}>
+          {metrics.map(({key,label,color,fmt})=>{
+            const data=weeks.map(w=>({wk:w.wk,val:w[key]}));
+            const vals=data.map(d=>d.val);
+            const total=key==='revenue'?vals.reduce((a,b)=>a+b,0):null;
+            const avg=Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
+            const latest=vals[vals.length-1];
+            const prev=vals.length>1?vals[vals.length-2]:null;
+            const delta=prev&&prev!==0?((latest-prev)/prev*100).toFixed(1):null;
+            const up=parseFloat(delta)>=0;
+            return(
+              <div key={key} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'12px 14px'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:8}}>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#666'}}>{label}</div>
+                  {delta!=null&&<span style={{fontSize:12,color:up?'#44CCAA':'#E05252',fontWeight:700}}>{up?'▲':'▼'}{Math.abs(delta)}% WoW</span>}
+                </div>
+                <div style={{display:'flex',gap:16,marginBottom:8}}>
+                  <div>
+                    <div style={{fontSize:11,color:'#555',marginBottom:2}}>Latest</div>
+                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color,lineHeight:1}}>{fmt(latest)}</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:11,color:'#555',marginBottom:2}}>Avg/wk</div>
+                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:'#888',lineHeight:1}}>{fmt(avg)}</div>
+                  </div>
+                  {total!=null&&<div>
+                    <div style={{fontSize:11,color:'#555',marginBottom:2}}>Total</div>
+                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:700,color:'#888',lineHeight:1}}>{fmt(total)}</div>
+                  </div>}
+                </div>
+                <MiniChart data={data} color={color} fmt={fmt}/>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg,granularity,dateFrom,dateTo,dailyAppts,dailyRevenue,staff,filterDisc,filterSite}){
   // Helper: get week key (YYYY-Www) from date string
   const getWeekKey=(dateStr)=>{
@@ -4234,6 +4423,15 @@ function PerformancePage({staff,perfData,setPerfData}){
                     });
                   }
                   pts=pts.filter(p=>p.val>0);
+                  // For weekly clinic view, also show the comparison table
+                  if(trendGranularity==='weekly'&&key==='revenue'){return(
+                    <div key={key} style={{gridColumn:'1/-1'}}>
+                      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:12}}>
+                        Clinic Totals — Weekly Comparison
+                      </div>
+                      <WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>
+                    </div>
+                  );}
                   if(!pts.length)return null;
                   const pVals=pts.map(p=>p.val);
                   const lastPt=pts[pts.length-1];
@@ -4301,7 +4499,16 @@ function PerformancePage({staff,perfData,setPerfData}){
             );
           })()}
 
-          {trendView==='practitioner'&&trendStaff?(
+          {trendView==='practitioner'&&trendStaff&&trendGranularity==='weekly'&&(
+            <div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:12}}>
+                {trendStaff.name} — Weekly Breakdown
+              </div>
+              <WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>
+            </div>
+          )}
+
+          {trendView==='practitioner'&&trendStaff&&trendGranularity==='monthly'?(
             <div>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:16}}>
                 {trendStaff.name.toUpperCase()}
@@ -4437,7 +4644,7 @@ function PerformancePage({staff,perfData,setPerfData}){
                 );
               })()}
             </div>
-          ):(trendView==='practitioner'?(
+          ):(trendView==='practitioner'&&trendGranularity==='monthly'?(
             <div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to view their trends.</div>
           ):null)}
 
