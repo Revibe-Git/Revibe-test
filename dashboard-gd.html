@@ -3152,13 +3152,15 @@ function PerformancePage({staff,perfData,setPerfData}){
 
       // Sort snapshots by date, keep last 36
       newSnapshots=newSnapshots.sort((a,b)=>a.date.localeCompare(b.date)).slice(-36);
+      console.log('[PreSave] newSnapshots count:',newSnapshots.length,'sample revenue:',newSnapshots.find(s=>s.date.startsWith('2026-05'))?.rows?.find(r=>r.revenue)?.revenue);
       const newData={...data,snapshots:newSnapshots,lastImport:new Date().toISOString()};
       save(newData);
       // Save to Supabase
       let sbOk=true;
       if(window.__SB){
         for(const snap of newSnapshots){
-          await saveSnapshot(snap);
+          const r=await saveSnapshot(snap);
+          console.log('[SB Save]',snap.id,'rows:',snap.rows?.length);
         }
       }else{sbOk=false;}
 
