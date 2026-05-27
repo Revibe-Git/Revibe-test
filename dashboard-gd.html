@@ -2059,8 +2059,12 @@ function Sparkline({values,color,width=120,height=32}){
 function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,staffId,snapshots}){
   const now=new Date();
   const curM=now.toISOString().slice(0,7);
-  const dayOfMonth=now.getDate();
   const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  // Use last date with actual data so projection isn't diluted by days with no data yet
+  const _revDates=dailyRevenue.filter(r=>r.date&&r.date.startsWith(curM)).map(r=>r.date).sort();
+  const _apptDates=dailyAppts.filter(r=>r.date&&r.date.startsWith(curM)).map(r=>r.date).sort();
+  const _lastDate=(_revDates.length?_revDates[_revDates.length-1]:null)||(_apptDates.length?_apptDates[_apptDates.length-1]:null);
+  const dayOfMonth=_lastDate?parseInt(_lastDate.slice(8)):now.getDate();
   const pct=Math.round((dayOfMonth/daysInMonth)*100);
 
   // Use snapshots for revenue (Sales CSV = source of truth)
