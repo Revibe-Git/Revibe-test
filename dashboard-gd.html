@@ -2709,13 +2709,9 @@ function PerformancePage({staff,perfData,setPerfData}){
       const r=norm(row);
       const name=r['staff member']||r['staff_member']||'';
       if(!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa')return;
-      const status=r['status']||'';
-      // Include paid and partially_paid — both have real collected amounts
-      if(!['paid','partially_paid','partially_paid_and_written_off'].includes(status))return;
       const category=(r['income category']||r['income_category']||'').toLowerCase();
-      if(category.includes('product'))return;
-      // Collected is already numeric in Jane's export
-      const collected=parseFloat((r['total']||r['collected']||'0').toString().replace(/[$,\s]/g,''))||0;
+      // Total invoiced — all statuses, all income types
+      const collected=parseFloat((r['total']||'0').toString().replace(/[$,\s]/g,''))||0;
       if(!collected)return;
       const month=getMonth(r['purchase date']||r['invoice date']);
       if(!month)return;
