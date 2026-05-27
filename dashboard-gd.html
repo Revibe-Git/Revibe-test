@@ -2056,411 +2056,32 @@ function Sparkline({values,color,width=120,height=32}){
   </svg>);
 }
 
-function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,staffId,snapshots}){
+function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg,granularity,dateFrom,dateTo}){
+  const allPts=snapshots.map(s=>{
+    const r=s.rows?.find(r=>r.staffId===staffId);
+    return r&&r[metric]!=null?{date:s.date,val:parseFloat(r[metric])||0}:null;
+  }).filter(Boolean);
+
+  // Apply date filter
   const now=new Date();
-  const curM=now.toISOString().slice(0,7);
-  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  // Use last date with actual data so projection isn't diluted by days with no data yet
-  const _revDates=dailyRevenue.filter(r=>r.date&&r.date.startsWith(curM)).map(r=>r.date).sort();
-  const _apptDates=dailyAppts.filter(r=>r.date&&r.date.startsWith(curM)).map(r=>r.date).sort();
-  const _lastDate=(_revDates.length?_revDates[_revDates.length-1]:null)||(_apptDates.length?_apptDates[_apptDates.length-1]:null);
-  const dayOfMonth=_lastDate?parseInt(_lastDate.slice(8)):now.getDate();
-  const pct=Math.round((dayOfMonth/daysInMonth)*100);
-
-  // Use snapshots for revenue (Sales CSV = source of truth)
-  // Use dailyAppts for visits and IAs (more granular)
-  const curSnap=snapshots?snapshots.find(s=>s.date&&s.date.startsWith(curM)):null;
-
-  const filterStaff=s=>!['mgmt','ops','edu'].includes(s.discipline)
-    &&(filterDisc==='all'||s.discipline===filterDisc)
-    &&(filterSite==='all'||s.site===filterSite)
-    &&(!staffId||s.id===staffId);
-
-  // Revenue from snapshots
-  // Sum all revenue rows including unmatched (_clinic bucket) for full clinic total
-  const snapRevenue=curSnap?(curSnap.rows||[]).reduce((a,r)=>{
-    if(!r.revenue)return a;
-    // If staffId filter active, only include matched staff
-    if(staffId&&r.staffId!==staffId)return a;
-    if(!staffId&&(filterDisc!=='all'||filterSite!=='all')){
-      const s=staff.find(x=>x.id===r.staffId);
-      if(r.staffId&&s&&!filterStaff(s))return a;
-    }
-    return a+(parseFloat(r.revenue)||0);
-  },0):0;
-
-  // Visits + IAs from dailyAppts (more current)
-  const monthAppts=dailyAppts.filter(r=>{
-    if(!r.date.startsWith(curM))return false;
-    if(staffId&&r.staff_id!==staffId)return false;
-    const s=staff.find(x=>x.id===r.staff_id);
-    return s&&filterStaff(s);
-  });
-  const visits=monthAppts.reduce((a,r)=>a+(r.completed||0),0);
-  const ias=monthAppts.reduce((a,r)=>a+(r.initial_assessments||0),0);
-
-  // Use whichever revenue source has data
-  const revenueActual=snapRevenue>0?snapRevenue:dailyRevenue.filter(r=>{
-    if(!r.date.startsWith(curM))return false;
-    if(staffId&&r.staff_id!==staffId)return false;
-    const s=staff.find(x=>x.id===r.staff_id);return s&&filterStaff(s);
-  }).reduce((a,r)=>a+(r.revenue||0),0);
-
-  const metrics=[
-    {key:'revenue',label:'Revenue',color:'#CAE8C1',actual:revenueActual,fmt:v=>'$'+Math.round(v).toLocaleString()},
-    {key:'visits',label:'Completed Visits',color:'#BB99FF',actual:visits,fmt:v=>Math.round(v).toLocaleString()},
-    {key:'ias',label:'Initial Assessments',color:'#F4DB71',actual:ias,fmt:v=>Math.round(v).toString()},
-  ].filter(m=>m.actual>0).map(m=>({
-    ...m,
-    dailyRate:m.actual/dayOfMonth,
-    projected:Math.round((m.actual/dayOfMonth)*daysInMonth),
-    remaining:Math.round(((m.actual/dayOfMonth)*daysInMonth)-m.actual),
-  }));
-
-  if(!metrics.length||dayOfMonth<3)return null;
-
-  const monthName=now.toLocaleDateString('en-CA',{month:'long',year:'numeric'});
-
-  return(
-    <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'18px 20px',marginBottom:14}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
-        <div>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA',fontWeight:700,marginBottom:2}}>
-            📈 {monthName} — Month-End Projection
-          </div>
-          <div style={{fontSize:13,color:'#555'}}>{dayOfMonth} of {daysInMonth} days complete ({pct}%)</div>
-        </div>
-        {/* Progress bar */}
-        <div style={{flex:1,minWidth:120,maxWidth:200}}>
-          <div style={{height:6,background:'var(--surface3)',borderRadius:3}}>
-            <div style={{height:'100%',borderRadius:3,background:'#44CCAA',width:pct+'%'}}/>
-          </div>
-        </div>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:12}}>
-        {metrics.map(({key,label,color,actual,projected,remaining,dailyRate,fmt})=>(
-          <div key={key} style={{background:'var(--surface3)',borderRadius:6,padding:'14px 16px',borderLeft:'3px solid '+color}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:8}}>{label}</div>
-            <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}>
-              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color,lineHeight:1}}>{fmt(projected)}</span>
-              <span style={{fontSize:12,color:'#555'}}>projected</span>
-            </div>
-            <div style={{display:'flex',flexDirection:'column',gap:3,fontSize:13}}>
-              <div><span style={{color:'#888'}}>So far: </span><span style={{color:'#ddd',fontWeight:600}}>{fmt(actual)}</span></div>
-              <div><span style={{color:'#888'}}>Remaining: </span><span style={{color:'#44CCAA',fontWeight:600}}>{fmt(remaining)}</span></div>
-              <div style={{color:'#555',fontSize:12}}>{fmt(Math.round(dailyRate))}/day pace</div>
-            </div>
-            <div style={{marginTop:10,height:3,background:'var(--surface2)',borderRadius:2}}>
-              <div style={{height:'100%',borderRadius:2,background:color,width:Math.min(100,pct)+'%'}}/>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-
-function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filterSite,dateFrom,dateTo,timeframe}){
-  const[activeMetric,setActiveMetric]=React.useState('revenue');
-  const[weekA,setWeekA]=React.useState('');
-  const[weekB,setWeekB]=React.useState('');
-
-  const getWeekStart=(dateStr)=>{
-    const d=new Date(dateStr+'T12:00');
-    const day=d.getDay();
-    const diff=d.getDate()-(day===0?6:day-1);
-    return new Date(d.getFullYear(),d.getMonth(),diff).toISOString().slice(0,10);
-  };
-  const getWeekEnd=(wkStart)=>{
-    const d=new Date(wkStart+'T12:00');
-    d.setDate(d.getDate()+6);
-    return d.toISOString().slice(0,10);
-  };
-
-  // In weekly compare mode, always load ALL available weeks for the dropdowns
-  // No date range filtering - user picks weeks manually via dropdowns
-  const inRange=()=>true;
-
-  const filterRow=(r)=>{
-    if(staffId)return r.staff_id===staffId;
-    const s=(staff||[]).find(x=>x.id===r.staff_id);
-    if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;
-    if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;
-    if(filterSite&&filterSite!=='all'&&s.site!==filterSite)return false;
-    return true;
-  };
-
-  // Build per-staff per-week data
-  const staffWeekMap={};// staffId -> weekStart -> {revenue,visits,ias,noShows,cancellations}
-  const allWeeks=new Set();
-
-  (dailyAppts||[]).forEach(r=>{
-    if(!inRange(r.date)||!filterRow(r))return;
-    const wk=getWeekStart(r.date);
-    allWeeks.add(wk);
-    if(!staffWeekMap[r.staff_id])staffWeekMap[r.staff_id]={};
-    if(!staffWeekMap[r.staff_id][wk])staffWeekMap[r.staff_id][wk]={revenue:0,visits:0,ias:0,noShows:0,cancellations:0};
-    staffWeekMap[r.staff_id][wk].visits+=(r.completed||0);
-    staffWeekMap[r.staff_id][wk].ias+=(r.initial_assessments||0);
-    staffWeekMap[r.staff_id][wk].noShows+=(r.no_shows||0);
-    staffWeekMap[r.staff_id][wk].cancellations+=(r.cancellations||0);
-  });
-  (dailyRevenue||[]).forEach(r=>{
-    if(!inRange(r.date)||!filterRow(r))return;
-    const wk=getWeekStart(r.date);
-    allWeeks.add(wk);
-    if(!staffWeekMap[r.staff_id])staffWeekMap[r.staff_id]={};
-    if(!staffWeekMap[r.staff_id][wk])staffWeekMap[r.staff_id][wk]={revenue:0,visits:0,ias:0,noShows:0,cancellations:0};
-    staffWeekMap[r.staff_id][wk].revenue+=(r.revenue||0);
-  });
-
-  const sortedWeeks=[...allWeeks].sort();
-  if(!sortedWeeks.length)return<div style={{fontSize:14,color:'#777',padding:'40px',textAlign:'center'}}>No weekly data for this period.<br/><span style={{fontSize:12,color:'#555'}}>Import Appointments CSV to enable weekly trends.</span></div>;
-
-  // Auto-select last 2 weeks if not set
-  React.useEffect(()=>{
-    if(sortedWeeks.length>=2&&!weekA&&!weekB){
-      setWeekA(sortedWeeks[sortedWeeks.length-2]);
-      setWeekB(sortedWeeks[sortedWeeks.length-1]);
-    }else if(sortedWeeks.length===1&&!weekA){
-      setWeekA(sortedWeeks[0]);
-    }
-  },[sortedWeeks.join(',')]);
-
-  const fmtWkRange=(wk)=>{
-    if(!wk)return'—';
-    const s=new Date(wk+'T12:00');
-    const e=new Date(wk+'T12:00');e.setDate(e.getDate()+6);
-    const fmt=d=>d.toLocaleDateString('en-CA',{month:'short',day:'numeric'});
-    return`${fmt(s)} – ${fmt(e)}`;
-  };
-
-  const metrics=[
-    {key:'revenue',label:'Revenue',color:'#CAE8C1',fmt:v=>'$'+Math.round(v).toLocaleString()},
-    {key:'visits',label:'Visits',color:'#BB99FF',fmt:v=>String(v)},
-    {key:'ias',label:'IAs',color:'#F4DB71',fmt:v=>String(v)},
-    {key:'noShows',label:'No-Shows',color:'#E05252',fmt:v=>String(v)},
-  ];
-  const m=metrics.find(x=>x.key===activeMetric)||metrics[0];
-
-  // Group active staff by discipline
-  const activeStaff=(staff||[]).filter(s=>{
-    if(['mgmt','ops','edu'].includes(s.discipline))return false;
-    if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;
-    if(filterSite&&filterSite!=='all'&&s.site!==filterSite)return false;
-    if(staffId&&s.id!==staffId)return false;
-    return staffWeekMap[s.id]&&Object.keys(staffWeekMap[s.id]).length>0;
-  });
-
-  const byDisc={};
-  activeStaff.forEach(s=>{
-    const disc=s.discipline||'Other';
-    if(!byDisc[disc])byDisc[disc]=[];
-    byDisc[disc].push(s);
-  });
-
-  const getVal=(sId,wk)=>wk&&staffWeekMap[sId]?staffWeekMap[sId][wk]?staffWeekMap[sId][wk][activeMetric]||0:0:0;
-
-  // Clinic totals for selected weeks
-  const clinicA=activeStaff.reduce((a,s)=>a+getVal(s.id,weekA),0);
-  const clinicB=activeStaff.reduce((a,s)=>a+getVal(s.id,weekB),0);
-  const clinicDelta=clinicA>0?((clinicB-clinicA)/clinicA*100).toFixed(1):null;
-  const clinicUp=parseFloat(clinicDelta)>=0;
-
-  const DeltaBadge=({a,b})=>{
-    if(!a||a===0)return null;
-    const d=((b-a)/a*100).toFixed(1);
-    const up=parseFloat(d)>=0;
-    return<span style={{fontSize:11,marginLeft:6,color:up?'#44CCAA':'#E05252',fontWeight:700,background:up?'rgba(68,204,170,.08)':'rgba(224,82,82,.08)',padding:'1px 5px',borderRadius:3}}>{up?'▲':'▼'}{Math.abs(d)}%</span>;
-  };
-
-  return(
-    <div>
-      {/* Metric tabs */}
-      <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
-        {metrics.map(({key,label,color})=>(
-          <button key={key} onClick={()=>setActiveMetric(key)}
-            style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',
-              padding:'5px 14px',borderRadius:4,border:'1px solid '+(activeMetric===key?color:'var(--border2)'),
-              background:activeMetric===key?color+'18':'transparent',color:activeMetric===key?color:'#555',cursor:'pointer'}}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Week pickers */}
-      <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap',alignItems:'center'}}>
-        <div style={{flex:1,minWidth:160}}>
-          <div style={{fontSize:11,color:'#555',marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Week A (baseline)</div>
-          <select value={weekA} onChange={e=>setWeekA(e.target.value)}
-            style={{width:'100%',background:'var(--surface3)',border:'1px solid '+(weekA?'var(--go)':'var(--border2)'),borderRadius:5,color:weekA?'#ddd':'#666',fontSize:13,padding:'6px 8px',outline:'none',cursor:'pointer'}}>
-            <option value="">Select week…</option>
-            {sortedWeeks.map(wk=><option key={wk} value={wk}>{fmtWkRange(wk)}</option>)}
-          </select>
-        </div>
-        <div style={{fontSize:18,color:'#444',marginTop:16}}>→</div>
-        <div style={{flex:1,minWidth:160}}>
-          <div style={{fontSize:11,color:'#555',marginBottom:4,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Week B (compare)</div>
-          <select value={weekB} onChange={e=>setWeekB(e.target.value)}
-            style={{width:'100%',background:'var(--surface3)',border:'1px solid '+(weekB?'var(--lime)':'var(--border2)'),borderRadius:5,color:weekB?'#ddd':'#666',fontSize:13,padding:'6px 8px',outline:'none',cursor:'pointer'}}>
-            <option value="">Select week…</option>
-            {sortedWeeks.map(wk=><option key={wk} value={wk}>{fmtWkRange(wk)}</option>)}
-          </select>
-        </div>
-        {/* Clinic total summary */}
-        {weekA&&weekB&&(
-          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 14px',display:'flex',gap:16,alignItems:'center'}}>
-            <div style={{textAlign:'center'}}>
-              <div style={{fontSize:11,color:'#555',fontFamily:"'Barlow Condensed',sans-serif",textTransform:'uppercase',letterSpacing:'1px'}}>Clinic Week A</div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:m.color}}>{m.fmt(Math.round(clinicA))}</div>
-            </div>
-            <div style={{textAlign:'center'}}>
-              <div style={{fontSize:11,color:'#555',fontFamily:"'Barlow Condensed',sans-serif",textTransform:'uppercase',letterSpacing:'1px'}}>Clinic Week B</div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:m.color}}>{m.fmt(Math.round(clinicB))}<DeltaBadge a={clinicA} b={clinicB}/></div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Per-discipline comparison table */}
-      {weekA&&(
-        <div style={{overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-            <thead>
-              <tr style={{borderBottom:'1px solid var(--border)'}}>
-                <th style={{textAlign:'left',padding:'8px 10px',color:'#444',fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.5px',textTransform:'uppercase',width:'30%'}}>Practitioner</th>
-                <th style={{textAlign:'right',padding:'8px 10px',color:m.color,fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1px',textTransform:'uppercase'}}>{weekA?fmtWkRange(weekA):'Week A'}</th>
-                {weekB&&<th style={{textAlign:'right',padding:'8px 10px',color:m.color,fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1px',textTransform:'uppercase'}}>{fmtWkRange(weekB)}</th>}
-                {weekB&&<th style={{textAlign:'right',padding:'8px 10px',color:'#555',fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1px',textTransform:'uppercase'}}>Change</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(byDisc).sort().map(([disc,staffList])=>{
-                const discA=staffList.reduce((a,s)=>a+getVal(s.id,weekA),0);
-                const discB=staffList.reduce((a,s)=>a+getVal(s.id,weekB),0);
-                return(
-                  <React.Fragment key={disc}>
-                    {/* Discipline header row */}
-                    <tr style={{background:'rgba(255,255,255,.03)'}}>
-                      <td colSpan={weekB?4:2} style={{padding:'7px 10px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#666',fontWeight:700}}>
-                        {disc}
-                        <span style={{fontWeight:400,color:'#444',marginLeft:8,fontSize:11}}>{staffList.length} practitioners</span>
-                      </td>
-                    </tr>
-                    {/* Staff rows */}
-                    {staffList.sort((a,b)=>getVal(b.id,weekB||weekA)-getVal(a.id,weekB||weekA)).map(s=>{
-                      const vA=getVal(s.id,weekA);
-                      const vB=weekB?getVal(s.id,weekB):null;
-                      const delta=vA>0&&vB!=null?((vB-vA)/vA*100).toFixed(1):null;
-                      const up=parseFloat(delta)>=0;
-                      return(
-                        <tr key={s.id} style={{borderBottom:'1px solid rgba(255,255,255,.03)'}}>
-                          <td style={{padding:'7px 10px 7px 20px',color:'#aaa'}}>{s.name}</td>
-                          <td style={{padding:'7px 10px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:vA>0?m.color:'#444'}}>{m.fmt(Math.round(vA))}</td>
-                          {weekB&&<td style={{padding:'7px 10px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:vB>0?m.color:'#444'}}>{m.fmt(Math.round(vB||0))}</td>}
-                          {weekB&&<td style={{padding:'7px 10px',textAlign:'right'}}>
-                            {delta!=null?<span style={{fontSize:13,fontWeight:700,color:up?'#44CCAA':'#E05252'}}>{up?'▲':'▼'}{Math.abs(delta)}%</span>:<span style={{color:'#444'}}>—</span>}
-                          </td>}
-                        </tr>
-                      );
-                    })}
-                    {/* Discipline subtotal */}
-                    {staffList.length>1&&(
-                      <tr style={{borderBottom:'1px solid var(--border)',background:'rgba(255,255,255,.02)'}}>
-                        <td style={{padding:'6px 10px 6px 20px',color:'#555',fontSize:12,fontFamily:"'Barlow Condensed',sans-serif",textTransform:'uppercase',letterSpacing:'1px'}}>Subtotal</td>
-                        <td style={{padding:'6px 10px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:'#666'}}>{m.fmt(Math.round(discA))}</td>
-                        {weekB&&<td style={{padding:'6px 10px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:'#666'}}>{m.fmt(Math.round(discB))}</td>}
-                        {weekB&&<td style={{padding:'6px 10px',textAlign:'right'}}><DeltaBadge a={discA} b={discB}/></td>}
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-            {/* Clinic total footer */}
-            <tfoot>
-              <tr style={{borderTop:'2px solid var(--border)'}}>
-                <td style={{padding:'9px 10px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,textTransform:'uppercase',letterSpacing:'1px',color:'#555'}}>Clinic Total</td>
-                <td style={{padding:'9px 10px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:m.color}}>{m.fmt(Math.round(clinicA))}</td>
-                {weekB&&<td style={{padding:'9px 10px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:m.color}}>{m.fmt(Math.round(clinicB))}</td>}
-                {weekB&&<td style={{padding:'9px 10px',textAlign:'right'}}>{clinicDelta!=null&&<span style={{fontSize:14,fontWeight:800,color:clinicUp?'#44CCAA':'#E05252'}}>{clinicUp?'▲':'▼'}{Math.abs(clinicDelta)}%</span>}</td>}
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-
-function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg,granularity,dateFrom,dateTo,dailyAppts,dailyRevenue,staff,filterDisc,filterSite}){
-  // Helper: get week key (YYYY-Www) from date string
-  const getWeekKey=(dateStr)=>{
-    const d=new Date(dateStr+'T12:00');
-    const jan1=new Date(d.getFullYear(),0,1);
-    const week=Math.ceil(((d-jan1)/86400000+jan1.getDay()+1)/7);
-    return `${d.getFullYear()}-W${String(week).padStart(2,'0')}`;
-  };
-  const getWeekStart=(dateStr)=>{
-    const d=new Date(dateStr+'T12:00');
-    const day=d.getDay();
-    const diff=d.getDate()-(day===0?6:day-1);
-    const mon=new Date(d.setDate(diff));
-    return mon.toISOString().slice(0,10);
-  };
-
-  // Date range filter helper
-  const inRange=(dateStr)=>{
-    // For monthly mode, compare at month level so snapshot dates (YYYY-MM-01) match date range
-    const cmpDate=granularity==='monthly'?dateStr.slice(0,7):dateStr;
-    const cmpFrom=granularity==='monthly'&&dateFrom?dateFrom.slice(0,7):dateFrom;
-    const cmpTo=granularity==='monthly'&&dateTo?dateTo.slice(0,7):dateTo;
-    if(cmpFrom&&cmpDate<cmpFrom)return false;
-    if(cmpTo&&cmpDate>cmpTo)return false;
+  const filtered=allPts.filter(p=>{
+    const d=new Date(p.date+'T12:00');
+    if(dateFrom&&d<new Date(dateFrom))return false;
+    if(dateTo&&d>new Date(dateTo))return false;
     if(!dateFrom&&!dateTo){
-      const d=new Date(dateStr+'T12:00');const now=new Date();
+      if(!timeframe||timeframe==='all')return true;
       if(timeframe==='3m'){const c=new Date(now);c.setMonth(c.getMonth()-3);return d>=c;}
       if(timeframe==='6m'){const c=new Date(now);c.setMonth(c.getMonth()-6);return d>=c;}
       if(timeframe==='12m'){const c=new Date(now);c.setMonth(c.getMonth()-12);return d>=c;}
       if(timeframe==='ytd')return d.getFullYear()===now.getFullYear();
     }
     return true;
-  };
+  });
 
-  let pts=[];
+  // Weekly aggregation from daily data (if available via dailySnaps prop)
+  let pts=filtered;
 
-  if(granularity==='weekly'){
-    // Use daily data for weekly aggregation
-    const dailySrc=metric==='revenue'?dailyRevenue:dailyAppts;
-    const metricField=metric==='revenue'?'revenue':metric==='completed'?'completed':metric==='initialAssessments'?'initial_assessments':metric;
-    const weekMap={};
-    (dailySrc||[]).forEach(r=>{
-      if(!inRange(r.date))return;
-      if(staffId&&r.staff_id!==staffId)return;
-      if(!staffId){
-        const s=(staff||[]).find(x=>x.id===r.staff_id);
-        if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
-        if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return;
-        if(filterSite&&filterSite!=='all'&&s.site!==filterSite)return;
-      }
-      const wk=getWeekStart(r.date);
-      if(!weekMap[wk])weekMap[wk]=0;
-      weekMap[wk]+=(parseFloat(r[metricField])||0);
-    });
-    pts=Object.entries(weekMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,val])=>({date,val:Math.round(val*100)/100}));
-  }else{
-    // Monthly from snapshots
-    const allPts=snapshots.map(s=>{
-      const r=s.rows?.find(r=>r.staffId===staffId);
-      return r&&r[metric]!=null?{date:s.date,val:parseFloat(r[metric])||0}:null;
-    }).filter(Boolean);
-    pts=allPts.filter(p=>inRange(p.date));
-  }
-
-  if(pts.length<1)return<div style={{fontSize:14,color:'#777',padding:'20px 16px',textAlign:'center'}}>No {label.toLowerCase()} data for this period.{granularity==='weekly'?' (Weekly view requires daily appointment/revenue data.)':''}</div>;
+  if(pts.length<1)return<div style={{fontSize:14,color:'#777',padding:'20px 16px',textAlign:'center'}}>No {label.toLowerCase()} data for this period.</div>;
 
   const vals=pts.map(p=>p.val);
   const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
@@ -2471,14 +2092,18 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
         <div><div style={{fontSize:13,color:'#888',marginBottom:2}}>Latest</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color,lineHeight:1}}>{fmt(pts[0].val)}</div></div>
         {clinicAvg!=null&&<div><div style={{fontSize:13,color:'#888',marginBottom:2}}>Clinic Avg</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#555',lineHeight:1}}>{fmt(Math.round(clinicAvg))}</div></div>}
       </div>
-      <div style={{fontSize:13,color:'#888',fontStyle:'italic'}}>Import more data to see a trend.</div>
+      <div style={{fontSize:13,color:'#888',fontStyle:'italic'}}>Import more snapshots to see a trend line.</div>
     </div>
   );
 
-  const min=Math.min(...vals)*0.9,max=Math.max(...vals)*1.1,range=max-min||1;
+  const min=Math.min(...vals)*0.9,max=Math.max(...vals)*1.1;
+  const range=max-min||1;
   const W=500,H=140,PADX=52,PADY=16,BOTTOM=32;
   const toY=(v)=>PADY+Math.round((1-(v-min)/range)*(H-PADY*2));
-  const coords=pts.map((p,i)=>({x:PADX+Math.round((i/(pts.length-1||1))*(W-PADX-14)),y:toY(p.val),val:p.val,date:p.date}));
+  const coords=pts.map((p,i)=>({
+    x:PADX+Math.round((i/(pts.length-1||1))*(W-PADX-14)),
+    y:toY(p.val),val:p.val,date:p.date
+  }));
   const pathD=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
   const areaD=pathD+` L${coords[coords.length-1].x},${H} L${coords[0].x},${H} Z`;
   const latest=vals[vals.length-1];
@@ -2489,18 +2114,11 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
   const clinicAvgY=clinicAvg!=null?toY(Math.max(min,Math.min(max,clinicAvg))):null;
   const yGrid=Array.from({length:5},(_,i)=>({y:PADY+Math.round((i/4)*(H-PADY*2)),val:max-((max-min)*(i/4))}));
   const showLabel=(i)=>{
-    if(pts.length<=8)return true;
-    if(pts.length<=16)return i%2===0||i===pts.length-1;
-    if(pts.length<=26)return i%4===0||i===pts.length-1;
+    if(pts.length<=6)return true;
+    if(pts.length<=12)return i%2===0||i===pts.length-1;
     return i===0||i===Math.floor(pts.length/2)||i===pts.length-1;
   };
-  const fmtDate=(d)=>{
-    if(granularity==='weekly'){
-      const dt=new Date(d+'T12:00');
-      return dt.toLocaleDateString('en-CA',{month:'short',day:'numeric'});
-    }
-    return new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'});
-  };
+  const fmtDate=(d)=>new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'});
 
   return(
     <div>
@@ -2514,33 +2132,49 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
             </div>
           </div>
           <div>
-            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Avg / {granularity==='weekly'?'wk':'mo'}</div>
+            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Avg / period</div>
             <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#aaa',lineHeight:1}}>{fmt(Math.round(avg))}</span>
           </div>
           {clinicAvg!=null&&<div>
-            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Clinic Avg / {granularity==='weekly'?'wk':'mo'}</div>
+            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Clinic Avg</div>
             <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#555',lineHeight:1}}>{fmt(Math.round(clinicAvg))}</span>
           </div>}
         </div>
         <div style={{fontSize:13,color:'#777'}}>{pts.length} {granularity==='weekly'?'weeks':'months'}</div>
       </div>
       <svg width="100%" viewBox={`0 0 ${W} ${H+BOTTOM}`} style={{display:'block',overflow:'visible'}}>
-        {yGrid.map((g,i)=>(<g key={i}><line x1={PADX} y1={g.y} x2={W-14} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/><text x={PADX-6} y={g.y+4} textAnchor="end" fontSize="11" fill="#666">{fmt(Math.round(g.val))}</text></g>))}
-        {clinicAvgY!=null&&clinicAvgY>PADY&&clinicAvgY<H&&(<g><line x1={PADX} y1={clinicAvgY} x2={W-14} y2={clinicAvgY} stroke="#444" strokeWidth="1.5" strokeDasharray="5,4"/><text x={W-12} y={clinicAvgY+4} fontSize="11" fill="#555" textAnchor="start">clinic</text></g>)}
-        {avgY>PADY&&avgY<H&&(<g><line x1={PADX} y1={avgY} x2={W-14} y2={avgY} stroke={color} strokeWidth="1.5" strokeDasharray="4,3" opacity="0.4"/><text x={W-12} y={avgY+4} fontSize="11" fill={color} opacity="0.6" textAnchor="start">avg</text></g>)}
+        {yGrid.map((g,i)=>(
+          <g key={i}>
+            <line x1={PADX} y1={g.y} x2={W-14} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/>
+            <text x={PADX-6} y={g.y+4} textAnchor="end" fontSize="11" fill="#666">{fmt(Math.round(g.val))}</text>
+          </g>
+        ))}
+        {clinicAvgY!=null&&clinicAvgY>PADY&&clinicAvgY<H&&(
+          <g>
+            <line x1={PADX} y1={clinicAvgY} x2={W-14} y2={clinicAvgY} stroke="#444" strokeWidth="1.5" strokeDasharray="5,4"/>
+            <text x={W-12} y={clinicAvgY+4} fontSize="11" fill="#555" textAnchor="start">clinic</text>
+          </g>
+        )}
+        {avgY>PADY&&avgY<H&&(
+          <g>
+            <line x1={PADX} y1={avgY} x2={W-14} y2={avgY} stroke={color} strokeWidth="1.5" strokeDasharray="4,3" opacity="0.4"/>
+            <text x={W-12} y={avgY+4} fontSize="11" fill={color} opacity="0.6" textAnchor="start">avg</text>
+          </g>
+        )}
         <path d={areaD} fill={color} opacity="0.07"/>
         <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
-        {coords.map((c,i)=>(<g key={i}>
-          <circle cx={c.x} cy={c.y} r="4.5" fill={color} opacity="0.9"/>
-          {pts.length<=12&&<text x={c.x} y={c.y-11} textAnchor="middle" fontSize="11" fill={color} opacity="0.85" fontWeight="600">{fmt(c.val)}</text>}
-          {showLabel(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">{fmtDate(c.date)}</text>}
-        </g>))}
+        {coords.map((c,i)=>(
+          <g key={i}>
+            <circle cx={c.x} cy={c.y} r="4.5" fill={color} opacity="0.9"/>
+            {pts.length<=10&&<text x={c.x} y={c.y-11} textAnchor="middle" fontSize="11" fill={color} opacity="0.85" fontWeight="600">{fmt(c.val)}</text>}
+            {showLabel(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">{fmtDate(c.date)}</text>}
+          </g>
+        ))}
         <line x1={PADX} y1={H} x2={W-14} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
       </svg>
     </div>
   );
 }
-
 
 
 function PerformancePage({staff,perfData,setPerfData}){
@@ -2858,22 +2492,22 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   /* ── Parse daily revenue ───────────────────── */
   const parseDailyRevenue=(rows)=>{
-    const norm=(r)=>{const out={};Object.entries(r).forEach(([k,v])=>out[k.toLowerCase().trim()]=v?.toString().trim()||'');return out;};
     const byKey={};
-    rows.forEach(row=>{
-      const r=norm(row);
-      const name=r['staff member']||r['staff_member']||'';
-      const bucketName=(!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa')?'_clinic':name;
-      const matched=bucketName==='_clinic'?null:matchStaff(bucketName);
-      if(bucketName!=='_clinic'&&!matched)return;
-      const total=parseFloat((r['total']||'0').toString().replace(/[$,\s]/g,''))||0;
-      if(!total)return;
-      const dateStr=(r['purchase date']||r['invoice date']||'').slice(0,10);
+    rows.forEach(r=>{
+      const name=r['staff member']||'';
+      if(!name)return;
+      const matched=matchStaff(name);
+      if(!matched)return;
+      const status=(r['status']||'').toLowerCase();
+      if(!['paid','partially_paid','partially_paid_and_written_off'].includes(status))return;
+      if((r['income category']||'').toLowerCase()!=='treatment income')return;
+      const collected=parseFloat((r['collected']||'0').toString().replace(/[$,]/g,''))||0;
+      if(collected<=0)return;
+      const dateStr=(r['purchase date']||'').slice(0,10);
       if(!dateStr||dateStr.length!==10)return;
-      const staffId=matched?matched.id:'_clinic';
-      const key=staffId+'_'+dateStr;
-      if(!byKey[key])byKey[key]={id:key,staff_id:staffId,date:dateStr,revenue:0};
-      byKey[key].revenue+=total;
+      const key=matched.id+'_'+dateStr;
+      if(!byKey[key])byKey[key]={id:key,staff_id:matched.id,date:dateStr,revenue:0};
+      byKey[key].revenue+=collected;
     });
     return Object.values(byKey).map(r=>({...r,revenue:Math.round(r.revenue*100)/100}));
   };
@@ -2981,17 +2615,20 @@ function PerformancePage({staff,perfData,setPerfData}){
     rows.forEach(row=>{
       const r=norm(row);
       const name=r['staff member']||r['staff_member']||'';
+      if(!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa')return;
+      const status=r['status']||'';
+      // Include paid and partially_paid — both have real collected amounts
+      if(!['paid','partially_paid','partially_paid_and_written_off'].includes(status))return;
       const category=(r['income category']||r['income_category']||'').toLowerCase();
-      // Total invoiced — all statuses, all income types including GE/products
-      const collected=parseFloat((r['total']||'0').toString().replace(/[$,\s]/g,''))||0;
+      if(category.includes('product'))return;
+      // Collected is already numeric in Jane's export
+      const collected=parseFloat((r['collected']||'0').toString().replace(/[$,\s]/g,''))||0;
       if(!collected)return;
       const month=getMonth(r['purchase date']||r['invoice date']);
       if(!month)return;
       if(!byMonth[month])byMonth[month]={};
-      // GE/no-name/spa go into _clinic bucket for total tracking
-      const bucketName=(!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa')?'_clinic':name;
-      if(!byMonth[month][bucketName])byMonth[month][bucketName]={name:bucketName,revenue:0};
-      byMonth[month][bucketName].revenue+=collected;
+      if(!byMonth[month][name])byMonth[month][name]={name,revenue:0};
+      byMonth[month][name].revenue+=collected;
     });
     const result={};
     Object.entries(byMonth).forEach(([month,staffMap])=>{
@@ -3011,8 +2648,9 @@ function PerformancePage({staff,perfData,setPerfData}){
       const rows=parseCSV(text);
       if(!rows.length){setImportMsg({type:'error',msg:'File is empty or unreadable.'});setImporting(false);return;}
       const type=detectFileType(rows);
+
       let newSnapshots=[...data.snapshots];
-      let totalPractitioners=0,totalMatched=0,monthsCreated=[],unmatchedNames=new Set();
+      let totalPractitioners=0,totalMatched=0,monthsCreated=[];
 
       if(type==='appointments'){
         const byMonth=aggregateAppointmentsByMonth(rows);
@@ -3062,8 +2700,6 @@ function PerformancePage({staff,perfData,setPerfData}){
           monthsCreated.push(month);
           const snapDate=month+'-01';
           const existingIdx=newSnapshots.findIndex(s=>s.date.startsWith(month));
-          // Also check already-loaded snapshots (e.g. appt snapshot from previous import)
-          const loadedIdx=existingIdx<0?data.snapshots.findIndex(s=>s.date.startsWith(month)):-1;
           if(existingIdx>=0){
             const existing=newSnapshots[existingIdx];
             const mergedRows=[...existing.rows];
@@ -3073,17 +2709,6 @@ function PerformancePage({staff,perfData,setPerfData}){
               else mergedRows.push(nr);
             });
             newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
-          }else if(loadedIdx>=0){
-            // Merge sales revenue into existing loaded appointments snapshot
-            const existing=data.snapshots[loadedIdx];
-            const mergedRows=existing.rows.map(r=>({...r}));
-            parsed.forEach(nr=>{
-              const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.staffId&&r.staffId===nr.staffId));
-              if(idx>=0){mergedRows[idx].revenue=(mergedRows[idx].revenue||0)+(nr.revenue||0);}
-              else mergedRows.push(nr);
-            });
-            // Save as new sales snapshot with merged data
-            newSnapshots.push({id:'snap_'+month+'_sales',date:snapDate,rows:mergedRows,files:[...(existing.files||[]),file.name],type:'sales'});
           }else{
             newSnapshots.push({id:'snap_'+month+'_sales',date:snapDate,rows:parsed,files:[file.name],type:'sales'});
           }
@@ -3162,9 +2787,7 @@ function PerformancePage({staff,perfData,setPerfData}){
       const uniqMonths=[...new Set(monthsCreated)].sort();
       const monthNames=uniqMonths.map(m=>new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}));
       const totalIA=newSnapshots.flatMap(s=>s.rows||[]).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
-      const unmatched=[...unmatchedNames].filter(n=>n&&n!=='_clinic');
       let msg=`✓ ${type} report auto-split into ${uniqMonths.length} monthly snapshot${uniqMonths.length!==1?'s':''}: ${monthNames.join(', ')}. ${totalPractitioners} practitioners, ${totalMatched} matched.${totalIA>0?` ${totalIA} initial assessments detected.`:''}`;
-      if(unmatched.length>0)msg+=` ⚠ ${unmatched.length} unmatched name${unmatched.length!==1?'s':''}: ${unmatched.join(', ')} — add staff profiles and re-import.`;
       if(!sbOk)msg+=` (Saved locally — Supabase unavailable)`;
       else msg+=` Saved to Supabase ✓`;
       setImportMsg({type:'success',msg});
@@ -3206,58 +2829,28 @@ function PerformancePage({staff,perfData,setPerfData}){
   // For appointments: sum across snapshots. For utilization/revenue: use latest in period.
   const aggregateRows=(snaps)=>{
     if(!snaps.length)return[];
-    // Deduplicate: group by month, pick best snapshot per type
-    const byMonth={};
-    snaps.forEach(snap=>{
-      const m=snap.date.slice(0,7);
-      if(!byMonth[m])byMonth[m]={appt:null,sales:null,shift:[]};
-      const t=snap.type||'appointments';
-      if(t==='appointments')byMonth[m].appt=snap;
-      else if(t==='sales'){
-        // Merge sales revenue into appt if appt exists, otherwise use as appt
-        if(byMonth[m].appt){
-          // Already have appt - this is a separate sales snap, mark it
-          byMonth[m].sales=snap;
-        }else{
-          byMonth[m].appt=snap;
-        }
-      }
-      else if(t==='shift')byMonth[m].shift.push(snap);
-      else byMonth[m].appt=byMonth[m].appt||snap; // unknown type: use as appt fallback
-    });
     const byStaff={};
-    Object.values(byMonth).forEach(({appt,sales,shift})=>{
-      // Use appt for visits/IAs, sales for revenue, latest shift for utilization
-      const visitSnap=appt||sales;
-      const shiftSnap=shift.length?shift[shift.length-1]:null;
-      const revenueSnap=sales||appt;
-      // Collect utilization from shift
-      const utilByStaff={};
-      if(shiftSnap)(shiftSnap.rows||[]).forEach(r=>{if(r.staffId&&r.utilization!=null)utilByStaff[r.staffId]=parseFloat(r.utilization)||0;});
-      // Collect visits/IAs from appt
-      if(visitSnap)(visitSnap.rows||[]).forEach(r=>{
+    snaps.forEach(snap=>{
+      (snap.rows||[]).forEach(r=>{
         if(!r.staffId)return;
-        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name||r.staffName,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
+        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
         const b=byStaff[r.staffId];
         if(r.completed)b.completed+=(parseFloat(r.completed)||0);
         if(r.noShows)b.noShows+=(parseFloat(r.noShows)||0);
         if(r.cancellations)b.cancellations+=(parseFloat(r.cancellations)||0);
         if(r.rescheduled)b.rescheduled+=(parseFloat(r.rescheduled)||0);
+        if(r.revenue){
+          if(r.staffId==='_clinic'){
+            if(!byStaff['_clinic'])byStaff['_clinic']={staffId:'_clinic',name:'Clinic (unassigned)',completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
+            byStaff['_clinic'].revenue+=(parseFloat(r.revenue)||0);
+          }else{b.revenue+=(parseFloat(r.revenue)||0);}
+        }
         if(r.appointments)b.appointments+=(parseFloat(r.appointments)||0);
         if(r.initialAssessments)b.initialAssessments+=(parseFloat(r.initialAssessments)||0);
-        if(utilByStaff[r.staffId]!=null){b.utilization=(b.utilization||0)+utilByStaff[r.staffId];b.utilizationCount++;}
-      });
-      // Add revenue from sales snapshot (separate pass to avoid double-counting)
-      if(revenueSnap)(revenueSnap.rows||[]).forEach(r=>{
-        if(!r.revenue)return;
-        if(r.staffId){
-          if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name||r.staffName,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
-          byStaff[r.staffId].revenue+=(parseFloat(r.revenue)||0);
-        }
-        // _clinic bucket: add to a special clinic-total entry
-        else if(r.name==='_clinic'){
-          if(!byStaff['_clinic'])byStaff['_clinic']={staffId:'_clinic',name:'Clinic (unassigned)',completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
-          byStaff['_clinic'].revenue+=(parseFloat(r.revenue)||0);
+        // Average utilization across months rather than summing
+        if(r.utilization!=null){
+          b.utilization=(b.utilization||0)+(parseFloat(r.utilization)||0);
+          b.utilizationCount++;
         }
       });
     });
@@ -3522,7 +3115,6 @@ function PerformancePage({staff,perfData,setPerfData}){
 
       {tab==='overview'&&(
         <div className="grid2">
-          <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={filterDisc} filterSite={filterSite} snapshots={data.snapshots}/>
           <div className="perf-slot">
             <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#CAE8C1'}}>Revenue</span>{!withRev.length&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('import')}>Import →</button>}</div>
             <div className="perf-slot-body">{withRev.length?withRev.slice(0,12).map(s=><BarRow key={s.id} s={s} val={s.revenue} max={maxRev} color="#CAE8C1" sub={fmtRev(s.revenue)} metric="revenue"/>):<div className="empty" style={{padding:24}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue.</p></div>}</div>
@@ -4356,20 +3948,20 @@ function PerformancePage({staff,perfData,setPerfData}){
                 ))}
               </div>
               <div style={{width:1,height:20,background:'var(--border2)',flexShrink:0}}/>
-              {trendGranularity!=='weekly'&&<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+              <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
                 {[['3m','3 Mo'],['6m','6 Mo'],['ytd','YTD'],['12m','12 Mo'],['all','All']].map(([v,l])=>(
                   <button key={v} className={`btn btn-sm ${trendTimeframe===v&&!trendFrom?'btn-go':'btn-ghost'}`}
                     onClick={()=>{setTrendTimeframe(v);setTrendFrom('');setTrendTo('');}}>{l}</button>
                 ))}
-              </div>}
-              {trendGranularity!=='weekly'&&<div style={{display:'flex',alignItems:'center',gap:6,marginLeft:4}}>
+              </div>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:4}}>
                 <input type="date" value={trendFrom} onChange={e=>{setTrendFrom(e.target.value);setTrendTimeframe('');}}
                   style={{background:'var(--surface3)',border:'1px solid '+(trendFrom?'var(--go)':'var(--border2)'),borderRadius:4,color:trendFrom?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/>
                 <span style={{color:'#555',fontSize:12}}>→</span>
                 <input type="date" value={trendTo} onChange={e=>{setTrendTo(e.target.value);setTrendTimeframe('');}}
                   style={{background:'var(--surface3)',border:'1px solid '+(trendTo?'var(--go)':'var(--border2)'),borderRadius:4,color:trendTo?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/>
                 {(trendFrom||trendTo)&&<button className="btn btn-ghost btn-xs" onClick={()=>{setTrendFrom('');setTrendTo('');setTrendTimeframe('12m');}}>✕</button>}
-              </div>}
+              </div>
             </div>
             {/* Row 2: Filters */}
             <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -4401,176 +3993,7 @@ function PerformancePage({staff,perfData,setPerfData}){
 
           {data.snapshots.length<2&&<div style={{fontSize:14,color:'#777',padding:'12px 0',fontStyle:'italic'}}>Import at least 2 monthly snapshots to see trend lines.</div>}
 
-          {/* Clinic Totals View */}
-          {trendView==='clinic'&&trendGranularity==='weekly'&&(
-            <div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:12}}>
-                Clinic Totals — Week-over-Week
-              </div>
-              <WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>
-            </div>
-          )}
-
-          {trendView==='clinic'&&trendGranularity==='monthly'&&(()=>{
-            const filteredStaff=staff.filter(s=>!['mgmt','ops','edu'].includes(s.discipline)&&(trendDisc==='all'||s.discipline===trendDisc)&&(trendSite==='all'||s.site===trendSite));
-            const clinicMetrics=[
-              {key:'revenue',label:'Revenue',color:'#CAE8C1',fmt:v=>'$'+Math.round(v).toLocaleString()},
-              {key:'completed',label:'Completed Visits',color:'#BB99FF',fmt:v=>Math.round(v).toString()},
-              {key:'initialAssessments',label:'Initial Assessments',color:'#F4DB71',fmt:v=>Math.round(v).toString()},
-              {key:'utilization',label:'Avg Utilization %',color:'#44CCAA',fmt:v=>Math.round(v)+'%'},
-            ];
-            const now=new Date();
-            const inSnapsRange=(dateStr)=>{
-              const d=new Date(dateStr+'T12:00');
-              if(trendFrom&&d<new Date(trendFrom))return false;
-              if(trendTo&&d>new Date(trendTo))return false;
-              if(!trendFrom&&!trendTo){
-                const now2=new Date();
-                if(!trendTimeframe||trendTimeframe==='all')return true;
-                if(trendTimeframe==='3m'){const c=new Date(now2);c.setMonth(c.getMonth()-3);return d>=c;}
-                if(trendTimeframe==='6m'){const c=new Date(now2);c.setMonth(c.getMonth()-6);return d>=c;}
-                if(trendTimeframe==='12m'){const c=new Date(now2);c.setMonth(c.getMonth()-12);return d>=c;}
-                if(trendTimeframe==='ytd')return d.getFullYear()===now2.getFullYear();
-              }
-              return true;
-            };
-            const snaps=data.snapshots.filter(s=>{
-              const d=new Date(s.date+'T12:00');
-              if(trendFrom&&d<new Date(trendFrom))return false;
-              if(trendTo&&d>new Date(trendTo))return false;
-              if(!trendFrom&&!trendTo){
-                if(!trendTimeframe||trendTimeframe==='all')return true;
-                if(trendTimeframe==='3m'){const c=new Date(now);c.setMonth(c.getMonth()-3);return d>=c;}
-                if(trendTimeframe==='6m'){const c=new Date(now);c.setMonth(c.getMonth()-6);return d>=c;}
-                if(trendTimeframe==='12m'){const c=new Date(now);c.setMonth(c.getMonth()-12);return d>=c;}
-                if(trendTimeframe==='ytd')return d.getFullYear()===now.getFullYear();
-              }
-              return true;
-            }).sort((a,b)=>a.date.localeCompare(b.date));
-            if(!snaps.length)return<div style={{fontSize:14,color:'#777',padding:'20px 0',textAlign:'center',fontStyle:'italic'}}>No data for this period.</div>;
-            return(
-              <div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:12}}>
-                  Clinic Totals — {filteredStaff.length} practitioners{trendDisc!=='all'?` · ${trendDisc}`:''}{trendSite!=='all'?` · ${trendSite}`:''}
-                </div>
-                <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} snapshots={data.snapshots}/>
-                {clinicMetrics.map(({key,label,color,fmt})=>{
-                  const nowD=new Date();
-                  const curM=nowD.toISOString().slice(0,7);
-                  const dayOf=nowD.getDate();
-                  const daysIn=new Date(nowD.getFullYear(),nowD.getMonth()+1,0).getDate();
-                  let pts=[];
-                  if(trendGranularity==='weekly'){
-                    // Aggregate daily data into weeks for clinic totals
-                    const dailySrc=key==='revenue'?dailyRevenue:dailyAppts;
-                    const metricField=key==='revenue'?'revenue':key==='completed'?'completed':key==='initialAssessments'?'initial_assessments':key;
-                    const weekMap={};
-                    (dailySrc||[]).forEach(r=>{
-                      if(!inSnapsRange(r.date))return;
-                      const s=(staff||[]).find(x=>x.id===r.staff_id);
-                      if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
-                      if(trendDisc!=='all'&&s.discipline!==trendDisc)return;
-                      if(trendSite!=='all'&&s.site!==trendSite)return;
-                      const wkDate=(()=>{const d=new Date(r.date+'T12:00');const day=d.getDay();const diff=d.getDate()-(day===0?6:day-1);return new Date(d.setDate(diff)).toISOString().slice(0,10);})();
-                      if(!weekMap[wkDate])weekMap[wkDate]=0;
-                      if(key==='utilization'){
-                        // Skip utilization in weekly — no daily util data
-                      }else{weekMap[wkDate]+=(parseFloat(r[metricField])||0);}
-                    });
-                    pts=Object.entries(weekMap).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,val])=>({date,val:Math.round(val),isPartial:date.startsWith(curM)}));
-                  }else{
-                    pts=snaps.map(s=>{
-                      const vals=filteredStaff.map(st=>{const row=s.rows?.find(r=>r.staffId===st.id);return row?parseFloat(row[key])||0:0;});
-                      const val=key==='utilization'&&filteredStaff.length?Math.round(vals.reduce((a,b)=>a+b,0)/filteredStaff.length):Math.round(vals.reduce((a,b)=>a+b,0));
-                      const isPartial=s.date.startsWith(curM);
-                      return{date:s.date,val,isPartial};
-                    });
-                  }
-                  pts=pts.filter(p=>p.val>0);
-
-                  if(!pts.length)return null;
-                  const pVals=pts.map(p=>p.val);
-                  const lastPt=pts[pts.length-1];
-                  const isCurrentMonthPartial=lastPt.isPartial&&dayOf<daysIn;
-                  // Projection for current month
-                  const projVal=isCurrentMonthPartial&&key!=='utilization'?Math.round((lastPt.val/dayOf)*daysIn):null;
-                  const sumOrAvg=key==='utilization'?Math.round(pVals.reduce((a,b)=>a+b,0)/pVals.length):pVals.reduce((a,b)=>a+b,0);
-                  const latest=pVals[pVals.length-1];const prev=pVals.length>1?pVals[pVals.length-2]:null;
-                  // Compare against projected if partial month, else actual MoM
-                  const compareVal=isCurrentMonthPartial&&projVal?projVal:latest;
-                  const delta=prev&&prev!==0?((compareVal-prev)/prev*100).toFixed(1):null;const up=delta>=0;
-                  const allValsForScale=[...pVals,...(projVal?[projVal]:[])];
-                  const minV=Math.min(...allValsForScale)*0.9,maxV=Math.max(...allValsForScale)*1.1,rangeV=maxV-minV||1;
-                  const W=500,H=120,PADX=52,PADY=12,BOTTOM=28;
-                  const toY=v=>PADY+Math.round((1-(v-minV)/rangeV)*(H-PADY*2));
-                  const coords=pts.map((p,i)=>({x:PADX+Math.round((i/(pts.length-1||1))*(W-PADX-14)),y:toY(p.val),val:p.val,date:p.date,isPartial:p.isPartial}));
-                  // Separate solid line (complete months) from partial
-                  const solidCoords=isCurrentMonthPartial?coords.slice(0,-1):coords;
-                  const pathD=solidCoords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
-                  const areaD=pathD+` L${solidCoords[solidCoords.length-1]?.x||coords[0].x},${H} L${coords[0].x},${H} Z`;
-                  const lastC=coords[coords.length-1];
-                  const projY=projVal?toY(projVal):null;
-                  const showLbl=i=>pts.length<=6||(pts.length<=12&&i%2===0)||i===0||i===pts.length-1;
-                  const fmtD=d=>trendGranularity==='weekly'?new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'}):new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'});
-                  const yGrid=Array.from({length:4},(_,i)=>({y:PADY+Math.round((i/3)*(H-PADY*2)),val:maxV-((maxV-minV)*(i/3))}));
-                  return(
-                    <div key={key} className="perf-slot" style={{marginBottom:14}}>
-                      <div className="perf-slot-head">
-                        <span className="perf-slot-title" style={{color}}>{label}</span>
-                        <div style={{display:'flex',gap:20,alignItems:'center'}}>
-                          <div style={{display:'flex',alignItems:'baseline',gap:12,flexWrap:'wrap'}}>
-                            <div>
-                              <span style={{fontSize:12,color:'#888',marginRight:6}}>{key==='utilization'?'Avg':'Total'}: </span>
-                              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color}}>{fmt(sumOrAvg)}</span>
-                              {delta!=null&&<span style={{marginLeft:8,fontSize:13,color:up?'#44CCAA':'#E05252',fontWeight:700}}>{up?'▲':'▼'}{Math.abs(delta)}% MoM</span>}
-                            </div>
-                            {projVal&&<div style={{background:'rgba(244,219,113,.08)',border:'1px solid rgba(244,219,113,.2)',borderRadius:4,padding:'3px 10px'}}>
-                              <span style={{fontSize:12,color:'#888',marginRight:6}}>Projected: </span>
-                              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#F4DB71'}}>{fmt(projVal)}</span>
-                              <span style={{fontSize:11,color:'#666',marginLeft:6}}>({dayOf}/{daysIn} days)</span>
-                            </div>}
-                          </div>
-                          <span style={{fontSize:12,color:'#555'}}>{pts.length} months</span>
-                        </div>
-                      </div>
-                      <div style={{padding:'8px 16px 4px'}}>
-                        <svg width="100%" viewBox={`0 0 ${W} ${H+BOTTOM}`} style={{display:'block',overflow:'visible'}}>
-                          {yGrid.map((g,i)=>(<g key={i}><line x1={PADX} y1={g.y} x2={W-14} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/><text x={PADX-6} y={g.y+4} textAnchor="end" fontSize="11" fill="#666">{fmt(Math.round(g.val))}</text></g>))}
-                          <path d={areaD} fill={color} opacity="0.07"/>
-                          {solidCoords.length>1&&<path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>}
-                          {/* Partial month dotted segment */}
-                          {isCurrentMonthPartial&&solidCoords.length>0&&lastC&&<line x1={solidCoords[solidCoords.length-1].x} y1={solidCoords[solidCoords.length-1].y} x2={lastC.x} y2={lastC.y} stroke={color} strokeWidth="2" strokeDasharray="4,3" opacity="0.6"/>}
-                          {/* Projection dotted extension */}
-                          {projVal&&projY&&lastC&&<line x1={lastC.x} y1={lastC.y} x2={lastC.x+30} y2={projY} stroke="#F4DB71" strokeWidth="2" strokeDasharray="3,3" opacity="0.8"/>}
-                          {projVal&&projY&&<circle cx={lastC.x+30} cy={projY} r="4" fill="#F4DB71" opacity="0.8"/>}
-                          {projVal&&projY&&<text x={lastC.x+34} y={projY+4} fontSize="10" fill="#F4DB71" opacity="0.9">{fmt(projVal)} proj</text>}
-                          {coords.map((c,i)=>(<g key={i}><circle cx={c.x} cy={c.y} r={c.isPartial?3:4} fill={c.isPartial?'#888':color} opacity={c.isPartial?0.7:1}/>{pts.length<=10&&!c.isPartial&&<text x={c.x} y={c.y-9} textAnchor="middle" fontSize="10" fill={color} fontWeight="600">{fmt(c.val)}</text>}{c.isPartial&&<text x={c.x} y={c.y-9} textAnchor="middle" fontSize="10" fill="#888">partial</text>}{showLbl(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill={c.isPartial?'#888':'#777'}>{fmtD(c.date)}</text>}</g>))}
-                          <line x1={PADX} y1={H} x2={W-14} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
-                        </svg>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })()}
-
-          {trendView==='practitioner'&&trendGranularity==='weekly'&&(
-            <div>
-              {trendStaff?(
-                <div>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:12}}>
-                    {trendStaff.name} — Week-over-Week
-                  </div>
-                  <WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>
-                </div>
-              ):(
-                <div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to compare their weeks.</div>
-              )}
-            </div>
-          )}
-
-          {trendView==='practitioner'&&trendStaff&&trendGranularity==='monthly'?(
+          {trendStaff?(
             <div>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:16}}>
                 {trendStaff.name.toUpperCase()}
@@ -4612,16 +4035,13 @@ function PerformancePage({staff,perfData,setPerfData}){
                       <div key={key} className="perf-slot">
                         <div className="perf-slot-head"><span className="perf-slot-title" style={{color}}>{label}</span></div>
                         <div style={{padding:'4px 16px 16px'}}>
-                          <LineChart snapshots={data.snapshots} staffId={trendStaff.id} metric={key} color={color} label={label} fmt={fmt} timeframe={trendTimeframe} clinicAvg={clinicAvg[key]} granularity={trendGranularity} dateFrom={trendFrom} dateTo={trendTo} dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite}/>
+                          <LineChart snapshots={data.snapshots} staffId={trendStaff.id} metric={key} color={color} label={label} fmt={fmt} timeframe={trendTimeframe} clinicAvg={clinicAvg[key]}/>
                         </div>
                       </div>
                     ))}
                   </div>
                 );
               })()}
-
-              {/* ── Per-practitioner projection ── */}
-              <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc="all" filterSite="all" staffId={trendStaff.id} snapshots={data.snapshots}/>
 
               {/* ── Per-practitioner retention trend ── */}
               {(()=>{
@@ -4706,9 +4126,9 @@ function PerformancePage({staff,perfData,setPerfData}){
                 );
               })()}
             </div>
-          ):(trendView==='practitioner'&&trendGranularity==='monthly'?(
+          ):(
             <div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to view their trends.</div>
-          ):null)}
+          )}
 
         </div>
       )}
@@ -4722,7 +4142,7 @@ function PerformancePage({staff,perfData,setPerfData}){
               {[
                 {n:1,title:'Appointments Report',where:'Reports → Appointments',action:'Set date range → ··· menu → Export CSV',cols:'staff_member_name, state, no_show_at, cancelled_at',note:'Gives: completed visits, no-shows, cancellations per practitioner'},
                 {n:2,title:'Shift Report',where:'Reports → Payroll → Timesheets',action:'Set date range → Export CSV',cols:'Staff Name, Appointment Total Hours, Shift Total Hours',note:'Gives: utilization % (Appt Hours ÷ Shift Hours)'},
-                {n:3,title:'Sales Report',where:'Reports → Sales',action:'Set date range → Export CSV',cols:'Staff Member, Status, Income Category, Collected',note:'Gives: revenue per practitioner (total invoiced, treatment income)'},
+                {n:3,title:'Sales Report',where:'Reports → Sales',action:'Set date range → Export CSV',cols:'Staff Member, Status, Income Category, Collected',note:'Gives: revenue per practitioner (paid treatment income only)'},
                 {n:4,title:'Member Retention Report',where:'Reports → Member Retention',action:'Set date range → Export CSV',cols:'Practitioner name block + 6 data rows each',note:'Gives: % Returning, % Repeat Visits, new/returning patient counts per practitioner'},
               ].map(s=>(
                 <div key={s.n} style={{background:'var(--surface3)',borderRadius:5,padding:'12px 14px',border:'1px solid var(--border)'}}>
@@ -4760,64 +4180,6 @@ function PerformancePage({staff,perfData,setPerfData}){
               }}}>
               ⚠ Reset All Data
             </button>
-          </div>
-          {/* Per-type purge buttons */}
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:4}}>
-            {[
-              {label:'Purge Sales',type:'sales',color:'#E05252'},
-              {label:'Purge Appointments',type:'appointments',color:'#E05252'},
-              {label:'Purge Shift Reports',type:'shift',color:'#E05252'},
-              {label:'Purge Retention',type:'retention',color:'#E05252'},
-            ].map(({label,type,color})=>(
-              <button key={type} className="btn btn-ghost btn-sm" style={{color,border:'1px solid '+color+'44',fontSize:12}}
-                onClick={async()=>{
-                  if(!window.confirm(`Purge all ${type} data? You will need to re-import.`))return;
-                  const SB=window.__SB;
-                  let purgeError=null;
-                  if(type==='retention'){
-                    if(SB){
-                      const r1=await SB.from('retention_snapshots').delete().neq('id','_none_');
-                      const r2=await SB.from('retention_full').delete().neq('id','_none_');
-                      if(r1.error)purgeError=r1.error.message;
-                      if(r2.error)purgeError=r2.error.message;
-                    }
-                    setRetentionSnapshots([]);
-                    const newData={...data,retentionFull:{},retentionClinic:{},retentionImportDate:null,retention:{}};
-                    save(newData);
-                  }else{
-                    const remaining=data.snapshots.filter(s=>s.type!==type);
-                    if(SB){
-                      const toDelete=data.snapshots.filter(s=>s.type===type);
-                      for(const s of toDelete){
-                        const r=await SB.from('performance_snapshots').delete().eq('id',s.id);
-                        if(r.error)purgeError=r.error.message;
-                      }
-                      if(type==='appointments'){
-                        const r=await SB.from('daily_appointments').delete().neq('staff_id','_none_');
-                        if(r.error)purgeError=r.error.message;
-                        setDailyAppts([]);
-                        try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}
-                      }
-                      if(type==='sales'){
-                        const r=await SB.from('daily_revenue').delete().neq('staff_id','_none_');
-                        if(r.error)purgeError=r.error.message;
-                        setDailyRevenue([]);
-                        try{localStorage.removeItem('rvgd3_daily_rev');}catch(e){}
-                      }
-                    }
-                    const newData={...data,snapshots:remaining};
-                    save(newData);
-                  }
-                  if(purgeError){
-                    setImportMsg({type:'error',msg:`Purge error: ${purgeError} — run the SQL fix below.`});
-                    return;
-                  }
-                  setImportMsg({type:'success',msg:`✓ All ${type} data purged. Reloading…`});
-                  setTimeout(()=>window.location.reload(),800);
-                }}>
-                🗑 {label}
-              </button>
-            ))}
           </div>
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#777'}}>Shift Report Month</div>
