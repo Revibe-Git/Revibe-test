@@ -3211,9 +3211,19 @@ function PerformancePage({staff,perfData,setPerfData}){
     snaps.forEach(snap=>{
       const m=snap.date.slice(0,7);
       if(!byMonth[m])byMonth[m]={appt:null,sales:null,shift:[]};
-      if(snap.type==='appointments')byMonth[m].appt=snap;
-      else if(snap.type==='sales')byMonth[m].sales=snap;
-      else if(snap.type==='shift')byMonth[m].shift.push(snap);
+      const t=snap.type||'appointments';
+      if(t==='appointments')byMonth[m].appt=snap;
+      else if(t==='sales'){
+        // Merge sales revenue into appt if appt exists, otherwise use as appt
+        if(byMonth[m].appt){
+          // Already have appt - this is a separate sales snap, mark it
+          byMonth[m].sales=snap;
+        }else{
+          byMonth[m].appt=snap;
+        }
+      }
+      else if(t==='shift')byMonth[m].shift.push(snap);
+      else byMonth[m].appt=byMonth[m].appt||snap; // unknown type: use as appt fallback
     });
     const byStaff={};
     Object.values(byMonth).forEach(({appt,sales,shift})=>{
