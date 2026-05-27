@@ -4432,7 +4432,8 @@ function PerformancePage({staff,perfData,setPerfData}){
                     const newData={...data,snapshots:remaining};
                     save(newData);
                   }
-                  setImportMsg({type:'success',msg:`✓ All ${type} data purged. Re-import to restore.`});
+                  setImportMsg({type:'success',msg:`✓ All ${type} data purged. Reloading…`});
+                  setTimeout(()=>window.location.reload(),800);
                 }}>
                 🗑 {label}
               </button>
