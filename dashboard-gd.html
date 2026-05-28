@@ -2064,24 +2064,38 @@ function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,sta
   const now=new Date();
   const curM=now.toISOString().slice(0,7);
   const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const _revD=dailyRevenue.filter(r=>r.date&&r.date.startsWith(curM)).map(r=>r.date).sort();
-  const _apptD=dailyAppts.filter(r=>r.date&&r.date.startsWith(curM)).map(r=>r.date).sort();
-  const _last=(_revD.length?_revD[_revD.length-1]:null)||(_apptD.length?_apptD[_apptD.length-1]:null);
-  const dayOfMonth=_last?parseInt(_last.slice(8)):now.getDate();
+  const dayOfMonth=now.getDate();
   const pct=Math.round((dayOfMonth/daysInMonth)*100);
   const fs=s=>!['mgmt','ops','edu'].includes(s.discipline)&&(filterDisc==='all'||s.discipline===filterDisc)&&(filterSite==='all'||s.site===filterSite)&&(!staffId||s.id===staffId);
   const curSnap=snapshots?snapshots.find(s=>s.date&&s.date.startsWith(curM)):null;
-  const snapRev=curSnap?(curSnap.rows||[]).reduce((a,r)=>{if(!r.revenue)return a;if(staffId&&r.staffId!==staffId)return a;return a+(parseFloat(r.revenue)||0);},0):0;
-  const mAppts=dailyAppts.filter(r=>{if(!r.date.startsWith(curM))return false;if(staffId&&r.staff_id!==staffId)return false;const s=staff.find(x=>x.id===r.staff_id);return s&&fs(s);});
-  const visits=mAppts.reduce((a,r)=>a+(r.completed||0),0);
-  const ias=mAppts.reduce((a,r)=>a+(r.initial_assessments||0),0);
-  const revAct=snapRev>0?snapRev:dailyRevenue.filter(r=>{if(!r.date.startsWith(curM))return false;if(staffId&&r.staff_id!==staffId)return false;const s=staff.find(x=>x.id===r.staff_id);return s&&fs(s);}).reduce((a,r)=>a+(r.revenue||0),0);
+  // Revenue from snapshot
+  const revAct=curSnap?(curSnap.rows||[]).reduce((a,r)=>{
+    if(!r.revenue)return a;
+    if(staffId&&r.staffId!==staffId)return a;
+    if(!staffId&&(filterDisc!=='all'||filterSite!=='all')){const s=staff.find(x=>x.id===r.staffId);if(r.staffId&&r.staffId!=='_clinic'&&s&&!fs(s))return a;}
+    return a+(parseFloat(r.revenue)||0);
+  },0):0;
+  // Visits/IAs from snapshot
+  const snapVisits=curSnap?(curSnap.rows||[]).reduce((a,r)=>{
+    if(!r.completed)return a;
+    if(staffId&&r.staffId!==staffId)return a;
+    if(!staffId&&(filterDisc!=='all'||filterSite!=='all')){const s=staff.find(x=>x.id===r.staffId);if(s&&!fs(s))return a;}
+    return a+(parseFloat(r.completed)||0);
+  },0):0;
+  const snapIAs=curSnap?(curSnap.rows||[]).reduce((a,r)=>{
+    if(!r.initialAssessments)return a;
+    if(staffId&&r.staffId!==staffId)return a;
+    if(!staffId&&(filterDisc!=='all'||filterSite!=='all')){const s=staff.find(x=>x.id===r.staffId);if(s&&!fs(s))return a;}
+    return a+(parseFloat(r.initialAssessments)||0);
+  },0):0;
+  const visits=snapVisits;
+  const ias=snapIAs;
   const metrics=[
     {key:'rev',label:'Revenue',color:'#CAE8C1',actual:revAct,fmt:v=>'$'+Math.round(v).toLocaleString()},
     {key:'vis',label:'Completed Visits',color:'#BB99FF',actual:visits,fmt:v=>Math.round(v).toLocaleString()},
     {key:'ia',label:'Initial Assessments',color:'#F4DB71',actual:ias,fmt:v=>Math.round(v).toString()},
-  ].filter(m=>m.actual>0).map(m=>({...m,projected:Math.round((m.actual/dayOfMonth)*daysInMonth),remaining:Math.round(((m.actual/dayOfMonth)*daysInMonth)-m.actual),dailyRate:m.actual/dayOfMonth}));
-  if(!metrics.length||dayOfMonth<3)return null;
+  ].filter(m=>m.actual>0&&dayOfMonth>0).map(m=>({...m,projected:Math.round((m.actual/dayOfMonth)*daysInMonth),remaining:Math.round(((m.actual/dayOfMonth)*daysInMonth)-m.actual),dailyRate:m.actual/dayOfMonth}));
+  // Show projection card - using today's date
   return(
     <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'18px 20px',marginBottom:14}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
