@@ -2060,52 +2060,6 @@ function Sparkline({values,color,width=120,height=32}){
   </svg>);
 }
 
-function ProjectionCard({snapshots,filterDisc,filterSite,staff}){
-  const now=new Date();
-  const curM=now.toISOString().slice(0,7);
-  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const curSnap=snapshots?snapshots.find(s=>s.date&&s.date.startsWith(curM)):null;
-  if(!curSnap)return null;
-  const _snapLastSale=curSnap.lastSaleDate?parseInt(curSnap.lastSaleDate.slice(8,10)):null;
-  const dayOfMonth=_snapLastSale&&_snapLastSale>0&&_snapLastSale<now.getDate()?_snapLastSale:now.getDate();
-  const pct=Math.round((dayOfMonth/daysInMonth)*100);
-  const fs=s=>!['mgmt','ops','edu'].includes(s.discipline)&&(filterDisc==='all'||s.discipline===filterDisc)&&(filterSite==='all'||s.site===filterSite);
-  const revAct=(curSnap.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0),0);
-  const visAct=(curSnap.rows||[]).filter(r=>{if(!r.staffId)return false;const s=staff.find(x=>x.id===r.staffId);return !s||fs(s);}).reduce((a,r)=>a+(parseFloat(r.completed)||0),0);
-  const iaAct=(curSnap.rows||[]).filter(r=>{if(!r.staffId)return false;const s=staff.find(x=>x.id===r.staffId);return !s||fs(s);}).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
-  const metrics=[
-    {key:'rev',label:'Revenue',color:'#CAE8C1',actual:revAct,fmt:v=>'$'+Math.round(v).toLocaleString()},
-    {key:'vis',label:'Completed Visits',color:'#BB99FF',actual:visAct,fmt:v=>Math.round(v).toLocaleString()},
-    {key:'ia',label:'Initial Assessments',color:'#F4DB71',actual:iaAct,fmt:v=>Math.round(v).toString()},
-  ].filter(m=>m.actual>0).map(m=>({...m,projected:Math.round((m.actual/dayOfMonth)*daysInMonth),remaining:Math.round(((m.actual/dayOfMonth)*daysInMonth)-m.actual),dailyRate:m.actual/dayOfMonth}));
-  if(!metrics.length)return null;
-  const monthName=now.toLocaleDateString('en-CA',{month:'long',year:'numeric'});
-  return(
-    <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'18px 20px',marginBottom:14}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
-        <div>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA',fontWeight:700,marginBottom:2}}>📈 {monthName} — Month-End Projection</div>
-          <div style={{fontSize:13,color:'#555'}}>{dayOfMonth} of {daysInMonth} days complete ({pct}%)</div>
-        </div>
-        <div style={{flex:1,minWidth:120,maxWidth:200}}><div style={{height:6,background:'var(--surface3)',borderRadius:3}}><div style={{height:'100%',borderRadius:3,background:'#44CCAA',width:pct+'%'}}/></div></div>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:12}}>
-        {metrics.map(({key,label,color,actual,projected,remaining,dailyRate,fmt})=>(
-          <div key={key} style={{background:'var(--surface3)',borderRadius:6,padding:'14px 16px',borderLeft:'3px solid '+color}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:8}}>{label}</div>
-            <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color,lineHeight:1}}>{fmt(projected)}</span><span style={{fontSize:12,color:'#555'}}>projected</span></div>
-            <div style={{display:'flex',flexDirection:'column',gap:3,fontSize:13}}>
-              <div><span style={{color:'#888'}}>So far: </span><span style={{color:'#ddd',fontWeight:600}}>{fmt(actual)}</span></div>
-              <div><span style={{color:'#888'}}>Remaining: </span><span style={{color:'#44CCAA',fontWeight:600}}>{fmt(remaining)}</span></div>
-              <div style={{color:'#555',fontSize:12}}>{fmt(Math.round(dailyRate))}/day pace</div>
-            </div>
-            <div style={{marginTop:10,height:3,background:'var(--surface2)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:color,width:Math.min(100,pct)+'%'}}/></div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg}){
   const allPts=snapshots.map(s=>{
     const r=s.rows?.find(r=>r.staffId===staffId);
@@ -2238,6 +2192,34 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
   );
 }
 
+function ProjectionCard({snapshots,filterDisc,filterSite,staff}){
+  const now=new Date();const curM=now.toISOString().slice(0,7);
+  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const curSnap=snapshots?snapshots.find(s=>s.date&&s.date.startsWith(curM)):null;
+  if(!curSnap)return null;
+  const _snapLastSale=curSnap.lastSaleDate?parseInt(curSnap.lastSaleDate.slice(8,10)):null;
+  const dayOfMonth=_snapLastSale&&_snapLastSale>0&&_snapLastSale<now.getDate()?_snapLastSale:now.getDate();
+  const pct=Math.round((dayOfMonth/daysInMonth)*100);
+  const revAct=(curSnap.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0),0);
+  const visAct=(curSnap.rows||[]).filter(r=>r.staffId).reduce((a,r)=>a+(parseFloat(r.completed)||0),0);
+  const iaAct=(curSnap.rows||[]).filter(r=>r.staffId).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
+  const metrics=[{key:'rev',label:'Revenue',color:'#CAE8C1',actual:revAct,fmt:v=>'$'+Math.round(v).toLocaleString()},{key:'vis',label:'Completed Visits',color:'#BB99FF',actual:visAct,fmt:v=>Math.round(v).toLocaleString()},{key:'ia',label:'Initial Assessments',color:'#F4DB71',actual:iaAct,fmt:v=>Math.round(v).toString()}].filter(m=>m.actual>0).map(m=>({...m,projected:Math.round((m.actual/dayOfMonth)*daysInMonth),remaining:Math.round(((m.actual/dayOfMonth)*daysInMonth)-m.actual),dailyRate:m.actual/dayOfMonth}));
+  if(!metrics.length)return null;
+  return(<div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'18px 20px',marginBottom:14}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
+      <div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA',fontWeight:700,marginBottom:2}}>📈 {now.toLocaleDateString('en-CA',{month:'long',year:'numeric'})} — Month-End Projection</div><div style={{fontSize:13,color:'#555'}}>{dayOfMonth} of {daysInMonth} days complete ({pct}%)</div></div>
+      <div style={{flex:1,minWidth:120,maxWidth:200}}><div style={{height:6,background:'var(--surface3)',borderRadius:3}}><div style={{height:'100%',borderRadius:3,background:'#44CCAA',width:pct+'%'}}/></div></div>
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:12}}>
+      {metrics.map(({key,label,color,actual,projected,remaining,dailyRate,fmt})=>(<div key={key} style={{background:'var(--surface3)',borderRadius:6,padding:'14px 16px',borderLeft:'3px solid '+color}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:8}}>{label}</div>
+        <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color,lineHeight:1}}>{fmt(projected)}</span><span style={{fontSize:12,color:'#555'}}>projected</span></div>
+        <div style={{display:'flex',flexDirection:'column',gap:3,fontSize:13}}><div><span style={{color:'#888'}}>So far: </span><span style={{color:'#ddd',fontWeight:600}}>{fmt(actual)}</span></div><div><span style={{color:'#888'}}>Remaining: </span><span style={{color:'#44CCAA',fontWeight:600}}>{fmt(remaining)}</span></div><div style={{color:'#555',fontSize:12}}>{fmt(Math.round(dailyRate))}/day pace</div></div>
+        <div style={{marginTop:10,height:3,background:'var(--surface2)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:color,width:Math.min(100,pct)+'%'}}/></div>
+      </div>))}
+    </div>
+  </div>);
+}
 function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filterSite,dateFrom,dateTo,timeframe}){
   const[activeMetric,setActiveMetric]=React.useState('revenue');
   const[weekA,setWeekA]=React.useState('');
@@ -2255,7 +2237,7 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
     return d.toISOString().slice(0,10);
   };
 
-  const inRange=()=>true; // All weeks load — user picks via dropdowns
+  const inRange=()=>true;
 
   const filterRow=(r)=>{
     if(staffId)return r.staff_id===staffId;
@@ -2350,15 +2332,7 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
     return<span style={{fontSize:11,marginLeft:6,color:up?'#44CCAA':'#E05252',fontWeight:700,background:up?'rgba(68,204,170,.08)':'rgba(224,82,82,.08)',padding:'1px 5px',borderRadius:3}}>{up?'▲':'▼'}{Math.abs(d)}%</span>;
   };
 
-  // Clinic weekly totals for sparklines
-  const weeks=sortedWeeks.map(wk=>({
-    wk,
-    revenue:activeStaff.reduce((a,s)=>a+(staffWeekMap[s.id]?.[wk]?.revenue||0),0),
-    visits:activeStaff.reduce((a,s)=>a+(staffWeekMap[s.id]?.[wk]?.visits||0),0),
-    ias:activeStaff.reduce((a,s)=>a+(staffWeekMap[s.id]?.[wk]?.ias||0),0),
-    noShows:activeStaff.reduce((a,s)=>a+(staffWeekMap[s.id]?.[wk]?.noShows||0),0),
-  }));
-
+  const weeks=sortedWeeks.map(wk=>({wk,revenue:activeStaff.reduce((a,s)=>a+(staffWeekMap[s.id]?.[wk]?.revenue||0),0),visits:activeStaff.reduce((a,s)=>a+(staffWeekMap[s.id]?.[wk]?.visits||0),0),ias:activeStaff.reduce((a,s)=>a+(staffWeekMap[s.id]?.[wk]?.ias||0),0),noShows:activeStaff.reduce((a,s)=>a+(staffWeekMap[s.id]?.[wk]?.noShows||0),0)}));
   return(
     <div>
       {/* Metric tabs */}
@@ -2474,40 +2448,25 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
           </table>
         </div>
       )}
-
-      {/* Sparkline charts */}
       {weeks.length>=2&&(
         <div style={{marginTop:16}}>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',textTransform:'uppercase',color:'#555',marginBottom:10}}>Weekly Trend</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:10}}>
             {metrics.map(({key,label,color,fmt})=>{
-              const data=weeks.map(w=>({wk:w.wk,val:w[key]||0}));
-              const vals=data.map(d=>d.val);
+              const wdata=weeks.map(w=>({wk:w.wk,val:w[key]||0}));const vals=wdata.map(d=>d.val);
               if(!vals.some(v=>v>0))return null;
-              const avg=Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);
-              const latest=vals[vals.length-1];
-              const prev=vals.length>1?vals[vals.length-2]:null;
-              const delta=prev&&prev!==0?((latest-prev)/prev*100).toFixed(1):null;
-              const up=parseFloat(delta)>=0;
-              const maxV=Math.max(...vals,1);
-              const W=280,H=70,PX=4,PY=4;
-              const toY=v=>PY+Math.round((1-(v/maxV))*(H-PY*2));
-              const coords=data.map((d,i)=>({x:PX+Math.round(i/(data.length-1||1)*(W-PX*2)),y:toY(d.val),val:d.val,wk:d.wk}));
+              const avg=Math.round(vals.reduce((a,b)=>a+b,0)/vals.length);const latest=vals[vals.length-1];
+              const prev=vals.length>1?vals[vals.length-2]:null;const delta=prev&&prev!==0?((latest-prev)/prev*100).toFixed(1):null;const up=parseFloat(delta)>=0;
+              const maxV=Math.max(...vals,1);const W=280,H=70,PX=4,PY=4;const toY=v=>PY+Math.round((1-(v/maxV))*(H-PY*2));
+              const coords=wdata.map((d,i)=>({x:PX+Math.round(i/(wdata.length-1||1)*(W-PX*2)),y:toY(d.val),val:d.val,wk:d.wk}));
               const path=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
               const area=path+` L${coords[coords.length-1].x},${H} L${coords[0].x},${H} Z`;
               const fmtD=d=>new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'});
               return(<div key={key} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'12px 14px'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#666'}}>{label}</div>
-                  {delta!=null&&<span style={{fontSize:12,color:up?'#44CCAA':'#E05252',fontWeight:700}}>{up?'▲':'▼'}{Math.abs(delta)}% WoW</span>}
-                </div>
-                <div style={{display:'flex',gap:12,marginBottom:6,alignItems:'baseline'}}>
-                  <div><div style={{fontSize:10,color:'#555'}}>Latest</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color,lineHeight:1}}>{fmt(latest)}</div></div>
-                  <div><div style={{fontSize:10,color:'#555'}}>Avg/wk</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:'#666',lineHeight:1}}>{fmt(avg)}</div></div>
-                </div>
+                <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#666'}}>{label}</div>{delta!=null&&<span style={{fontSize:12,color:up?'#44CCAA':'#E05252',fontWeight:700}}>{up?'▲':'▼'}{Math.abs(delta)}% WoW</span>}</div>
+                <div style={{display:'flex',gap:12,marginBottom:6,alignItems:'baseline'}}><div><div style={{fontSize:10,color:'#555'}}>Latest</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color,lineHeight:1}}>{fmt(latest)}</div></div><div><div style={{fontSize:10,color:'#555'}}>Avg/wk</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:'#666',lineHeight:1}}>{fmt(avg)}</div></div></div>
                 <svg width="100%" viewBox={`0 0 ${W} ${H+18}`} style={{display:'block',overflow:'visible'}}>
-                  <path d={area} fill={color} opacity="0.08"/>
-                  <path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
+                  <path d={area} fill={color} opacity="0.08"/><path d={path} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
                   {coords.map((c,i)=>(<g key={i}><circle cx={c.x} cy={c.y} r={c.wk===weekA||c.wk===weekB?5:3} fill={color} opacity={c.wk===weekA||c.wk===weekB?1:0.5}/>{(i===0||i===coords.length-1||c.wk===weekA||c.wk===weekB)&&<text x={c.x} y={H+14} textAnchor="middle" fontSize="9" fill="#666">{fmtD(c.wk)}</text>}</g>))}
                   <line x1={PX} y1={H} x2={W-PX} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
                 </svg>
@@ -2656,6 +2615,12 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[gvaSaved,setGvaSaved]=useState(false);
   const[trendStaff,setTrendStaff]=useState(null);
   const[trendTimeframe,setTrendTimeframe]=useState('12m');
+  const[trendGranularity,setTrendGranularity]=useState('monthly');
+  const[trendView,setTrendView]=useState('clinic');
+  const[trendFrom,setTrendFrom]=useState('');
+  const[trendTo,setTrendTo]=useState('');
+  const[trendDisc,setTrendDisc]=useState('all');
+  const[trendSite,setTrendSite]=useState('all');
   const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
@@ -2908,27 +2873,8 @@ function PerformancePage({staff,perfData,setPerfData}){
   const parseSalesByMonth=(rows)=>{
     const norm=(r)=>{const out={};Object.entries(r).forEach(([k,v])=>out[k.toLowerCase().trim()]=v?.toString().trim()||'');return out;};
     const byMonth={};
-    rows.forEach(row=>{
-      const r=norm(row);
-      const name=r['staff member']||r['staff_member']||'';
-      const isClinic=!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa';
-      const total=parseFloat((r['total']||'0').toString().replace(/[$,\s]/g,''))||0;
-      if(!total)return;
-      const month=getMonth(r['purchase date']||r['invoice date']);
-      if(!month)return;
-      if(!byMonth[month])byMonth[month]={};
-      const key=isClinic?'_clinic':name;
-      if(!byMonth[month][key])byMonth[month][key]={name:key,revenue:0};
-      byMonth[month][key].revenue+=total;
-    });
-    const result={};
-    Object.entries(byMonth).forEach(([month,staffMap])=>{
-      result[month]=Object.values(staffMap).map(r=>{
-        if(r.name==='_clinic')return{...r,revenue:Math.round(r.revenue*100)/100,staffId:null};
-        const matched=matchStaff(r.name);
-        return{...r,revenue:Math.round(r.revenue*100)/100,staffId:matched?.id||null,matchedName:matched?.name||null};
-      }).filter(r=>r.revenue>0);
-    });
+    rows.forEach(row=>{const r=norm(row);const name=r['staff member']||r['staff_member']||'';const isClinic=!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa';const total=parseFloat((r['total']||'0').toString().replace(/[$,\s]/g,''))||0;if(!total)return;const month=getMonth(r['purchase date']||r['invoice date']);if(!month)return;if(!byMonth[month])byMonth[month]={};const key=isClinic?'_clinic':name;if(!byMonth[month][key])byMonth[month][key]={name:key,revenue:0};byMonth[month][key].revenue+=total;});
+    const result={};Object.entries(byMonth).forEach(([month,staffMap])=>{result[month]=Object.values(staffMap).map(r=>{if(r.name==='_clinic')return{...r,revenue:Math.round(r.revenue*100)/100,staffId:null};const matched=matchStaff(r.name);return{...r,revenue:Math.round(r.revenue*100)/100,staffId:matched?.id||null,matchedName:matched?.name||null};}).filter(r=>r.revenue>0);});
     return result;
   };
 
@@ -2987,9 +2933,9 @@ function PerformancePage({staff,perfData,setPerfData}){
         }
       }else if(type==='sales'){
         const byMonth=parseSalesByMonth(rows);
-        const _norm2=(r)=>{const out={};Object.entries(r).forEach(([k,v])=>out[k.toLowerCase().trim()]=v?.toString().trim()||'');return out;};
-        const _salesDates=rows.map(r=>{const n=_norm2(r);return(n['purchase date']||n['invoice date']||'').slice(0,10);}).filter(d=>d.length===10).sort();
-        const _lastSaleDate=_salesDates.length?_salesDates[_salesDates.length-1]:null;
+        const _n2=(r)=>{const o={};Object.entries(r).forEach(([k,v])=>o[k.toLowerCase().trim()]=v?.toString().trim()||'');return o;};
+        const _sd=rows.map(r=>{const n=_n2(r);return(n['purchase date']||n['invoice date']||'').slice(0,10);}).filter(d=>d.length===10).sort();
+        const _lastSaleDate=_sd.length?_sd[_sd.length-1]:null;
         Object.entries(byMonth).forEach(([month,parsed])=>{
           totalPractitioners=Math.max(totalPractitioners,parsed.length);
           totalMatched=Math.max(totalMatched,parsed.filter(r=>r.staffId).length);
@@ -3002,11 +2948,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             parsed.forEach(nr=>{
               const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
               if(idx>=0){if(nr.revenue!=null)mergedRows[idx]={...mergedRows[idx],revenue:nr.revenue};}
-              else if(nr.name==='_clinic'){
-                const ci=mergedRows.findIndex(r=>r.name==='_clinic');
-                if(ci>=0)mergedRows[ci]={...mergedRows[ci],revenue:nr.revenue};
-                else mergedRows.push(nr);
-              }else mergedRows.push(nr);
+              else if(nr.name==='_clinic'){const ci=mergedRows.findIndex(r=>r.name==='_clinic');if(ci>=0)mergedRows[ci]={...mergedRows[ci],revenue:nr.revenue};else mergedRows.push(nr);}else mergedRows.push(nr);
             });
             newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
           }else{
@@ -3791,57 +3733,24 @@ function PerformancePage({staff,perfData,setPerfData}){
           {/* Controls */}
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'12px 14px',marginBottom:14}}>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:10}}>
-              <div style={{display:'flex',gap:4}}>
-                {[['clinic','🏥 Clinic Totals'],['practitioner','👤 Practitioner']].map(([v,l])=>(
-                  <button key={v} className={`btn btn-sm ${trendView===v?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendView(v)}>{l}</button>
-                ))}
-              </div>
+              <div style={{display:'flex',gap:4}}>{[['clinic','🏥 Clinic Totals'],['practitioner','👤 Practitioner']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${trendView===v?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendView(v)}>{l}</button>))}</div>
               <div style={{width:1,height:20,background:'var(--border2)',flexShrink:0}}/>
-              <div style={{display:'flex',gap:4}}>
-                {[['monthly','Monthly'],['weekly','Weekly']].map(([v,l])=>(
-                  <button key={v} className={`btn btn-sm ${trendGranularity===v?'btn-go':'btn-ghost'}`} onClick={()=>setTrendGranularity(v)}>{l}</button>
-                ))}
-              </div>
+              <div style={{display:'flex',gap:4}}>{[['monthly','Monthly'],['weekly','Weekly']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${trendGranularity===v?'btn-go':'btn-ghost'}`} onClick={()=>setTrendGranularity(v)}>{l}</button>))}</div>
               <div style={{width:1,height:20,background:'var(--border2)',flexShrink:0}}/>
-              {trendGranularity!=='weekly'&&<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                {[['3m','3 Mo'],['6m','6 Mo'],['ytd','YTD'],['12m','12 Mo'],['all','All']].map(([v,l])=>(
-                  <button key={v} className={`btn btn-sm ${trendTimeframe===v&&!trendFrom?'btn-go':'btn-ghost'}`} onClick={()=>{setTrendTimeframe(v);setTrendFrom('');setTrendTo('');}}>{l}</button>
-                ))}
-              </div>}
-              {trendGranularity!=='weekly'&&<div style={{display:'flex',alignItems:'center',gap:6}}>
-                <input type="date" value={trendFrom} onChange={e=>{setTrendFrom(e.target.value);setTrendTimeframe('');}} style={{background:'var(--surface3)',border:'1px solid '+(trendFrom?'var(--go)':'var(--border2)'),borderRadius:4,color:trendFrom?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/>
-                <span style={{color:'#555',fontSize:12}}>→</span>
-                <input type="date" value={trendTo} onChange={e=>{setTrendTo(e.target.value);setTrendTimeframe('');}} style={{background:'var(--surface3)',border:'1px solid '+(trendTo?'var(--go)':'var(--border2)'),borderRadius:4,color:trendTo?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/>
-                {(trendFrom||trendTo)&&<button className="btn btn-ghost btn-xs" onClick={()=>{setTrendFrom('');setTrendTo('');setTrendTimeframe('12m');}}>✕</button>}
-              </div>}
+              {trendGranularity!=='weekly'&&<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{[['3m','3 Mo'],['6m','6 Mo'],['ytd','YTD'],['12m','12 Mo'],['all','All']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${trendTimeframe===v&&!trendFrom?'btn-go':'btn-ghost'}`} onClick={()=>{setTrendTimeframe(v);setTrendFrom('');setTrendTo('');}}>{l}</button>))}</div>}
+              {trendGranularity!=='weekly'&&<div style={{display:'flex',alignItems:'center',gap:6}}><input type="date" value={trendFrom} onChange={e=>{setTrendFrom(e.target.value);setTrendTimeframe('');}} style={{background:'var(--surface3)',border:'1px solid '+(trendFrom?'var(--go)':'var(--border2)'),borderRadius:4,color:trendFrom?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/><span style={{color:'#555',fontSize:12}}>→</span><input type="date" value={trendTo} onChange={e=>{setTrendTo(e.target.value);setTrendTimeframe('');}} style={{background:'var(--surface3)',border:'1px solid '+(trendTo?'var(--go)':'var(--border2)'),borderRadius:4,color:trendTo?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/>{(trendFrom||trendTo)&&<button className="btn btn-ghost btn-xs" onClick={()=>{setTrendFrom('');setTrendTo('');setTrendTimeframe('12m');}}>✕</button>}</div>}
             </div>
             <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-              <select value={trendDisc} onChange={e=>setTrendDisc(e.target.value)} style={{background:'var(--surface3)',border:'1px solid '+(trendDisc!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:trendDisc!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:140}}>
-                <option value="all">All Disciplines</option>
-                {[...new Set(staff.filter(s=>s.discipline&&!['mgmt','ops','edu'].includes(s.discipline)).map(s=>s.discipline))].sort().map(d=>(<option key={d} value={d}>{d}</option>))}
-              </select>
-              <select value={trendSite} onChange={e=>setTrendSite(e.target.value)} style={{background:'var(--surface3)',border:'1px solid '+(trendSite!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:trendSite!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:140}}>
-                <option value="all">All Locations</option>
-                {[...new Set(staff.filter(s=>s.site).map(s=>s.site))].sort().map(s=>(<option key={s} value={s}>{s}</option>))}
-              </select>
-              {trendView==='practitioner'&&<div style={{display:'flex',gap:4,flexWrap:'wrap',flex:3}}>
-                {mergedStaff.filter(s=>(trendDisc==='all'||s.discipline===trendDisc)&&(trendSite==='all'||s.site===trendSite)).map(s=>(
-                  <button key={s.id} className={`btn btn-sm ${trendStaff?.id===s.id?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendStaff(s)}>{s.name.split(' ')[0]}</button>
-                ))}
-              </div>}
+              <select value={trendDisc} onChange={e=>setTrendDisc(e.target.value)} style={{background:'var(--surface3)',border:'1px solid '+(trendDisc!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:trendDisc!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:140}}><option value="all">All Disciplines</option>{[...new Set(staff.filter(s=>s.discipline&&!['mgmt','ops','edu'].includes(s.discipline)).map(s=>s.discipline))].sort().map(d=>(<option key={d} value={d}>{d}</option>))}</select>
+              <select value={trendSite} onChange={e=>setTrendSite(e.target.value)} style={{background:'var(--surface3)',border:'1px solid '+(trendSite!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:trendSite!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:140}}><option value="all">All Locations</option>{[...new Set(staff.filter(s=>s.site).map(s=>s.site))].sort().map(s=>(<option key={s} value={s}>{s}</option>))}</select>
+              {trendView==='practitioner'&&<div style={{display:'flex',gap:4,flexWrap:'wrap',flex:3}}>{mergedStaff.filter(s=>(trendDisc==='all'||s.discipline===trendDisc)&&(trendSite==='all'||s.site===trendSite)).map(s=>(<button key={s.id} className={`btn btn-sm ${trendStaff?.id===s.id?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendStaff(s)}>{s.name.split(' ')[0]}</button>))}</div>}
             </div>
           </div>
 
           {data.snapshots.length<2&&trendGranularity==='monthly'&&<div style={{fontSize:14,color:'#777',padding:'12px 0',fontStyle:'italic'}}>Import at least 2 monthly snapshots to see trend lines.</div>}
 
-          {trendGranularity==='weekly'&&trendView==='clinic'&&(
-            <WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>
-          )}
-          {trendGranularity==='weekly'&&trendView==='practitioner'&&(
-            trendStaff
-              ?<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>
-              :<div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to compare their weeks.</div>
-          )}
+          {trendGranularity==='weekly'&&trendView==='clinic'&&(<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>)}
+          {trendGranularity==='weekly'&&trendView==='practitioner'&&(trendStaff?<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>:<div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to compare their weeks.</div>)}
 
           {trendGranularity==='monthly'&&trendStaff?(
             <div>
