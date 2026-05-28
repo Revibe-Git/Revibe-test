@@ -2064,15 +2064,15 @@ function ProjectionCard({snapshots,filterDisc,filterSite,staff}){
   const now=new Date();
   const curM=now.toISOString().slice(0,7);
   const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const _snapLastSale=curSnap&&curSnap.lastSaleDate?parseInt(curSnap.lastSaleDate.slice(8,10)):null;
-  const dayOfMonth=_snapLastSale&&_snapLastSale>0&&_snapLastSale<now.getDate()?_snapLastSale:now.getDate();
-  const pct=Math.round((dayOfMonth/daysInMonth)*100);
   const curSnap=snapshots?snapshots.find(s=>s.date&&s.date.startsWith(curM)):null;
   if(!curSnap)return null;
+  const _snapLastSale=curSnap.lastSaleDate?parseInt(curSnap.lastSaleDate.slice(8,10)):null;
+  const dayOfMonth=_snapLastSale&&_snapLastSale>0&&_snapLastSale<now.getDate()?_snapLastSale:now.getDate();
+  const pct=Math.round((dayOfMonth/daysInMonth)*100);
   const fs=s=>!['mgmt','ops','edu'].includes(s.discipline)&&(filterDisc==='all'||s.discipline===filterDisc)&&(filterSite==='all'||s.site===filterSite);
   const revAct=(curSnap.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0),0);
-  const visAct=(curSnap.rows||[]).filter(r=>{const s=staff.find(x=>x.id===r.staffId);return !s||fs(s);}).reduce((a,r)=>a+(parseFloat(r.completed)||0),0);
-  const iaAct=(curSnap.rows||[]).filter(r=>{const s=staff.find(x=>x.id===r.staffId);return !s||fs(s);}).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
+  const visAct=(curSnap.rows||[]).filter(r=>{if(!r.staffId)return false;const s=staff.find(x=>x.id===r.staffId);return !s||fs(s);}).reduce((a,r)=>a+(parseFloat(r.completed)||0),0);
+  const iaAct=(curSnap.rows||[]).filter(r=>{if(!r.staffId)return false;const s=staff.find(x=>x.id===r.staffId);return !s||fs(s);}).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
   const metrics=[
     {key:'rev',label:'Revenue',color:'#CAE8C1',actual:revAct,fmt:v=>'$'+Math.round(v).toLocaleString()},
     {key:'vis',label:'Completed Visits',color:'#BB99FF',actual:visAct,fmt:v=>Math.round(v).toLocaleString()},
@@ -2106,7 +2106,6 @@ function ProjectionCard({snapshots,filterDisc,filterSite,staff}){
     </div>
   );
 }
-
 function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg}){
   const allPts=snapshots.map(s=>{
     const r=s.rows?.find(r=>r.staffId===staffId);
@@ -2630,26 +2629,22 @@ function PerformancePage({staff,perfData,setPerfData}){
       const r=norm(row);
       const name=r['staff member']||r['staff_member']||'';
       const isClinic=!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa';
-      const status=r['status']||'';
-      if(!['paid','partially_paid','partially_paid_and_written_off'].includes(status))return;
-      const category=(r['income category']||r['income_category']||'').toLowerCase();
-      if(category.includes('product'))return;
-      const collected=parseFloat((r['collected']||'0').toString().replace(/[$,\s]/g,''))||0;
-      if(!collected)return;
+      const total=parseFloat((r['total']||'0').toString().replace(/[$,\s]/g,''))||0;
+      if(!total)return;
       const month=getMonth(r['purchase date']||r['invoice date']);
       if(!month)return;
       if(!byMonth[month])byMonth[month]={};
       const key=isClinic?'_clinic':name;
       if(!byMonth[month][key])byMonth[month][key]={name:key,revenue:0};
-      byMonth[month][key].revenue+=collected;
+      byMonth[month][key].revenue+=total;
     });
     const result={};
     Object.entries(byMonth).forEach(([month,staffMap])=>{
-      result[month]=Object.values(staffMap)
-        .map(r=>{
-          if(r.name==='_clinic')return{...r,revenue:Math.round(r.revenue*100)/100,staffId:null};
-          const matched=matchStaff(r.name);return{...r,revenue:Math.round(r.revenue*100)/100,staffId:matched?.id||null,matchedName:matched?.name||null};
-        }).filter(r=>r.revenue>0);
+      result[month]=Object.values(staffMap).map(r=>{
+        if(r.name==='_clinic')return{...r,revenue:Math.round(r.revenue*100)/100,staffId:null};
+        const matched=matchStaff(r.name);
+        return{...r,revenue:Math.round(r.revenue*100)/100,staffId:matched?.id||null,matchedName:matched?.name||null};
+      }).filter(r=>r.revenue>0);
     });
     return result;
   };
@@ -2709,8 +2704,8 @@ function PerformancePage({staff,perfData,setPerfData}){
         }
       }else if(type==='sales'){
         const byMonth=parseSalesByMonth(rows);
-        const _norm=(r)=>{const out={};Object.entries(r).forEach(([k,v])=>out[k.toLowerCase().trim()]=v?.toString().trim()||'');return out;};
-        const _salesDates=rows.map(r=>{const n=_norm(r);return(n['purchase date']||n['invoice date']||'').slice(0,10);}).filter(d=>d.length===10).sort();
+        const _norm2=(r)=>{const out={};Object.entries(r).forEach(([k,v])=>out[k.toLowerCase().trim()]=v?.toString().trim()||'');return out;};
+        const _salesDates=rows.map(r=>{const n=_norm2(r);return(n['purchase date']||n['invoice date']||'').slice(0,10);}).filter(d=>d.length===10).sort();
         const _lastSaleDate=_salesDates.length?_salesDates[_salesDates.length-1]:null;
         Object.entries(byMonth).forEach(([month,parsed])=>{
           totalPractitioners=Math.max(totalPractitioners,parsed.length);
@@ -2724,10 +2719,13 @@ function PerformancePage({staff,perfData,setPerfData}){
             parsed.forEach(nr=>{
               const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
               if(idx>=0){if(nr.revenue!=null)mergedRows[idx]={...mergedRows[idx],revenue:nr.revenue};}
-              else if(!mergedRows.find(r=>r.name===nr.name&&nr.name==='_clinic'))mergedRows.push(nr);
-              else if(nr.name!=='_clinic')mergedRows.push(nr);
+              else if(nr.name==='_clinic'){
+                const ci=mergedRows.findIndex(r=>r.name==='_clinic');
+                if(ci>=0)mergedRows[ci]={...mergedRows[ci],revenue:nr.revenue};
+                else mergedRows.push(nr);
+              }else mergedRows.push(nr);
             });
-            newSnapshots[existingIdx]={...existing,rows:mergedRows,lastSaleDate:_lastSaleDate||existing.lastSaleDate,files:[...(existing.files||[]),file.name]};
+            newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
           }else{
             newSnapshots.push({id:'snap_'+month+'_sales',date:snapDate,rows:parsed,files:[file.name],type:'sales'});
           }
