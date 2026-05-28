@@ -2665,8 +2665,10 @@ function PerformancePage({staff,perfData,setPerfData}){
             const mergedRows=[...existing.rows];
             parsed.forEach(nr=>{
               const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
-              if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
-              else mergedRows.push(nr);
+              if(idx>=0){
+                // Only merge revenue — don't overwrite visits/IAs with null from sales rows
+                if(nr.revenue!=null)mergedRows[idx]={...mergedRows[idx],revenue:nr.revenue};
+              }else mergedRows.push(nr);
             });
             newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
           }else{
@@ -4174,6 +4176,31 @@ function PerformancePage({staff,perfData,setPerfData}){
               }}}>
               ⚠ Reset All Data
             </button>
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:4}}>
+            {[{label:'Purge Sales',type:'sales'},{label:'Purge Appointments',type:'appointments'},{label:'Purge Shift Reports',type:'shift'},{label:'Purge Retention',type:'retention'}].map(({label,type})=>(
+              <button key={type} className="btn btn-ghost btn-sm" style={{color:'#E05252',border:'1px solid #E0525244',fontSize:12}}
+                onClick={async()=>{
+                  if(!window.confirm(`Purge all ${type} data?`))return;
+                  const SB=window.__SB;let err=null;
+                  if(type==='retention'){
+                    if(SB){const r1=await SB.from('retention_snapshots').delete().neq('id','_none_');const r2=await SB.from('retention_full').delete().neq('id','_none_');if(r1.error)err=r1.error.message;if(r2.error)err=r2.error.message;}
+                    setRetentionSnapshots([]);save({...data,retentionFull:{},retentionClinic:{},retentionImportDate:null,retention:{}});
+                  }else{
+                    const remaining=data.snapshots.filter(s=>s.type!==type);
+                    if(SB){
+                      const toDel=data.snapshots.filter(s=>s.type===type);
+                      for(const s of toDel){const r=await SB.from('performance_snapshots').delete().eq('id',s.id);if(r.error)err=r.error.message;}
+                      if(type==='appointments'){const r=await SB.from('daily_appointments').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyAppts([]);try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}}
+                      if(type==='sales'){const r=await SB.from('daily_revenue').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyRevenue([]);try{localStorage.removeItem('rvgd3_daily_rev');}catch(e){}}
+                    }
+                    save({...data,snapshots:remaining});
+                  }
+                  if(err){setImportMsg({type:'error',msg:`Purge error: ${err}`});return;}
+                  setImportMsg({type:'success',msg:`✓ ${type} data purged. Reloading…`});
+                  setTimeout(()=>window.location.reload(),800);
+                }}>🗑 {label}</button>
+            ))}
           </div>
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#777'}}>Shift Report Month</div>
