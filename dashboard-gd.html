@@ -2060,6 +2060,64 @@ function Sparkline({values,color,width=120,height=32}){
   </svg>);
 }
 
+function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,staffId,snapshots}){
+  const now=new Date();
+  const curM=now.toISOString().slice(0,7);
+  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const _revD=dailyRevenue.filter(r=>r.date&&r.date.startsWith(curM)).map(r=>r.date).sort();
+  const _apptD=dailyAppts.filter(r=>r.date&&r.date.startsWith(curM)).map(r=>r.date).sort();
+  const _last=(_revD.length?_revD[_revD.length-1]:null)||(_apptD.length?_apptD[_apptD.length-1]:null);
+  const dayOfMonth=_last?parseInt(_last.slice(8)):now.getDate();
+  const pct=Math.round((dayOfMonth/daysInMonth)*100);
+  const fs=s=>!['mgmt','ops','edu'].includes(s.discipline)&&(filterDisc==='all'||s.discipline===filterDisc)&&(filterSite==='all'||s.site===filterSite)&&(!staffId||s.id===staffId);
+  const curSnap=snapshots?snapshots.find(s=>s.date&&s.date.startsWith(curM)):null;
+  const snapRev=curSnap?(curSnap.rows||[]).reduce((a,r)=>{if(!r.revenue)return a;if(staffId&&r.staffId!==staffId)return a;return a+(parseFloat(r.revenue)||0);},0):0;
+  const mAppts=dailyAppts.filter(r=>{if(!r.date.startsWith(curM))return false;if(staffId&&r.staff_id!==staffId)return false;const s=staff.find(x=>x.id===r.staff_id);return s&&fs(s);});
+  const visits=mAppts.reduce((a,r)=>a+(r.completed||0),0);
+  const ias=mAppts.reduce((a,r)=>a+(r.initial_assessments||0),0);
+  const revAct=snapRev>0?snapRev:dailyRevenue.filter(r=>{if(!r.date.startsWith(curM))return false;if(staffId&&r.staff_id!==staffId)return false;const s=staff.find(x=>x.id===r.staff_id);return s&&fs(s);}).reduce((a,r)=>a+(r.revenue||0),0);
+  const metrics=[
+    {key:'rev',label:'Revenue',color:'#CAE8C1',actual:revAct,fmt:v=>'$'+Math.round(v).toLocaleString()},
+    {key:'vis',label:'Completed Visits',color:'#BB99FF',actual:visits,fmt:v=>Math.round(v).toLocaleString()},
+    {key:'ia',label:'Initial Assessments',color:'#F4DB71',actual:ias,fmt:v=>Math.round(v).toString()},
+  ].filter(m=>m.actual>0).map(m=>({...m,projected:Math.round((m.actual/dayOfMonth)*daysInMonth),remaining:Math.round(((m.actual/dayOfMonth)*daysInMonth)-m.actual),dailyRate:m.actual/dayOfMonth}));
+  if(!metrics.length||dayOfMonth<3)return null;
+  return(
+    <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'18px 20px',marginBottom:14}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA',fontWeight:700,marginBottom:2}}>📈 {now.toLocaleDateString('en-CA',{month:'long',year:'numeric'})} — Month-End Projection</div>
+          <div style={{fontSize:13,color:'#555'}}>{dayOfMonth} of {daysInMonth} days complete ({pct}%)</div>
+        </div>
+        <div style={{flex:1,minWidth:120,maxWidth:200}}>
+          <div style={{height:6,background:'var(--surface3)',borderRadius:3}}>
+            <div style={{height:'100%',borderRadius:3,background:'#44CCAA',width:pct+'%'}}/>
+          </div>
+        </div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:12}}>
+        {metrics.map(({key,label,color,actual,projected,remaining,dailyRate,fmt})=>(
+          <div key={key} style={{background:'var(--surface3)',borderRadius:6,padding:'14px 16px',borderLeft:'3px solid '+color}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:8}}>{label}</div>
+            <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}>
+              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color,lineHeight:1}}>{fmt(projected)}</span>
+              <span style={{fontSize:12,color:'#555'}}>projected</span>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:3,fontSize:13}}>
+              <div><span style={{color:'#888'}}>So far: </span><span style={{color:'#ddd',fontWeight:600}}>{fmt(actual)}</span></div>
+              <div><span style={{color:'#888'}}>Remaining: </span><span style={{color:'#44CCAA',fontWeight:600}}>{fmt(remaining)}</span></div>
+              <div style={{color:'#555',fontSize:12}}>{fmt(Math.round(dailyRate))}/day pace</div>
+            </div>
+            <div style={{marginTop:10,height:3,background:'var(--surface2)',borderRadius:2}}>
+              <div style={{height:'100%',borderRadius:2,background:color,width:Math.min(100,pct)+'%'}}/>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg}){
   const allPts=snapshots.map(s=>{
     const r=s.rows?.find(r=>r.staffId===staffId);
@@ -3004,7 +3062,9 @@ function PerformancePage({staff,perfData,setPerfData}){
       )}
 
       {tab==='overview'&&(
-        <div className="grid2">
+        <>
+          <ProjectionCard dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={filterDisc} filterSite={filterSite} snapshots={data.snapshots}/>
+          <div className="grid2">
           <div className="perf-slot">
             <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#CAE8C1'}}>Revenue</span>{!withRev.length&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('import')}>Import →</button>}</div>
             <div className="perf-slot-body">{withRev.length?withRev.slice(0,12).map(s=><BarRow key={s.id} s={s} val={s.revenue} max={maxRev} color="#CAE8C1" sub={fmtRev(s.revenue)} metric="revenue"/>):<div className="empty" style={{padding:24}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue.</p></div>}</div>
@@ -3105,6 +3165,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             </>);
           })()}
         </div>
+        </>
       )}
 
       {/* ── REVENUE ── */}
@@ -3574,6 +3635,31 @@ function PerformancePage({staff,perfData,setPerfData}){
               }}}>
               ⚠ Reset All Data
             </button>
+          </div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:4}}>
+            {[{label:'Purge Sales',type:'sales'},{label:'Purge Appointments',type:'appointments'},{label:'Purge Shift Reports',type:'shift'},{label:'Purge Retention',type:'retention'}].map(({label,type})=>(
+              <button key={type} className="btn btn-ghost btn-sm" style={{color:'#E05252',border:'1px solid #E0525244',fontSize:12}}
+                onClick={async()=>{
+                  if(!window.confirm(`Purge all ${type} data?`))return;
+                  const SB=window.__SB;let err=null;
+                  if(type==='retention'){
+                    if(SB){const r1=await SB.from('retention_snapshots').delete().neq('id','_none_');const r2=await SB.from('retention_full').delete().neq('id','_none_');if(r1.error)err=r1.error.message;if(r2.error)err=r2.error.message;}
+                    setRetentionSnapshots([]);save({...data,retentionFull:{},retentionClinic:{},retentionImportDate:null,retention:{}});
+                  }else{
+                    const remaining=data.snapshots.filter(s=>s.type!==type);
+                    if(SB){
+                      const toDel=data.snapshots.filter(s=>s.type===type);
+                      for(const s of toDel){const r=await SB.from('performance_snapshots').delete().eq('id',s.id);if(r.error)err=r.error.message;}
+                      if(type==='appointments'){const r=await SB.from('daily_appointments').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyAppts([]);try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}}
+                      if(type==='sales'){const r=await SB.from('daily_revenue').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyRevenue([]);try{localStorage.removeItem('rvgd3_daily_rev');}catch(e){}}
+                    }
+                    save({...data,snapshots:remaining});
+                  }
+                  if(err){setImportMsg({type:'error',msg:`Purge error: ${err}`});return;}
+                  setImportMsg({type:'success',msg:`✓ ${type} data purged. Reloading…`});
+                  setTimeout(()=>window.location.reload(),800);
+                }}>🗑 {label}</button>
+            ))}
           </div>
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#777'}}>Shift Report Month</div>
