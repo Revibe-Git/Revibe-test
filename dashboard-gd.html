@@ -2629,26 +2629,27 @@ function PerformancePage({staff,perfData,setPerfData}){
     rows.forEach(row=>{
       const r=norm(row);
       const name=r['staff member']||r['staff_member']||'';
-      if(!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa')return;
+      const isClinic=!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa';
       const status=r['status']||'';
-      // Include paid and partially_paid — both have real collected amounts
       if(!['paid','partially_paid','partially_paid_and_written_off'].includes(status))return;
       const category=(r['income category']||r['income_category']||'').toLowerCase();
       if(category.includes('product'))return;
-      // Collected is already numeric in Jane's export
       const collected=parseFloat((r['collected']||'0').toString().replace(/[$,\s]/g,''))||0;
       if(!collected)return;
       const month=getMonth(r['purchase date']||r['invoice date']);
       if(!month)return;
       if(!byMonth[month])byMonth[month]={};
-      if(!byMonth[month][name])byMonth[month][name]={name,revenue:0};
-      byMonth[month][name].revenue+=collected;
+      const key=isClinic?'_clinic':name;
+      if(!byMonth[month][key])byMonth[month][key]={name:key,revenue:0};
+      byMonth[month][key].revenue+=collected;
     });
     const result={};
     Object.entries(byMonth).forEach(([month,staffMap])=>{
       result[month]=Object.values(staffMap)
-        .map(r=>{const matched=matchStaff(r.name);return{...r,revenue:Math.round(r.revenue*100)/100,staffId:matched?.id||null,matchedName:matched?.name||null};})
-        .filter(r=>r.revenue>0);
+        .map(r=>{
+          if(r.name==='_clinic')return{...r,revenue:Math.round(r.revenue*100)/100,staffId:null};
+          const matched=matchStaff(r.name);return{...r,revenue:Math.round(r.revenue*100)/100,staffId:matched?.id||null,matchedName:matched?.name||null};
+        }).filter(r=>r.revenue>0);
     });
     return result;
   };
@@ -2723,9 +2724,10 @@ function PerformancePage({staff,perfData,setPerfData}){
             parsed.forEach(nr=>{
               const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
               if(idx>=0){if(nr.revenue!=null)mergedRows[idx]={...mergedRows[idx],revenue:nr.revenue};}
-              else mergedRows.push(nr);
+              else if(!mergedRows.find(r=>r.name===nr.name&&nr.name==='_clinic'))mergedRows.push(nr);
+              else if(nr.name!=='_clinic')mergedRows.push(nr);
             });
-            newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
+            newSnapshots[existingIdx]={...existing,rows:mergedRows,lastSaleDate:_lastSaleDate||existing.lastSaleDate,files:[...(existing.files||[]),file.name]};
           }else{
             newSnapshots.push({id:'snap_'+month+'_sales',date:snapDate,rows:parsed,files:[file.name],type:'sales'});
           }
