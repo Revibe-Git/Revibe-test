@@ -1,4 +1,4 @@
-<!DOCTYPE html><!-- v20260520g -->
+<!DOCTYPE html><!-- v20260514221343 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -8,14 +8,7 @@
 (function(){
   const SUPABASE_URL='https://ekjzbdvvxvylembmrphv.supabase.co';
   const SUPABASE_KEY='sb_publishable_2NpHtgiPTvrqi3bkQiejNw_Ob5dsATN';
-  window.__SB=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{
-    auth:{
-      detectSessionInUrl:true,
-      persistSession:true,
-      autoRefreshToken:true,
-      flowType:'implicit'
-    }
-  });
+  window.__SB=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 })();
 </script>
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
@@ -917,13 +910,36 @@ const RUBRIC_SYSTEMS = {
     "col7Label": "7 (Competent: Revibe Standard)",
     "col810Label": "8–10 (Advanced / Elite / Mastery)",
     "cats": [
-      {"id":"comm","label":"Communication & Trust","weight":20},
-      {"id":"rehab","label":"Performance Rehab Integration","weight":20},
-      {"id":"awareness","label":"Awareness & Athlete Reading","weight":15},
-      {"id":"structure","label":"Session Structure, Intent & Flow","weight":20},
-      {"id":"cueing","label":"Movement Coaching & Cueing","weight":15},
-      {"id":"energy","label":"Energy, Leadership & Environment Control","weight":5},
-      {"id":"brand","label":"Brand Presence & Community Involvement","weight":5}
+      {
+        "id": "comm",
+        "label": "Communication & Trust",
+        "weight": 25
+      },
+      {
+        "id": "awareness",
+        "label": "Awareness & Athlete Reading",
+        "weight": 20
+      },
+      {
+        "id": "structure",
+        "label": "Session Structure, Intent & Flow",
+        "weight": 20
+      },
+      {
+        "id": "cueing",
+        "label": "Movement Coaching & Cueing",
+        "weight": 20
+      },
+      {
+        "id": "energy",
+        "label": "Energy, Leadership & Environment Control",
+        "weight": 10
+      },
+      {
+        "id": "brand",
+        "label": "Brand Presence & Community Involvement",
+        "weight": 5
+      }
     ],
     "catDefs": [
       {
@@ -933,14 +949,6 @@ const RUBRIC_SYSTEMS = {
         "col56": "Basic rapport established; checks in but inconsistent; limited emotional intelligence; accountability is reactive",
         "col7": "Clear and concise; builds trust consistently; explains session intent and 'why'; adapts communication style to athlete",
         "col810": "Intuitive communicator; inspires ownership; drives accountability through trust; natural relationship builder; athletes self-correct"
-      },
-      {
-        "id": "rehab",
-        "label": "Performance Rehab Integration",
-        "col04": "No awareness of injury limitations; cannot modify exercises; ignores pain signals; no communication with therapy staff",
-        "col56": "Basic modifications attempted; inconsistent progression decisions; limited rehab understanding; occasional therapist communication",
-        "col7": "Modifies exercises without losing session intent; understands performance rehab principles; communicates effectively with therapists; builds athlete confidence during recovery; makes appropriate progression/regression decisions in real time",
-        "col810": "Bridges rehab into performance seamlessly; anticipates compensation patterns; confidently guides return-to-play; proactively collaborates with clinical staff; athletes fully trust them through recovery"
       },
       {
         "id": "awareness",
@@ -1973,10 +1981,6 @@ function App(){
   const PAGES={overview:Overview,staff:StaffPage,evals:EvalsPage,education:EduPage,mentors:MentorsPage,gaps:GapsPage,performance:PerformancePage,forms:FormsPage,resources:ResourcesPage,leadership:LeadershipPage,schedule:SchedulePage,clinresources:ClinResourcesPage,gdtracker:GDTrackerPage,systematic:SystematicPage};
   const PageComp=PAGES[page]||Overview;
 
-
-
-
-
   return(
     <div className="shell">
       <div className="sidebar">
@@ -2056,30 +2060,23 @@ function Sparkline({values,color,width=120,height=32}){
   </svg>);
 }
 
-function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg,granularity,dateFrom,dateTo}){
+function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg}){
   const allPts=snapshots.map(s=>{
     const r=s.rows?.find(r=>r.staffId===staffId);
     return r&&r[metric]!=null?{date:s.date,val:parseFloat(r[metric])||0}:null;
   }).filter(Boolean);
 
-  // Apply date filter
+  // Apply timeframe filter
   const now=new Date();
-  const filtered=allPts.filter(p=>{
+  const pts=allPts.filter(p=>{
+    if(!timeframe||timeframe==='all')return true;
     const d=new Date(p.date+'T12:00');
-    if(dateFrom&&d<new Date(dateFrom))return false;
-    if(dateTo&&d>new Date(dateTo))return false;
-    if(!dateFrom&&!dateTo){
-      if(!timeframe||timeframe==='all')return true;
-      if(timeframe==='3m'){const c=new Date(now);c.setMonth(c.getMonth()-3);return d>=c;}
-      if(timeframe==='6m'){const c=new Date(now);c.setMonth(c.getMonth()-6);return d>=c;}
-      if(timeframe==='12m'){const c=new Date(now);c.setMonth(c.getMonth()-12);return d>=c;}
-      if(timeframe==='ytd')return d.getFullYear()===now.getFullYear();
-    }
+    if(timeframe==='3m'){const cutoff=new Date(now);cutoff.setMonth(cutoff.getMonth()-3);return d>=cutoff;}
+    if(timeframe==='6m'){const cutoff=new Date(now);cutoff.setMonth(cutoff.getMonth()-6);return d>=cutoff;}
+    if(timeframe==='12m'){const cutoff=new Date(now);cutoff.setMonth(cutoff.getMonth()-12);return d>=cutoff;}
+    if(timeframe==='ytd'){return d.getFullYear()===now.getFullYear();}
     return true;
   });
-
-  // Weekly aggregation from daily data (if available via dailySnaps prop)
-  let pts=filtered;
 
   if(pts.length<1)return<div style={{fontSize:14,color:'#777',padding:'20px 16px',textAlign:'center'}}>No {label.toLowerCase()} data for this period.</div>;
 
@@ -2090,6 +2087,7 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
     <div style={{padding:'16px 0'}}>
       <div style={{display:'flex',alignItems:'center',gap:24,flexWrap:'wrap',marginBottom:8}}>
         <div><div style={{fontSize:13,color:'#888',marginBottom:2}}>Latest</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color,lineHeight:1}}>{fmt(pts[0].val)}</div></div>
+        <div><div style={{fontSize:13,color:'#888',marginBottom:2}}>Your Avg</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#aaa',lineHeight:1}}>{fmt(Math.round(avg))}</div></div>
         {clinicAvg!=null&&<div><div style={{fontSize:13,color:'#888',marginBottom:2}}>Clinic Avg</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#555',lineHeight:1}}>{fmt(Math.round(clinicAvg))}</div></div>}
       </div>
       <div style={{fontSize:13,color:'#888',fontStyle:'italic'}}>Import more snapshots to see a trend line.</div>
@@ -2099,10 +2097,12 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
   const min=Math.min(...vals)*0.9,max=Math.max(...vals)*1.1;
   const range=max-min||1;
   const W=500,H=140,PADX=52,PADY=16,BOTTOM=32;
+
   const toY=(v)=>PADY+Math.round((1-(v-min)/range)*(H-PADY*2));
   const coords=pts.map((p,i)=>({
-    x:PADX+Math.round((i/(pts.length-1||1))*(W-PADX-14)),
-    y:toY(p.val),val:p.val,date:p.date
+    x:PADX+Math.round((i/(pts.length-1))*(W-PADX-14)),
+    y:toY(p.val),
+    val:p.val,date:p.date
   }));
   const pathD=coords.map((c,i)=>(i===0?'M':'L')+c.x+','+c.y).join(' ');
   const areaD=pathD+` L${coords[coords.length-1].x},${H} L${coords[0].x},${H} Z`;
@@ -2112,16 +2112,22 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
   const up=delta>=0;
   const avgY=toY(avg);
   const clinicAvgY=clinicAvg!=null?toY(Math.max(min,Math.min(max,clinicAvg))):null;
-  const yGrid=Array.from({length:5},(_,i)=>({y:PADY+Math.round((i/4)*(H-PADY*2)),val:max-((max-min)*(i/4))}));
+
+  const gridLines=4;
+  const yGrid=Array.from({length:gridLines+1},(_,i)=>({
+    y:PADY+Math.round((i/gridLines)*(H-PADY*2)),
+    val:max-((max-min)*(i/gridLines))
+  }));
+
   const showLabel=(i)=>{
     if(pts.length<=6)return true;
     if(pts.length<=12)return i%2===0||i===pts.length-1;
     return i===0||i===Math.floor(pts.length/2)||i===pts.length-1;
   };
-  const fmtDate=(d)=>new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'});
 
   return(
     <div>
+      {/* Stats row */}
       <div style={{display:'flex',alignItems:'flex-end',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:12}}>
         <div style={{display:'flex',gap:24,flexWrap:'wrap'}}>
           <div>
@@ -2132,55 +2138,63 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
             </div>
           </div>
           <div>
-            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Avg / period</div>
+            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Their Avg / mo</div>
             <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#aaa',lineHeight:1}}>{fmt(Math.round(avg))}</span>
           </div>
           {clinicAvg!=null&&<div>
-            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Clinic Avg</div>
+            <div style={{fontSize:12,color:'#888',marginBottom:2,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>Clinic Avg / mo</div>
             <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:700,color:'#555',lineHeight:1}}>{fmt(Math.round(clinicAvg))}</span>
           </div>}
         </div>
-        <div style={{fontSize:13,color:'#777'}}>{pts.length} {granularity==='weekly'?'weeks':'months'}</div>
+        <div style={{fontSize:13,color:'#777'}}>{pts.length} months</div>
       </div>
+      {/* Chart */}
       <svg width="100%" viewBox={`0 0 ${W} ${H+BOTTOM}`} style={{display:'block',overflow:'visible'}}>
+        {/* Y-axis grid */}
         {yGrid.map((g,i)=>(
           <g key={i}>
             <line x1={PADX} y1={g.y} x2={W-14} y2={g.y} stroke="#1e1e1e" strokeWidth="1"/>
             <text x={PADX-6} y={g.y+4} textAnchor="end" fontSize="11" fill="#666">{fmt(Math.round(g.val))}</text>
           </g>
         ))}
+        {/* Clinic avg reference line */}
         {clinicAvgY!=null&&clinicAvgY>PADY&&clinicAvgY<H&&(
           <g>
             <line x1={PADX} y1={clinicAvgY} x2={W-14} y2={clinicAvgY} stroke="#444" strokeWidth="1.5" strokeDasharray="5,4"/>
             <text x={W-12} y={clinicAvgY+4} fontSize="11" fill="#555" textAnchor="start">clinic</text>
           </g>
         )}
+        {/* Personal avg reference line */}
         {avgY>PADY&&avgY<H&&(
           <g>
             <line x1={PADX} y1={avgY} x2={W-14} y2={avgY} stroke={color} strokeWidth="1.5" strokeDasharray="4,3" opacity="0.4"/>
             <text x={W-12} y={avgY+4} fontSize="11" fill={color} opacity="0.6" textAnchor="start">avg</text>
           </g>
         )}
+        {/* Area fill */}
         <path d={areaD} fill={color} opacity="0.07"/>
+        {/* Line */}
         <path d={pathD} fill="none" stroke={color} strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round"/>
+        {/* Points */}
         {coords.map((c,i)=>(
           <g key={i}>
             <circle cx={c.x} cy={c.y} r="4.5" fill={color} opacity="0.9"/>
             {pts.length<=10&&<text x={c.x} y={c.y-11} textAnchor="middle" fontSize="11" fill={color} opacity="0.85" fontWeight="600">{fmt(c.val)}</text>}
-            {showLabel(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">{fmtDate(c.date)}</text>}
+            {showLabel(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">
+              {new Date(c.date+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}
+            </text>}
           </g>
         ))}
+        {/* Baseline */}
         <line x1={PADX} y1={H} x2={W-14} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
       </svg>
     </div>
   );
 }
 
-
 function PerformancePage({staff,perfData,setPerfData}){
   const SK='rvgd3_perf3';
   const[loading,setLoading]=useState(true);
-  const[loadError,setLoadError]=useState('');
   const data=perfData||{snapshots:[],gva:{},retention:{},lastImport:null};
 
   // Daily granular data — stores per-staff per-day aggregates
@@ -2201,8 +2215,8 @@ function PerformancePage({staff,perfData,setPerfData}){
       if(!SB){setTimeout(tryLoad,400);return;}
       try{
         const[{data:appts},{data:rev}]=await Promise.all([
-          SB.from('daily_appointments').select('*').order('date',{ascending:false}).limit(5000),
-          SB.from('daily_revenue').select('*').order('date',{ascending:false}).limit(5000)
+          SB.from('daily_appointments').select('*'),
+          SB.from('daily_revenue').select('*')
         ]);
         if(!cancelled){
           if(appts&&appts.length>0){setDailyAppts(appts);try{localStorage.setItem('rvgd3_daily_appts',JSON.stringify(appts));}catch(e){}}
@@ -2235,9 +2249,6 @@ function PerformancePage({staff,perfData,setPerfData}){
           const retention={};
           (retRows||[]).forEach(r=>{if(!retention[r.staff_id])retention[r.staff_id]=r.value;});
           const loaded={snapshots:snaps.map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:snaps[snaps.length-1]?.created_at||null};
-          let retFullRow=null;
-          try{const{data:r}=await SB.from('retention_full').select('*').eq('id','singleton').single();retFullRow={data:r};}catch(e){retFullRow={data:null};}
-          if(retFullRow?.data){loaded.retentionFull=retFullRow.data.retentionFull||{};loaded.retentionClinic=retFullRow.data.retentionClinic||{};loaded.retentionImportDate=retFullRow.data.importDate||null;}
           // Supabase data is fresher — update state and localStorage
           setPerfData(loaded);
           try{localStorage.setItem('rvgd3_perf3',JSON.stringify(loaded));}catch(e){}
@@ -2254,11 +2265,6 @@ function PerformancePage({staff,perfData,setPerfData}){
           }
         }
       }catch(e){console.warn('[Perf] Supabase sync error:',e);}
-      // Load retention snapshots unconditionally
-      try{
-        const{data:retSnaps}=await SB.from('retention_snapshots').select('*').order('month',{ascending:true});
-        if(retSnaps&&retSnaps.length>0)setRetentionSnapshots(retSnaps);
-      }catch(e){console.warn('retention_snapshots load failed',e);}
       setLoading(false);
     };
     setTimeout(tryLoad,500);
@@ -2284,10 +2290,6 @@ function PerformancePage({staff,perfData,setPerfData}){
   };
 
   // Save retention to Supabase
-  const saveRetentionSnapshot=async(month,retFull,clinicData)=>{
-    const SB2=window.__SB;if(!SB2)return;
-    try{await SB2.from('retention_snapshots').upsert({id:month,month,staff_data:retFull,clinic_data:clinicData,imported_at:new Date().toISOString()});}catch(e){console.warn('retention_snapshots save failed',e);}
-  };
   const saveRetentionToSB=async(staffId,value,recordedBy)=>{
     const SB=window.__SB;if(!SB)return;
     try{
@@ -2313,11 +2315,8 @@ function PerformancePage({staff,perfData,setPerfData}){
 
   const save=(d)=>{
     setPerfData(d);
+    // Write to localStorage as primary (instant, survives refresh)
     try{localStorage.setItem('rvgd3_perf3',JSON.stringify(d));}catch(e){}
-    const SB2=window.__SB;
-    if(SB2&&(d.retentionFull||d.retentionClinic)){
-      SB2.from('retention_full').upsert({id:'singleton',data:{retentionFull:d.retentionFull||{},retentionClinic:d.retentionClinic||{},importDate:d.retentionImportDate||null}}).then();
-    }
   };
   const[tab,setTab]=useState('overview');
   const[dragging,setDragging]=useState(false);
@@ -2327,32 +2326,9 @@ function PerformancePage({staff,perfData,setPerfData}){
   const[gvaSaved,setGvaSaved]=useState(false);
   const[trendStaff,setTrendStaff]=useState(null);
   const[trendTimeframe,setTrendTimeframe]=useState('12m');
-  const[trendGranularity,setTrendGranularity]=useState('monthly');
-  const[trendFrom,setTrendFrom]=useState('');
-  const[trendTo,setTrendTo]=useState('');
-  const[trendDisc,setTrendDisc]=useState('all');
-  const[trendSite,setTrendSite]=useState('all');
-  const[trendView,setTrendView]=useState('practitioner');
   const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
-  const[revSort,setRevSort]=useState({k:'revenue',d:'desc'});
-  const[utilSort,setUtilSort]=useState({k:'utilization',d:'desc'});
-  const[apptSort,setApptSort]=useState({k:'completed',d:'desc'});
-  const[retSortKey,setRetSortKey]=useState('pctReturning');
-  const[retPeriod,setRetPeriod]=useState('latest');
-  const[retFilterDisc,setRetFilterDisc]=useState('all');
-  const[retFilterSite,setRetFilterSite]=useState('all');
-  const[retSelectedMonth,setRetSelectedMonth]=useState('');
-  const[retentionMonthPicker,setRetentionMonthPicker]=useState('');
-  const[pendingRetentionData,setPendingRetentionData]=useState(null);
-  const[retentionSnapshots,setRetentionSnapshots]=useState([]);
-  const[retSortDir,setRetSortDir]=useState('desc');
-  const[showManualRet,setShowManualRet]=useState(false);
-  const[iaSortKey,setIaSortKey]=useState('total');
-  const[iaSortDir,setIaSortDir]=useState('desc');
-  const[iaView,setIaView]=useState('summary');
-  const[iaSelectedStaff,setIaSelectedStaff]=useState(null);
   const[periodFilter,setPeriodFilter]=useState(()=>new Date().toISOString().slice(0,7));
   const curMonth=new Date().toISOString().slice(0,7);
   const[dateFrom,setDateFrom]=useState(curMonth);
@@ -2599,16 +2575,6 @@ function PerformancePage({staff,perfData,setPerfData}){
   };
 
   /* ── Parse sales by month ────────────────────── */
-  const parseRetentionCSV=(text)=>{
-    const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
-    const FIELD_MAP={'New Patients':'newPatients','Returning Patients':'returningPatients','Total Patients':'totalPatients','Total Visits':'totalVisits','% Returning':'pctReturning','% Repeat Visits Within Date Range':'pctRepeatVisits'};
-    const CLINIC_KEYS=['revibe','mississauga','markham','sherway','rec 44'];
-    const isClinic=(n)=>CLINIC_KEYS.some(k=>n.toLowerCase().includes(k));
-    const isDataLine=(l)=>{const p=l.split(',');if(p.length!==2)return false;return!isNaN(parseFloat(p[1]));};
-    const clinicSummaries={};const practitioners=[];let i=0;
-    while(i<lines.length){const line=lines[i];if(!isDataLine(line)){const name=line.replace(/^"|"$/g,'').trim();const data={};let j=i+1;while(j<lines.length&&j<i+8){const dl=lines[j];const p=dl.split(',');if(p.length===2&&!isNaN(parseFloat(p[1]))){const key=p[0].trim().replace(/^"|"$/g,'');if(FIELD_MAP[key])data[FIELD_MAP[key]]=parseFloat(p[1]);j++;}else break;}if(data.pctReturning!==undefined){const entry={name,...data};if(isClinic(name))clinicSummaries[name]=entry;else practitioners.push(entry);i=j;}else{i++;}}else{i++;}}
-    return{clinicSummaries,practitioners};
-  };
   const parseSalesByMonth=(rows)=>{
     const norm=(r)=>{const out={};Object.entries(r).forEach(([k,v])=>out[k.toLowerCase().trim()]=v?.toString().trim()||'');return out;};
     const byMonth={};
@@ -2665,10 +2631,8 @@ function PerformancePage({staff,perfData,setPerfData}){
             const mergedRows=[...existing.rows];
             parsed.forEach(nr=>{
               const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
-              if(idx>=0){
-                // Only merge revenue — don't overwrite visits/IAs with null from sales rows
-                if(nr.revenue!=null)mergedRows[idx]={...mergedRows[idx],revenue:nr.revenue};
-              }else mergedRows.push(nr);
+              if(idx>=0){if(nr.revenue!=null)mergedRows[idx]={...mergedRows[idx],revenue:nr.revenue};}
+              else mergedRows.push(nr);
             });
             newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
           }else{
@@ -2752,23 +2716,6 @@ function PerformancePage({staff,perfData,setPerfData}){
           newSnapshots.push({id:'snap_'+Date.now(),date:snapDate,rows:parsed,files:[file.name],type:'shift'});
         }
         monthsCreated=[snapDate.slice(0,7)];
-      }else if(text.includes('% Returning')&&text.includes('% Repeat Visits Within Date Range')){
-        const{clinicSummaries,practitioners}=parseRetentionCSV(text);
-        if(!practitioners.length){setImportMsg({type:'error',msg:'No practitioner data found.'});setImporting(false);return;}
-        let matched=0;
-        const retFull={};
-        practitioners.forEach(p=>{const s=matchStaff(p.name);if(s){retFull[s.id]={pctReturning:p.pctReturning,pctRepeatVisits:p.pctRepeatVisits,newPatients:p.newPatients||0,returningPatients:p.returningPatients||0,totalPatients:p.totalPatients||0,totalVisits:p.totalVisits||0};matched++;}});
-        const clinicData={};Object.entries(clinicSummaries).forEach(([name,d])=>{const key=name.toLowerCase().includes('mississauga')?'Mississauga':'Markham';clinicData[key]=d;});
-        // Try to detect month from filename e.g. Member_Retention_20260120.csv → 2026-01
-        let autoMonth='';
-        const fnMatch=file.name.match(/(\d{4})(\d{2})\d{2}/);
-        if(fnMatch){autoMonth=fnMatch[1]+'-'+fnMatch[2];}
-        else{const d=new Date();d.setDate(0);autoMonth=d.toISOString().slice(0,7);}
-        // Store pending so user can confirm/correct the detected month
-        setPendingRetentionData({retFull,clinicData,matched,total:practitioners.length});
-        setRetentionMonthPicker(autoMonth);
-        setImportMsg({type:'info',msg:`Parsed ${matched}/${practitioners.length} practitioners. Confirm the month below then click Save.`});
-        setImporting(false);return;
       }else{
         setImportMsg({type:'error',msg:'Could not identify this file type. Columns found: '+Object.keys(rows[0]).join(', ')});
         setImporting(false);return;
@@ -2786,11 +2733,6 @@ function PerformancePage({staff,perfData,setPerfData}){
         }
       }else{sbOk=false;}
 
-      // Debug: log unmatched names
-      const _allNames=new Set();
-      newSnapshots.forEach(s=>(s.rows||[]).forEach(r=>{if(r.name&&!r.staffId)_allNames.add(r.name);}));
-      if(_allNames.size>0)console.warn('[Unmatched]',[..._allNames]);
-      else console.log('[Match] All staff matched ✓');
       const uniqMonths=[...new Set(monthsCreated)].sort();
       const monthNames=uniqMonths.map(m=>new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}));
       const totalIA=newSnapshots.flatMap(s=>s.rows||[]).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
@@ -2852,7 +2794,11 @@ function PerformancePage({staff,perfData,setPerfData}){
           if(r.appointments)b.appointments+=(parseFloat(r.appointments)||0);
           if(r.initialAssessments)b.initialAssessments+=(parseFloat(r.initialAssessments)||0);
         }
-        if(r.utilization!=null){b.utilization=(b.utilization||0)+(parseFloat(r.utilization)||0);b.utilizationCount++;}
+        // Average utilization across months rather than summing
+        if(r.utilization!=null){
+          b.utilization=(b.utilization||0)+(parseFloat(r.utilization)||0);
+          b.utilizationCount++;
+        }
       });
     });
     return Object.values(byStaff).map(r=>({
@@ -2871,60 +2817,13 @@ function PerformancePage({staff,perfData,setPerfData}){
   const filteredRows=useMemo(()=>{
     if(usingCustomRange&&hasDailyData)return aggregateDaily(customFrom,customTo);
     return aggregateRows(filteredSnaps);
-  },[filteredSnaps,usingCustomRange,hasDailyData,customFrom,customTo,dailyAppts,dailyRevenue,filterDisc,filterSite]);
+  },[filteredSnaps,usingCustomRange,hasDailyData,customFrom,customTo,dailyAppts,dailyRevenue]);
 
   // Compare mode rows
   const compareARows=useMemo(()=>aggregateRows(filterSnaps(compareA)),[data.snapshots,compareA]);
   const compareBRows=useMemo(()=>aggregateRows(filterSnaps(compareB)),[data.snapshots,compareB]);
 
   /* ── Merged staff with period-filtered data ── */
-  const iaByStaff=useMemo(()=>{
-    const dFrom=customFrom||(dateFrom?dateFrom+'-01':null);
-    const dTo=customTo||(dateTo?(()=>{const d=new Date(dateTo+'-01');d.setMonth(d.getMonth()+1);d.setDate(0);return d.toISOString().slice(0,10);})():null);
-    const byStaff={};
-    if(dailyAppts.length>0){
-      dailyAppts.forEach(r=>{
-        if(dFrom&&r.date<dFrom)return;if(dTo&&r.date>dTo)return;
-        const s=staff.find(x=>x.id===r.staff_id);
-        if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
-        if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
-        if(filterSite!=='all'&&s.site!==filterSite)return;
-        if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
-        const ia=r.initial_assessments||0;byStaff[r.staff_id].total+=ia;byStaff[r.staff_id].completed+=(r.completed||0);
-        if(ia>0)byStaff[r.staff_id].dailyBreakdown[r.date]=(byStaff[r.staff_id].dailyBreakdown[r.date]||0)+ia;
-      });
-    }else{
-      data.snapshots.forEach(snap=>{
-        const m=snap.date.slice(0,7);if(dFrom&&m<dFrom.slice(0,7))return;if(dTo&&m>dTo.slice(0,7))return;
-        (snap.rows||[]).forEach(r=>{
-          if(!r.staffId)return;const s=staff.find(x=>x.id===r.staffId);
-          if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
-          if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
-          if(filterSite!=='all'&&s.site!==filterSite)return;
-          const ia=parseFloat(r.initialAssessments)||0;
-          if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:s.name,site:s.site||'',discipline:s.discipline,total:0,completed:0,dailyBreakdown:{}};
-          byStaff[r.staffId].total+=ia;byStaff[r.staffId].completed+=(parseFloat(r.completed)||0);
-        });
-      });
-    }
-    return Object.values(byStaff).map(r=>({...r,iaRate:r.completed>0?Math.round((r.total/r.completed)*100):null}));
-  },[customFrom,customTo,dateFrom,dateTo,filterDisc,filterSite,dailyAppts,data.snapshots,staff]);
-
-  const clinicDailyTrend=useMemo(()=>{
-    const dFrom=customFrom||(dateFrom?dateFrom+'-01':null);
-    const dTo=customTo||(dateTo?(()=>{const d=new Date(dateTo+'-01');d.setMonth(d.getMonth()+1);d.setDate(0);return d.toISOString().slice(0,10);})():null);
-    if(!dailyAppts.length)return[];const byDate={};
-    dailyAppts.forEach(r=>{
-      if(dFrom&&r.date<dFrom)return;if(dTo&&r.date>dTo)return;
-      const s=staff.find(x=>x.id===r.staff_id);
-      if(!s||['mgmt','ops','edu'].includes(s.discipline))return;
-      if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
-      if(filterSite!=='all'&&s.site!==filterSite)return;
-      const ia=r.initial_assessments||0;if(ia>0)byDate[r.date]=(byDate[r.date]||0)+ia;
-    });
-    return Object.entries(byDate).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>({date,count}));
-  },[customFrom,customTo,dateFrom,dateTo,filterDisc,filterSite,dailyAppts,staff]);
-
   const mergedStaff=useMemo(()=>
     staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'
       &&(filterDisc==='all'||s.discipline===filterDisc)
@@ -2933,21 +2832,14 @@ function PerformancePage({staff,perfData,setPerfData}){
       const jr=filteredRows.find(r=>r.staffId===s.id);
       const gvaVal=parseFloat(gvaEdits[s.id]!==undefined?gvaEdits[s.id]:data.gva[s.id])||null;
       const retVal=data.retention?.[s.id]||null;
-      const retFull=(data.retentionFull||{})[s.id]||null;
       return{...s,
         completed:jr?.completed||null,utilization:jr?.utilization||null,
         appointments:jr?.appointments||null,noShows:jr?.noShows||null,
         cancellations:jr?.cancellations||null,rescheduled:jr?.rescheduled||null,
         revenue:jr?.revenue||null,initialAssessments:jr?.initialAssessments||null,
-        gva:gvaVal,retention:retVal,
-        pctReturning:retFull?retFull.pctReturning:retVal,
-        pctRepeatVisits:retFull?.pctRepeatVisits??null,
-        newPatients:retFull?.newPatients??null,
-        returningPatients:retFull?.returningPatients??null,
-        totalPatients:retFull?.totalPatients??null,
-        totalVisits:retFull?.totalVisits??null};
+        gva:gvaVal,retention:retVal};
     })
-  ,[staff,filteredRows,data.gva,data.retention,data.retentionFull,gvaEdits,filterDisc,filterSite]);
+  ,[staff,filteredRows,data.gva,data.retention,gvaEdits]);
 
   const withUtil  =mergedStaff.filter(s=>s.utilization!=null).sort((a,b)=>b.utilization-a.utilization);
   const withAppts =mergedStaff.filter(s=>s.completed!=null).sort((a,b)=>b.completed-a.completed);
@@ -3025,7 +2917,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           <div style={{fontSize:14,color:'#777'}}>Jane data (Appointments + Shift reports) · GVA · Retention · {data.snapshots.length} snapshot{data.snapshots.length!==1?'s':''} stored</div>
         </div>
         <div className="flex aic g5" style={{flexWrap:'wrap'}}>
-          {[['overview','▣ Overview'],['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['appointments','📋 Appointments'],['ia','🩺 Initials'],['gva','📈 GVA'],['retention','🔄 Retention'],['trends','↗ Trends'],['import','📂 Jane Import']].map(([k,l])=>(
+          {[['overview','▣ Overview'],['revenue','💰 Revenue'],['utilization','⏱ Utilization'],['appointments','📋 Appointments'],['gva','📈 GVA'],['retention','🔄 Retention'],['trends','↗ Trends'],['import','📂 Jane Import']].map(([k,l])=>(
             <button key={k} className={`btn btn-sm ${tab===k?'btn-go':'btn-ghost'}`} onClick={()=>setTab(k)}>{l}</button>
           ))}
         </div>
@@ -3041,10 +2933,9 @@ function PerformancePage({staff,perfData,setPerfData}){
       </div>
 
       {/* Filter bar */}
-      {!['import','gva','trends','retention'].includes(tab)&&data.snapshots.length>0&&(
+      {!['import','gva','retention','trends'].includes(tab)&&data.snapshots.length>0&&(
         <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
 
-          {tab!=='retention'&&<>
           {/* Quick period pills */}
           <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
             {[
@@ -3063,11 +2954,10 @@ function PerformancePage({staff,perfData,setPerfData}){
             ))}
           </div>
 
-          </>}
           {/* Divider */}
           <div style={{width:1,height:22,background:'var(--border2)',margin:'0 4px',flexShrink:0}}/>
 
-          {tab!=='retention'&&(
+          {/* Custom date inputs */}
           <div style={{display:'flex',alignItems:'center',gap:6}}>
             <span style={{fontSize:12,color:'#777',flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'1px',textTransform:'uppercase'}}>From</span>
             <input type="date" value={customFrom}
@@ -3081,7 +2971,6 @@ function PerformancePage({staff,perfData,setPerfData}){
             {usingCustomRange&&<button className="btn btn-xs btn-ghost" onClick={()=>{setCustomFrom('');setCustomTo('');}} style={{flexShrink:0}}>✕</button>}
             {usingCustomRange&&customFrom&&customTo&&<span style={{fontSize:13,color:hasDailyData?'var(--lime)':'#F4DB71',flexShrink:0}}>{Math.round((new Date(customTo)-new Date(customFrom))/(86400000))+1}d{!hasDailyData?' ·re-import':''}</span>}
           </div>
-          )}
 
           {/* Divider */}
           <div style={{width:1,height:22,background:'var(--border2)',margin:'0 4px',flexShrink:0}}/>
@@ -3215,71 +3104,6 @@ function PerformancePage({staff,perfData,setPerfData}){
               </div>
             </>);
           })()}
-
-          {/* Retention overview card */}
-          {(retentionSnapshots.length>0||data.retentionClinic)&&(()=>{
-            const snaps=[...retentionSnapshots].sort((a,b)=>a.month.localeCompare(b.month));
-            const latestSnap=snaps.length>0?snaps[snaps.length-1]:null;
-            const clinicData=latestSnap?latestSnap.clinic_data:(data.retentionClinic||{});
-            const missRet=clinicData['Mississauga']?.pctReturning??null;
-            const markRet=clinicData['Markham']?.pctReturning??null;
-            const missRep=clinicData['Mississauga']?.pctRepeatVisits??null;
-            const markRep=clinicData['Markham']?.pctRepeatVisits??null;
-            const missTrend=snaps.map(s=>s.clinic_data?.['Mississauga']?.pctReturning??null);
-            const markTrend=snaps.map(s=>s.clinic_data?.['Markham']?.pctReturning??null);
-            const allVals=[...missTrend,...markTrend].filter(v=>v!=null);
-            const minV=allVals.length?Math.max(0,Math.min(...allVals)-3):70;
-            const maxV=allVals.length?Math.min(100,Math.max(...allVals)+2):100;
-            const W=320,H=50,PAD=4;
-            const toY=v=>PAD+Math.round((1-(v-minV)/(maxV-minV||1))*(H-PAD*2));
-            const toX=(i,len)=>len>1?Math.round(i*(W-1)/(len-1)):W/2;
-            const sparkLine=(pts,color)=>{
-              const valid=pts.map((v,i)=>v!=null?{v,i}:null).filter(Boolean);
-              if(valid.length<2)return null;
-              const d=valid.map(({v,i})=>`${toX(i,pts.length)},${toY(v)}`).join(' ');
-              return <polyline points={d} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round"/>;
-            };
-            const latest=latestSnap?latestSnap.month:data.retentionImportDate;
-            const prev=snaps.length>=2?snaps[snaps.length-2]:null;
-            const missDelta=prev&&prev.clinic_data?.['Mississauga']&&missRet?+(missRet-prev.clinic_data['Mississauga'].pctReturning).toFixed(1):null;
-            return(
-              <div className="perf-slot" style={{gridColumn:'1/-1'}}>
-                <div className="perf-slot-head">
-                  <span className="perf-slot-title" style={{color:'#BB99FF'}}>Member Retention</span>
-                  <div style={{display:'flex',gap:16,fontSize:13,color:'#777',alignItems:'center'}}>
-                    {latest&&<span>{latest}</span>}
-                    {snaps.length>0&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('retention')}>View all →</button>}
-                  </div>
-                </div>
-                <div style={{padding:'12px 16px'}}>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:snaps.length>=2?12:0}}>
-                    {[['Mississauga',missRet,missRep,missDelta,'#CAE8C1'],['Markham',markRet,markRep,null,'#44CCAA']].map(([loc,ret,rep,delta,color])=>(
-                      <div key={loc} style={{background:'var(--surface3)',borderRadius:5,padding:'10px 14px'}}>
-                        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:6}}>{loc}</div>
-                        <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:4}}>
-                          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:ret!=null?(ret>=70?'#CAE8C1':ret>=55?'#F4DB71':'#E05252'):'#888',lineHeight:1}}>{ret!=null?ret+'%':'—'}</span>
-                          <span style={{fontSize:12,color:'#666'}}>returning</span>
-                          {delta!=null&&<span style={{fontSize:12,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777',marginLeft:4}}>{delta>0?'+':''}{delta}%</span>}
-                        </div>
-                        <div style={{fontSize:12,color:'#555'}}>Repeat visits: <strong style={{color:rep>=45?color:rep>=25?'#F4DB71':'#E05252'}}>{rep!=null?rep+'%':'—'}</strong></div>
-                      </div>
-                    ))}
-                  </div>
-                  {snaps.length>=2&&(
-                    <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{display:'block',overflow:'visible'}}>
-                      {sparkLine(missTrend,'#CAE8C1')}
-                      {sparkLine(markTrend,'#44CCAA')}
-                      {missTrend.map((v,i)=>v!=null&&<circle key={i} cx={toX(i,missTrend.length)} cy={toY(v)} r="2.5" fill="#CAE8C1"/>)}
-                      {markTrend.map((v,i)=>v!=null&&<circle key={i} cx={toX(i,markTrend.length)} cy={toY(v)} r="2.5" fill="#44CCAA"/>)}
-                      {snaps.map((_,i)=>(
-                        <text key={i} x={toX(i,snaps.length)} y={H} textAnchor="middle" fontSize="9" fill="#444">{snaps[i].month.slice(5)}</text>
-                      ))}
-                    </svg>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
         </div>
       )}
 
@@ -3350,22 +3174,15 @@ function PerformancePage({staff,perfData,setPerfData}){
                 </div>);
               })}
             </div>);
-          })():(()=>{
-            const revSorted=[...withRev].sort((a,b)=>{const av=a[revSort.k]??-1,bv=b[revSort.k]??-1;if(typeof av==='string')return revSort.d==='desc'?av.localeCompare(bv):bv.localeCompare(av);return revSort.d==='desc'?bv-av:av-bv;});
-            const sortRevBy=(k)=>setRevSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
-            const revTh=(label,k,align='right')=>{const active=revSort.k===k;return(<th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',padding:'8px 12px',whiteSpace:'nowrap'}} onClick={()=>sortRevBy(k)}>{label}{active?(revSort.d==='desc'?' ▼':' ▲'):''}</th>);};
-            return revSorted.length?(
-              <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{revTh('Practitioner','name','left')}{revTh('Revenue','revenue')}{revTh('Site','site')}</tr></thead>
-                <tbody>{revSorted.map(s=>(<tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
-                  <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div></div></td>
-                  <td style={{padding:'9px 12px',textAlign:'right'}}><div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:80,height:4,background:'var(--surface3)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:'#CAE8C1',width:(s.revenue/maxRev*100)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(s.revenue)}</span></div></td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#777',fontSize:13}}>{s.site}</td>
-                </tr>))}</tbody>
-                <tfoot><tr style={{borderTop:'2px solid var(--border)',background:'var(--surface2)'}}><td style={{padding:'8px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777'}}>Total</td><td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(totalRev)}</td><td/></tr></tfoot>
-              </table></div>
-            ):<div className="empty" style={{padding:40}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue data.</p></div>;
-          })()}
+          })():(<div className="perf-slot-body">{withRev.length?withRev.map(s=>(
+            <div key={s.id} className="perf-bar-row" style={{padding:'9px 0',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+              <div style={{minWidth:180}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777',marginTop:2}}>{s.site}</div></div>
+              <div className="perf-bar-track" style={{height:6}}><div className="perf-bar-fill" style={{width:(s.revenue/maxRev*100)+'%',background:'#CAE8C1'}}/></div>
+              <div style={{display:'flex',alignItems:'center',gap:8,minWidth:120,justifyContent:'flex-end'}}>
+                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:'#CAE8C1'}}>{fmtRev(s.revenue)}</span>
+              </div>
+            </div>
+          )):<div className="empty" style={{padding:40}}><div className="empty-ico">💰</div><p>Import a Sales CSV to see revenue data.</p></div>}</div>)}
         </div>
       )}
 
@@ -3420,24 +3237,42 @@ function PerformancePage({staff,perfData,setPerfData}){
               </div>);
             })}</div>);
           })():(()=>{
-            const allUtilRows=data.snapshots.flatMap(sn=>(sn.rows||[]).filter(r=>r.utilization!=null)).reduce((acc,r)=>{if(!acc[r.staffId]||r.utilization>0)acc[r.staffId]=r;return acc;},{});
-            const fallbackStaff=Object.values(allUtilRows).map(r=>{const s=staff.find(st=>st.id===r.staffId);return s?{...s,utilization:parseFloat(r.utilization)||null}:null;}).filter(Boolean).filter(s=>s.utilization!=null);
-            const baseList=withUtil.length>0?withUtil:fallbackStaff;
+            // Always show utilization — fall back to all snapshots if filtered period has none
+            const allUtilRows=data.snapshots
+              .flatMap(sn=>(sn.rows||[]).filter(r=>r.utilization!=null))
+              .reduce((acc,r)=>{
+                if(!acc[r.staffId]||r.utilization>0)acc[r.staffId]=r;
+                return acc;
+              },{});
+            const fallbackStaff=Object.values(allUtilRows).map(r=>{
+              const s=staff.find(st=>st.id===r.staffId);
+              return s?{...s,utilization:parseFloat(r.utilization)||null}:null;
+            }).filter(Boolean).filter(s=>s.utilization!=null).sort((a,b)=>b.utilization-a.utilization);
+            const showing=withUtil.length>0?withUtil:fallbackStaff;
             const isFiltered=periodFilter!=='all'&&withUtil.length===0&&fallbackStaff.length>0;
-            const utilSorted=[...baseList].sort((a,b)=>{const av=a[utilSort.k]??-1,bv=b[utilSort.k]??-1;if(typeof av==='string')return utilSort.d==='desc'?av.localeCompare(bv):bv.localeCompare(av);return utilSort.d==='desc'?bv-av:av-bv;});
-            const sortUtilBy=(k)=>setUtilSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
-            const utTh=(label,k,align='right')=>{const active=utilSort.k===k;return(<th key={k} style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',padding:'8px 12px',whiteSpace:'nowrap'}} onClick={()=>sortUtilBy(k)}>{label}{active?(utilSort.d==='desc'?' ▼':' ▲'):''}</th>);};
-            return(<div>
-              {isFiltered&&<div style={{padding:'8px 14px',background:'rgba(244,219,113,.06)',border:'1px solid rgba(244,219,113,.18)',borderRadius:5,fontSize:14,color:'#F4DB71',marginBottom:8}}>No shift report for this period — showing most recent available utilization.</div>}
-              {utilSorted.length?(<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{utTh('Practitioner','name','left')}{utTh('Utilization %','utilization')}{utTh('Site','site')}</tr></thead>
-                <tbody>{utilSorted.map(s=>{const c=s.utilization>=85?'#CAE8C1':s.utilization>=70?'#44ccaa':s.utilization>50?'#F4DB71':'#E05252';const lbl=s.utilization>=85?'Strong':s.utilization>=70?'Good':s.utilization>50?'Fair':'Low';return(<tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
-                  <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
-                  <td style={{padding:'9px 12px',textAlign:'right'}}><div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:80,height:4,background:'var(--surface3)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:c,width:Math.min(100,s.utilization)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:c}}>{s.utilization}%</span><span style={{fontSize:13,background:c+'22',color:c,border:'1px solid '+c+'44',borderRadius:3,padding:'2px 5px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{lbl}</span></div></td>
-                  <td style={{padding:'9px 12px',textAlign:'right',color:'#777',fontSize:13}}>{s.site}</td>
-                </tr>);})}</tbody>
-              </table></div>):<div className="empty" style={{padding:40}}><div className="empty-ico">⏱</div><p>Import a Shift Report CSV to see utilization data.</p></div>}
-            </div>);
+            return(
+              <div>
+                {isFiltered&&(
+                  <div style={{padding:'8px 14px',background:'rgba(244,219,113,.06)',border:'1px solid rgba(244,219,113,.18)',borderRadius:5,fontSize:14,color:'#F4DB71',marginBottom:8}}>
+                    No shift report for this period — showing most recent available utilization. Import a monthly Shift Report to track per-period utilization.
+                  </div>
+                )}
+                <div className="perf-slot-body">{showing.length?showing.map(s=>{
+                  const c=s.utilization>=85?'#CAE8C1':s.utilization>=70?'#44ccaa':s.utilization>50?'#F4DB71':'#E05252';
+                  const lbl=s.utilization>=85?'Strong':s.utilization>=70?'Good':s.utilization>50?'Fair':'Low';
+                  return(
+                    <div key={s.id} className="perf-bar-row" style={{padding:'9px 0',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+                      <div style={{minWidth:180}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777',marginTop:2}}>{s.site}</div></div>
+                      <div className="perf-bar-track" style={{height:6}}><div className="perf-bar-fill" style={{width:s.utilization+'%',background:c}}/></div>
+                      <div style={{display:'flex',alignItems:'center',gap:8,minWidth:130,justifyContent:'flex-end'}}>
+                        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:c}}>{s.utilization}%</span>
+                        <span style={{fontSize:13,background:c+'22',color:c,border:'1px solid '+c+'44',borderRadius:3,padding:'2px 5px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{lbl}</span>
+                      </div>
+                    </div>
+                  );
+                }):<div className="empty" style={{padding:40}}><div className="empty-ico">⏱</div><p>Import a Shift Report CSV to see utilization data.</p></div>}</div>
+              </div>
+            );
           })()}
         </div>
       )}
@@ -3487,196 +3322,30 @@ function PerformancePage({staff,perfData,setPerfData}){
                 </tr>);
               })}</tbody>
             </table></div>);
-          })():(()=>{
-            const apptSorted=[...withAppts].sort((a,b)=>{const av=a[apptSort.k]??-1,bv=b[apptSort.k]??-1;if(typeof av==='string')return apptSort.d==='desc'?av.localeCompare(bv):bv.localeCompare(av);return apptSort.d==='desc'?bv-av:av-bv;});
-            const sortApptBy=(k)=>setApptSort(p=>({k,d:p.k===k&&p.d==='desc'?'asc':'desc'}));
-            const apTh=(label,k,align='right')=>{const active=apptSort.k===k;return(<th key={k} style={{padding:'8px 10px',textAlign:align,fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',textTransform:'uppercase',color:active?'var(--lime)':'#999',fontWeight:600,cursor:'pointer',userSelect:'none',whiteSpace:'nowrap'}} onClick={()=>sortApptBy(k)}>{label}{active?(apptSort.d==='desc'?' ▼':' ▲'):''}</th>);};
-            return apptSorted.length?(<div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-              <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{apTh('Practitioner','name','left')}{apTh('Completed','completed')}{apTh('Initial Assessments','initialAssessments')}{apTh('No-Shows','noShows')}{apTh('Cancellations','cancellations')}{apTh('Rescheduled','rescheduled')}{apTh('Cancel Rate','cancelRate')}</tr></thead>
-              <tbody>{apptSorted.map(s=>{
+          })():(<div className="perf-slot-body">{withAppts.length?(
+            <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
+              <thead><tr style={{borderBottom:'1px solid var(--border)'}}>{['Practitioner','Completed','Initial Assessments','No-Shows','Cancellations','Rescheduled','Cancel Rate'].map(h=><th key={h} style={{padding:'8px 10px',textAlign:h==='Practitioner'?'left':'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',textTransform:'uppercase',color:'#999',fontWeight:600}}>{h}</th>)}</tr></thead>
+              <tbody>{withAppts.map(s=>{
                 const total=(s.completed||0)+(s.noShows||0)+(s.cancellations||0)+(s.rescheduled||0);
                 const cancelRate=total>0?Math.round(((s.cancellations||0)/total)*100):0;
-                return(<tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
-                  <td style={{padding:'8px 10px'}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777'}}>{s.site}</div></td>
-                  <td style={{padding:'8px 10px',textAlign:'right',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.completed||0}</td>
-                  <td style={{padding:'8px 10px',textAlign:'right',color:'#BB99FF',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.initialAssessments||0}</td>
-                  <td style={{padding:'8px 10px',textAlign:'right',color:(s.noShows||0)>8?'#E05252':'#888'}}>{s.noShows||0}</td>
-                  <td style={{padding:'8px 10px',textAlign:'right',color:(s.cancellations||0)>15?'#F4DB71':'#888'}}>{s.cancellations||0}</td>
-                  <td style={{padding:'8px 10px',textAlign:'right',color:'#888'}}>{s.rescheduled||0}</td>
-                  <td style={{padding:'8px 10px',textAlign:'right',color:cancelRate>15?'#E05252':cancelRate>10?'#F4DB71':'#44ccaa',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{cancelRate}%</td>
-                </tr>);
+                return(
+                  <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer'}} onClick={()=>{setTrendStaff(s);setTab('trends');}}>
+                    <td style={{padding:'8px 10px'}}><div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:14,color:'#777'}}>{s.site}</div></td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:'#CAE8C1',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.completed||0}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:'#BB99FF',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:15}}>{s.initialAssessments||0}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:(s.noShows||0)>8?'#E05252':'#888'}}>{s.noShows||0}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:(s.cancellations||0)>15?'#F4DB71':'#888'}}>{s.cancellations||0}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:'#888'}}>{s.rescheduled||0}</td>
+                    <td style={{padding:'8px 10px',textAlign:'right',color:cancelRate>15?'#E05252':cancelRate>10?'#F4DB71':'#44ccaa',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{cancelRate}%</td>
+                  </tr>
+                );
               })}</tbody>
-            </table></div>):<div className="empty" style={{padding:40}}><div className="empty-ico">📋</div><p>Import an Appointments CSV to see per-practitioner breakdown.</p></div>;
-          })()}
+            </table></div>
+          ):<div className="empty" style={{padding:40}}><div className="empty-ico">📋</div><p>Import an Appointments CSV to see per-practitioner breakdown.</p></div>}</div>)}
         </div>
       )}
 
-
-            {/* ── INITIAL ASSESSMENTS ── */}
-      {tab==='ia'&&(
-        <div>
-          {(()=>{
-            const toggleIaSort=(key)=>{if(iaSortKey===key)setIaSortDir(d=>d==='desc'?'asc':'desc');else{setIaSortKey(key);setIaSortDir('desc');}};
-            const iaSorted=[...iaByStaff].sort((a,b)=>{const av=a[iaSortKey]??-1,bv=b[iaSortKey]??-1;if(typeof av==='string')return iaSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);return iaSortDir==='desc'?bv-av:av-bv;});
-            const totalIA=iaSorted.reduce((a,s)=>a+s.total,0);
-            const totalCompleted=iaSorted.reduce((a,s)=>a+s.completed,0);
-            const avgIA=iaSorted.filter(s=>s.total>0).length?(totalIA/iaSorted.filter(s=>s.total>0).length).toFixed(1):0;
-            const maxIA=Math.max(...iaSorted.map(s=>s.total),1);
-            const hasDailyData=dailyAppts.length>0;
-            const IASortTh=({label,k,align='right'})=>{
-              const active=iaSortKey===k;
-              return(<th style={{textAlign:align,cursor:'pointer',userSelect:'none',color:active?'var(--lime)':'#888',whiteSpace:'nowrap',padding:'8px 12px'}} onClick={()=>toggleIaSort(k)}>{label}{active?(iaSortDir==='desc'?' ▼':' ▲'):''}</th>);
-            };
-            const selectedData=iaSelectedStaff?iaSorted.find(s=>s.staffId===iaSelectedStaff):null;
-            const rangeLabel=(()=>{
-              if(customFrom||customTo)return `${customFrom||'…'} → ${customTo||'…'}`;
-              if(dateFrom===dateTo)return new Date(dateFrom+'-15').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
-              return `${new Date(dateFrom+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})} – ${new Date(dateTo+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'})}`;
-            })();
-            return(
-              <div>
-                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
-                  <div>
-                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#aaa',marginBottom:2}}>Initial Assessments</div>
-                    <div style={{fontSize:14,color:'#777'}}>
-                      {hasDailyData?'Daily granular data':'Monthly snapshot'} · {rangeLabel}
-                      {filterDisc!=='all'&&<span style={{marginLeft:6,color:'var(--lime)'}}>· {filterDisc}</span>}
-                      {filterSite!=='all'&&<span style={{marginLeft:6,color:'var(--lime)'}}>· {filterSite}</span>}
-                      {!hasDailyData&&<span style={{marginLeft:8,color:'#F4DB71',fontSize:13}}>⚠ Re-import Appointments CSV for day-level tracking</span>}
-                    </div>
-                  </div>
-                  <div style={{display:'flex',gap:6}}>
-                    <button className={`btn btn-sm ${iaView==='summary'?'btn-go':'btn-ghost'}`} onClick={()=>setIaView('summary')}>Summary</button>
-                    {hasDailyData&&<button className={`btn btn-sm ${iaView==='daily'?'btn-go':'btn-ghost'}`} onClick={()=>setIaView('daily')}>Daily Trend</button>}
-                  </div>
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
-                  {[
-                    {label:'Total IAs',val:totalIA||'—',color:'#BB99FF'},
-                    {label:'Avg per Practitioner',val:totalIA>0?avgIA:'—',color:'#CAE8C1'},
-                    {label:'IA Rate',val:totalCompleted>0?(totalIA/totalCompleted*100).toFixed(1)+'%':'—',color:'#F4DB71',sub:'of completed visits'},
-                    {label:'Practitioners w/ IAs',val:iaSorted.filter(s=>s.total>0).length+' / '+iaSorted.length,color:'#6B9FD4'},
-                  ].map(s=>(<div key={s.label} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'12px 14px'}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#999',marginBottom:5}}>{s.label}</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:s.color,lineHeight:1}}>{s.val}</div>{s.sub&&<div style={{fontSize:13,color:'#777',marginTop:3}}>{s.sub}</div>}</div>))}
-                </div>
-                {iaView==='daily'&&hasDailyData&&(
-                  <div className="perf-slot" style={{marginBottom:14}}>
-                    <div className="perf-slot-head">
-                      <span className="perf-slot-title" style={{color:'#BB99FF'}}>Clinic-Wide Daily Initial Assessments</span>
-                      {clinicDailyTrend.length>0&&<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:'#BB99FF'}}>{clinicDailyTrend.reduce((a,d)=>a+d.count,0)} total</span>}
-                    </div>
-                    <div style={{padding:'8px 16px 16px'}}>
-                      {clinicDailyTrend.length<1?(<div style={{fontSize:14,color:'#777',padding:'16px 0',textAlign:'center',fontStyle:'italic'}}>No initial assessments found for this period.</div>):(()=>{
-                        const vals=clinicDailyTrend.map(d=>d.count);
-                        const maxV=Math.max(...vals,1);
-                        const W=600,H=120,PADX=32,PADY=12,BOT=28;
-                        const toY=v=>PADY+Math.round((1-v/maxV)*(H-PADY*2));
-                        const spacing=(W-PADX*2)/Math.max(clinicDailyTrend.length,1);
-                        const toX=(i)=>PADX+Math.round(i*spacing+spacing/2);
-                        const barW=Math.max(4,Math.floor(spacing*0.7));
-                        const dailyAvg=vals.reduce((a,b)=>a+b,0)/vals.length;
-                        const avgY=toY(dailyAvg);
-                        return(
-                          <div>
-                            <div style={{display:'flex',gap:20,marginBottom:10}}>
-                              <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:2}}>Daily Avg</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#BB99FF'}}>{dailyAvg.toFixed(1)}</span></div>
-                              <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:2}}>Peak Day</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#CAE8C1'}}>{Math.max(...vals)}</span><span style={{fontSize:13,color:'#888',marginLeft:6}}>{clinicDailyTrend[vals.indexOf(Math.max(...vals))]?.date}</span></div>
-                              <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:2}}>Days w/ IAs</div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#F4DB71'}}>{vals.length}</span></div>
-                            </div>
-                            <svg width="100%" viewBox={`0 0 ${W} ${H+BOT}`} style={{display:'block',overflow:'visible'}}>
-                              {[0,Math.round(maxV/2),maxV].map((v,i)=>(<g key={i}><line x1={PADX} y1={toY(v)} x2={W-PADX} y2={toY(v)} stroke="#1e1e1e" strokeWidth="1"/><text x={PADX-5} y={toY(v)+4} textAnchor="end" fontSize="11" fill="#666">{v}</text></g>))}
-                              <line x1={PADX} y1={avgY} x2={W-PADX} y2={avgY} stroke="#BB99FF" strokeWidth="1.5" strokeDasharray="4,3" opacity="0.5"/>
-                              {clinicDailyTrend.map((d,i)=>{
-                                const x=toX(i);const y=toY(d.count);const bh=H-PADY-y+PADY/2;const isMax=d.count===Math.max(...vals);
-                                const showLabel=clinicDailyTrend.length<=14||(i%Math.ceil(clinicDailyTrend.length/10)===0)||i===clinicDailyTrend.length-1;
-                                return(<g key={d.date}><rect x={x-barW/2} y={y} width={barW} height={Math.max(bh,2)} fill={isMax?'#CAE8C1':'#BB99FF'} opacity="0.85" rx="2"/><text x={x} y={y-4} textAnchor="middle" fontSize="11" fill={isMax?'#CAE8C1':'#BB99FF'} fontWeight="700">{d.count}</text>{showLabel&&<text x={x} y={H+BOT-4} textAnchor="middle" fontSize="10" fill="#777">{new Date(d.date+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}</text>}</g>);
-                              })}
-                              <line x1={PADX} y1={H} x2={W-PADX} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
-                            </svg>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                )}
-                {iaView==='summary'&&(
-                  <div className="perf-slot">
-                    <div className="perf-slot-head">
-                      <span className="perf-slot-title" style={{color:'#BB99FF'}}>Initial Assessments by Practitioner</span>
-                      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,color:'#BB99FF',fontWeight:800}}>{totalIA} total</span>
-                    </div>
-                    {iaSorted.length===0?(
-                      <div className="empty" style={{padding:40}}><div className="empty-ico">🩺</div><p>No initial assessment data for this period. Import Appointments CSV or adjust your filters.</p></div>
-                    ):(
-                      <div>
-                        <div style={{overflowX:'auto'}}>
-                          <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                            <thead>
-                              <tr style={{borderBottom:'1px solid var(--border)'}}>
-                                <IASortTh label="Practitioner" k="name" align="left"/>
-                                <IASortTh label="Initial Assessments" k="total"/>
-                                <IASortTh label="Completed Visits" k="completed"/>
-                                <IASortTh label="IA Rate %" k="iaRate"/>
-                                <IASortTh label="Site" k="site"/>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {iaSorted.map(s=>{
-                                const pct=s.total>0?(s.total/maxIA*100):0;
-                                const rateColor=s.iaRate!=null?(s.iaRate>=15?'#CAE8C1':s.iaRate>=10?'#44CCAA':s.iaRate>=5?'#F4DB71':'#aaa'):'#555';
-                                return(
-                                  <tr key={s.staffId} style={{borderBottom:'1px solid rgba(50,50,50,.5)',cursor:'pointer',background:iaSelectedStaff===s.staffId?'rgba(187,153,255,.04)':'transparent'}} onClick={()=>setIaSelectedStaff(iaSelectedStaff===s.staffId?null:s.staffId)}>
-                                    <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{DISC.find(d=>d.id===s.discipline)?.abbr||s.discipline}</div></div></div></td>
-                                    <td style={{padding:'9px 12px',textAlign:'right'}}><div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:80,height:5,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:'#BB99FF',width:pct+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,color:s.total>0?'#BB99FF':'#555',minWidth:28,textAlign:'right'}}>{s.total||0}</span></div></td>
-                                    <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa'}}>{s.completed||0}</td>
-                                    <td style={{padding:'9px 12px',textAlign:'right'}}>{s.iaRate!=null?(<span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:rateColor,background:rateColor+'18',border:'1px solid '+rateColor+'33',borderRadius:3,padding:'2px 7px'}}>{s.iaRate}%</span>):<span style={{color:'#555'}}>—</span>}</td>
-                                    <td style={{padding:'9px 12px',textAlign:'right',color:'#777',fontSize:13}}>{s.site}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                            <tfoot>
-                              <tr style={{borderTop:'2px solid var(--border)',background:'var(--surface2)'}}>
-                                <td style={{padding:'8px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777'}}>Total</td>
-                                <td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#BB99FF'}}>{totalIA}</td>
-                                <td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:'#aaa'}}>{totalCompleted}</td>
-                                <td style={{padding:'8px 12px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:'#F4DB71'}}>{totalCompleted>0?(totalIA/totalCompleted*100).toFixed(1)+'%':'—'}</td>
-                                <td/>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                        {selectedData&&hasDailyData&&Object.keys(selectedData.dailyBreakdown).length>0&&(
-                          <div style={{borderTop:'1px solid var(--border)',padding:'16px',background:'rgba(187,153,255,.03)'}}>
-                            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#BB99FF',marginBottom:12,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                              {selectedData.name} — Daily Breakdown
-                              <button className="btn btn-ghost btn-xs" onClick={()=>setIaSelectedStaff(null)}>✕</button>
-                            </div>
-                            <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
-                              {Object.entries(selectedData.dailyBreakdown).sort((a,b)=>a[0].localeCompare(b[0])).map(([date,count])=>(
-                                <div key={date} style={{background:'rgba(187,153,255,.1)',border:'1px solid rgba(187,153,255,.25)',borderRadius:4,padding:'6px 10px',textAlign:'center',minWidth:70}}>
-                                  <div style={{fontSize:13,color:'#999',marginBottom:2}}>{new Date(date+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}</div>
-                                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#BB99FF'}}>{count}</div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {!hasDailyData&&iaSorted.length===0&&(
-                  <div style={{background:'rgba(244,219,113,.05)',border:'1px solid rgba(244,219,113,.15)',borderRadius:6,padding:'14px 18px',fontSize:14,color:'#F4DB71'}}>
-                    <strong>Tip:</strong> Import an Appointments CSV in the Jane Import tab. Initial assessments are auto-detected from treatment names starting with "Initial".
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </div>
-      )}
-
-{/* ── GVA ── */}
+      {/* ── GVA ── */}
       {tab==='gva'&&(
         <div>
           <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:14,color:'#aaa',lineHeight:1.7}}>
@@ -3727,268 +3396,80 @@ function PerformancePage({staff,perfData,setPerfData}){
         </div>
       )}
 
-                                    {/* ── RETENTION ── */}
+      {/* ── RETENTION ── */}
       {tab==='retention'&&(
         <div>
-          {/* ── Retention-specific filter bar ── */}
-          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 14px',marginBottom:14}}>
-            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
-              {/* Period pills */}
-              {[['latest','Latest'],['1m','Last Month'],['3m','Last 3 Mo'],['6m','Last 6 Mo'],['all','All Time']].map(([v,l])=>(
-                <button key={v} className={`btn btn-sm ${retPeriod===v&&!retSelectedMonth?'btn-go':'btn-ghost'}`}
-                  onClick={()=>{setRetPeriod(v);setRetSelectedMonth('');}}>
-                  {l}
-                </button>
-              ))}
-              <div style={{width:1,height:22,background:'var(--border2)',margin:'0 4px',flexShrink:0}}/>
-              {/* Specific month picker */}
-              <select value={retSelectedMonth} onChange={e=>{setRetSelectedMonth(e.target.value);if(e.target.value)setRetPeriod('');}}
-                style={{background:'var(--surface3)',border:'1px solid '+(retSelectedMonth?'var(--go)':'var(--border2)'),borderRadius:5,color:retSelectedMonth?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer'}}>
-                <option value="">Specific Month…</option>
-                {[...retentionSnapshots].sort((a,b)=>b.month.localeCompare(a.month)).map(s=>(
-                  <option key={s.month} value={s.month}>{s.month}</option>
-                ))}
-              </select>
+          <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:14,color:'#aaa',lineHeight:1.7}}>
+            <strong style={{color:'var(--lime)'}}>Retention %</strong> — Manually enter each practitioner's member retention rate. Pull this from Jane's Member Retention report (Reports → Member Retention → filter by staff). Target: ≥75% good · ≥85% strong.
+          </div>
+          <div className="perf-slot">
+            <div className="perf-slot-head">
+              <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — Manual Entry</span>
+              <button className="btn btn-lime btn-sm" onClick={async()=>{
+                const nr={...data.retention||{}};
+                const entries=Object.entries(retentionEdits);
+                entries.forEach(([k,v])=>{if(v!=='')nr[k]=parseFloat(v)||0;});
+                save({...data,retention:nr});
+                for(const[staffId,val] of entries){
+                  if(val!=='')await saveRetentionToSB(staffId,parseFloat(val)||0,'management');
+                }
+                setRetentionEdits({});setRetSaved(true);
+                setTimeout(()=>setRetSaved(false),2000);
+              }} disabled={!Object.keys(retentionEdits).length}>{retSaved?'✓ Saved':'Save Retention'}</button>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-              {/* Discipline */}
-              <select value={retFilterDisc} onChange={e=>setRetFilterDisc(e.target.value)}
-                style={{background:'var(--surface3)',border:'1px solid '+(retFilterDisc!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:retFilterDisc!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:160}}>
-                <option value="all">All Disciplines</option>
-                {[...new Set(staff.filter(s=>s.discipline&&!['mgmt','ops','edu'].includes(s.discipline)).map(s=>s.discipline))].sort().map(d=>(
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-              {/* Location */}
-              <select value={retFilterSite} onChange={e=>setRetFilterSite(e.target.value)}
-                style={{background:'var(--surface3)',border:'1px solid '+(retFilterSite!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:retFilterSite!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:160}}>
-                <option value="all">All Locations</option>
-                {[...new Set(staff.filter(s=>s.site).map(s=>s.site))].sort().map(s=>(
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              {(retFilterDisc!=='all'||retFilterSite!=='all'||retSelectedMonth)&&(
-                <button className="btn btn-ghost btn-sm" onClick={()=>{setRetFilterDisc('all');setRetFilterSite('all');setRetSelectedMonth('');setRetPeriod('latest');}}>Clear filters</button>
-              )}
+            <div className="perf-slot-body">
+              {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{
+                const editing=retentionEdits[s.id]!==undefined;
+                const val=editing?retentionEdits[s.id]:((data.retention||{})[s.id]||'');
+                const num=parseFloat(val)||null;
+                const c=num?num>=85?'#CAE8C1':num>=75?'#44ccaa':num>=65?'#F4DB71':'#E05252':'#555';
+                const lbl=num?num>=85?'Strong':num>=70?'Good':num>50?'Fair':'Low':'';
+                return(
+                  <div key={s.id} className="gva-input-row">
+                    <div style={{flex:1,display:'flex',alignItems:'center',gap:10}}>
+                      <Av name={s.name} sz="sm"/>
+                      <div>
+                        <div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div>
+                        <div style={{fontSize:14,color:'#777'}}>{s.site} · Target ≥75%</div>
+                      </div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                      {num&&<div style={{height:4,width:60,background:'var(--surface3)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:c,width:Math.min(100,num)+'%'}}/></div>}
+                      <input type="number" min="0" max="100" step="0.1" value={val} placeholder="—"
+                        onChange={e=>setRetentionEdits(p=>({...p,[s.id]:e.target.value}))}
+                        style={{width:62,textAlign:'center',background:'var(--surface3)',border:'1px solid',borderColor:editing?'var(--go)':'var(--border2)',borderRadius:5,color:num?c:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,padding:'5px 0',outline:'none'}}/>
+                      {num&&<span style={{fontSize:15,background:c+'18',color:c,border:'1px solid '+c+'33',borderRadius:3,padding:'2px 7px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,minWidth:64,textAlign:'center'}}>{lbl}</span>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-
-
-          {importMsg&&tab==='retention'&&(
-            <div style={{marginBottom:14,padding:'9px 13px',borderRadius:5,fontSize:14,
-              background:importMsg.type==='success'?'rgba(68,204,170,.08)':importMsg.type==='info'?'rgba(107,159,212,.08)':'rgba(224,82,82,.08)',
-              border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':importMsg.type==='info'?'rgba(107,159,212,.2)':'rgba(224,82,82,.2)'}`,
-              color:importMsg.type==='success'?'#44CCAA':importMsg.type==='info'?'#6B9FD4':'#E05252'}}>
-              {importMsg.msg}
-            </div>
-          )}
-
-
-          {(()=>{
-            // Snapshot selection — runs on every render (state changes trigger re-render)
-            const _snaps=[...retentionSnapshots].sort((a,b)=>a.month.localeCompare(b.month));
-            // Filter snaps by period
-            let _filteredSnaps=_snaps;
-            if(retSelectedMonth){
-              _filteredSnaps=_snaps.filter(s=>s.month===retSelectedMonth);
-            }else if(retPeriod!=='all'){
-              const _now=new Date();
-              const _mb=retPeriod==='latest'?0:retPeriod==='1m'?1:retPeriod==='3m'?3:retPeriod==='6m'?6:999;
-              if(retPeriod==='latest'){
-                _filteredSnaps=_snaps.slice(-1);
-              }else{
-                const _cut=new Date(_now);_cut.setMonth(_cut.getMonth()-_mb);
-                const _cutM=_cut.toISOString().slice(0,7);
-                _filteredSnaps=_snaps.filter(s=>s.month>=_cutM);
-              }
-            }
-            if(_filteredSnaps.length===0)_filteredSnaps=_snaps.slice(-1);
-            // Aggregate: average each staff member's values across all filtered snapshots
-            const _snapFull={};
-            const _staffIds=new Set(_filteredSnaps.flatMap(s=>Object.keys(s.staff_data||{})));
-            _staffIds.forEach(id=>{
-              const vals=_filteredSnaps.map(s=>(s.staff_data||{})[id]).filter(Boolean);
-              if(!vals.length)return;
-              _snapFull[id]={
-                pctReturning:Math.round(vals.reduce((a,v)=>a+v.pctReturning,0)/vals.length*100)/100,
-                pctRepeatVisits:Math.round(vals.reduce((a,v)=>a+(v.pctRepeatVisits||0),0)/vals.length*100)/100,
-                newPatients:Math.round(vals.reduce((a,v)=>a+(v.newPatients||0),0)/vals.length),
-                returningPatients:Math.round(vals.reduce((a,v)=>a+(v.returningPatients||0),0)/vals.length),
-                totalPatients:Math.round(vals.reduce((a,v)=>a+(v.totalPatients||0),0)/vals.length),
-                totalVisits:Math.round(vals.reduce((a,v)=>a+(v.totalVisits||0),0)/vals.length),
-              };
-            });
-            // Aggregate clinic data
-            const _snapClinic={};
-            ['Mississauga','Markham'].forEach(loc=>{
-              const vals=_filteredSnaps.map(s=>(s.clinic_data||{})[loc]).filter(Boolean);
-              if(!vals.length)return;
-              _snapClinic[loc]={
-                pctReturning:Math.round(vals.reduce((a,v)=>a+v.pctReturning,0)/vals.length*100)/100,
-                pctRepeatVisits:Math.round(vals.reduce((a,v)=>a+(v.pctRepeatVisits||0),0)/vals.length*100)/100,
-                newPatients:Math.round(vals.reduce((a,v)=>a+(v.newPatients||0),0)/vals.length),
-                returningPatients:Math.round(vals.reduce((a,v)=>a+(v.returningPatients||0),0)/vals.length),
-                totalVisits:Math.round(vals.reduce((a,v)=>a+(v.totalVisits||0),0)/vals.length),
-              };
-            });
-            const _snapMonth=retSelectedMonth||(
-              _filteredSnaps.length===1?_filteredSnaps[0].month:
-              `${_filteredSnaps[0].month} – ${_filteredSnaps[_filteredSnaps.length-1].month} (${_filteredSnaps.length} mo avg)`
-            );
-            const _retRows=staff
-              .filter(s=>!['mgmt','ops','edu'].includes(s.discipline)
-                &&(retFilterDisc==='all'||s.discipline===retFilterDisc)
-                &&(retFilterSite==='all'||s.site===retFilterSite))
-              .map(s=>{
-                const d=_snapFull[s.id]||null;
-                const pctRet=(data.retention||{})[s.id]||null;
-                return{...s,
-                  pctReturning:d?d.pctReturning:pctRet,
-                  pctRepeatVisits:d?.pctRepeatVisits??null,
-                  newPatients:d?.newPatients??null,
-                  returningPatients:d?.returningPatients??null,
-                  totalPatients:d?.totalPatients??null,
-                  totalVisits:d?.totalVisits??null};
-              })
-              .filter(s=>s.pctReturning!==null||s.pctRepeatVisits!==null)
-              .sort((a,b)=>{
-                const av=a[retSortKey]??-1,bv=b[retSortKey]??-1;
-                if(typeof av==='string')return retSortDir==='desc'?av.localeCompare(bv):bv.localeCompare(av);
-                return retSortDir==='desc'?bv-av:av-bv;
-              });
-            return(
-              <div>
-                {Object.keys(_snapClinic).length>0&&(
-                  <div>
-                    {_snapMonth&&<div style={{fontSize:12,color:'#555',marginBottom:6,textAlign:'right'}}>Showing: {_snapMonth}</div>}
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:10,marginBottom:16}}>
-                      {Object.entries(_snapClinic).map(([loc,d])=>(
-                        <div key={loc} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'14px 18px',borderLeft:'3px solid var(--go)'}}>
-                          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',fontWeight:700,marginBottom:10}}>{loc}</div>
-                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:8}}>
-                            <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:3}}>% Returning</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color:'#CAE8C1',lineHeight:1}}>{d.pctReturning}%</div></div>
-                            <div><div style={{fontSize:12,color:'#888',letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:3}}>% Repeat Visits</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color:'#44CCAA',lineHeight:1}}>{d.pctRepeatVisits}%</div></div>
-                          </div>
-                          <div style={{display:'flex',gap:16,fontSize:14,color:'#777'}}>
-                            <span>New: <strong style={{color:'#ddd'}}>{(d.newPatients||0).toLocaleString()}</strong></span>
-                            <span>Returning: <strong style={{color:'#ddd'}}>{(d.returningPatients||0).toLocaleString()}</strong></span>
-                            <span>Visits: <strong style={{color:'#ddd'}}>{(d.totalVisits||0).toLocaleString()}</strong></span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {_retRows.length===0?(
-                  <div className="perf-slot">
-                    <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner</span></div>
-                    <div className="empty" style={{padding:40}}><div className="empty-ico">🔄</div><p>Import a Member Retention CSV via the Jane Import tab. Upload one file per month.</p></div>
-                  </div>
-                ):(
-                  <div className="perf-slot">
-                    <div className="perf-slot-head">
-                      <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — {_retRows.length} Practitioners</span>
-                      <div style={{fontSize:13,color:'#555'}}>{retentionSnapshots.length} month{retentionSnapshots.length!==1?'s':''} stored</div>
-                    </div>
-                    <div style={{overflowX:'auto'}}>
-                      <table style={{width:'100%',borderCollapse:'collapse',fontSize:14}}>
-                        <thead>
-                          <tr style={{borderBottom:'1px solid var(--border)'}}>
-                            <th style={{textAlign:'left',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='name'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='name'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('name');}}>Practitioner{retSortKey==='name'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='pctReturning'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='pctReturning'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('pctReturning');}}>% Returning{retSortKey==='pctReturning'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='pctRepeatVisits'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='pctRepeatVisits'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('pctRepeatVisits');}}>% Repeat Visits{retSortKey==='pctRepeatVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='newPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='newPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('newPatients');}}>New Members{retSortKey==='newPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='returningPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='returningPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('returningPatients');}}>Returning{retSortKey==='returningPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='totalPatients'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='totalPatients'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('totalPatients');}}>Total Members{retSortKey==='totalPatients'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                            <th style={{textAlign:'right',cursor:'pointer',userSelect:'none',padding:'8px 12px',color:retSortKey==='totalVisits'?'var(--lime)':'#888',whiteSpace:'nowrap'}} onClick={()=>{setRetSortDir(retSortKey==='totalVisits'?(retSortDir==='desc'?'asc':'desc'):'desc');setRetSortKey('totalVisits');}}>Total Visits{retSortKey==='totalVisits'?(retSortDir==='desc'?' ▼':' ▲'):''}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {_retRows.map(s=>{
-                            const rc=s.pctReturning!=null?(s.pctReturning>=70?'#CAE8C1':s.pctReturning>=55?'#F4DB71':'#E05252'):'#555';
-                            const rpc=s.pctRepeatVisits!=null?(s.pctRepeatVisits>=45?'#CAE8C1':s.pctRepeatVisits>=25?'#F4DB71':'#E05252'):'#555';
-                            return(
-                              <tr key={s.id} style={{borderBottom:'1px solid rgba(50,50,50,.5)'}}>
-                                <td style={{padding:'9px 12px'}}><div style={{display:'flex',alignItems:'center',gap:8}}><Av name={s.name} sz="sm"/><div><div style={{fontSize:14,fontWeight:600,color:'#ddd'}}>{s.name}</div><div style={{fontSize:13,color:'#777',marginTop:1}}>{s.site}</div></div></div></td>
-                                <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctReturning!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rc,width:Math.min(100,s.pctReturning)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rc,minWidth:46,textAlign:'right'}}>{s.pctReturning}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
-                                <td style={{padding:'9px 12px',textAlign:'right'}}>{s.pctRepeatVisits!=null?(<div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}><div style={{width:60,height:4,background:'var(--surface3)',borderRadius:2,flexShrink:0}}><div style={{height:'100%',borderRadius:2,background:rpc,width:Math.min(100,s.pctRepeatVisits)+'%'}}/></div><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,color:rpc,minWidth:46,textAlign:'right'}}>{s.pctRepeatVisits}%</span></div>):<span style={{color:'#555'}}>—</span>}</td>
-                                <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.newPatients??'—'}</td>
-                                <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.returningPatients??'—'}</td>
-                                <td style={{padding:'9px 12px',textAlign:'right',color:'#ddd',fontWeight:600,fontSize:14}}>{s.totalPatients??'—'}</td>
-                                <td style={{padding:'9px 12px',textAlign:'right',color:'#aaa',fontSize:14}}>{s.totalVisits!=null?s.totalVisits.toLocaleString():'—'}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
         </div>
       )}
 
-{/* ── TRENDS ── */}
+      {/* ── TRENDS ── */}
       {tab==='trends'&&(
         <div>
           {/* Controls */}
-          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'12px 14px',marginBottom:14}}>
-            {/* Row 1: View toggle + Granularity + Timeframe */}
-            <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:10}}>
-              <div style={{display:'flex',gap:4}}>
-                {[['practitioner','👤 Practitioner'],['clinic','🏥 Clinic Totals']].map(([v,l])=>(
-                  <button key={v} className={`btn btn-sm ${trendView===v?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendView(v)}>{l}</button>
+          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'12px 14px',marginBottom:14,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+            <div style={{flex:1,minWidth:200}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:8}}>Practitioner</div>
+              <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                {mergedStaff.map(s=>(
+                  <button key={s.id} className={`btn btn-sm ${trendStaff?.id===s.id?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendStaff(s)}>
+                    {s.name.split(' ')[0]}
+                  </button>
                 ))}
-              </div>
-              <div style={{width:1,height:20,background:'var(--border2)',flexShrink:0}}/>
-              <div style={{display:'flex',gap:4}}>
-                {[['monthly','Monthly'],['weekly','Weekly']].map(([v,l])=>(
-                  <button key={v} className={`btn btn-sm ${trendGranularity===v?'btn-go':'btn-ghost'}`} onClick={()=>setTrendGranularity(v)}>{l}</button>
-                ))}
-              </div>
-              <div style={{width:1,height:20,background:'var(--border2)',flexShrink:0}}/>
-              <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                {[['3m','3 Mo'],['6m','6 Mo'],['ytd','YTD'],['12m','12 Mo'],['all','All']].map(([v,l])=>(
-                  <button key={v} className={`btn btn-sm ${trendTimeframe===v&&!trendFrom?'btn-go':'btn-ghost'}`}
-                    onClick={()=>{setTrendTimeframe(v);setTrendFrom('');setTrendTo('');}}>{l}</button>
-                ))}
-              </div>
-              <div style={{display:'flex',alignItems:'center',gap:6,marginLeft:4}}>
-                <input type="date" value={trendFrom} onChange={e=>{setTrendFrom(e.target.value);setTrendTimeframe('');}}
-                  style={{background:'var(--surface3)',border:'1px solid '+(trendFrom?'var(--go)':'var(--border2)'),borderRadius:4,color:trendFrom?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/>
-                <span style={{color:'#555',fontSize:12}}>→</span>
-                <input type="date" value={trendTo} onChange={e=>{setTrendTo(e.target.value);setTrendTimeframe('');}}
-                  style={{background:'var(--surface3)',border:'1px solid '+(trendTo?'var(--go)':'var(--border2)'),borderRadius:4,color:trendTo?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/>
-                {(trendFrom||trendTo)&&<button className="btn btn-ghost btn-xs" onClick={()=>{setTrendFrom('');setTrendTo('');setTrendTimeframe('12m');}}>✕</button>}
               </div>
             </div>
-            {/* Row 2: Filters */}
-            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-              <select value={trendDisc} onChange={e=>setTrendDisc(e.target.value)}
-                style={{background:'var(--surface3)',border:'1px solid '+(trendDisc!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:trendDisc!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:140}}>
-                <option value="all">All Disciplines</option>
-                {[...new Set(staff.filter(s=>s.discipline&&!['mgmt','ops','edu'].includes(s.discipline)).map(s=>s.discipline))].sort().map(d=>(
-                  <option key={d} value={d}>{d}</option>
+            <div style={{flexShrink:0}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:8}}>Timeframe</div>
+              <div style={{display:'flex',gap:6}}>
+                {[['3m','3 Months'],['6m','6 Months'],['ytd','Year to Date'],['12m','12 Months'],['all','All Time']].map(([v,l])=>(
+                  <button key={v} className={`btn btn-sm ${trendTimeframe===v?'btn-go':'btn-ghost'}`} onClick={()=>setTrendTimeframe(v)}>{l}</button>
                 ))}
-              </select>
-              <select value={trendSite} onChange={e=>setTrendSite(e.target.value)}
-                style={{background:'var(--surface3)',border:'1px solid '+(trendSite!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:trendSite!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:140}}>
-                <option value="all">All Locations</option>
-                {[...new Set(staff.filter(s=>s.site).map(s=>s.site))].sort().map(s=>(
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              {trendView==='practitioner'&&(
-                <div style={{display:'flex',gap:4,flexWrap:'wrap',flex:3}}>
-                  {staff.filter(s=>!['mgmt','ops','edu'].includes(s.discipline)&&(trendDisc==='all'||s.discipline===trendDisc)&&(trendSite==='all'||s.site===trendSite)).map(s=>(
-                    <button key={s.id} className={`btn btn-sm ${trendStaff?.id===s.id?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendStaff(s)}>
-                      {s.name.split(' ')[0]}
-                    </button>
-                  ))}
-                </div>
-              )}
+              </div>
             </div>
           </div>
 
@@ -4043,94 +3524,10 @@ function PerformancePage({staff,perfData,setPerfData}){
                   </div>
                 );
               })()}
-
-              {/* ── Per-practitioner retention trend ── */}
-              {(()=>{
-                const staffSnaps=retentionSnapshots
-                  .filter(s=>(s.staff_data||{})[trendStaff.id]!=null)
-                  .sort((a,b)=>a.month.localeCompare(b.month));
-                if(!staffSnaps.length)return(
-                  <div className="perf-slot" style={{marginTop:14}}>
-                    <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention</span></div>
-                    <div style={{padding:'16px',fontSize:14,color:'#555',fontStyle:'italic'}}>No retention data yet. Upload monthly retention CSVs via the Jane Import tab.</div>
-                  </div>
-                );
-                const vals=staffSnaps.map(s=>s.staff_data[trendStaff.id]);
-                const retVals=vals.map(v=>v.pctReturning);
-                const repVals=vals.map(v=>v.pctRepeatVisits??null);
-                const latest=retVals[retVals.length-1];
-                const prev=retVals.length>1?retVals[retVals.length-2]:null;
-                const delta=prev!=null?+(latest-prev).toFixed(1):null;
-                const W=560,H=100,PADX=36,PADY=8,BOT=22;
-                const allV=[...retVals,...repVals].filter(v=>v!=null);
-                const minV=Math.max(0,Math.min(...allV)-5);
-                const maxV=Math.min(100,Math.max(...allV)+3);
-                const toY=v=>PADY+Math.round((1-(v-minV)/(maxV-minV||1))*(H-PADY*2));
-                const toX=i=>staffSnaps.length>1?PADX+Math.round(i*(W-PADX*2)/(staffSnaps.length-1)):W/2;
-                const retC=latest>=70?'#CAE8C1':latest>=55?'#F4DB71':'#E05252';
-                return(
-                  <div className="perf-slot" style={{marginTop:14}}>
-                    <div className="perf-slot-head">
-                      <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention</span>
-                      <div style={{display:'flex',gap:16,fontSize:13,alignItems:'center'}}>
-                        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:retC}}>{latest}%</span>
-                        {delta!=null&&<span style={{fontSize:13,color:delta>0?'#44CCAA':delta<0?'#E05252':'#777'}}>{delta>0?'+':''}{delta}% MoM</span>}
-                        <span style={{color:'#555',fontSize:12}}>{staffSnaps.length} month{staffSnaps.length!==1?'s':''}</span>
-                      </div>
-                    </div>
-                    <div style={{padding:'12px 16px 4px'}}>
-                      <div style={{display:'flex',gap:8,marginBottom:10,fontSize:12}}>
-                        <span style={{color:'#CAE8C1'}}>─ % Returning</span>
-                        {repVals.some(v=>v!=null)&&<span style={{color:'#44CCAA'}}>─ % Repeat Visits</span>}
-                      </div>
-                      <svg width="100%" viewBox={`0 0 ${W} ${H+BOT}`} style={{display:'block',overflow:'visible'}}>
-                        {[minV,Math.round((minV+maxV)/2),maxV].map((v,i)=>(
-                          <g key={i}>
-                            <line x1={PADX} y1={toY(v)} x2={W-PADX} y2={toY(v)} stroke="#1e1e1e" strokeWidth="1"/>
-                            <text x={PADX-5} y={toY(v)+4} textAnchor="end" fontSize="10" fill="#555">{v}%</text>
-                          </g>
-                        ))}
-                        {retVals.length>1&&<polyline points={retVals.map((v,i)=>`${toX(i)},${toY(v)}`).join(' ')} fill="none" stroke="#CAE8C1" strokeWidth="2" strokeLinejoin="round"/>}
-                        {retVals.map((v,i)=>(
-                          <g key={`r${i}`}>
-                            <circle cx={toX(i)} cy={toY(v)} r="3.5" fill="#CAE8C1"/>
-                            <text x={toX(i)} y={toY(v)-7} textAnchor="middle" fontSize="10" fill="#CAE8C1" fontWeight="700">{v}%</text>
-                          </g>
-                        ))}
-                        {repVals.filter(v=>v!=null).length>1&&<polyline points={repVals.map((v,i)=>v!=null?`${toX(i)},${toY(v)}`:null).filter(Boolean).join(' ')} fill="none" stroke="#44CCAA" strokeWidth="2" strokeLinejoin="round" strokeDasharray="4,2"/>}
-                        {repVals.map((v,i)=>v!=null&&(
-                          <g key={`p${i}`}>
-                            <circle cx={toX(i)} cy={toY(v)} r="3.5" fill="#44CCAA"/>
-                            <text x={toX(i)} y={toY(v)+16} textAnchor="middle" fontSize="10" fill="#44CCAA">{v}%</text>
-                          </g>
-                        ))}
-                        {staffSnaps.map((_,i)=>(
-                          <text key={i} x={toX(i)} y={H+BOT} textAnchor="middle" fontSize="10" fill="#555">{staffSnaps[i].month}</text>
-                        ))}
-                        <line x1={PADX} y1={H} x2={W-PADX} y2={H} stroke="#2a2a2a" strokeWidth="1"/>
-                      </svg>
-                    </div>
-                    <div style={{padding:'0 16px 14px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:8}}>
-                      {staffSnaps.map(s=>{
-                        const d=s.staff_data[trendStaff.id];
-                        const c=d.pctReturning>=70?'#CAE8C1':d.pctReturning>=55?'#F4DB71':'#E05252';
-                        return(
-                          <div key={s.month} style={{background:'var(--surface3)',borderRadius:4,padding:'8px 10px'}}>
-                            <div style={{fontSize:11,color:'#555',marginBottom:4}}>{s.month}</div>
-                            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:c}}>{d.pctReturning}%</div>
-                            {d.pctRepeatVisits!=null&&<div style={{fontSize:11,color:d.pctRepeatVisits>=45?'#44CCAA':d.pctRepeatVisits>=25?'#F4DB71':'#E05252'}}>{d.pctRepeatVisits}% repeat</div>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
             </div>
           ):(
             <div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to view their trends.</div>
           )}
-
         </div>
       )}
 
@@ -4139,12 +3536,11 @@ function PerformancePage({staff,perfData,setPerfData}){
         <div>
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'16px 18px',marginBottom:14}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',fontWeight:700,marginBottom:10}}>How to Export from Jane</div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
               {[
                 {n:1,title:'Appointments Report',where:'Reports → Appointments',action:'Set date range → ··· menu → Export CSV',cols:'staff_member_name, state, no_show_at, cancelled_at',note:'Gives: completed visits, no-shows, cancellations per practitioner'},
                 {n:2,title:'Shift Report',where:'Reports → Payroll → Timesheets',action:'Set date range → Export CSV',cols:'Staff Name, Appointment Total Hours, Shift Total Hours',note:'Gives: utilization % (Appt Hours ÷ Shift Hours)'},
                 {n:3,title:'Sales Report',where:'Reports → Sales',action:'Set date range → Export CSV',cols:'Staff Member, Status, Income Category, Collected',note:'Gives: revenue per practitioner (paid treatment income only)'},
-                {n:4,title:'Member Retention Report',where:'Reports → Member Retention',action:'Set date range → Export CSV',cols:'Practitioner name block + 6 data rows each',note:'Gives: % Returning, % Repeat Visits, new/returning patient counts per practitioner'},
               ].map(s=>(
                 <div key={s.n} style={{background:'var(--surface3)',borderRadius:5,padding:'12px 14px',border:'1px solid var(--border)'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
@@ -4162,14 +3558,11 @@ function PerformancePage({staff,perfData,setPerfData}){
               <strong style={{color:'var(--lime)'}}>Tip:</strong> Import both files for the same period — Appointments gives visit counts, Shift gives utilization. They merge into the same snapshot automatically. Import monthly to build trend history.
             </div>
           </div>
-          <div style={{background:'rgba(107,159,212,.06)',border:'1px solid rgba(107,159,212,.2)',borderRadius:6,padding:'9px 14px',marginTop:10,marginBottom:4,fontSize:13,color:'#888'}}>
-            <strong style={{color:'#6B9FD4'}}>📅 Member Retention:</strong> Export one month at a time from Jane (Reports → Member Retention → set to that month only). After dropping the file below, select which month it covers.
-          </div>
 
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
             <div style={{fontSize:14,color:'#777',lineHeight:1.6}}>
-              <strong style={{color:'#aaa'}}>Appointments</strong>, <strong style={{color:'#aaa'}}>Sales</strong>, and <strong style={{color:'#aaa'}}>Shift Report</strong> — just drop them in, no date selection needed.<br/>
-              <strong style={{color:'#BB99FF'}}>Member Retention</strong> — drop it in and you'll be prompted to select which month it covers (since the file has no dates).
+              <strong style={{color:'#aaa'}}>Appointments</strong> and <strong style={{color:'#aaa'}}>Sales</strong> CSVs auto-split by month from the row dates — just drop them in.<br/>
+              <strong style={{color:'#aaa'}}>Shift Report</strong> has no date column, so set the month it covers below.
             </div>
             <button className="btn btn-ghost btn-xs" style={{color:'#E05252',marginLeft:'auto',flexShrink:0}}
               onClick={async()=>{if(confirm('Reset ALL performance data? This clears all snapshots, GVA, and retention entries. Cannot be undone.')){
@@ -4181,31 +3574,6 @@ function PerformancePage({staff,perfData,setPerfData}){
               }}}>
               ⚠ Reset All Data
             </button>
-          </div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:4}}>
-            {[{label:'Purge Sales',type:'sales'},{label:'Purge Appointments',type:'appointments'},{label:'Purge Shift Reports',type:'shift'},{label:'Purge Retention',type:'retention'}].map(({label,type})=>(
-              <button key={type} className="btn btn-ghost btn-sm" style={{color:'#E05252',border:'1px solid #E0525244',fontSize:12}}
-                onClick={async()=>{
-                  if(!window.confirm(`Purge all ${type} data?`))return;
-                  const SB=window.__SB;let err=null;
-                  if(type==='retention'){
-                    if(SB){const r1=await SB.from('retention_snapshots').delete().neq('id','_none_');const r2=await SB.from('retention_full').delete().neq('id','_none_');if(r1.error)err=r1.error.message;if(r2.error)err=r2.error.message;}
-                    setRetentionSnapshots([]);save({...data,retentionFull:{},retentionClinic:{},retentionImportDate:null,retention:{}});
-                  }else{
-                    const remaining=data.snapshots.filter(s=>s.type!==type);
-                    if(SB){
-                      const toDel=data.snapshots.filter(s=>s.type===type);
-                      for(const s of toDel){const r=await SB.from('performance_snapshots').delete().eq('id',s.id);if(r.error)err=r.error.message;}
-                      if(type==='appointments'){const r=await SB.from('daily_appointments').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyAppts([]);try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}}
-                      if(type==='sales'){const r=await SB.from('daily_revenue').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyRevenue([]);try{localStorage.removeItem('rvgd3_daily_rev');}catch(e){}}
-                    }
-                    save({...data,snapshots:remaining});
-                  }
-                  if(err){setImportMsg({type:'error',msg:`Purge error: ${err}`});return;}
-                  setImportMsg({type:'success',msg:`✓ ${type} data purged. Reloading…`});
-                  setTimeout(()=>window.location.reload(),800);
-                }}>🗑 {label}</button>
-            ))}
           </div>
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#777'}}>Shift Report Month</div>
@@ -4221,59 +3589,17 @@ function PerformancePage({staff,perfData,setPerfData}){
             <input id="jane-csv-in" type="file" accept=".csv" onChange={e=>{handleFile(e.target.files[0]);e.target.value='';}}/>
             <div style={{fontSize:32,marginBottom:10}}>📊</div>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:'var(--lime)',letterSpacing:'1px',marginBottom:4}}>
-              {importing?'Processing…':'Drop any Jane CSV here (Appointments, Shift Report, Sales, or Member Retention)'}
+              {importing?'Processing…':'Drop Appointments or Shift Report CSV here'}
             </div>
             <div style={{fontSize:14,color:'#777'}}>Auto-detects file type · Both files can be imported for the same snapshot date</div>
           </div>
 
           {importMsg&&(
             <div style={{marginTop:10,padding:'10px 14px',borderRadius:5,fontSize:14,lineHeight:1.6,
-              background:importMsg.type==='success'?'rgba(68,204,170,.08)':importMsg.type==='info'?'rgba(107,159,212,.08)':'rgba(224,82,82,.08)',
-              border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':importMsg.type==='info'?'rgba(107,159,212,.2)':'rgba(224,82,82,.2)'}`,
-              color:importMsg.type==='success'?'#44CCAA':importMsg.type==='info'?'#6B9FD4':'#E05252'}}>
+              background:importMsg.type==='success'?'rgba(68,204,170,.08)':'rgba(224,82,82,.08)',
+              border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':'rgba(224,82,82,.2)'}`,
+              color:importMsg.type==='success'?'#44CCAA':'#E05252'}}>
               {importMsg.msg}
-            </div>
-          )}
-          {pendingRetentionData&&(
-            <div style={{marginTop:10,background:'var(--surface2)',border:'2px solid var(--go)',borderRadius:7,padding:'14px 18px'}}>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'var(--lime)',marginBottom:10}}>
-                🔄 Retention file ready — {pendingRetentionData.matched}/{pendingRetentionData.total} practitioners matched
-              </div>
-              <div style={{fontSize:14,color:'#aaa',marginBottom:12}}>Which month does this file cover? Select below — saves automatically.</div>
-              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                {(()=>{
-                  const months=[];
-                  for(let i=0;i<12;i++){
-                    const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);
-                    const val=d.toISOString().slice(0,7);
-                    const lbl=d.toLocaleDateString('en-CA',{month:'short',year:'numeric'});
-                    months.push({val,lbl});
-                  }
-                  return months.map(({val,lbl})=>(
-                    <button key={val}
-                      className={`btn btn-sm ${retentionMonthPicker===val?'btn-lime':'btn-ghost'}`}
-                      onClick={async()=>{
-                        setRetentionMonthPicker(val);
-                        const{retFull,clinicData,matched,total}=pendingRetentionData;
-                        await saveRetentionSnapshot(val,retFull,clinicData);
-                        const newRetention={...data.retention||{}};
-                        Object.entries(retFull).forEach(([id,d])=>{newRetention[id]=d.pctReturning;});
-                        const newData={...data,retention:newRetention,retentionFull:retFull,retentionClinic:clinicData,retentionImportDate:val};
-                        save(newData);
-                        const SB2=window.__SB;
-                        if(SB2)SB2.from('retention_full').upsert({id:'singleton',data:{retentionFull:retFull,retentionClinic:clinicData,importDate:val}}).then();
-                        setRetentionSnapshots(prev=>{
-                          const filtered=prev.filter(s=>s.month!==val);
-                          return[...filtered,{id:val,month:val,staff_data:retFull,clinic_data:clinicData}].sort((a,b)=>a.month.localeCompare(b.month));
-                        });
-                        setPendingRetentionData(null);setRetentionMonthPicker('');
-                        setImportMsg({type:'success',msg:`✓ Retention saved for ${val} · ${matched}/${total} matched`});
-                      }}>
-                      {lbl}
-                    </button>
-                  ));
-                })()}
-              </div>
             </div>
           )}
 
