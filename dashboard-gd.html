@@ -2259,6 +2259,39 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
     weekMap[wk].revenue+=(r.revenue||0);
   });
 
+  // Snapshot fallback if no daily data
+  if(Object.keys(weekMap).length===0&&snapshots&&snapshots.length>0){
+    const today=new Date().toISOString().slice(0,10);
+    snapshots.filter(s=>s.type!=='shift').forEach(snap=>{
+      const m=snap.date.slice(0,7);const[yr,mo]=m.split('-').map(Number);
+      const daysInMonth=new Date(yr,mo,0).getDate();
+      const monthWeeks=[];
+      for(let d=1;d<=daysInMonth;d++){
+        const date=`${m}-${String(d).padStart(2,'0')}`;
+        if(new Date(date+'T12:00').getDay()===1&&date<=today)monthWeeks.push(date);
+      }
+      if(!monthWeeks.length){
+        let d=new Date(yr,mo-1,1);while(d.getDay()!==1)d.setDate(d.getDate()+1);
+        const wk=d.toISOString().slice(0,10);if(wk<=today)monthWeeks.push(wk);
+      }
+      const nw=monthWeeks.length||1;
+      (snap.rows||[]).forEach(r=>{
+        if(!r.staffId)return;
+        const s=staff.find(x=>x.id===r.staffId);if(!s)return;
+        if(staffId&&r.staffId!==staffId)return;
+        if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
+        if(filterSite!=='all'&&s.site!==filterSite)return;
+        monthWeeks.forEach(wk=>{
+          if(!weekMap[wk])weekMap[wk]={wk,revenue:0,visits:0,ias:0,noShows:0,cancellations:0};
+          weekMap[wk].revenue+=Math.round((parseFloat(r.revenue)||0)/nw*100)/100;
+          weekMap[wk].visits+=Math.round((parseFloat(r.completed)||0)/nw*10)/10;
+          weekMap[wk].ias+=Math.round((parseFloat(r.initialAssessments)||0)/nw*10)/10;
+          weekMap[wk].noShows+=Math.round((parseFloat(r.noShows)||0)/nw*10)/10;
+          weekMap[wk].cancellations+=Math.round((parseFloat(r.cancellations)||0)/nw*10)/10;
+        });
+      });
+    });
+  }
   const weeks=Object.values(weekMap).sort((a,b)=>a.wk.localeCompare(b.wk));
   if(!weeks.length)return<div style={{fontSize:14,color:'#777',padding:'40px',textAlign:'center'}}>No weekly data for this period.<br/><span style={{fontSize:12,color:'#555'}}>Import Appointments CSV to enable weekly trends.</span></div>;
 
