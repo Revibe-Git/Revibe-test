@@ -2295,7 +2295,7 @@ function PerformancePage({staff,perfData,setPerfData}){
           (gvaRows||[]).forEach(r=>{if(!gva[r.staff_id])gva[r.staff_id]=r.value;});
           const retention={};
           (retRows||[]).forEach(r=>{if(!retention[r.staff_id])retention[r.staff_id]=r.value;});
-          const loaded={snapshots:snaps.map(s=>({...s,rows:s.rows||[],files:s.files||[]})),gva,retention,lastImport:snaps[snaps.length-1]?.created_at||null};
+          const loaded={snapshots:snaps.map(s=>({...s,rows:s.rows||[],files:s.files||[],lastSaleDate:s.last_sale_date||null})),gva,retention,lastImport:snaps[snaps.length-1]?.created_at||null};
           // Supabase data is fresher — update state and localStorage
           setPerfData(loaded);
           try{localStorage.setItem('rvgd3_perf3',JSON.stringify(loaded));}catch(e){}
@@ -2322,7 +2322,8 @@ function PerformancePage({staff,perfData,setPerfData}){
     const SB=window.__SB;if(!SB)return;
     try{
       const{error}=await SB.from('performance_snapshots').upsert({
-        id:snap.id,date:snap.date,rows:snap.rows,files:snap.files,type:snap.type
+        id:snap.id,date:snap.date,rows:snap.rows,files:snap.files,type:snap.type,
+        ...(snap.lastSaleDate?{last_sale_date:snap.lastSaleDate}:{})
       });
       if(error)console.warn('[Perf] saveSnapshot error:',error);
     }catch(e){console.warn('[Perf] saveSnapshot failed:',e);}
