@@ -2064,7 +2064,13 @@ function ProjectionCard({dailyAppts,dailyRevenue,staff,filterDisc,filterSite,sta
   const now=new Date();
   const curM=now.toISOString().slice(0,7);
   const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const dayOfMonth=now.getDate();
+  // Use last date with data, not today (Jane export lags by 1-2 days)
+  // Use last data date from daily data, lastImport, or today
+  const _revD=dailyRevenue.filter(r=>r.date&&r.date.startsWith(curM)).map(r=>r.date).sort();
+  const _apptD=dailyAppts.filter(r=>r.date&&r.date.startsWith(curM)).map(r=>r.date).sort();
+  const _lastDate=(_revD.length?_revD[_revD.length-1]:null)||(_apptD.length?_apptD[_apptD.length-1]:null);
+  const _importDay=data&&data.lastImport?new Date(data.lastImport).getDate():null;
+  const dayOfMonth=_lastDate?parseInt(_lastDate.slice(8)):(_importDay&&_importDay<now.getDate()?_importDay:now.getDate()-2);
   const pct=Math.round((dayOfMonth/daysInMonth)*100);
   const fs=s=>!['mgmt','ops','edu'].includes(s.discipline)&&(filterDisc==='all'||s.discipline===filterDisc)&&(filterSite==='all'||s.site===filterSite)&&(!staffId||s.id===staffId);
   const curSnap=snapshots?snapshots.find(s=>s.date&&s.date.startsWith(curM)):null;
