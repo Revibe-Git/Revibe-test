@@ -2786,6 +2786,11 @@ function PerformancePage({staff,perfData,setPerfData}){
         }
       }else{sbOk=false;}
 
+      // Debug: log unmatched names
+      const _allNames=new Set();
+      newSnapshots.forEach(s=>(s.rows||[]).forEach(r=>{if(r.name&&!r.staffId)_allNames.add(r.name);}));
+      if(_allNames.size>0)console.warn('[Unmatched]',[..._allNames]);
+      else console.log('[Match] All staff matched ✓');
       const uniqMonths=[...new Set(monthsCreated)].sort();
       const monthNames=uniqMonths.map(m=>new Date(m+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}));
       const totalIA=newSnapshots.flatMap(s=>s.rows||[]).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
