@@ -2220,7 +2220,7 @@ function ProjectionCard({snapshots,filterDisc,filterSite,staff}){
     </div>
   </div>);
 }
-function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filterSite,dateFrom,dateTo,timeframe}){
+function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filterSite,dateFrom,dateTo,timeframe,snapshots}){
   const[activeMetric,setActiveMetric]=React.useState('revenue');
   const[weekA,setWeekA]=React.useState('');
   const[weekB,setWeekB]=React.useState('');
@@ -2272,7 +2272,48 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
     staffWeekMap[r.staff_id][wk].revenue+=(r.revenue||0);
   });
 
-  const sortedWeeks=[...allWeeks].sort();
+  // Fallback: if no daily data, build weekly data from monthly snapshots
+  // by distributing snapshot revenue/visits evenly across weeks in that month
+  if(allWeeks.size===0&&snapshots&&snapshots.length>0){
+    snapshots.filter(s=>s.type!=='shift').forEach(snap=>{
+      const m=snap.date.slice(0,7);
+      // Get all Mondays in this month
+      const [yr,mo]=m.split('-').map(Number);
+      const daysInMonth=new Date(yr,mo,0).getDate();
+      const monthWeeks=[];
+      for(let d=1;d<=daysInMonth;d++){
+        const date=`${m}-${String(d).padStart(2,'0')}`;
+        const dow=new Date(date+'T12:00').getDay();
+        if(dow===1)monthWeeks.push(date); // Mondays only
+      }
+      if(!monthWeeks.length){
+        // Find first Monday on or after the 1st
+        let d=new Date(yr,mo-1,1);
+        while(d.getDay()!==1)d.setDate(d.getDate()+1);
+        monthWeeks.push(d.toISOString().slice(0,10));
+      }
+      const numWeeks=monthWeeks.length||1;
+      (snap.rows||[]).forEach(r=>{
+        if(!r.staffId)return;
+        const s=staff.find(x=>x.id===r.staffId);
+        if(!s)return;
+        if(staffId&&r.staffId!==staffId)return;
+        if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
+        if(filterSite!=='all'&&s.site!==filterSite)return;
+        monthWeeks.forEach(wk=>{
+          allWeeks.add(wk);
+          if(!staffWeekMap[r.staffId])staffWeekMap[r.staffId]={};
+          if(!staffWeekMap[r.staffId][wk])staffWeekMap[r.staffId][wk]={revenue:0,visits:0,ias:0,noShows:0,cancellations:0};
+          staffWeekMap[r.staffId][wk].revenue+=Math.round((parseFloat(r.revenue)||0)/numWeeks*100)/100;
+          staffWeekMap[r.staffId][wk].visits+=Math.round((parseFloat(r.completed)||0)/numWeeks*10)/10;
+          staffWeekMap[r.staffId][wk].ias+=Math.round((parseFloat(r.initialAssessments)||0)/numWeeks*10)/10;
+          staffWeekMap[r.staffId][wk].noShows+=Math.round((parseFloat(r.noShows)||0)/numWeeks*10)/10;
+          staffWeekMap[r.staffId][wk].cancellations+=Math.round((parseFloat(r.cancellations)||0)/numWeeks*10)/10;
+        });
+      });
+    });
+  }
+    const sortedWeeks=[...allWeeks].sort();
   if(!sortedWeeks.length)return<div style={{fontSize:14,color:'#777',padding:'40px',textAlign:'center'}}>No weekly data for this period.<br/><span style={{fontSize:12,color:'#555'}}>Import Appointments CSV to enable weekly trends.</span></div>;
 
   // Auto-select last 2 weeks if not set
@@ -3755,7 +3796,7 @@ function PerformancePage({staff,perfData,setPerfData}){
 
           {data.snapshots.length<2&&trendGranularity==='monthly'&&<div style={{fontSize:14,color:'#777',padding:'12px 0',fontStyle:'italic'}}>Import at least 2 monthly snapshots to see trend lines.</div>}
 
-          {trendGranularity==='weekly'&&trendView==='clinic'&&(<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>)}
+          {trendGranularity==='weekly'&&trendView==='clinic'&&(<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe} snapshots={data.snapshots}/>)}
           {trendGranularity==='weekly'&&trendView==='practitioner'&&(trendStaff?<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>:<div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to compare their weeks.</div>)}
 
           {trendGranularity==='monthly'&&trendStaff?(
