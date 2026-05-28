@@ -2268,11 +2268,14 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
       const monthWeeks=[];
       for(let d=1;d<=daysInMonth;d++){
         const date=`${m}-${String(d).padStart(2,'0')}`;
-        if(new Date(date+'T12:00').getDay()===1&&date<=today)monthWeeks.push(date);
+        // Only include Mondays that START within this month AND are not in the future
+        if(new Date(date+'T12:00').getDay()===1&&date<=today&&date.startsWith(m))monthWeeks.push(date);
       }
       if(!monthWeeks.length){
         let d=new Date(yr,mo-1,1);while(d.getDay()!==1)d.setDate(d.getDate()+1);
-        const wk=d.toISOString().slice(0,10);if(wk<=today)monthWeeks.push(wk);
+        const wk=d.toISOString().slice(0,10);
+        if(wk<=today&&wk.startsWith(m))monthWeeks.push(wk);
+        else if(!monthWeeks.length)monthWeeks.push(`${m}-01`); // fallback: use 1st of month
       }
       const nw=monthWeeks.length||1;
       (snap.rows||[]).forEach(r=>{
@@ -2369,10 +2372,10 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
                   <rect x={x} y={y} width={BAR_W} height={barH}
                     fill={m.color} opacity={isHov?1:aboveAvg?0.85:0.45} rx="2"/>
                   {/* Value label */}
-                  {(isHov||weeks.length<=12)&&<text x={x+BAR_W/2} y={y-5} textAnchor="middle" fontSize="11" fill={m.color} fontWeight="700" opacity={isHov?1:0.8}>{m.fmt(val)}</text>}
+                  {(isHov||weeks.length<=12)&&<text x={x+BAR_W/2} y={Math.max(y-5,14)} textAnchor="middle" fontSize="11" fill={m.color} fontWeight="700" opacity={isHov?1:0.8}>{m.fmt(val)}</text>}
                   {/* WoW delta */}
                   {delta!=null&&isHov&&(
-                    <text x={x+BAR_W/2} y={y-18} textAnchor="middle" fontSize="10" fill={up?'#44CCAA':'#E05252'} fontWeight="700">
+                    <text x={x+BAR_W/2} y={Math.max(y-18,4)} textAnchor="middle" fontSize="10" fill={up?'#44CCAA':'#E05252'} fontWeight="700">
                       {up?'▲':'▼'}{Math.abs(delta)}%
                     </text>
                   )}
