@@ -2631,7 +2631,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             const mergedRows=[...existing.rows];
             parsed.forEach(nr=>{
               const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
-              if(idx>=0){if(nr.revenue!=null)mergedRows[idx]={...mergedRows[idx],revenue:nr.revenue};}
+              if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
               else mergedRows.push(nr);
             });
             newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
@@ -2671,7 +2671,7 @@ function PerformancePage({staff,perfData,setPerfData}){
             const mergedRows=[...existing.rows];
             parsed.forEach(nr=>{
               const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
-              if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
+              if(idx>=0){if(nr.revenue!=null)mergedRows[idx]={...mergedRows[idx],revenue:nr.revenue};}
               else mergedRows.push(nr);
             });
             newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
