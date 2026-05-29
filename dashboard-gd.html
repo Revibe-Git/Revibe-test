@@ -2295,7 +2295,11 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
       });
     });
   }
-  const weeks=Object.values(weekMap).sort((a,b)=>a.wk.localeCompare(b.wk));
+  // Cap weeks at last date in actual data (daily tables or snapshot lastSaleDate)
+  const _allDates=[...(dailyAppts||[]).map(r=>r.date),...(dailyRevenue||[]).map(r=>r.date)].filter(Boolean).sort();
+  const _snapLastDate=(snapshots||[]).map(s=>s.lastSaleDate).filter(Boolean).sort().pop();
+  const _lastDataDate=_allDates.length?_allDates[_allDates.length-1]:(_snapLastDate||new Date().toISOString().slice(0,10));
+  const weeks=Object.values(weekMap).filter(w=>w.wk<=_lastDataDate).sort((a,b)=>a.wk.localeCompare(b.wk));
   if(!weeks.length)return<div style={{fontSize:14,color:'#777',padding:'40px',textAlign:'center'}}>No weekly data for this period.<br/><span style={{fontSize:12,color:'#555'}}>Import Appointments CSV to enable weekly trends.</span></div>;
 
   const metrics=[
