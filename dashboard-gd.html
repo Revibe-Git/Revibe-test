@@ -2625,6 +2625,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[reportNotes,setReportNotes]=useState('');
   const[viewingSaved,setViewingSaved]=useState(null);
   const[savedReports,setSavedReports]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_reports'))||[];}catch(e){return[];}});
+  // ── Clinic/location retention summary (from Jane Member Retention report upload) ──
+  const[retentionSummary,setRetentionSummary]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_retention_summary'))||null;}catch(e){return null;}});
 
   // Load daily data from localStorage on mount
   useEffect(()=>{
@@ -2816,6 +2818,44 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       headers.forEach((h,idx)=>obj[h]=(vals[idx]||'').replace(/^"|"$/g,'').trim());
       return obj;
     }).filter(r=>Object.values(r).some(v=>v));
+  };
+
+  /* ── Async chunked CSV parser (for large files — yields to UI, reports progress) ── */
+  const parseCSVChunked=async(text,onProgress)=>{
+    const rows=[];
+    let i=0,cur='',inQ=false,fields=[];
+    const N=text.length;
+    const SLICE=400000; // characters per time-slice before yielding
+    let nextYield=SLICE;
+    while(i<=N){
+      const c=text[i];
+      if(c==='"'){
+        if(inQ&&text[i+1]==='"'){cur+='"';i+=2;continue;}
+        inQ=!inQ;i++;continue;
+      }
+      if(c===','&&!inQ){fields.push(cur.trim());cur='';i++;continue;}
+      if((c==='\n'||c==='\r'||c===undefined)&&!inQ){
+        if(c==='\r'&&text[i+1]==='\n')i++;
+        fields.push(cur.trim());
+        if(fields.some(f=>f))rows.push(fields);
+        fields=[];cur='';i++;
+        // Safe to yield here: row state is reset
+        if(i>=nextYield){nextYield=i+SLICE;if(onProgress)onProgress(Math.min(85,Math.round(i/N*85)));await new Promise(r=>setTimeout(r,0));}
+        continue;
+      }
+      cur+=(c||'');i++;
+    }
+    if(!rows.length)return[];
+    const headers=rows[0].map(h=>h.toLowerCase().replace(/^"|"$/g,'').trim());
+    const out=[];
+    const total=rows.length-1;
+    for(let r=1;r<rows.length;r++){
+      const vals=rows[r];const obj={};
+      headers.forEach((h,idx)=>obj[h]=(vals[idx]||'').replace(/^"|"$/g,'').trim());
+      if(Object.values(obj).some(v=>v))out.push(obj);
+      if(r%40000===0){if(onProgress)onProgress(Math.min(99,85+Math.round(r/total*14)));await new Promise(res=>setTimeout(res,0));}
+    }
+    return out;
   };
 
   /* ── Detect file type ───────────────────────── */
@@ -3026,15 +3066,86 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     return result;
   };
 
+  /* ── Member Retention report (key-value summary, NOT a row table) ── */
+  // The Jane "Member Retention" export is a summary: clinic-wide metrics first,
+  // then a location name line followed by that location's metrics. parseCSV would
+  // mangle it (treats line 1 as headers), so we detect + parse from raw text.
+  const RET_METRICS={
+    'new patients':'newPatients',
+    'returning patients':'returningPatients',
+    'total patients':'totalPatients',
+    'total visits':'totalVisits',
+    '% returning':'pctReturning',
+    '% repeat visits within date range':'pctRepeatVisits',
+    '% repeat visits':'pctRepeatVisits',
+  };
+  const looksLikeRetention=(text)=>{
+    const head=text.slice(0,4000).toLowerCase();
+    const firstLine=(text.split(/\r?\n/).find(l=>l.trim())||'').toLowerCase();
+    return /^\s*"?new patients"?\s*,/.test(firstLine) && head.includes('% returning');
+  };
+  const parseRetentionSummary=(text)=>{
+    const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length);
+    const clinic={};
+    const locations=[];
+    const practitioners=[];
+    let current=clinic; // first block (before any header) = clinic-wide totals
+    lines.forEach(line=>{
+      // split on FIRST comma only (names/locations won't contain commas in Jane exports)
+      const ci=line.indexOf(',');
+      const label=(ci>=0?line.slice(0,ci):line).replace(/^"|"$/g,'').trim();
+      const rawVal=ci>=0?line.slice(ci+1).replace(/^"|"$/g,'').trim():'';
+      const key=RET_METRICS[label.toLowerCase()];
+      if(key&&rawVal!==''){
+        const num=parseFloat(rawVal.replace(/[%,\s]/g,''));
+        current[key]=isNaN(num)?null:num;
+      }else if(!key&&label){
+        // Section header. Jane location names start with "Revibe"; everything else is a practitioner.
+        if(/^revibe/i.test(label)){const loc={name:label};locations.push(loc);current=loc;}
+        else{const pr={name:label};practitioners.push(pr);current=pr;}
+      }
+    });
+    // Match practitioner sections to staff so we can auto-fill per-therapist retention
+    practitioners.forEach(p=>{const m=matchStaff(p.name);p.staffId=m?.id||null;p.matchedName=m?.name||null;});
+    return{clinic,locations,practitioners,importedAt:new Date().toISOString()};
+  };
+
   /* ── Handle file upload ─────────────────────── */
   const handleFile=async(file)=>{
     if(!file||!file.name.endsWith('.csv')){setImportMsg({type:'error',msg:'Please upload a .csv file from Jane.'});return;}
     setImporting(true);setImportMsg(null);
     try{
+      setImportMsg({type:'info',msg:'Reading file…'});
       const text=await file.text();
-      const rows=parseCSV(text);
+
+      // ── Member Retention summary report (handle before CSV parse — different shape) ──
+      if(looksLikeRetention(text)){
+        const summary=parseRetentionSummary(text);
+        setRetentionSummary(summary);
+        try{localStorage.setItem('rvgd3_retention_summary',JSON.stringify(summary));}catch(e){}
+        // Auto-fill per-practitioner retention (matched by name) into data.retention + Supabase
+        const nr={...(data.retention||{})};
+        let filled=0;
+        for(const p of summary.practitioners){
+          if(p.staffId&&p.pctReturning!=null){nr[p.staffId]=p.pctReturning;filled++;}
+        }
+        save({...data,retention:nr});
+        if(window.__SB){
+          for(const p of summary.practitioners){
+            if(p.staffId&&p.pctReturning!=null)await saveRetentionToSB(p.staffId,p.pctReturning,'jane-import');
+          }
+        }
+        const cw=summary.clinic.pctReturning!=null?` Clinic-wide returning ${summary.clinic.pctReturning}%.`:'';
+        setImportMsg({type:'success',msg:`✓ Member Retention imported.${cw} Auto-filled ${filled} practitioner${filled!==1?'s':''}, ${summary.locations.length} location${summary.locations.length!==1?'s':''}. See the Retention tab.`});
+        setImporting(false);return;
+      }
+
+      // Large files: chunked async parser keeps the tab responsive + shows progress
+      const big=text.length>2_000_000;
+      const rows=await parseCSVChunked(text,big?(pct=>setImportMsg({type:'info',msg:`Parsing ${(text.length/1048576).toFixed(1)} MB file… ${pct}%`})):null);
       if(!rows.length){setImportMsg({type:'error',msg:'File is empty or unreadable.'});setImporting(false);return;}
       const type=detectFileType(rows);
+      if(big)setImportMsg({type:'info',msg:`Processing ${rows.length.toLocaleString()} rows…`});
 
       let newSnapshots=[...data.snapshots];
       let totalPractitioners=0,totalMatched=0,monthsCreated=[];
@@ -3055,7 +3166,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
               else mergedRows.push(nr);
             });
-            newSnapshots[existingIdx]={...existing,rows:mergedRows,lastSaleDate:_lastSaleDate||existing.lastSaleDate,files:[...(existing.files||[]),file.name]};
+            newSnapshots[existingIdx]={...existing,rows:mergedRows,lastSaleDate:existing.lastSaleDate,files:[...(existing.files||[]),file.name]};
           }else{
             newSnapshots.push({id:'snap_'+month+'_appt',date:snapDate,rows:parsed,files:[file.name],type:'appointments'});
           }
@@ -3073,9 +3184,12 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           const SB=window.__SB;
           if(SB){
             const chunks=[];
-            for(let i=0;i<newDailyAppts.length;i+=100)chunks.push(newDailyAppts.slice(i,i+100));
+            for(let i=0;i<newDailyAppts.length;i+=500)chunks.push(newDailyAppts.slice(i,i+500));
+            let done=0;
             for(const chunk of chunks){
               await SB.from('daily_appointments').upsert(chunk);
+              done++;
+              if(chunks.length>1)setImportMsg({type:'info',msg:`Saving to Supabase… ${Math.round(done/chunks.length*100)}%`});
             }
           }
         }
@@ -3114,7 +3228,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           const SB=window.__SB;
           if(SB){
             const chunks=[];
-            for(let i=0;i<newDailyRev.length;i+=100)chunks.push(newDailyRev.slice(i,i+100));
+            for(let i=0;i<newDailyRev.length;i+=500)chunks.push(newDailyRev.slice(i,i+500));
             for(const chunk of chunks){
               await SB.from('daily_revenue').upsert(chunk);
             }
@@ -4053,6 +4167,46 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:14,color:'#aaa',lineHeight:1.7}}>
             <strong style={{color:'var(--lime)'}}>Retention %</strong> — Manually enter each practitioner's member retention rate. Pull this from Jane's Member Retention report (Reports → Member Retention → filter by staff). Target: ≥75% good · ≥85% strong.
           </div>
+          {retentionSummary&&(()=>{
+            const cards=[{name:'Clinic-wide',m:retentionSummary.clinic},...retentionSummary.locations.map(l=>({name:l.name,m:l}))];
+            const retC=(n)=>n==null?'#555':n>=85?'#CAE8C1':n>=75?'#44ccaa':n>=65?'#F4DB71':'#E05252';
+            return(
+              <div className="perf-slot" style={{marginBottom:14}}>
+                <div className="perf-slot-head">
+                  <span className="perf-slot-title" style={{color:'#BB99FF'}}>Clinic & Location Retention — from Jane Member Retention report</span>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}>
+                    <span style={{fontSize:13,color:'#777'}}>{retentionSummary.importedAt?'Imported '+new Date(retentionSummary.importedAt).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):''}</span>
+                    <button className="btn btn-ghost btn-xs" style={{color:'#E05252',fontSize:14}} onClick={()=>{if(confirm('Clear the imported retention summary?')){setRetentionSummary(null);try{localStorage.removeItem('rvgd3_retention_summary');}catch(e){}}}}>Clear</button>
+                  </div>
+                </div>
+                <div className="perf-slot-body">
+                  <div style={{display:'flex',flexWrap:'wrap',gap:12}}>
+                    {cards.map((c,i)=>{
+                      const pr=c.m.pctReturning;
+                      return(
+                        <div key={i} style={{flex:'1 1 220px',minWidth:220,background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'12px 14px'}}>
+                          <div style={{fontSize:13,color:'#999',fontWeight:600,marginBottom:8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{i===0?'🏥 ':'📍 '}{c.name}</div>
+                          <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}>
+                            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:34,fontWeight:800,color:retC(pr),lineHeight:1}}>{pr!=null?pr+'%':'—'}</span>
+                            <span style={{fontSize:13,color:'#777'}}>returning</span>
+                          </div>
+                          {pr!=null&&<div style={{height:4,background:'var(--surface2)',borderRadius:2,marginBottom:10}}><div style={{height:'100%',borderRadius:2,background:retC(pr),width:Math.min(100,pr)+'%'}}/></div>}
+                          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontSize:13,color:'#aaa'}}>
+                            {c.m.newPatients!=null&&<div>New: <strong style={{color:'#ddd'}}>{c.m.newPatients}</strong></div>}
+                            {c.m.returningPatients!=null&&<div>Returning: <strong style={{color:'#ddd'}}>{c.m.returningPatients}</strong></div>}
+                            {c.m.totalPatients!=null&&<div>Patients: <strong style={{color:'#ddd'}}>{c.m.totalPatients}</strong></div>}
+                            {c.m.totalVisits!=null&&<div>Visits: <strong style={{color:'#ddd'}}>{c.m.totalVisits}</strong></div>}
+                            {c.m.pctRepeatVisits!=null&&<div style={{gridColumn:'1 / -1'}}>Repeat visits: <strong style={{color:'#ddd'}}>{c.m.pctRepeatVisits}%</strong></div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{fontSize:13,color:'#666',marginTop:10,lineHeight:1.6}}>This is clinic- and location-level data from the Member Retention report. Per-practitioner retention is entered manually below.</div>
+                </div>
+              </div>
+            );
+          })()}
           <div className="perf-slot">
             <div className="perf-slot-head">
               <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — Manual Entry</span>
@@ -4273,16 +4427,16 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             <input id="jane-csv-in" type="file" accept=".csv" onChange={e=>{handleFile(e.target.files[0]);e.target.value='';}}/>
             <div style={{fontSize:32,marginBottom:10}}>📊</div>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:700,color:'var(--lime)',letterSpacing:'1px',marginBottom:4}}>
-              {importing?'Processing…':'Drop Appointments or Shift Report CSV here'}
+              {importing?'Processing…':'Drop Appointments, Sales, Shift, or Member Retention CSV here'}
             </div>
             <div style={{fontSize:14,color:'#777'}}>Auto-detects file type · Both files can be imported for the same snapshot date</div>
           </div>
 
           {importMsg&&(
             <div style={{marginTop:10,padding:'10px 14px',borderRadius:5,fontSize:14,lineHeight:1.6,
-              background:importMsg.type==='success'?'rgba(68,204,170,.08)':'rgba(224,82,82,.08)',
-              border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':'rgba(224,82,82,.2)'}`,
-              color:importMsg.type==='success'?'#44CCAA':'#E05252'}}>
+              background:importMsg.type==='success'?'rgba(68,204,170,.08)':importMsg.type==='info'?'rgba(202,232,193,.06)':'rgba(224,82,82,.08)',
+              border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':importMsg.type==='info'?'rgba(202,232,193,.18)':'rgba(224,82,82,.2)'}`,
+              color:importMsg.type==='success'?'#44CCAA':importMsg.type==='info'?'#aaa':'#E05252'}}>
               {importMsg.msg}
             </div>
           )}
