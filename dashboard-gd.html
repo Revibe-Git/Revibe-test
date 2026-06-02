@@ -2778,6 +2778,18 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const curMonth=new Date().toISOString().slice(0,7);
   const[dateFrom,setDateFrom]=useState(curMonth);
   const[dateTo,setDateTo]=useState(curMonth);
+  // Auto-fit the date window to imported data the first time it loads, so the
+  // tabs don't sit on an empty current month when all the data is historical.
+  const autoRangedRef=useRef(false);
+  useEffect(()=>{
+    if(autoRangedRef.current)return;
+    if(!data.snapshots||!data.snapshots.length)return;
+    const months=data.snapshots.map(s=>s.date.slice(0,7)).sort();
+    const min=months[0],max=months[months.length-1];
+    const hasInWindow=months.some(m=>(!dateFrom||m>=dateFrom)&&(!dateTo||m<=dateTo));
+    if(!hasInWindow){setDateFrom(min);setDateTo(max);}
+    autoRangedRef.current=true;
+  },[data.snapshots]);
   // Custom date range for daily granular data (null = use monthly snapshots)
   const[customFrom,setCustomFrom]=useState('');
   const[customTo,setCustomTo]=useState('');
@@ -4406,7 +4418,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 onClick={async()=>{
                   if(!window.confirm(`Purge all ${type} data?`))return;
                   const SB=window.__SB;let err=null;
-                  if(type==='retention'){if(SB){const r1=await SB.from('retention_snapshots').delete().neq('id','_none_');const r2=await SB.from('retention_full').delete().neq('id','_none_');if(r1.error)err=r1.error.message;if(r2.error)err=r2.error.message;}setRetentionSnapshots([]);save({...data,retentionFull:{},retentionClinic:{},retentionImportDate:null,retention:{}});}
+                  if(type==='retention'){if(SB){const r1=await SB.from('retention_entries').delete().neq('staff_id','_none_');if(r1.error)err=r1.error.message;}setRetentionSummary(null);try{localStorage.removeItem('rvgd3_retention_summary');}catch(e){}save({...data,retention:{}});}
                   else{const remaining=data.snapshots.filter(s=>s.type!==type);if(SB){const toDel=data.snapshots.filter(s=>s.type===type);for(const s of toDel){const r=await SB.from('performance_snapshots').delete().eq('id',s.id);if(r.error)err=r.error.message;}if(type==='appointments'){const r=await SB.from('daily_appointments').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyAppts([]);try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}}if(type==='sales'){const r=await SB.from('daily_revenue').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyRevenue([]);try{localStorage.removeItem('rvgd3_daily_rev');}catch(e){}}}save({...data,snapshots:remaining});}
                   if(err){setImportMsg({type:'error',msg:`Purge error: ${err}`});return;}
                   setImportMsg({type:'success',msg:`✓ ${type} purged. Reloading…`});setTimeout(()=>window.location.reload(),800);
