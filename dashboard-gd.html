@@ -2364,7 +2364,8 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
     return new Date(d.getFullYear(),d.getMonth(),diff).toISOString().slice(0,10);
   };
 
-  const inRange=()=>true;
+  const inRange=(d)=>(!dateFrom||d>=dateFrom)&&(!dateTo||d<=dateTo);
+  const _ranged=!!(dateFrom||dateTo);
 
   const filterRow=(r)=>{
     if(staffId)return r.staff_id===staffId;
@@ -2438,7 +2439,7 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
   let _lastDataDate=_maxDaily||_snapLastDate||_today;
   if(_lastDataDate>_today)_lastDataDate=_today; // hard guard against future weeks
   const _allWeeks=Object.values(weekMap).filter(w=>w.wk<=_lastDataDate).sort((a,b)=>a.wk.localeCompare(b.wk));
-  const weeks=weekWindow==='all'?_allWeeks:_allWeeks.slice(-weekWindow);
+  const weeks=(weekWindow==='all'||_ranged)?_allWeeks:_allWeeks.slice(-weekWindow);
   if(!weeks.length)return<div style={{fontSize:14,color:'#777',padding:'40px',textAlign:'center'}}>No weekly data for this period.<br/><span style={{fontSize:12,color:'#555'}}>Import Appointments CSV to enable weekly trends.</span></div>;
 
   const metrics=[
@@ -2453,10 +2454,15 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
   const maxVal=Math.max(...vals,1);
   const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
   const fmtWk=(d,short)=>{
-    const dt=new Date(d+'T12:00');
-    const yy=String(dt.getFullYear()).slice(2);
-    return short?`${dt.toLocaleDateString('en-CA',{month:'short',day:'numeric'})} '${yy}`:
-      `Week of ${dt.toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'})}`;
+    const a=new Date(d+'T12:00');
+    const b=new Date(d+'T12:00');b.setDate(b.getDate()+6);
+    const mA=a.toLocaleDateString('en-CA',{month:'short'});
+    const mB=b.toLocaleDateString('en-CA',{month:'short'});
+    const yr=a.getFullYear();
+    if(short){
+      return mA===mB?`${mA} ${a.getDate()}–${b.getDate()}`:`${mA} ${a.getDate()}–${mB} ${b.getDate()}`;
+    }
+    return mA===mB?`${mA} ${a.getDate()}–${b.getDate()}, ${yr}`:`${mA} ${a.getDate()} – ${mB} ${b.getDate()}, ${yr}`;
   };
 
   // Bar chart dimensions
@@ -3511,6 +3517,47 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
   const buildReport=()=>{const cur=reportAgg(reportPeriod.from,reportPeriod.to);const prev=reportAgg(reportPeriod.prevFrom,reportPeriod.prevTo);return{cur,prev,movers:computeMovers(cur,prev)};};
 
+  // Auto-generated red flags, gaps, and wins to drive 1:1 / action-planning dialogue
+  const buildInsights=(cur,prev,isMonth)=>{
+    const per='vs prior '+(isMonth?'month':'week');
+    const lastP='last '+(isMonth?'month':'week');
+    const pm={};prev.perStaff.forEach(p=>pm[p.id]=p);
+    const flags=[],gaps=[],wins=[];
+    const sched=(x)=>x.visits+x.noShows+x.cancels;
+    const cT=cur.totals,pT=prev.totals;
+    const cSched=cT.visits+cT.noShows+cT.cancels;
+    const clinicNoShow=cSched>0?cT.noShows/cSched*100:0;
+    const pSched=pT.visits+pT.noShows+pT.cancels;
+    const prevNoShow=pSched>0?pT.noShows/pSched*100:0;
+    // ── Clinic-level flags ──
+    if(pT.revenue>0){const dr=(cT.revenue-pT.revenue)/pT.revenue*100;
+      if(dr<=-15)flags.push({sev:'high',title:`Clinic revenue down ${Math.abs(dr).toFixed(0)}% ${per}`,detail:`${fmtMoney(cT.revenue)} this period vs ${fmtMoney(pT.revenue)} prior.`,action:'Pinpoint which disciplines/practitioners drove it (see movers) and rule out a holiday or missing-import artifact.'});
+      else if(dr<=-10)flags.push({sev:'med',title:`Clinic revenue down ${Math.abs(dr).toFixed(0)}% ${per}`,detail:`${fmtMoney(cT.revenue)} vs ${fmtMoney(pT.revenue)}.`,action:'Watch into next period; check schedule fill across the team.'});}
+    if(clinicNoShow>=12)flags.push({sev:clinicNoShow>=18?'high':'med',title:`Clinic no-show rate ${clinicNoShow.toFixed(0)}%`,detail:`${cT.noShows} no-shows of ~${cSched} booked${pSched?` (was ${prevNoShow.toFixed(0)}%)`:''}.`,action:'Tighten confirmations (48h + day-of) and revisit deposit / late-cancel policy.'});
+    if(pT.ias>0){const di=(cT.ias-pT.ias)/pT.ias*100;if(di<=-30)flags.push({sev:'med',title:`New-patient (IA) volume down ${Math.abs(di).toFixed(0)}% ${per}`,detail:`${cT.ias} initial assessments vs ${pT.ias} prior.`,action:'Pipeline gap — review lead follow-up, online-booking availability, and marketing spend.'});}
+    // ── Per-practitioner ──
+    const clinAvgRpv=cT.visits>0?cT.revenue/cT.visits:0;
+    cur.perStaff.forEach(c=>{
+      const p=pm[c.id]||{visits:0,revenue:0,noShows:0,cancels:0,ias:0};
+      const cs=sched(c);const nsr=cs>0?c.noShows/cs*100:0;const csr=cs>0?c.cancels/cs*100:0;
+      const rpv=c.visits>0?c.revenue/c.visits:0;const first=c.name.split(' ')[0];
+      if(p.visits>=5&&c.visits===0)flags.push({sev:'high',title:`${c.name}: no completed visits`,detail:`Had ${p.visits} ${lastP}; zero this period.`,action:`Confirm ${first}'s availability — is this leave, a data gap, or a real stop?`,score:9000});
+      else if(c.noShows>=3&&nsr>=15)flags.push({sev:nsr>=25?'high':'med',title:`${c.name}: ${c.noShows} no-shows (${nsr.toFixed(0)}% of booked)`,detail:`${c.visits} completed · ${c.noShows} no-shows · ${c.cancels} cancels.`,action:`Review ${first}'s reminder/confirmation flow and rebooking of no-shows.`,score:c.noShows*100});
+      if(c.cancels>=4&&csr>=15)gaps.push({title:`${c.name}: ${c.cancels} cancellations (${csr.toFixed(0)}%)`,detail:'High cancel rate is eroding bookable capacity.',action:`Check booking lead-time and whether cancelled slots get backfilled.`,score:c.cancels*80});
+      if(c.visits>=5&&clinAvgRpv>0&&rpv<clinAvgRpv*0.6)gaps.push({title:`${c.name}: ${fmtMoney(rpv)}/visit (clinic ${fmtMoney(clinAvgRpv)})`,detail:'Revenue per visit well below the clinic average.',action:`Treatment-plan, rebooking, and service-mix conversation with ${first}.`,score:(clinAvgRpv-rpv)*c.visits});
+      if(isMonth&&c.visits>=8&&c.ias===0)gaps.push({title:`${c.name}: no new patients this month`,detail:`${c.visits} visits but 0 initial assessments — all repeat work.`,action:`Is ${first} open to new-patient bookings? Adjust online availability if so.`,score:c.visits*5});
+      // wins
+      const dr=c.revenue-p.revenue,dv=c.visits-p.visits;
+      if(dr>=500&&(p.revenue===0||dr/p.revenue>=0.2))wins.push({title:`${c.name}: revenue up ${fmtMoney(dr)}`,detail:`${fmtMoney(p.revenue)} → ${fmtMoney(c.revenue)}.`,score:dr});
+      else if(dv>=4)wins.push({title:`${c.name}: +${dv} visits`,detail:`${p.visits} → ${c.visits} completed.`,score:dv*100});
+    });
+    if(pSched>0&&prevNoShow-clinicNoShow>=3)wins.push({title:'No-show rate improving',detail:`${prevNoShow.toFixed(0)}% → ${clinicNoShow.toFixed(0)}% clinic-wide.`,score:8000});
+    flags.sort((a,b)=>((b.sev==='high')-(a.sev==='high'))||((b.score||0)-(a.score||0)));
+    gaps.sort((a,b)=>b.score-a.score);
+    wins.sort((a,b)=>b.score-a.score);
+    return{flags:flags.slice(0,7),gaps:gaps.slice(0,6),wins:wins.slice(0,4),clinicNoShow};
+  };
+
   const navPeriod=(dir)=>{
     const a=reportAnchor||dailyDateRange.max||new Date().toISOString().slice(0,10);
     if(reportType==='month'){const d=new Date(a+'T12:00');d.setMonth(d.getMonth()+dir);setReportAnchor(d.toISOString().slice(0,10));}
@@ -3616,6 +3663,47 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               );
             })}
           </div>
+
+          {/* Red flags / gaps / wins — action-planning section */}
+          {!noData&&(()=>{
+            const ins=buildInsights(cur,prev,isMonth);
+            const secTitle={fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:12,fontWeight:700};
+            return(
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:14,marginBottom:24}}>
+                <div style={{background:'rgba(224,82,82,.05)',border:'1px solid rgba(224,82,82,.25)',borderRadius:10,padding:'16px 18px'}}>
+                  <div style={{...secTitle,color:'#E05252'}}>⚑ Red Flags &amp; Watch List</div>
+                  {ins.flags.length?ins.flags.map((f,i)=>(
+                    <div key={i} style={{marginBottom:i<ins.flags.length-1?12:0,paddingBottom:i<ins.flags.length-1?12:0,borderBottom:i<ins.flags.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
+                      <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap'}}>
+                        <span style={{fontSize:9,fontWeight:800,letterSpacing:'.5px',padding:'2px 6px',borderRadius:3,background:f.sev==='high'?'rgba(224,82,82,.18)':'rgba(224,160,82,.18)',color:f.sev==='high'?'#E05252':'#E0A052'}}>{f.sev==='high'?'HIGH':'WATCH'}</span>
+                        <span style={{fontSize:14,fontWeight:700,color:'#eee'}}>{f.title}</span>
+                      </div>
+                      <div style={{fontSize:13,color:'#aaa',marginTop:4}}>{f.detail}</div>
+                      <div style={{fontSize:13,color:'#CAE8C1',marginTop:3}}>→ {f.action}</div>
+                    </div>
+                  )):<div style={{fontSize:13,color:'#777',fontStyle:'italic'}}>No red flags this period — nothing breached the thresholds.</div>}
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                  <div style={{background:'rgba(244,219,113,.05)',border:'1px solid rgba(244,219,113,.22)',borderRadius:10,padding:'16px 18px',flex:1}}>
+                    <div style={{...secTitle,color:'#F4DB71'}}>◎ Gaps &amp; Opportunities</div>
+                    {ins.gaps.length?ins.gaps.map((g,i)=>(
+                      <div key={i} style={{marginBottom:i<ins.gaps.length-1?11:0}}>
+                        <div style={{fontSize:14,fontWeight:700,color:'#eee'}}>{g.title}</div>
+                        <div style={{fontSize:13,color:'#aaa'}}>{g.detail}</div>
+                        <div style={{fontSize:13,color:'#CAE8C1',marginTop:2}}>→ {g.action}</div>
+                      </div>
+                    )):<div style={{fontSize:13,color:'#777',fontStyle:'italic'}}>No notable gaps flagged this period.</div>}
+                  </div>
+                  {ins.wins.length>0&&(
+                    <div style={{background:'rgba(68,204,170,.05)',border:'1px solid rgba(68,204,170,.22)',borderRadius:10,padding:'16px 18px'}}>
+                      <div style={{...secTitle,color:'#44CCAA',marginBottom:10}}>★ Wins to Recognize</div>
+                      {ins.wins.map((w,i)=>(<div key={i} style={{marginBottom:i<ins.wins.length-1?8:0}}><span style={{fontSize:14,fontWeight:700,color:'#eee'}}>{w.title}</span><span style={{fontSize:13,color:'#aaa'}}> — {w.detail}</span></div>))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Breakdowns */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:20,marginBottom:24}}>
@@ -4276,7 +4364,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{display:'flex',gap:4}}>{[['monthly','Monthly'],['weekly','Weekly']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${trendGranularity===v?'btn-go':'btn-ghost'}`} onClick={()=>setTrendGranularity(v)}>{l}</button>))}</div>
               <div style={{width:1,height:20,background:'var(--border2)',flexShrink:0}}/>
               {trendGranularity!=='weekly'&&<div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{[['3m','3 Mo'],['6m','6 Mo'],['ytd','YTD'],['12m','12 Mo'],['all','All']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${trendTimeframe===v&&!trendFrom?'btn-go':'btn-ghost'}`} onClick={()=>{setTrendTimeframe(v);setTrendFrom('');setTrendTo('');}}>{l}</button>))}</div>}
-              {trendGranularity!=='weekly'&&<div style={{display:'flex',alignItems:'center',gap:6}}><input type="date" value={trendFrom} onChange={e=>{setTrendFrom(e.target.value);setTrendTimeframe('');}} style={{background:'var(--surface3)',border:'1px solid '+(trendFrom?'var(--go)':'var(--border2)'),borderRadius:4,color:trendFrom?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/><span style={{color:'#555',fontSize:12}}>→</span><input type="date" value={trendTo} onChange={e=>{setTrendTo(e.target.value);setTrendTimeframe('');}} style={{background:'var(--surface3)',border:'1px solid '+(trendTo?'var(--go)':'var(--border2)'),borderRadius:4,color:trendTo?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/>{(trendFrom||trendTo)&&<button className="btn btn-ghost btn-xs" onClick={()=>{setTrendFrom('');setTrendTo('');setTrendTimeframe('12m');}}>✕</button>}</div>}
+              {<div style={{display:'flex',alignItems:'center',gap:6}}><input type="date" value={trendFrom} onChange={e=>{setTrendFrom(e.target.value);setTrendTimeframe('');}} style={{background:'var(--surface3)',border:'1px solid '+(trendFrom?'var(--go)':'var(--border2)'),borderRadius:4,color:trendFrom?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/><span style={{color:'#555',fontSize:12}}>→</span><input type="date" value={trendTo} onChange={e=>{setTrendTo(e.target.value);setTrendTimeframe('');}} style={{background:'var(--surface3)',border:'1px solid '+(trendTo?'var(--go)':'var(--border2)'),borderRadius:4,color:trendTo?'var(--lime)':'#666',fontSize:12,padding:'4px 7px',outline:'none',width:130}}/>{(trendFrom||trendTo)&&<button className="btn btn-ghost btn-xs" onClick={()=>{setTrendFrom('');setTrendTo('');setTrendTimeframe('12m');}}>✕</button>}</div>}
             </div>
             <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
               <select value={trendDisc} onChange={e=>setTrendDisc(e.target.value)} style={{background:'var(--surface3)',border:'1px solid '+(trendDisc!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:trendDisc!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:140}}><option value="all">All Disciplines</option>{[...new Set(staff.filter(s=>s.discipline&&!['mgmt','ops','edu'].includes(s.discipline)).map(s=>s.discipline))].sort().map(d=>(<option key={d} value={d}>{d}</option>))}</select>
