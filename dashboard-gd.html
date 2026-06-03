@@ -2970,22 +2970,22 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
   /* ── Parse daily revenue ───────────────────── */
   const parseDailyRevenue=(rows)=>{
+    // Match the books: billed Total, ALL income categories, ALL statuses, by purchase date.
+    // Matched clinical practitioners get their own staff_id; everything else (front desk,
+    // retail/product, Guest Experience, Relax Spa, unmatched names) buckets to '_clinic'
+    // so the clinic total still reconciles to Jane's Sales total.
     const byKey={};
     rows.forEach(r=>{
-      const name=r['staff member']||'';
-      if(!name)return;
-      const matched=matchStaff(name);
-      if(!matched)return;
-      const status=(r['status']||'').toLowerCase();
-      if(!['paid','partially_paid','partially_paid_and_written_off'].includes(status))return;
-      if((r['income category']||'').toLowerCase()!=='treatment income')return;
-      const collected=parseFloat((r['collected']||'0').toString().replace(/[$,]/g,''))||0;
-      if(collected<=0)return;
-      const dateStr=(r['purchase date']||'').slice(0,10);
+      const total=parseFloat((r['total']||'0').toString().replace(/[$,\s]/g,''))||0;
+      if(!total)return;
+      const dateStr=(r['purchase date']||r['invoice date']||'').slice(0,10);
       if(!dateStr||dateStr.length!==10)return;
-      const key=matched.id+'_'+dateStr;
-      if(!byKey[key])byKey[key]={id:key,staff_id:matched.id,date:dateStr,revenue:0};
-      byKey[key].revenue+=collected;
+      const name=(r['staff member']||r['staff_member']||'').trim();
+      const matched=name?matchStaff(name):null;
+      const sid=matched?matched.id:'_clinic';
+      const key=sid+'_'+dateStr;
+      if(!byKey[key])byKey[key]={id:key,staff_id:sid,date:dateStr,revenue:0};
+      byKey[key].revenue+=total;
     });
     return Object.values(byKey).map(r=>({...r,revenue:Math.round(r.revenue*100)/100}));
   };
@@ -3507,12 +3507,14 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const byStaff={};
     const touch=(id)=>{const s=staff.find(x=>x.id===id);if(!s||['mgmt','ops','edu'].includes(s.discipline))return null;if(!byStaff[id])byStaff[id]={id,name:s.name,disc:s.discipline,site:s.site||'—',visits:0,ias:0,noShows:0,cancels:0,revenue:0};return byStaff[id];};
     dailyAppts.forEach(r=>{if(r.date<from||r.date>to)return;const b=touch(r.staff_id);if(!b)return;b.visits+=(r.completed||0);b.ias+=(r.initial_assessments||0);b.noShows+=(r.no_shows||0);b.cancels+=(r.cancellations||0);});
-    dailyRevenue.forEach(r=>{if(r.date<from||r.date>to)return;const b=touch(r.staff_id);if(!b)return;b.revenue+=(r.revenue||0);});
+    let otherRev=0;
+    dailyRevenue.forEach(r=>{if(r.date<from||r.date>to)return;const b=touch(r.staff_id);if(!b){otherRev+=(r.revenue||0);return;}b.revenue+=(r.revenue||0);});
     const list=Object.values(byStaff);
     const totals=list.reduce((a,b)=>({revenue:a.revenue+b.revenue,visits:a.visits+b.visits,ias:a.ias+b.ias,noShows:a.noShows+b.noShows,cancels:a.cancels+b.cancels}),{revenue:0,visits:0,ias:0,noShows:0,cancels:0});
+    totals.revenue=Math.round((totals.revenue+otherRev)*100)/100; // include front-desk / retail / unmatched so the total matches the books
     const byDisc={};DISC_CLIN.forEach(d=>{const rows=list.filter(x=>x.disc===d.id);if(rows.length)byDisc[d.id]={label:d.label,abbr:d.abbr,revenue:rows.reduce((a,b)=>a+b.revenue,0),visits:rows.reduce((a,b)=>a+b.visits,0),ias:rows.reduce((a,b)=>a+b.ias,0)};});
     const byLoc={};list.forEach(x=>{const k=x.site||'—';if(!byLoc[k])byLoc[k]={revenue:0,visits:0,ias:0};byLoc[k].revenue+=x.revenue;byLoc[k].visits+=x.visits;byLoc[k].ias+=x.ias;});
-    return{totals,byDisc,byLoc,perStaff:list};
+    return{totals,byDisc,byLoc,perStaff:list,otherRev:Math.round(otherRev*100)/100};
   };
 
   const computeMovers=(cur,prev)=>{
