@@ -2656,7 +2656,22 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[viewingSaved,setViewingSaved]=useState(null);
   const[savedReports,setSavedReports]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_reports'))||[];}catch(e){return[];}});
   // ── Clinic/location retention summary (from Jane Member Retention report upload) ──
-  const[retentionSummary,setRetentionSummary]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_retention_summary'))||null;}catch(e){return null;}});
+  // Retention is stored per month so multiple report periods coexist (Jan, May, …).
+  const[retentionSummaries,setRetentionSummaries]=useState(()=>{
+    try{
+      const keyed=JSON.parse(localStorage.getItem('rvgd3_retention_summaries')||'null');
+      if(keyed&&typeof keyed==='object')return keyed;
+      // migrate a single legacy summary into the keyed store
+      const legacy=JSON.parse(localStorage.getItem('rvgd3_retention_summary')||'null');
+      if(legacy&&legacy.period)return{[legacy.period]:legacy};
+      if(legacy)return{'legacy':legacy};
+    }catch(e){}
+    return {};
+  });
+  const[retViewMonth,setRetViewMonth]=useState('');
+  const retMonthsAvail=Object.keys(retentionSummaries).sort();
+  const retActiveMonth=retViewMonth&&retentionSummaries[retViewMonth]?retViewMonth:(retMonthsAvail[retMonthsAvail.length-1]||'');
+  const retentionSummary=retActiveMonth?retentionSummaries[retActiveMonth]:null;
 
   // Load daily data from localStorage on mount
   useEffect(()=>{
@@ -2808,6 +2823,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[retSaved,setRetSaved]=useState(false);
   const[periodFilter,setPeriodFilter]=useState(()=>new Date().toISOString().slice(0,7));
   const curMonth=new Date().toISOString().slice(0,7);
+  // The latest month that actually has data — relative presets anchor here, not the
+  // literal calendar month, so "Latest Mo" / "Last 3 Mo" always land on real data.
+  const dataMaxMonth=(data.snapshots&&data.snapshots.length)?data.snapshots.map(s=>s.date.slice(0,7)).sort().slice(-1)[0]:curMonth;
   const[dateFrom,setDateFrom]=useState(curMonth);
   const[dateTo,setDateTo]=useState(curMonth);
   // Keep the date window fitted to the data. Whenever snapshots are present but the
@@ -3173,8 +3191,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         const periodLabel=new Date(retentionMonth+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
         const monthEnd=new Date(parseInt(retentionMonth.slice(0,4)),parseInt(retentionMonth.slice(5,7)),0).toISOString().slice(0,10);
         summary.period=retentionMonth;summary.periodLabel=periodLabel;
-        setRetentionSummary(summary);
-        try{localStorage.setItem('rvgd3_retention_summary',JSON.stringify(summary));}catch(e){}
+        setRetentionSummaries(prev=>{const next={...prev,[retentionMonth]:summary};try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(next));}catch(e){}return next;});
+        setRetViewMonth(retentionMonth);
         // Auto-fill per-practitioner retention (matched by name) into data.retention + Supabase
         const nr={...(data.retention||{})};
         let filled=0;
@@ -3873,10 +3891,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           {/* Quick period pills */}
           <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
             {[
-              {l:'This Month',f:curMonth,t:curMonth},
-              {l:'Last 3 Mo',f:(()=>{const d=new Date();d.setMonth(d.getMonth()-2);return d.toISOString().slice(0,7)})(),t:curMonth},
-              {l:'Last 6 Mo',f:(()=>{const d=new Date();d.setMonth(d.getMonth()-5);return d.toISOString().slice(0,7)})(),t:curMonth},
-              {l:'YTD',f:new Date().getFullYear()+'-01',t:curMonth},
+              {l:'Latest Mo',f:dataMaxMonth,t:dataMaxMonth},
+              {l:'Last 3 Mo',f:(()=>{const d=new Date(dataMaxMonth+'-01T12:00');d.setMonth(d.getMonth()-2);return d.toISOString().slice(0,7)})(),t:dataMaxMonth},
+              {l:'Last 6 Mo',f:(()=>{const d=new Date(dataMaxMonth+'-01T12:00');d.setMonth(d.getMonth()-5);return d.toISOString().slice(0,7)})(),t:dataMaxMonth},
+              {l:'YTD',f:dataMaxMonth.slice(0,4)+'-01',t:dataMaxMonth},
               {l:'2025',f:'2025-01',t:'2025-12'},
               {l:'All Time',f:'',t:''},
             ].map(({l,f,t})=>(
@@ -4377,6 +4395,18 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:14,color:'#aaa',lineHeight:1.7}}>
             <strong style={{color:'var(--lime)'}}>Retention %</strong> — Manually enter each practitioner's member retention rate. Pull this from Jane's Member Retention report (Reports → Member Retention → filter by staff). Target: ≥75% good · ≥85% strong.
           </div>
+          {retMonthsAvail.length>0&&(
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:14,flexWrap:'wrap'}}>
+              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#BB99FF'}}>Retention Period</span>
+              <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+                {retMonthsAvail.slice().reverse().map(mo=>{
+                  const lbl=retentionSummaries[mo]?.periodLabel||mo;
+                  return(<button key={mo} className={`btn btn-sm ${retActiveMonth===mo?'btn-go':'btn-ghost'}`} onClick={()=>setRetViewMonth(mo)}>{lbl}</button>);
+                })}
+              </div>
+              {retMonthsAvail.length===1&&<span style={{fontSize:13,color:'#666'}}>import more months to compare — set the Retention Report Month on the Jane Import tab before dropping</span>}
+            </div>
+          )}
           {retentionSummary&&(()=>{
             const cards=[{name:'Clinic-wide',m:retentionSummary.clinic},...retentionSummary.locations.map(l=>({name:l.name,m:l}))];
             const retC=(n)=>n==null?'#555':n>=85?'#CAE8C1':n>=75?'#44ccaa':n>=65?'#F4DB71':'#E05252';
@@ -4389,7 +4419,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <span className="perf-slot-title" style={{color:'#BB99FF'}}>Clinic &amp; Location Retention{retentionSummary.periodLabel?` — ${retentionSummary.periodLabel}`:''}</span>
                   <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <span style={{fontSize:13,color:'#777'}}>{retentionSummary.importedAt?'Imported '+new Date(retentionSummary.importedAt).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):''}</span>
-                    <button className="btn btn-ghost btn-xs" style={{color:'#E05252',fontSize:14}} onClick={()=>{if(confirm('Clear the imported retention summary?')){setRetentionSummary(null);try{localStorage.removeItem('rvgd3_retention_summary');}catch(e){}}}}>Clear</button>
+                    <button className="btn btn-ghost btn-xs" style={{color:'#E05252',fontSize:14}} onClick={()=>{if(confirm('Clear retention for '+(retentionSummary.periodLabel||retActiveMonth)+'?')){setRetentionSummaries(prev=>{const next={...prev};delete next[retActiveMonth];try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(next));}catch(e){}return next;});setRetViewMonth('');}}}>Clear</button>
                   </div>
                 </div>
                 <div className="perf-slot-body">
@@ -4659,7 +4689,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 onClick={async()=>{
                   if(!window.confirm(`Purge all ${type} data?`))return;
                   const SB=window.__SB;let err=null;
-                  if(type==='retention'){if(SB){const r1=await SB.from('retention_entries').delete().neq('staff_id','_none_');if(r1.error)err=r1.error.message;}setRetentionSummary(null);try{localStorage.removeItem('rvgd3_retention_summary');}catch(e){}save({...data,retention:{}});}
+                  if(type==='retention'){if(SB){const r1=await SB.from('retention_entries').delete().neq('staff_id','_none_');if(r1.error)err=r1.error.message;}setRetentionSummaries({});try{localStorage.removeItem('rvgd3_retention_summaries');localStorage.removeItem('rvgd3_retention_summary');}catch(e){}save({...data,retention:{}});}
                   else{const remaining=data.snapshots.filter(s=>s.type!==type);if(SB){const toDel=data.snapshots.filter(s=>s.type===type);for(const s of toDel){const r=await SB.from('performance_snapshots').delete().eq('id',s.id);if(r.error)err=r.error.message;}if(type==='appointments'){const r=await SB.from('daily_appointments').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyAppts([]);try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}}if(type==='sales'){const r=await SB.from('daily_revenue').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyRevenue([]);try{localStorage.removeItem('rvgd3_daily_rev');}catch(e){}}}save({...data,snapshots:remaining});}
                   if(err){setImportMsg({type:'error',msg:`Purge error: ${err}`});return;}
                   setImportMsg({type:'success',msg:`✓ ${type} purged. Reloading…`});setTimeout(()=>window.location.reload(),800);
