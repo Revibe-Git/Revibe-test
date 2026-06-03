@@ -1787,6 +1787,7 @@ const NAV=[
   {id:'mentors',   icon:'◐', label:'Mentor Leads'},
   {id:'gaps',      icon:'⚑', label:'Gap Analysis'},
   {id:'performance',icon:'📊', label:'Performance & Revenue'},
+  {id:'calls',     icon:'📞', label:'Call History'},
   {id:'reports',   icon:'📄', label:'Weekly Reports'},
   {id:'forms',     icon:'◻', label:'Check-In Forms'},
   {id:'resources',  icon:'❋', label:'Lead Resources'},
@@ -1979,7 +1980,7 @@ function App(){
     return{...s,evals:sEvals};
   },[activeId,staff,evals]);
 
-  const PAGES={overview:Overview,staff:StaffPage,evals:EvalsPage,education:EduPage,mentors:MentorsPage,gaps:GapsPage,performance:PerformancePage,reports:PerformancePage,forms:FormsPage,resources:ResourcesPage,leadership:LeadershipPage,schedule:SchedulePage,clinresources:ClinResourcesPage,gdtracker:GDTrackerPage,systematic:SystematicPage};
+  const PAGES={overview:Overview,staff:StaffPage,evals:EvalsPage,education:EduPage,mentors:MentorsPage,gaps:GapsPage,performance:PerformancePage,reports:PerformancePage,calls:CallHistoryPage,forms:FormsPage,resources:ResourcesPage,leadership:LeadershipPage,schedule:SchedulePage,clinresources:ClinResourcesPage,gdtracker:GDTrackerPage,systematic:SystematicPage};
   const PageComp=PAGES[page]||Overview;
 
   return(
@@ -2041,8 +2042,219 @@ function App(){
   );
 }
 
-/* ══ PERFORMANCE & REVENUE PAGE ══ */
-/* ══ PERFORMANCE & REVENUE PAGE ══ */
+/* ══ CALL HISTORY (Guest Experience) ══ */
+function CallHistoryPage(){
+  const CD=[{id:'pt',label:'Physio',color:'#CAE8C1'},{id:'chiro',label:'Chiro',color:'#BB99FF'},{id:'rmt',label:'RMT',color:'#F4DB71'},{id:'osteo',label:'Osteo',color:'#7FC8E8'},{id:'naturo',label:'Naturo',color:'#E89F7F'}];
+  const fmt=(n)=>Math.round(n||0).toLocaleString();
+  const blank=()=>Object.fromEntries(CD.map(c=>[c.id,{calls:'',booked:''}]));
+  const[log,setLog]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_call_log')||'{}');}catch(e){return{};}});
+  const persist=(next)=>{setLog(next);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(next));}catch(e){}};
+  const today=new Date().toISOString().slice(0,10);
+  const[d,setD]=useState(today);
+  const[total,setTotal]=useState('');
+  const[disc,setDisc]=useState(blank);
+  const[saved,setSaved]=useState(false);
+  useEffect(()=>{
+    const e=log[d];
+    if(e){setTotal(String(e.total??''));setDisc(Object.fromEntries(CD.map(c=>[c.id,{calls:String(e.disc&&e.disc[c.id]?e.disc[c.id].calls:'' ),booked:String(e.disc&&e.disc[c.id]?e.disc[c.id].booked:'')}])));}
+    else{setTotal('');setDisc(blank());}
+    setSaved(false);
+  },[d]);// eslint-disable-line
+  const setDV=(id,k,v)=>setDisc(p=>({...p,[id]:{...p[id],[k]:v.replace(/[^0-9]/g,'')}}));
+  const bookedOf=(e)=>CD.reduce((a,c)=>a+((e.disc&&e.disc[c.id]&&+e.disc[c.id].booked)||0),0);
+  const saveEntry=()=>{
+    const entry={total:parseInt(total)||0,disc:Object.fromEntries(CD.map(c=>[c.id,{calls:parseInt(disc[c.id].calls)||0,booked:parseInt(disc[c.id].booked)||0}]))};
+    persist({...log,[d]:entry});setSaved(true);setTimeout(()=>setSaved(false),1800);
+  };
+  const delEntry=(dt)=>{if(!confirm('Delete the call log for '+dt+'?'))return;const n={...log};delete n[dt];persist(n);};
+
+  const[tf,setTf]=useState('30');
+  const inTf=(dt)=>{if(tf==='all')return true;if(tf==='month')return dt.slice(0,7)===today.slice(0,7);const days=parseInt(tf);const cut=new Date(Date.now()-days*86400000).toISOString().slice(0,10);return dt>=cut;};
+  const dates=Object.keys(log).sort();
+  const fdates=dates.filter(inTf);
+  const totCalls=fdates.reduce((a,dt)=>a+(log[dt].total||0),0);
+  const totBooked=fdates.reduce((a,dt)=>a+bookedOf(log[dt]),0);
+  const rate=totCalls>0?totBooked/totCalls*100:0;
+  const byDisc=CD.map(c=>{const calls=fdates.reduce((a,dt)=>a+((log[dt].disc&&log[dt].disc[c.id]&&log[dt].disc[c.id].calls)||0),0);const booked=fdates.reduce((a,dt)=>a+((log[dt].disc&&log[dt].disc[c.id]&&log[dt].disc[c.id].booked)||0),0);return{...c,calls,booked,rate:calls>0?booked/calls*100:0};});
+  const topDisc=byDisc.slice().sort((a,b)=>b.booked-a.booked)[0];
+  const rateC=(r)=>r>=60?'#CAE8C1':r>=40?'#F4DB71':'#E05252';
+
+  // time-series (last 30 dated entries in window)
+  const ts=fdates.slice(-30).map(dt=>({dt,calls:log[dt].total||0,booked:bookedOf(log[dt])}));
+  const tsMax=Math.max(1,...ts.map(t=>t.calls));
+  const CW=Math.max(560,ts.length*34),CH=200,padB=34,padL=4,padT=10;
+  const bw=ts.length?Math.min(26,(CW-padL)/ts.length-8):20;
+  const discMax=Math.max(1,...byDisc.map(x=>x.calls));
+
+  const card=(label,val,sub,color)=>(<div style={{flex:'1 1 150px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'14px 16px'}}>
+    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:6}}>{label}</div>
+    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color,lineHeight:1}}>{val}</div>
+    <div style={{fontSize:12,color:'#666',marginTop:4}}>{sub}</div>
+  </div>);
+
+  return(<div>
+    <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:6}}>
+      <h2 style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,letterSpacing:'1px',textTransform:'uppercase',color:'#eee',margin:0}}>Call History</h2>
+      <span style={{fontSize:13,color:'#777'}}>Guest Experience · daily call → booking tracking</span>
+    </div>
+    <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:7,padding:'10px 14px',marginBottom:14,fontSize:13,color:'#999',lineHeight:1.6}}>
+      Log each day's <strong style={{color:'#ccc'}}>new calls</strong>, how many became <strong style={{color:'#ccc'}}>booked initials</strong>, and the split by discipline. Charts update as you enter data. Stored on this device.
+    </div>
+
+    {/* timeframe */}
+    <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
+      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginRight:4}}>View</span>
+      {[['30','Last 30d'],['90','Last 90d'],['month','This Month'],['all','All Time']].map(([v,l])=>(
+        <button key={v} className={`btn btn-sm ${tf===v?'btn-go':'btn-ghost'}`} onClick={()=>setTf(v)}>{l}</button>
+      ))}
+    </div>
+
+    {dates.length===0?(
+      <div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:8,padding:'30px 20px',textAlign:'center',color:'#777',marginBottom:18}}>
+        <div style={{fontSize:30,marginBottom:8}}>📞</div>No calls logged yet — add your first day below.
+      </div>
+    ):(<>
+      {/* KPI cards */}
+      <div style={{display:'flex',flexWrap:'wrap',gap:12,marginBottom:16}}>
+        {card('New Calls',fmt(totCalls),fdates.length+' day'+(fdates.length===1?'':'s')+' logged','#7FC8E8')}
+        {card('Initials Booked',fmt(totBooked),'from calls','#CAE8C1')}
+        {card('Booking Rate',rate.toFixed(1)+'%',totBooked+' of '+totCalls+' calls',rateC(rate))}
+        {card('Top Discipline',topDisc&&topDisc.booked>0?topDisc.label:'—',topDisc&&topDisc.booked>0?topDisc.booked+' booked':'no bookings yet','#BB99FF')}
+      </div>
+
+      {/* time series */}
+      <div className="perf-slot" style={{marginBottom:14}}>
+        <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#7FC8E8'}}>Calls vs Booked Over Time</span><span style={{fontSize:12,color:'#666'}}>light = total calls · solid = booked</span></div>
+        <div className="perf-slot-body" style={{overflowX:'auto'}}>
+          {ts.length===0?<div style={{color:'#666',padding:'20px 0',textAlign:'center'}}>No entries in this window.</div>:
+          <svg viewBox={`0 0 ${CW} ${CH}`} style={{width:'100%',minWidth:Math.min(CW,560),height:CH}}>
+            {[0,.5,1].map(g=>{const y=padT+(1-g)*(CH-padB-padT);return(<g key={g}><line x1={padL} y1={y} x2={CW} y2={y} stroke="var(--border)" strokeDasharray="2 4"/><text x={padL} y={y-3} fontSize="9" fill="#666">{Math.round(tsMax*g)}</text></g>);})}
+            {ts.map((t,i)=>{const x=padL+i*((CW-padL)/ts.length)+((CW-padL)/ts.length-bw)/2;const hC=(t.calls/tsMax)*(CH-padB-padT);const hB=(t.booked/tsMax)*(CH-padB-padT);return(<g key={t.dt}>
+              <rect x={x} y={CH-padB-hC} width={bw} height={hC} rx={2} fill="#7FC8E8" opacity="0.28"/>
+              <rect x={x} y={CH-padB-hB} width={bw} height={hB} rx={2} fill="#CAE8C1"/>
+              {i%Math.ceil(ts.length/12||1)===0&&<text x={x+bw/2} y={CH-padB+14} fontSize="9" fill="#777" textAnchor="middle">{t.dt.slice(5)}</text>}
+            </g>);})}
+          </svg>}
+        </div>
+      </div>
+
+      {/* by discipline */}
+      <div className="perf-slot" style={{marginBottom:14}}>
+        <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Calls &amp; Bookings by Discipline</span></div>
+        <div className="perf-slot-body">
+          {byDisc.every(x=>x.calls===0)?<div style={{color:'#666',padding:'14px 0',textAlign:'center'}}>No discipline-level calls in this window.</div>:
+          byDisc.map(x=>(<div key={x.id} style={{marginBottom:12}}>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:4}}>
+              <span style={{color:'#ddd',fontWeight:600}}>{x.label}</span>
+              <span style={{color:'#999'}}>{x.booked}/{x.calls} booked · <span style={{color:rateC(x.rate),fontWeight:700}}>{x.rate.toFixed(0)}%</span></span>
+            </div>
+            <div style={{position:'relative',height:16,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}>
+              <div style={{position:'absolute',inset:0,width:(x.calls/discMax*100)+'%',background:x.color,opacity:0.25,borderRadius:4}}/>
+              <div style={{position:'absolute',top:0,bottom:0,left:0,width:(x.booked/discMax*100)+'%',background:x.color,borderRadius:4}}/>
+            </div>
+          </div>))}
+          <div style={{fontSize:12,color:'#666',marginTop:8}}>Faded bar = calls requesting that discipline · solid = booked. % is that discipline's booking rate.</div>
+        </div>
+      </div>
+    </>)}
+
+    {/* daily entry */}
+    <div className="perf-slot" style={{marginBottom:14}}>
+      <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#44CCAA'}}>Log a Day</span>{saved&&<span style={{fontSize:13,color:'#CAE8C1'}}>✓ Saved</span>}</div>
+      <div className="perf-slot-body">
+        <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginBottom:14}}>
+          <div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>Date</div>
+            <input type="date" value={d} max={today} onChange={e=>setD(e.target.value)} style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'8px 10px',color:'#eee',fontSize:14}}/></div>
+          <div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>Total New Calls</div>
+            <input type="text" inputMode="numeric" value={total} onChange={e=>setTotal(e.target.value.replace(/[^0-9]/g,''))} placeholder="0" style={{width:110,background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'8px 10px',color:'#eee',fontSize:14}}/></div>
+        </div>
+        <div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>Per Discipline — calls for initials / booked</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12,marginBottom:16}}>
+          {CD.map(c=>(<div key={c.id} style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'10px 12px'}}>
+            <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}><span style={{width:9,height:9,borderRadius:2,background:c.color,display:'inline-block'}}/><span style={{color:'#ddd',fontSize:14,fontWeight:600}}>{c.label}</span></div>
+            <div style={{display:'flex',gap:8}}>
+              <div style={{flex:1}}><div style={{fontSize:10,color:'#777',marginBottom:3}}>Calls</div><input type="text" inputMode="numeric" value={disc[c.id].calls} onChange={e=>setDV(c.id,'calls',e.target.value)} placeholder="0" style={{width:'100%',background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:5,padding:'6px 8px',color:'#eee',fontSize:14}}/></div>
+              <div style={{flex:1}}><div style={{fontSize:10,color:'#777',marginBottom:3}}>Booked</div><input type="text" inputMode="numeric" value={disc[c.id].booked} onChange={e=>setDV(c.id,'booked',e.target.value)} placeholder="0" style={{width:'100%',background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:5,padding:'6px 8px',color:'#eee',fontSize:14}}/></div>
+            </div>
+          </div>))}
+        </div>
+        <button className="btn btn-go" onClick={saveEntry}>{log[d]?'Update':'Save'} {new Date(d+'T12:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}</button>
+      </div>
+    </div>
+
+    {/* recent entries */}
+    {dates.length>0&&(
+      <div className="perf-slot">
+        <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#aaa'}}>Logged Days</span></div>
+        <div className="perf-slot-body" style={{overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+            <thead><tr style={{color:'#888'}}><th style={{textAlign:'left',padding:'5px 8px'}}>Date</th><th style={{textAlign:'right',padding:'5px 8px'}}>Calls</th><th style={{textAlign:'right',padding:'5px 8px'}}>Booked</th><th style={{textAlign:'right',padding:'5px 8px'}}>Rate</th><th></th></tr></thead>
+            <tbody>{dates.slice().reverse().map(dt=>{const e=log[dt];const b=bookedOf(e);const r=e.total>0?b/e.total*100:0;return(<tr key={dt} style={{borderTop:'1px solid var(--border)',color:'#bbb'}}>
+              <td style={{textAlign:'left',padding:'5px 8px',color:'#ddd',cursor:'pointer'}} onClick={()=>setD(dt)}>{dt}</td>
+              <td style={{textAlign:'right',padding:'5px 8px'}}>{e.total||0}</td>
+              <td style={{textAlign:'right',padding:'5px 8px',color:'#CAE8C1'}}>{b}</td>
+              <td style={{textAlign:'right',padding:'5px 8px',color:rateC(r)}}>{r.toFixed(0)}%</td>
+              <td style={{textAlign:'right',padding:'5px 8px'}}><button className="btn btn-ghost btn-xs" style={{color:'#E05252'}} onClick={()=>delEntry(dt)}>✕</button></td>
+            </tr>);})}</tbody>
+          </table>
+        </div>
+      </div>
+    )}
+  </div>);
+}
+
+
+
+/* ══ MEMBERSHIP / TRAINING SESSIONS (manual log) ══ */
+function SessionsLog({defaultMonth}){
+  const CATS=[{id:'membership',label:'Membership Sessions',color:'#BB99FF'},{id:'training',label:'Performance Training',color:'#F4DB71'}];
+  const money=(n)=>'$'+Math.round(n||0).toLocaleString();
+  const[log,setLog]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_sessions_log')||'{}');}catch(e){return{};}});
+  const persist=(n)=>{setLog(n);try{localStorage.setItem('rvgd3_sessions_log',JSON.stringify(n));}catch(e){}};
+  const[m,setM]=useState(defaultMonth||new Date().toISOString().slice(0,7));
+  const blank=()=>({membership:{sessions:'',dollars:''},training:{sessions:'',dollars:''}});
+  const[f,setF]=useState(blank);
+  const[saved,setSaved]=useState(false);
+  useEffect(()=>{const e=log[m];if(e){setF({membership:{sessions:String((e.membership&&e.membership.sessions)??''),dollars:String((e.membership&&e.membership.dollars)??'')},training:{sessions:String((e.training&&e.training.sessions)??''),dollars:String((e.training&&e.training.dollars)??'')}});}else setF(blank());setSaved(false);},[m]);// eslint-disable-line
+  const setV=(cat,k,v)=>setF(p=>({...p,[cat]:{...p[cat],[k]:v.replace(/[^0-9.]/g,'')}}));
+  const saveM=()=>{const e={membership:{sessions:parseInt(f.membership.sessions)||0,dollars:parseFloat(f.membership.dollars)||0},training:{sessions:parseInt(f.training.sessions)||0,dollars:parseFloat(f.training.dollars)||0}};persist({...log,[m]:e});setSaved(true);setTimeout(()=>setSaved(false),1800);};
+  const delM=(mo)=>{if(!confirm('Delete logged sessions for '+mo+'?'))return;const n={...log};delete n[mo];persist(n);};
+  const months=Object.keys(log).sort().reverse();
+  return(<div className="perf-slot" style={{marginBottom:14}}>
+    <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Memberships &amp; Training Sessions — Manual Log</span>{saved&&<span style={{fontSize:13,color:'#CAE8C1'}}>✓ Saved</span>}</div>
+    <div className="perf-slot-body">
+      <div style={{fontSize:13,color:'#999',lineHeight:1.6,marginBottom:14}}>Memberships and packages don't break out per-session in the Sales report, so log here how many <strong style={{color:'#ccc'}}>sessions were delivered</strong> each month and the <strong style={{color:'#ccc'}}>dollars</strong> attributed to them. Stored on this device.</div>
+      <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginBottom:14}}>
+        <div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>Month</div>
+          <input type="month" value={m} onChange={e=>setM(e.target.value)} style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'8px 10px',color:'#eee',fontSize:14}}/></div>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:12,marginBottom:16}}>
+        {CATS.map(c=>(<div key={c.id} style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'12px 14px'}}>
+          <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:10}}><span style={{width:9,height:9,borderRadius:2,background:c.color,display:'inline-block'}}/><span style={{color:'#ddd',fontSize:14,fontWeight:600}}>{c.label}</span></div>
+          <div style={{display:'flex',gap:8}}>
+            <div style={{flex:1}}><div style={{fontSize:10,color:'#777',marginBottom:3}}>Sessions</div><input type="text" inputMode="numeric" value={f[c.id].sessions} onChange={e=>setV(c.id,'sessions',e.target.value)} placeholder="0" style={{width:'100%',background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:5,padding:'6px 8px',color:'#eee',fontSize:14}}/></div>
+            <div style={{flex:1.3}}><div style={{fontSize:10,color:'#777',marginBottom:3}}>$ Total</div><input type="text" inputMode="decimal" value={f[c.id].dollars} onChange={e=>setV(c.id,'dollars',e.target.value)} placeholder="0" style={{width:'100%',background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:5,padding:'6px 8px',color:'#eee',fontSize:14}}/></div>
+          </div>
+        </div>))}
+      </div>
+      <button className="btn btn-go" onClick={saveM}>{log[m]?'Update':'Save'} {new Date(m+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</button>
+      {months.length>0&&<div style={{overflowX:'auto',marginTop:16}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+          <thead><tr style={{color:'#888'}}><th style={{textAlign:'left',padding:'5px 8px'}}>Month</th><th style={{textAlign:'right',padding:'5px 8px'}}>Mbr Sess</th><th style={{textAlign:'right',padding:'5px 8px'}}>Mbr $</th><th style={{textAlign:'right',padding:'5px 8px'}}>Train Sess</th><th style={{textAlign:'right',padding:'5px 8px'}}>Train $</th><th style={{textAlign:'right',padding:'5px 8px'}}>Total $</th><th></th></tr></thead>
+          <tbody>{months.map(mo=>{const e=log[mo];const ms=e.membership||{},tns=e.training||{};const tot=(ms.dollars||0)+(tns.dollars||0);return(<tr key={mo} style={{borderTop:'1px solid var(--border)',color:'#bbb'}}>
+            <td style={{textAlign:'left',padding:'5px 8px',color:'#ddd',cursor:'pointer'}} onClick={()=>setM(mo)}>{mo}</td>
+            <td style={{textAlign:'right',padding:'5px 8px'}}>{ms.sessions||0}</td>
+            <td style={{textAlign:'right',padding:'5px 8px',color:'#BB99FF'}}>{money(ms.dollars)}</td>
+            <td style={{textAlign:'right',padding:'5px 8px'}}>{tns.sessions||0}</td>
+            <td style={{textAlign:'right',padding:'5px 8px',color:'#F4DB71'}}>{money(tns.dollars)}</td>
+            <td style={{textAlign:'right',padding:'5px 8px',color:'#CAE8C1',fontWeight:600}}>{money(tot)}</td>
+            <td style={{textAlign:'right',padding:'5px 8px'}}><button className="btn btn-ghost btn-xs" style={{color:'#E05252'}} onClick={()=>delM(mo)}>✕</button></td>
+          </tr>);})}</tbody>
+        </table>
+      </div>}
+    </div>
+  </div>);
+}
 
 function Sparkline({values,color,width=120,height=32}){
   if(!values||values.length<2)return null;
@@ -2330,30 +2542,44 @@ function ClinicLineChart({snapshots,staff,metric,agg,color,label,fmt,timeframe,f
   );
 }
 
-function ProjectionCard({snapshots,filterDisc,filterSite,staff}){
-  const now=new Date();const curM=now.toISOString().slice(0,7);
-  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const curSnap=snapshots?snapshots.find(s=>s.date&&s.date.startsWith(curM)):null;
-  if(!curSnap)return null;
-  const _snapLastSale=curSnap.lastSaleDate?parseInt(curSnap.lastSaleDate.slice(8,10)):null;
-  const dayOfMonth=_snapLastSale&&_snapLastSale>0&&_snapLastSale<now.getDate()?_snapLastSale:now.getDate();
+function ProjectionCard({snapshots,filterDisc,filterSite,staff,revBasis,dataMaxMonth,dailyMaxDate}){
+  const projMonth=dataMaxMonth;
+  if(!projMonth)return null;
+  const parts=projMonth.split('-').map(Number);const yy=parts[0],mm=parts[1];
+  const daysInMonth=new Date(yy,mm,0).getDate();
+  const curM=new Date().toISOString().slice(0,7);
+  let dayOfMonth=daysInMonth;
+  if(dailyMaxDate&&dailyMaxDate.slice(0,7)===projMonth){dayOfMonth=parseInt(dailyMaxDate.slice(8,10))||daysInMonth;}
+  const partial=projMonth===curM&&dayOfMonth<daysInMonth;
+  const unfiltered=(!filterDisc||filterDisc==='all')&&(!filterSite||filterSite==='all');
+  const rowOK=(r)=>{if(!r.staffId)return false;const s=(staff||[]).find(x=>x.id===r.staffId);if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;if(filterSite&&filterSite!=='all'&&s.site!==filterSite)return false;return true;};
+  const monthRows=(snapshots||[]).filter(s=>s.date&&s.date.startsWith(projMonth)).flatMap(s=>(s.rows||[]).filter(rowOK));
+  let revAct;
+  if(unfiltered){
+    // Reliable billed straight from snapshots (all rows incl. the retail/_clinic bucket) —
+    // reconciles to the books and is immune to any revBasis double-count.
+    revAct=(snapshots||[]).filter(s=>s.date&&s.date.startsWith(projMonth)).flatMap(s=>s.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0),0);
+  }else{
+    revAct=monthRows.reduce((a,r)=>a+(parseFloat(r.revenue)||0),0);
+  }
+  const visAct=monthRows.reduce((a,r)=>a+(parseFloat(r.completed)||0),0);
+  const iaAct=monthRows.reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
   const pct=Math.round((dayOfMonth/daysInMonth)*100);
-  const revAct=(curSnap.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0),0);
-  const visAct=(curSnap.rows||[]).filter(r=>r.staffId).reduce((a,r)=>a+(parseFloat(r.completed)||0),0);
-  const iaAct=(curSnap.rows||[]).filter(r=>r.staffId).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
-  const metrics=[{key:'rev',label:'Revenue',color:'#CAE8C1',actual:revAct,fmt:v=>'$'+Math.round(v).toLocaleString()},{key:'vis',label:'Completed Visits',color:'#BB99FF',actual:visAct,fmt:v=>Math.round(v).toLocaleString()},{key:'ia',label:'Initial Assessments',color:'#F4DB71',actual:iaAct,fmt:v=>Math.round(v).toString()}].filter(m=>m.actual>0).map(m=>({...m,projected:Math.round((m.actual/dayOfMonth)*daysInMonth),remaining:Math.round(((m.actual/dayOfMonth)*daysInMonth)-m.actual),dailyRate:m.actual/dayOfMonth}));
+  const mk=(label,color,actual,fmt)=>({label,color,actual,fmt,projected:partial?Math.round(actual/dayOfMonth*daysInMonth):Math.round(actual),remaining:partial?Math.round(actual/dayOfMonth*daysInMonth-actual):0,dailyRate:dayOfMonth>0?actual/dayOfMonth:0});
+  const metrics=[mk('Revenue','#CAE8C1',revAct,v=>'$'+Math.round(v).toLocaleString()),mk('Completed Visits','#BB99FF',visAct,v=>Math.round(v).toLocaleString()),mk('Initial Assessments','#F4DB71',iaAct,v=>Math.round(v).toString())].filter(m=>m.actual>0);
   if(!metrics.length)return null;
+  const monthLbl=new Date(projMonth+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
   return(<div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'18px 20px',marginBottom:14}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
-      <div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA',fontWeight:700,marginBottom:2}}>📈 {now.toLocaleDateString('en-CA',{month:'long',year:'numeric'})} — Month-End Projection</div><div style={{fontSize:13,color:'#555'}}>{dayOfMonth} of {daysInMonth} days complete ({pct}%)</div></div>
-      <div style={{flex:1,minWidth:120,maxWidth:200}}><div style={{height:6,background:'var(--surface3)',borderRadius:3}}><div style={{height:'100%',borderRadius:3,background:'#44CCAA',width:pct+'%'}}/></div></div>
+      <div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA',fontWeight:700,marginBottom:2}}>📈 {monthLbl} — {partial?'Month-End Projection':'Month Total'}</div><div style={{fontSize:13,color:'#555'}}>{partial?`${dayOfMonth} of ${daysInMonth} days complete (${pct}%)`:'complete month'}</div></div>
+      {partial&&<div style={{flex:1,minWidth:120,maxWidth:200}}><div style={{height:6,background:'var(--surface3)',borderRadius:3}}><div style={{height:'100%',borderRadius:3,background:'#44CCAA',width:pct+'%'}}/></div></div>}
     </div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:12}}>
-      {metrics.map(({key,label,color,actual,projected,remaining,dailyRate,fmt})=>(<div key={key} style={{background:'var(--surface3)',borderRadius:6,padding:'14px 16px',borderLeft:'3px solid '+color}}>
+      {metrics.map(({label,color,actual,projected,remaining,dailyRate,fmt})=>(<div key={label} style={{background:'var(--surface3)',borderRadius:6,padding:'14px 16px',borderLeft:'3px solid '+color}}>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:8}}>{label}</div>
-        <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color,lineHeight:1}}>{fmt(projected)}</span><span style={{fontSize:12,color:'#555'}}>projected</span></div>
-        <div style={{display:'flex',flexDirection:'column',gap:3,fontSize:13}}><div><span style={{color:'#888'}}>So far: </span><span style={{color:'#ddd',fontWeight:600}}>{fmt(actual)}</span></div><div><span style={{color:'#888'}}>Remaining: </span><span style={{color:'#44CCAA',fontWeight:600}}>{fmt(remaining)}</span></div><div style={{color:'#555',fontSize:12}}>{fmt(Math.round(dailyRate))}/day pace</div></div>
-        <div style={{marginTop:10,height:3,background:'var(--surface2)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:color,width:Math.min(100,pct)+'%'}}/></div>
+        <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,color,lineHeight:1}}>{fmt(projected)}</span><span style={{fontSize:12,color:'#555'}}>{partial?'projected':'total'}</span></div>
+        <div style={{display:'flex',flexDirection:'column',gap:3,fontSize:13}}>{partial&&<div><span style={{color:'#888'}}>So far: </span><span style={{color:'#ddd',fontWeight:600}}>{fmt(actual)}</span></div>}{partial&&<div><span style={{color:'#888'}}>Remaining: </span><span style={{color:'#44CCAA',fontWeight:600}}>{fmt(remaining)}</span></div>}<div style={{color:'#555',fontSize:12}}>{fmt(Math.round(dailyRate))}/day pace</div></div>
+        {partial&&<div style={{marginTop:10,height:3,background:'var(--surface2)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:color,width:Math.min(100,pct)+'%'}}/></div>}
       </div>))}
     </div>
   </div>);
@@ -2818,6 +3044,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[trendSite,setTrendSite]=useState('all');
   const[snapDate,setSnapDate]=useState(()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,10);});
   const[retentionMonth,setRetentionMonth]=useState(()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);});
+  const[pendingRetention,setPendingRetention]=useState(null); // raw text of a dropped retention file, awaiting month confirmation
+  const[pendingRetMonth,setPendingRetMonth]=useState('');
   const[revBasis,setRevBasis]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_rev_basis')||'{}');}catch(e){return{};}}); // {month:{billed,collected}} for the billed-vs-collected view
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
@@ -3178,6 +3406,22 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   };
 
   /* ── Handle file upload ─────────────────────── */
+  // Import a Member Retention report for a chosen month (called from the confirm popup)
+  const doRetentionImport=async(text,month)=>{
+    const summary=parseRetentionSummary(text);
+    const periodLabel=new Date(month+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
+    const monthEnd=new Date(parseInt(month.slice(0,4)),parseInt(month.slice(5,7)),0).toISOString().slice(0,10);
+    summary.period=month;summary.periodLabel=periodLabel;
+    setRetentionSummaries(prev=>{const next={...prev,[month]:summary};try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(next));}catch(e){}return next;});
+    setRetViewMonth(month);
+    const nr={...(data.retention||{})};let filled=0;
+    for(const p of summary.practitioners){if(p.staffId&&p.pctReturning!=null){nr[p.staffId]=p.pctReturning;filled++;}}
+    save({...data,retention:nr});
+    if(window.__SB){for(const p of summary.practitioners){if(p.staffId&&p.pctReturning!=null)await saveRetentionToSB(p.staffId,p.pctReturning,'jane-import',monthEnd);}}
+    const cw=summary.clinic.pctReturning!=null?` Clinic-wide returning ${summary.clinic.pctReturning}%.`:'';
+    setImportMsg({type:'success',msg:`✓ Member Retention imported for ${periodLabel}.${cw} ${filled} practitioner${filled!==1?'s':''}, ${summary.locations.length} location${summary.locations.length!==1?'s':''} matched.`});
+  };
+
   const handleFile=async(file)=>{
     if(!file||!file.name.endsWith('.csv')){setImportMsg({type:'error',msg:'Please upload a .csv file from Jane.'});return;}
     setImporting(true);setImportMsg(null);
@@ -3185,29 +3429,12 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       setImportMsg({type:'info',msg:'Reading file…'});
       const text=await file.text();
 
-      // ── Member Retention summary report (handle before CSV parse — different shape) ──
+      // ── Member Retention summary report — confirm the month via popup before importing ──
       if(looksLikeRetention(text)){
-        const summary=parseRetentionSummary(text);
-        const periodLabel=new Date(retentionMonth+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
-        const monthEnd=new Date(parseInt(retentionMonth.slice(0,4)),parseInt(retentionMonth.slice(5,7)),0).toISOString().slice(0,10);
-        summary.period=retentionMonth;summary.periodLabel=periodLabel;
-        setRetentionSummaries(prev=>{const next={...prev,[retentionMonth]:summary};try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(next));}catch(e){}return next;});
-        setRetViewMonth(retentionMonth);
-        // Auto-fill per-practitioner retention (matched by name) into data.retention + Supabase
-        const nr={...(data.retention||{})};
-        let filled=0;
-        for(const p of summary.practitioners){
-          if(p.staffId&&p.pctReturning!=null){nr[p.staffId]=p.pctReturning;filled++;}
-        }
-        save({...data,retention:nr});
-        if(window.__SB){
-          for(const p of summary.practitioners){
-            if(p.staffId&&p.pctReturning!=null)await saveRetentionToSB(p.staffId,p.pctReturning,'jane-import',monthEnd);
-          }
-        }
-        const cw=summary.clinic.pctReturning!=null?` Clinic-wide returning ${summary.clinic.pctReturning}%.`:'';
-        setImportMsg({type:'success',msg:`✓ Member Retention imported for ${periodLabel}.${cw} Auto-filled ${filled} practitioner${filled!==1?'s':''}, ${summary.locations.length} location${summary.locations.length!==1?'s':''}. See the Retention tab.`});
-        setImporting(false);return;
+        setPendingRetention(text);
+        setPendingRetMonth(retentionMonth);
+        setImporting(false);
+        return;
       }
 
       // Large files: chunked async parser keeps the tab responsive + shows progress
@@ -3267,9 +3494,12 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         const byMonth=parseSalesByMonth(rows);
         const _n2=(r)=>{const o={};Object.entries(r).forEach(([k,v])=>o[k.toLowerCase().trim()]=v?.toString().trim()||'');return o;};
         // Billed vs collected per month (for the comparison view) — kept in localStorage, no DB column needed
-        const _basis={...revBasis};
-        rows.forEach(row=>{const r=_n2(row);const billed=parseFloat((r['total']||'0').replace(/[$,\s]/g,''))||0;const coll=parseFloat((r['collected']||'0').replace(/[$,\s]/g,''))||0;if(!billed&&!coll)return;const m=getMonth(r['purchase date']||r['invoice date']);if(!m)return;if(!_basis[m])_basis[m]={billed:0,collected:0};_basis[m].billed+=billed;_basis[m].collected+=coll;});
-        Object.keys(_basis).forEach(m=>{_basis[m].billed=Math.round(_basis[m].billed*100)/100;_basis[m].collected=Math.round(_basis[m].collected*100)/100;});
+        // Build this import's months fresh, then REPLACE those months in the store
+        // (re-importing the same file must not stack on top of prior totals).
+        const _fresh={};
+        rows.forEach(row=>{const r=_n2(row);const billed=parseFloat((r['total']||'0').replace(/[$,\s]/g,''))||0;const coll=parseFloat((r['collected']||'0').replace(/[$,\s]/g,''))||0;if(!billed&&!coll)return;const m=getMonth(r['purchase date']||r['invoice date']);if(!m)return;if(!_fresh[m])_fresh[m]={billed:0,collected:0};_fresh[m].billed+=billed;_fresh[m].collected+=coll;});
+        Object.keys(_fresh).forEach(m=>{_fresh[m].billed=Math.round(_fresh[m].billed*100)/100;_fresh[m].collected=Math.round(_fresh[m].collected*100)/100;});
+        const _basis={...revBasis,..._fresh};
         setRevBasis(_basis);try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(_basis));}catch(e){}
         const _sd=rows.map(r=>{const n=_n2(r);return(n['purchase date']||n['invoice date']||'').slice(0,10);}).filter(d=>d.length===10).sort();
         const _lastSaleDate=_sd.length?_sd[_sd.length-1]:null;
@@ -3955,9 +4185,23 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         </div>
       )}
 
+      {pendingRetention&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',backdropFilter:'blur(2px)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setPendingRetention(null)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface2)',border:'1px solid #BB99FF55',borderRadius:12,padding:'24px 26px',width:380,maxWidth:'90vw',boxShadow:'0 20px 60px rgba(0,0,0,.5)'}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#BB99FF',marginBottom:6}}>Which month is this retention report for?</div>
+            <div style={{fontSize:14,color:'#999',lineHeight:1.6,marginBottom:16}}>Member Retention exports don't contain the period, so pick the month this report covers. It'll be saved under that month and you can switch between months on the Retention tab.</div>
+            <input type="month" value={pendingRetMonth} onChange={e=>setPendingRetMonth(e.target.value)} autoFocus
+              style={{width:'100%',background:'var(--surface3)',border:'1px solid #BB99FF55',borderRadius:6,color:'var(--text)',fontSize:18,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,padding:'9px 12px',outline:'none',marginBottom:18}}/>
+            <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setPendingRetention(null)}>Cancel</button>
+              <button className="btn btn-go btn-sm" disabled={!pendingRetMonth} onClick={async()=>{const t=pendingRetention,mo=pendingRetMonth;setPendingRetention(null);await doRetentionImport(t,mo);}}>Import for {pendingRetMonth?new Date(pendingRetMonth+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'}):'…'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {tab==='overview'&&(
         <>
-          <ProjectionCard snapshots={data.snapshots} filterDisc={filterDisc} filterSite={filterSite} staff={staff}/>
+          <ProjectionCard snapshots={data.snapshots} filterDisc={filterDisc} filterSite={filterSite} staff={staff} revBasis={revBasis} dataMaxMonth={dataMaxMonth} dailyMaxDate={dailyDateRange.max}/>
           <div className="grid2">
           <div className="perf-slot">
             <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#CAE8C1'}}>Revenue</span>{!withRev.length&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('import')}>Import →</button>}</div>
@@ -4064,10 +4308,17 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
       {/* ── REVENUE ── */}
       {tab==='revenue'&&Object.keys(revBasis).length>0&&(()=>{
-        const months=Object.keys(revBasis).filter(m=>(!dateFrom||m>=dateFrom.slice(0,7))&&(!dateTo||m<=dateTo.slice(0,7))).sort();
+        // Billed comes from the deduped snapshots (reliable, reconciles to books). Collected
+        // is derived by applying each month's collected/billed RATIO from the sales import —
+        // so even if revBasis absolutes were inflated by repeat imports, the figures stay correct.
+        const snapBilled={};
+        (data.snapshots||[]).forEach(s=>{const m=s.date&&s.date.slice(0,7);if(!m)return;(s.rows||[]).forEach(r=>{snapBilled[m]=(snapBilled[m]||0)+(parseFloat(r.revenue)||0);});});
+        const months=Object.keys(revBasis).filter(m=>(!dateFrom||m>=dateFrom.slice(0,7))&&(!dateTo||m<=dateTo.slice(0,7))).filter(m=>(snapBilled[m]||revBasis[m].billed)).sort();
         if(!months.length)return null;
-        const billed=months.reduce((a,m)=>a+(revBasis[m].billed||0),0);
-        const collected=months.reduce((a,m)=>a+(revBasis[m].collected||0),0);
+        const rowFor=(m)=>{const rb=revBasis[m];const ratio=(rb&&rb.billed>0)?rb.collected/rb.billed:null;const b=snapBilled[m]!=null?snapBilled[m]:(rb?rb.billed:0);const c=ratio!=null?b*ratio:null;return{b,c,o:c!=null?b-c:null,p:(c!=null&&b>0)?c/b*100:null};};
+        const rows=months.map(m=>({m,...rowFor(m)}));
+        const billed=rows.reduce((a,r)=>a+r.b,0);
+        const collected=rows.reduce((a,r)=>a+(r.c||0),0);
         const outstanding=billed-collected;const pct=billed>0?collected/billed*100:0;
         return(
           <div className="perf-slot" style={{marginBottom:14}}>
@@ -4093,7 +4344,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{overflowX:'auto'}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                   <thead><tr style={{color:'#888'}}><th style={{textAlign:'left',padding:'4px 8px'}}>Month</th><th style={{textAlign:'right',padding:'4px 8px'}}>Billed</th><th style={{textAlign:'right',padding:'4px 8px'}}>Collected</th><th style={{textAlign:'right',padding:'4px 8px'}}>Outstanding</th><th style={{textAlign:'right',padding:'4px 8px'}}>% Collected</th></tr></thead>
-                  <tbody>{months.map(m=>{const b=revBasis[m].billed||0,c=revBasis[m].collected||0,o=b-c,p=b>0?c/b*100:0;return(<tr key={m} style={{borderTop:'1px solid var(--border)',color:'#bbb'}}><td style={{textAlign:'left',padding:'4px 8px',color:'#ddd'}}>{m}</td><td style={{textAlign:'right',padding:'4px 8px'}}>{fmtMoney(b)}</td><td style={{textAlign:'right',padding:'4px 8px',color:'#44CCAA'}}>{fmtMoney(c)}</td><td style={{textAlign:'right',padding:'4px 8px',color:o>0?'#E0A052':'#888'}}>{fmtMoney(o)}</td><td style={{textAlign:'right',padding:'4px 8px'}}>{p.toFixed(1)}%</td></tr>);})}</tbody>
+                  <tbody>{rows.map(({m,b,c,o,p})=>(<tr key={m} style={{borderTop:'1px solid var(--border)',color:'#bbb'}}><td style={{textAlign:'left',padding:'4px 8px',color:'#ddd'}}>{m}</td><td style={{textAlign:'right',padding:'4px 8px'}}>{fmtMoney(b)}</td><td style={{textAlign:'right',padding:'4px 8px',color:'#44CCAA'}}>{c!=null?fmtMoney(c):'—'}</td><td style={{textAlign:'right',padding:'4px 8px',color:o>0?'#E0A052':'#888'}}>{o!=null?fmtMoney(o):'—'}</td><td style={{textAlign:'right',padding:'4px 8px'}}>{p!=null?p.toFixed(1)+'%':'—'}</td></tr>))}</tbody>
                 </table>
               </div>
               <div style={{fontSize:12,color:'#666',marginTop:8,lineHeight:1.6}}>Billed = Total (all income, all statuses) — the figure tracked across the dashboard. Collected = cash actually received. Follows the date window above.</div>
@@ -4101,6 +4352,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           </div>
         );
       })()}
+      {tab==='revenue'&&<SessionsLog defaultMonth={dataMaxMonth}/>}
       {tab==='revenue'&&(
         <div className="perf-slot">
           <div className="perf-slot-head">
@@ -4488,49 +4740,16 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               </div>
             );
           })()}
-          <div className="perf-slot">
-            <div className="perf-slot-head">
-              <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention — Manual Entry</span>
-              <button className="btn btn-lime btn-sm" onClick={async()=>{
-                const nr={...data.retention||{}};
-                const entries=Object.entries(retentionEdits);
-                entries.forEach(([k,v])=>{if(v!=='')nr[k]=parseFloat(v)||0;});
-                save({...data,retention:nr});
-                for(const[staffId,val] of entries){
-                  if(val!=='')await saveRetentionToSB(staffId,parseFloat(val)||0,'management');
-                }
-                setRetentionEdits({});setRetSaved(true);
-                setTimeout(()=>setRetSaved(false),2000);
-              }} disabled={!Object.keys(retentionEdits).length}>{retSaved?'✓ Saved':'Save Retention'}</button>
+          {!retentionSummary&&(
+            <div className="perf-slot">
+              <div className="perf-slot-body">
+                <div className="empty" style={{padding:40,textAlign:'center'}}>
+                  <div className="empty-ico">🔄</div>
+                  <p>Import a Member Retention report on the Jane Import tab to see clinic, location, and per-practitioner retention.</p>
+                </div>
+              </div>
             </div>
-            <div className="perf-slot-body">
-              {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{
-                const editing=retentionEdits[s.id]!==undefined;
-                const val=editing?retentionEdits[s.id]:((data.retention||{})[s.id]||'');
-                const num=parseFloat(val)||null;
-                const c=num?num>=85?'#CAE8C1':num>=75?'#44ccaa':num>=65?'#F4DB71':'#E05252':'#555';
-                const lbl=num?num>=85?'Strong':num>=70?'Good':num>50?'Fair':'Low':'';
-                return(
-                  <div key={s.id} className="gva-input-row">
-                    <div style={{flex:1,display:'flex',alignItems:'center',gap:10}}>
-                      <Av name={s.name} sz="sm"/>
-                      <div>
-                        <div style={{fontSize:15,fontWeight:600,color:'#ddd'}}>{s.name}</div>
-                        <div style={{fontSize:14,color:'#777'}}>{s.site} · Target ≥75%</div>
-                      </div>
-                    </div>
-                    <div style={{display:'flex',alignItems:'center',gap:10}}>
-                      {num&&<div style={{height:4,width:60,background:'var(--surface3)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:c,width:Math.min(100,num)+'%'}}/></div>}
-                      <input type="number" min="0" max="100" step="0.1" value={val} placeholder="—"
-                        onChange={e=>setRetentionEdits(p=>({...p,[s.id]:e.target.value}))}
-                        style={{width:62,textAlign:'center',background:'var(--surface3)',border:'1px solid',borderColor:editing?'var(--go)':'var(--border2)',borderRadius:5,color:num?c:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,padding:'5px 0',outline:'none'}}/>
-                      {num&&<span style={{fontSize:15,background:c+'18',color:c,border:'1px solid '+c+'33',borderRadius:3,padding:'2px 7px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,minWidth:64,textAlign:'center'}}>{lbl}</span>}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          )}
         </div>
       )}
 
