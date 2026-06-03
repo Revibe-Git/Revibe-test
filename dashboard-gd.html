@@ -2048,7 +2048,8 @@ function CallHistoryPage(){
   const fmt=(n)=>Math.round(n||0).toLocaleString();
   const blank=()=>Object.fromEntries(CD.map(c=>[c.id,{calls:'',booked:''}]));
   const[log,setLog]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_call_log')||'{}');}catch(e){return{};}});
-  const persist=(next)=>{setLog(next);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(next));}catch(e){}};
+  const persist=(next)=>{setLog(next);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(next));}catch(e){}try{const SB=window.__SB;if(SB)SB.from('call_log').upsert({id:'singleton',data:next});}catch(e){}};
+  useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data}=await SB.from('call_log').select('data').eq('id','singleton').maybeSingle();if(!c&&data&&data.data&&typeof data.data==='object'){setLog(data.data);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(data.data));}catch(e){}}}catch(e){}};ld();return()=>{c=true;};},[]);// eslint-disable-line
   const today=new Date().toISOString().slice(0,10);
   const[d,setD]=useState(today);
   const[total,setTotal]=useState('');
@@ -2210,7 +2211,8 @@ function SessionsLog({defaultMonth}){
   const CATS=[{id:'membership',label:'Membership Sessions',color:'#BB99FF'},{id:'training',label:'Performance Training',color:'#F4DB71'}];
   const money=(n)=>'$'+Math.round(n||0).toLocaleString();
   const[log,setLog]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_sessions_log')||'{}');}catch(e){return{};}});
-  const persist=(n)=>{setLog(n);try{localStorage.setItem('rvgd3_sessions_log',JSON.stringify(n));}catch(e){}};
+  const persist=(n)=>{setLog(n);try{localStorage.setItem('rvgd3_sessions_log',JSON.stringify(n));}catch(e){}try{const SB=window.__SB;if(SB)SB.from('session_log').upsert({id:'singleton',data:n});}catch(e){}};
+  useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data}=await SB.from('session_log').select('data').eq('id','singleton').maybeSingle();if(!c&&data&&data.data&&typeof data.data==='object'){setLog(data.data);try{localStorage.setItem('rvgd3_sessions_log',JSON.stringify(data.data));}catch(e){}}}catch(e){}};ld();return()=>{c=true;};},[]);// eslint-disable-line
   const[m,setM]=useState(defaultMonth||new Date().toISOString().slice(0,7));
   const blank=()=>({membership:{sessions:'',dollars:''},training:{sessions:'',dollars:''}});
   const[f,setF]=useState(blank);
@@ -2972,6 +2974,16 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           }
         }
       }catch(e){console.warn('[Perf] Supabase sync error:',e);}
+      // ── Shared singleton blobs (team-wide): revenue basis + retention summaries ──
+      // Each lives in a {id:'singleton', data:jsonb} table. Supabase wins over localStorage.
+      try{
+        const{data:rb}=await SB.from('revenue_basis').select('data').eq('id','singleton').maybeSingle();
+        if(rb&&rb.data&&typeof rb.data==='object'){setRevBasis(rb.data);try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(rb.data));}catch(e){}}
+      }catch(e){}
+      try{
+        const{data:rs}=await SB.from('retention_summaries').select('data').eq('id','singleton').maybeSingle();
+        if(rs&&rs.data&&typeof rs.data==='object'){setRetentionSummaries(rs.data);try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(rs.data));}catch(e){}}
+      }catch(e){}
       setLoading(false);
     };
     setTimeout(tryLoad,500);
@@ -3410,7 +3422,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const periodLabel=new Date(month+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
     const monthEnd=new Date(parseInt(month.slice(0,4)),parseInt(month.slice(5,7)),0).toISOString().slice(0,10);
     summary.period=month;summary.periodLabel=periodLabel;
-    setRetentionSummaries(prev=>{const next={...prev,[month]:summary};try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(next));}catch(e){}return next;});
+    setRetentionSummaries(prev=>{const next={...prev,[month]:summary};try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(next));}catch(e){}try{const SB=window.__SB;if(SB)SB.from('retention_summaries').upsert({id:'singleton',data:next});}catch(e){}return next;});
     setRetViewMonth(month);
     const nr={...(data.retention||{})};let filled=0;
     for(const p of summary.practitioners){if(p.staffId&&p.pctReturning!=null){nr[p.staffId]=p.pctReturning;filled++;}}
@@ -3499,6 +3511,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         Object.keys(_fresh).forEach(m=>{_fresh[m].billed=Math.round(_fresh[m].billed*100)/100;_fresh[m].collected=Math.round(_fresh[m].collected*100)/100;});
         const _basis={...revBasis,..._fresh};
         setRevBasis(_basis);try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(_basis));}catch(e){}
+        try{const SB=window.__SB;if(SB)await SB.from('revenue_basis').upsert({id:'singleton',data:_basis});}catch(e){console.warn('revenue_basis sync',e);}
         const _sd=rows.map(r=>{const n=_n2(r);return(n['purchase date']||n['invoice date']||'').slice(0,10);}).filter(d=>d.length===10).sort();
         const _lastSaleDate=_sd.length?_sd[_sd.length-1]:null;
         Object.entries(byMonth).forEach(([month,parsed])=>{
@@ -4666,7 +4679,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <span className="perf-slot-title" style={{color:'#BB99FF'}}>Clinic &amp; Location Retention{retentionSummary.periodLabel?` — ${retentionSummary.periodLabel}`:''}</span>
                   <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <span style={{fontSize:13,color:'#777'}}>{retentionSummary.importedAt?'Imported '+new Date(retentionSummary.importedAt).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):''}</span>
-                    <button className="btn btn-ghost btn-xs" style={{color:'#E05252',fontSize:14}} onClick={()=>{if(confirm('Clear retention for '+(retentionSummary.periodLabel||retActiveMonth)+'?')){setRetentionSummaries(prev=>{const next={...prev};delete next[retActiveMonth];try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(next));}catch(e){}return next;});setRetViewMonth('');}}}>Clear</button>
+                    <button className="btn btn-ghost btn-xs" style={{color:'#E05252',fontSize:14}} onClick={()=>{if(confirm('Clear retention for '+(retentionSummary.periodLabel||retActiveMonth)+'?')){setRetentionSummaries(prev=>{const next={...prev};delete next[retActiveMonth];try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(next));}catch(e){}try{const SB=window.__SB;if(SB)SB.from('retention_summaries').upsert({id:'singleton',data:next});}catch(e){}return next;});setRetViewMonth('');}}}>Clear</button>
                   </div>
                 </div>
                 <div className="perf-slot-body">
@@ -4903,7 +4916,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 onClick={async()=>{
                   if(!window.confirm(`Purge all ${type} data?`))return;
                   const SB=window.__SB;let err=null;
-                  if(type==='retention'){if(SB){const r1=await SB.from('retention_entries').delete().neq('staff_id','_none_');if(r1.error)err=r1.error.message;}setRetentionSummaries({});try{localStorage.removeItem('rvgd3_retention_summaries');localStorage.removeItem('rvgd3_retention_summary');}catch(e){}save({...data,retention:{}});}
+                  if(type==='retention'){if(SB){const r1=await SB.from('retention_entries').delete().neq('staff_id','_none_');if(r1.error)err=r1.error.message;try{await SB.from('retention_summaries').upsert({id:'singleton',data:{}});}catch(e){}}setRetentionSummaries({});try{localStorage.removeItem('rvgd3_retention_summaries');localStorage.removeItem('rvgd3_retention_summary');}catch(e){}save({...data,retention:{}});}
                   else{const remaining=data.snapshots.filter(s=>s.type!==type);if(SB){const toDel=data.snapshots.filter(s=>s.type===type);for(const s of toDel){const r=await SB.from('performance_snapshots').delete().eq('id',s.id);if(r.error)err=r.error.message;}if(type==='appointments'){const r=await SB.from('daily_appointments').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyAppts([]);try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}}if(type==='sales'){const r=await SB.from('daily_revenue').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyRevenue([]);try{localStorage.removeItem('rvgd3_daily_rev');}catch(e){}}}save({...data,snapshots:remaining});}
                   if(err){setImportMsg({type:'error',msg:`Purge error: ${err}`});return;}
                   setImportMsg({type:'success',msg:`✓ ${type} purged. Reloading…`});setTimeout(()=>window.location.reload(),800);
