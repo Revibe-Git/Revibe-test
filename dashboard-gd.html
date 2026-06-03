@@ -2735,10 +2735,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   };
 
   // Save retention to Supabase
-  const saveRetentionToSB=async(staffId,value,recordedBy)=>{
+  const saveRetentionToSB=async(staffId,value,recordedBy,recordedAt)=>{
     const SB=window.__SB;if(!SB)return;
     try{
-      await SB.from('retention_entries').insert({staff_id:staffId,value,recorded_by:recordedBy,recorded_at:new Date().toISOString().slice(0,10)});
+      await SB.from('retention_entries').insert({staff_id:staffId,value,recorded_by:recordedBy,recorded_at:recordedAt||new Date().toISOString().slice(0,10)});
     }catch(e){console.warn('Retention save failed',e);}
   };
 
@@ -2778,6 +2778,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[trendDisc,setTrendDisc]=useState('all');
   const[trendSite,setTrendSite]=useState('all');
   const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
+  const[retentionMonth,setRetentionMonth]=useState(()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);});
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
   const[periodFilter,setPeriodFilter]=useState(()=>new Date().toISOString().slice(0,7));
@@ -3139,6 +3140,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       // ── Member Retention summary report (handle before CSV parse — different shape) ──
       if(looksLikeRetention(text)){
         const summary=parseRetentionSummary(text);
+        const periodLabel=new Date(retentionMonth+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
+        const monthEnd=new Date(parseInt(retentionMonth.slice(0,4)),parseInt(retentionMonth.slice(5,7)),0).toISOString().slice(0,10);
+        summary.period=retentionMonth;summary.periodLabel=periodLabel;
         setRetentionSummary(summary);
         try{localStorage.setItem('rvgd3_retention_summary',JSON.stringify(summary));}catch(e){}
         // Auto-fill per-practitioner retention (matched by name) into data.retention + Supabase
@@ -3150,11 +3154,11 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         save({...data,retention:nr});
         if(window.__SB){
           for(const p of summary.practitioners){
-            if(p.staffId&&p.pctReturning!=null)await saveRetentionToSB(p.staffId,p.pctReturning,'jane-import');
+            if(p.staffId&&p.pctReturning!=null)await saveRetentionToSB(p.staffId,p.pctReturning,'jane-import',monthEnd);
           }
         }
         const cw=summary.clinic.pctReturning!=null?` Clinic-wide returning ${summary.clinic.pctReturning}%.`:'';
-        setImportMsg({type:'success',msg:`✓ Member Retention imported.${cw} Auto-filled ${filled} practitioner${filled!==1?'s':''}, ${summary.locations.length} location${summary.locations.length!==1?'s':''}. See the Retention tab.`});
+        setImportMsg({type:'success',msg:`✓ Member Retention imported for ${periodLabel}.${cw} Auto-filled ${filled} practitioner${filled!==1?'s':''}, ${summary.locations.length} location${summary.locations.length!==1?'s':''}. See the Retention tab.`});
         setImporting(false);return;
       }
 
@@ -4304,7 +4308,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             return(
               <div className="perf-slot" style={{marginBottom:14}}>
                 <div className="perf-slot-head">
-                  <span className="perf-slot-title" style={{color:'#BB99FF'}}>Clinic & Location Retention — from Jane Member Retention report</span>
+                  <span className="perf-slot-title" style={{color:'#BB99FF'}}>Clinic &amp; Location Retention{retentionSummary.periodLabel?` — ${retentionSummary.periodLabel}`:''}</span>
                   <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <span style={{fontSize:13,color:'#777'}}>{retentionSummary.importedAt?'Imported '+new Date(retentionSummary.importedAt).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):''}</span>
                     <button className="btn btn-ghost btn-xs" style={{color:'#E05252',fontSize:14}} onClick={()=>{if(confirm('Clear the imported retention summary?')){setRetentionSummary(null);try{localStorage.removeItem('rvgd3_retention_summary');}catch(e){}}}}>Clear</button>
@@ -4492,11 +4496,12 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         <div>
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'16px 18px',marginBottom:14}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',fontWeight:700,marginBottom:10}}>How to Export from Jane</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:12}}>
               {[
                 {n:1,title:'Appointments Report',where:'Reports → Appointments',action:'Set date range → ··· menu → Export CSV',cols:'staff_member_name, state, no_show_at, cancelled_at',note:'Gives: completed visits, no-shows, cancellations per practitioner'},
                 {n:2,title:'Shift Report',where:'Reports → Payroll → Timesheets',action:'Set date range → Export CSV',cols:'Staff Name, Appointment Total Hours, Shift Total Hours',note:'Gives: utilization % (Appt Hours ÷ Shift Hours)'},
                 {n:3,title:'Sales Report',where:'Reports → Sales',action:'Set date range → Export CSV',cols:'Staff Member, Status, Income Category, Collected',note:'Gives: revenue per practitioner (paid treatment income only)'},
+                {n:4,title:'Member Retention',where:'Reports → Member Retention',action:'Set the month → Export CSV → set "Retention report month" below before dropping',cols:'New Patients, % Returning (clinic, per location, per practitioner)',note:'Gives: clinic & location retention + auto-fills each practitioner’s retention %'},
               ].map(s=>(
                 <div key={s.n} style={{background:'var(--surface3)',borderRadius:5,padding:'12px 14px',border:'1px solid var(--border)'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
@@ -4544,10 +4549,18 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 }}>🗑 {label}</button>
             ))}
           </div>
-          <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#777'}}>Shift Report Month</div>
-            <input type="month" value={snapDate.slice(0,7)} onChange={e=>setSnapDate(e.target.value+'-01')}
-              style={{background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none'}}/>
+          <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:18,flexWrap:'wrap'}}>
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#777'}}>Shift Report Month</div>
+              <input type="month" value={snapDate.slice(0,7)} onChange={e=>setSnapDate(e.target.value+'-01')}
+                style={{background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none'}}/>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#BB99FF'}}>Retention Report Month</div>
+              <input type="month" value={retentionMonth} onChange={e=>setRetentionMonth(e.target.value)}
+                style={{background:'var(--surface2)',border:'1px solid #BB99FF55',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none'}}/>
+              <span style={{fontSize:13,color:'#666'}}>set this before dropping the Member Retention CSV</span>
+            </div>
           </div>
 
           <div className={`perf-drop${dragging?' drag':''}`}
