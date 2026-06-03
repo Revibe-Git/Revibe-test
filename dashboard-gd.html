@@ -2779,23 +2779,22 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[trendSite,setTrendSite]=useState('all');
   const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
   const[retentionMonth,setRetentionMonth]=useState(()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);});
+  const[revBasis,setRevBasis]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_rev_basis')||'{}');}catch(e){return{};}}); // {month:{billed,collected}} for the billed-vs-collected view
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
   const[periodFilter,setPeriodFilter]=useState(()=>new Date().toISOString().slice(0,7));
   const curMonth=new Date().toISOString().slice(0,7);
   const[dateFrom,setDateFrom]=useState(curMonth);
   const[dateTo,setDateTo]=useState(curMonth);
-  // Auto-fit the date window to imported data the first time it loads, so the
-  // tabs don't sit on an empty current month when all the data is historical.
-  const autoRangedRef=useRef(false);
+  // Keep the date window fitted to the data. Whenever snapshots are present but the
+  // current window contains none of them (fresh load, after a purge/reset + re-import,
+  // or a stale window), snap the range to span the data so tabs never sit empty.
   useEffect(()=>{
-    if(autoRangedRef.current)return;
     if(!data.snapshots||!data.snapshots.length)return;
     const months=data.snapshots.map(s=>s.date.slice(0,7)).sort();
     const min=months[0],max=months[months.length-1];
     const hasInWindow=months.some(m=>(!dateFrom||m>=dateFrom)&&(!dateTo||m<=dateTo));
     if(!hasInWindow){setDateFrom(min);setDateTo(max);}
-    autoRangedRef.current=true;
   },[data.snapshots]);
   // Custom date range for daily granular data (null = use monthly snapshots)
   const[customFrom,setCustomFrom]=useState('');
@@ -2883,7 +2882,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const keys=Object.keys(rows[0]).map(k=>k.toLowerCase().trim());
     const has=(k)=>keys.some(h=>h.includes(k));
     if(has('staff_member_name')||has('start_at')||has('patient_guid'))return'appointments';
-    if(has('shift total')||has('appointment total hours')||has('shift_total'))return'shift';
+    if(has('shift total')||has('appointment total hours')||has('shift_total')||has('booked (hrs)')||has('scheduled (hrs)')||has('% booked'))return'shift';
     if(has('staff member')||has('subtotal')||has('collected')||has('income category'))return'sales';
     return'unknown';
   };
@@ -3064,12 +3063,19 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   /* ── Parse shift report (no date column — single snapshot) */
   const parseShiftReport=(rows)=>{
     return rows.map(r=>{
-      const name=r['staff name']||r['name']||Object.values(r)[0]||'';
+      const name=(r['staff name']||r['name']||Object.values(r)[0]||'').trim();
       if(!name||name==='Guest Experience'||name==='Relax Spa')return null;
-      const apptHrs=parseFloat(r['appointment total hours']||r['appointment_total_hours']||0)||0;
-      const shiftHrs=parseFloat(r['shift total hours']||r['shift_total_hours']||0)||0;
-      const apptCount=parseInt(r['appointment total count']||r['appointment_total_count']||0)||0;
-      const util=shiftHrs>0?Math.round((apptHrs/shiftHrs)*100):null;
+      if(/^revibe/i.test(name)||/^total/i.test(name))return null; // location/summary rows in the Hours Scheduled/Booked report
+      // Timesheet report: Appointment Total Hours ÷ Shift Total Hours.
+      // Hours Scheduled/Booked report: Booked (hrs) ÷ Scheduled (hrs), or the % Booked column directly.
+      const apptHrs=parseFloat(r['appointment total hours']||r['appointment_total_hours']||r['booked (hrs)']||r['booked']||0)||0;
+      const shiftHrs=parseFloat(r['shift total hours']||r['shift_total_hours']||r['scheduled (hrs)']||r['scheduled']||0)||0;
+      const apptCount=parseInt(r['appointment total count']||r['appointment_total_count']||r['total bookings']||0)||0;
+      let util=null;
+      const pctRaw=(r['% booked']||r['percent booked']||'').toString().replace(/[%\s]/g,'');
+      if(pctRaw!==''&&!isNaN(parseFloat(pctRaw)))util=Math.round(parseFloat(pctRaw));
+      else if(shiftHrs>0)util=Math.round((apptHrs/shiftHrs)*100);
+      if(util===null&&apptHrs===0&&shiftHrs===0)return null;
       const matched=matchStaff(name);
       return{name,staffId:matched?.id||null,matchedName:matched?.name||null,
         utilization:util,appointments:apptCount,appointmentHours:apptHrs,shiftHours:shiftHrs};
@@ -3218,6 +3224,11 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       }else if(type==='sales'){
         const byMonth=parseSalesByMonth(rows);
         const _n2=(r)=>{const o={};Object.entries(r).forEach(([k,v])=>o[k.toLowerCase().trim()]=v?.toString().trim()||'');return o;};
+        // Billed vs collected per month (for the comparison view) — kept in localStorage, no DB column needed
+        const _basis={...revBasis};
+        rows.forEach(row=>{const r=_n2(row);const billed=parseFloat((r['total']||'0').replace(/[$,\s]/g,''))||0;const coll=parseFloat((r['collected']||'0').replace(/[$,\s]/g,''))||0;if(!billed&&!coll)return;const m=getMonth(r['purchase date']||r['invoice date']);if(!m)return;if(!_basis[m])_basis[m]={billed:0,collected:0};_basis[m].billed+=billed;_basis[m].collected+=coll;});
+        Object.keys(_basis).forEach(m=>{_basis[m].billed=Math.round(_basis[m].billed*100)/100;_basis[m].collected=Math.round(_basis[m].collected*100)/100;});
+        setRevBasis(_basis);try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(_basis));}catch(e){}
         const _sd=rows.map(r=>{const n=_n2(r);return(n['purchase date']||n['invoice date']||'').slice(0,10);}).filter(d=>d.length===10).sort();
         const _lastSaleDate=_sd.length?_sd[_sd.length-1]:null;
         Object.entries(byMonth).forEach(([month,parsed])=>{
@@ -4010,6 +4021,44 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       )}
 
       {/* ── REVENUE ── */}
+      {tab==='revenue'&&Object.keys(revBasis).length>0&&(()=>{
+        const months=Object.keys(revBasis).filter(m=>(!dateFrom||m>=dateFrom.slice(0,7))&&(!dateTo||m<=dateTo.slice(0,7))).sort();
+        if(!months.length)return null;
+        const billed=months.reduce((a,m)=>a+(revBasis[m].billed||0),0);
+        const collected=months.reduce((a,m)=>a+(revBasis[m].collected||0),0);
+        const outstanding=billed-collected;const pct=billed>0?collected/billed*100:0;
+        return(
+          <div className="perf-slot" style={{marginBottom:14}}>
+            <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#CAE8C1'}}>Billed vs Collected — {months[0]} to {months[months.length-1]}</span></div>
+            <div className="perf-slot-body">
+              <div style={{display:'flex',flexWrap:'wrap',gap:14,marginBottom:14}}>
+                <div style={{flex:'1 1 160px',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'12px 14px'}}>
+                  <div style={{fontSize:12,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>Billed (Total)</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#CAE8C1'}}>{fmtMoney(billed)}</div>
+                  <div style={{fontSize:12,color:'#777',marginTop:2}}>tracked everywhere</div>
+                </div>
+                <div style={{flex:'1 1 160px',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'12px 14px'}}>
+                  <div style={{fontSize:12,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>Collected</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#44CCAA'}}>{fmtMoney(collected)}</div>
+                  <div style={{fontSize:12,color:'#777',marginTop:2}}>{pct.toFixed(1)}% of billed</div>
+                </div>
+                <div style={{flex:'1 1 160px',background:'var(--surface3)',border:'1px solid '+(outstanding>0?'#E0A05255':'var(--border2)'),borderRadius:6,padding:'12px 14px'}}>
+                  <div style={{fontSize:12,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>Outstanding</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:outstanding>0?'#E0A052':'#888'}}>{fmtMoney(outstanding)}</div>
+                  <div style={{fontSize:12,color:'#777',marginTop:2}}>unpaid / balances</div>
+                </div>
+              </div>
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                  <thead><tr style={{color:'#888'}}><th style={{textAlign:'left',padding:'4px 8px'}}>Month</th><th style={{textAlign:'right',padding:'4px 8px'}}>Billed</th><th style={{textAlign:'right',padding:'4px 8px'}}>Collected</th><th style={{textAlign:'right',padding:'4px 8px'}}>Outstanding</th><th style={{textAlign:'right',padding:'4px 8px'}}>% Collected</th></tr></thead>
+                  <tbody>{months.map(m=>{const b=revBasis[m].billed||0,c=revBasis[m].collected||0,o=b-c,p=b>0?c/b*100:0;return(<tr key={m} style={{borderTop:'1px solid var(--border)',color:'#bbb'}}><td style={{textAlign:'left',padding:'4px 8px',color:'#ddd'}}>{m}</td><td style={{textAlign:'right',padding:'4px 8px'}}>{fmtMoney(b)}</td><td style={{textAlign:'right',padding:'4px 8px',color:'#44CCAA'}}>{fmtMoney(c)}</td><td style={{textAlign:'right',padding:'4px 8px',color:o>0?'#E0A052':'#888'}}>{fmtMoney(o)}</td><td style={{textAlign:'right',padding:'4px 8px'}}>{p.toFixed(1)}%</td></tr>);})}</tbody>
+                </table>
+              </div>
+              <div style={{fontSize:12,color:'#666',marginTop:8,lineHeight:1.6}}>Billed = Total (all income, all statuses) — the figure tracked across the dashboard. Collected = cash actually received. Follows the date window above.</div>
+            </div>
+          </div>
+        );
+      })()}
       {tab==='revenue'&&(
         <div className="perf-slot">
           <div className="perf-slot-head">
@@ -4307,6 +4356,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           {retentionSummary&&(()=>{
             const cards=[{name:'Clinic-wide',m:retentionSummary.clinic},...retentionSummary.locations.map(l=>({name:l.name,m:l}))];
             const retC=(n)=>n==null?'#555':n>=85?'#CAE8C1':n>=75?'#44ccaa':n>=65?'#F4DB71':'#E05252';
+            // Repeat-visit % health bands (tunable): ≥55 healthy · 45–55 watch · <45 low
+            const repC=(n)=>n==null?'#555':n>=55?'#CAE8C1':n>=45?'#F4DB71':'#E05252';
+            const repLabel=(n)=>n==null?'':n>=55?'Healthy':n>=45?'Watch':'Low';
             return(
               <div className="perf-slot" style={{marginBottom:14}}>
                 <div className="perf-slot-head">
@@ -4317,29 +4369,36 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   </div>
                 </div>
                 <div className="perf-slot-body">
+                  <div style={{display:'flex',gap:16,marginBottom:12,fontSize:12,color:'#888',flexWrap:'wrap'}}>
+                    <span><span style={{display:'inline-block',width:9,height:9,borderRadius:2,background:'#CAE8C1',marginRight:5}}/>Healthy ≥55%</span>
+                    <span><span style={{display:'inline-block',width:9,height:9,borderRadius:2,background:'#F4DB71',marginRight:5}}/>Watch 45–55%</span>
+                    <span><span style={{display:'inline-block',width:9,height:9,borderRadius:2,background:'#E05252',marginRight:5}}/>Low &lt;45%</span>
+                    <span style={{color:'#666'}}>· bands are for repeat-visit %</span>
+                  </div>
                   <div style={{display:'flex',flexWrap:'wrap',gap:12}}>
                     {cards.map((c,i)=>{
-                      const pr=c.m.pctReturning;
+                      const rep=c.m.pctRepeatVisits, pr=c.m.pctReturning;
                       return(
-                        <div key={i} style={{flex:'1 1 220px',minWidth:220,background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'12px 14px'}}>
+                        <div key={i} style={{flex:'1 1 220px',minWidth:220,background:'var(--surface3)',border:'1px solid '+(rep!=null?repC(rep)+'55':'var(--border2)'),borderRadius:6,padding:'12px 14px'}}>
                           <div style={{fontSize:13,color:'#999',fontWeight:600,marginBottom:8,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{i===0?'🏥 ':'📍 '}{c.name}</div>
-                          <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}>
-                            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:34,fontWeight:800,color:retC(pr),lineHeight:1}}>{pr!=null?pr+'%':'—'}</span>
-                            <span style={{fontSize:13,color:'#777'}}>returning</span>
+                          <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:2}}>
+                            <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:38,fontWeight:800,color:repC(rep),lineHeight:1}}>{rep!=null?rep+'%':'—'}</span>
+                            <span style={{fontSize:13,color:'#888'}}>repeat visits</span>
                           </div>
-                          {pr!=null&&<div style={{height:4,background:'var(--surface2)',borderRadius:2,marginBottom:10}}><div style={{height:'100%',borderRadius:2,background:retC(pr),width:Math.min(100,pr)+'%'}}/></div>}
+                          {rep!=null&&<div style={{fontSize:12,fontWeight:700,color:repC(rep),marginBottom:8}}>{repLabel(rep)}</div>}
+                          {rep!=null&&<div style={{height:5,background:'var(--surface2)',borderRadius:2,marginBottom:10}}><div style={{height:'100%',borderRadius:2,background:repC(rep),width:Math.min(100,rep)+'%'}}/></div>}
                           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 10px',fontSize:13,color:'#aaa'}}>
+                            {pr!=null&&<div style={{gridColumn:'1 / -1'}}>Returning: <strong style={{color:retC(pr)}}>{pr}%</strong></div>}
                             {c.m.newPatients!=null&&<div>New: <strong style={{color:'#ddd'}}>{c.m.newPatients}</strong></div>}
                             {c.m.returningPatients!=null&&<div>Returning: <strong style={{color:'#ddd'}}>{c.m.returningPatients}</strong></div>}
                             {c.m.totalPatients!=null&&<div>Patients: <strong style={{color:'#ddd'}}>{c.m.totalPatients}</strong></div>}
                             {c.m.totalVisits!=null&&<div>Visits: <strong style={{color:'#ddd'}}>{c.m.totalVisits}</strong></div>}
-                            {c.m.pctRepeatVisits!=null&&<div style={{gridColumn:'1 / -1'}}>Repeat visits: <strong style={{color:'#ddd'}}>{c.m.pctRepeatVisits}%</strong></div>}
                           </div>
                         </div>
                       );
                     })}
                   </div>
-                  <div style={{fontSize:13,color:'#666',marginTop:10,lineHeight:1.6}}>This is clinic- and location-level data from the Member Retention report. Per-practitioner retention is entered manually below.</div>
+                  <div style={{fontSize:13,color:'#666',marginTop:10,lineHeight:1.6}}>Repeat-visit % (members with more than one visit in the period) is the headline; % returning and counts are shown below it. Per-practitioner retention is entered manually below.</div>
                 </div>
               </div>
             );
@@ -4533,7 +4592,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 const empty={snapshots:[],gva:{},retention:{},lastImport:null};
                 try{localStorage.removeItem('rvgd3_perf3');localStorage.removeItem('rvgd3_perf2');localStorage.removeItem('rvgd3_perf');}catch(e){}
                 save(empty);
-                setImportMsg({type:'success',msg:'✓ All data cleared. Import fresh CSVs to start over.'});
+                setImportMsg({type:'success',msg:'✓ All data cleared. Reloading…'});
+                setTimeout(()=>window.location.reload(),700);
               }}}>
               ⚠ Reset All Data
             </button>
