@@ -3483,6 +3483,17 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const pto=new Date(d.getFullYear(),d.getMonth(),0).toISOString().slice(0,10);
       return{from,to,label:_fmtMonth(from),prevFrom:pfrom,prevTo:pto,prevLabel:_fmtMonth(pfrom)};
     }
+    if(reportType==='quarter'){
+      const d=new Date(anchor+'T12:00');
+      const qs=Math.floor(d.getMonth()/3)*3; // quarter start month (0,3,6,9)
+      const from=new Date(d.getFullYear(),qs,1).toISOString().slice(0,10);
+      const to=new Date(d.getFullYear(),qs+3,0).toISOString().slice(0,10);
+      const pfrom=new Date(d.getFullYear(),qs-3,1).toISOString().slice(0,10);
+      const pto=new Date(d.getFullYear(),qs,0).toISOString().slice(0,10);
+      const qLbl=(ds)=>{const x=new Date(ds+'T12:00');return `Q${Math.floor(x.getMonth()/3)+1} ${x.getFullYear()}`;};
+      const qRange=(ds)=>{const x=new Date(ds+'T12:00');const a=x.toLocaleDateString('en-CA',{month:'short'});const b=new Date(x.getFullYear(),x.getMonth()+2,1).toLocaleDateString('en-CA',{month:'short'});return `${a}–${b}`;};
+      return{from,to,label:`${qLbl(from)} (${qRange(from)})`,prevFrom:pfrom,prevTo:pto,prevLabel:qLbl(pfrom)};
+    }
     const from=_wkStart(anchor),to=_addDays(from,6);
     const pfrom=_addDays(from,-7),pto=_addDays(from,-1);
     return{from,to,label:`${_fmtD(from)} – ${_fmtD(to)}`,prevFrom:pfrom,prevTo:pto,prevLabel:`${_fmtD(pfrom)} – ${_fmtD(pto)}`};
@@ -3518,9 +3529,14 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const buildReport=()=>{const cur=reportAgg(reportPeriod.from,reportPeriod.to);const prev=reportAgg(reportPeriod.prevFrom,reportPeriod.prevTo);return{cur,prev,movers:computeMovers(cur,prev)};};
 
   // Auto-generated red flags, gaps, and wins to drive 1:1 / action-planning dialogue
-  const buildInsights=(cur,prev,isMonth)=>{
-    const per='vs prior '+(isMonth?'month':'week');
-    const lastP='last '+(isMonth?'month':'week');
+  const buildInsights=(cur,prev,pWord)=>{
+    const per='vs prior '+pWord;
+    const lastP='last '+pWord;
+    const longPeriod=(pWord==='month'||pWord==='quarter');
+    const SPEC_LABEL=Object.fromEntries(SPECIALIZATIONS.map(s=>[s.id,s.label]));
+    const ret=(id)=>{const v=(data.retention||{})[id];if(v==null)return null;const n=typeof v==='number'?v:parseFloat(v);return isNaN(n)?null:n;};
+    const specLabel=(id)=>{const s=staff.find(x=>x.id===id);const sp=(s&&s.specializations)||[];const hi=sp.map(x=>SPEC_LABEL[x]).filter(Boolean);return hi.length?hi[0]:null;};
+    const med=(arr)=>{if(!arr.length)return 0;const s=[...arr].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;};
     const pm={};prev.perStaff.forEach(p=>pm[p.id]=p);
     const flags=[],gaps=[],wins=[];
     const sched=(x)=>x.visits+x.noShows+x.cancels;
@@ -3529,38 +3545,49 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const clinicNoShow=cSched>0?cT.noShows/cSched*100:0;
     const pSched=pT.visits+pT.noShows+pT.cancels;
     const prevNoShow=pSched>0?pT.noShows/pSched*100:0;
+    const clinAvgRpv=cT.visits>0?cT.revenue/cT.visits:0;
+    const active=cur.perStaff.filter(x=>x.visits>0||x.revenue>0);
+    const medRev=med(active.map(x=>x.revenue));
+    const medIA=med(active.map(x=>x.ias));
     // ── Clinic-level flags ──
     if(pT.revenue>0){const dr=(cT.revenue-pT.revenue)/pT.revenue*100;
-      if(dr<=-15)flags.push({sev:'high',title:`Clinic revenue down ${Math.abs(dr).toFixed(0)}% ${per}`,detail:`${fmtMoney(cT.revenue)} this period vs ${fmtMoney(pT.revenue)} prior.`,action:'Pinpoint which disciplines/practitioners drove it (see movers) and rule out a holiday or missing-import artifact.'});
-      else if(dr<=-10)flags.push({sev:'med',title:`Clinic revenue down ${Math.abs(dr).toFixed(0)}% ${per}`,detail:`${fmtMoney(cT.revenue)} vs ${fmtMoney(pT.revenue)}.`,action:'Watch into next period; check schedule fill across the team.'});}
-    if(clinicNoShow>=12)flags.push({sev:clinicNoShow>=18?'high':'med',title:`Clinic no-show rate ${clinicNoShow.toFixed(0)}%`,detail:`${cT.noShows} no-shows of ~${cSched} booked${pSched?` (was ${prevNoShow.toFixed(0)}%)`:''}.`,action:'Tighten confirmations (48h + day-of) and revisit deposit / late-cancel policy.'});
-    if(pT.ias>0){const di=(cT.ias-pT.ias)/pT.ias*100;if(di<=-30)flags.push({sev:'med',title:`New-patient (IA) volume down ${Math.abs(di).toFixed(0)}% ${per}`,detail:`${cT.ias} initial assessments vs ${pT.ias} prior.`,action:'Pipeline gap — review lead follow-up, online-booking availability, and marketing spend.'});}
+      if(dr<=-15)flags.push({sev:'high',title:`Clinic revenue down ${Math.abs(dr).toFixed(0)}% ${per}`,detail:`${fmtMoney(cT.revenue)} this period vs ${fmtMoney(pT.revenue)} prior.`,action:'Pinpoint which disciplines/practitioners drove it (see movers) and rule out a holiday or missing-import artifact.',score:8000});
+      else if(dr<=-10)flags.push({sev:'med',title:`Clinic revenue down ${Math.abs(dr).toFixed(0)}% ${per}`,detail:`${fmtMoney(cT.revenue)} vs ${fmtMoney(pT.revenue)}.`,action:'Watch into next period; check schedule fill across the team.',score:4000});}
+    if(clinicNoShow>=12){const lost=Math.round(cT.noShows*clinAvgRpv);flags.push({sev:clinicNoShow>=18?'high':'med',title:`Clinic no-show rate ${clinicNoShow.toFixed(0)}%`,detail:`${cT.noShows} no-shows of ~${cSched} booked${pSched?` (was ${prevNoShow.toFixed(0)}%)`:''}${lost>0?` · ~${fmtMoney(lost)} of lost capacity`:''}.`,action:'Tighten confirmations (48h + day-of) and revisit deposit / late-cancel policy.',score:5000});}
+    if(pT.ias>0){const di=(cT.ias-pT.ias)/pT.ias*100;if(di<=-30)flags.push({sev:'med',title:`New-patient (IA) volume down ${Math.abs(di).toFixed(0)}% ${per}`,detail:`${cT.ias} initial assessments vs ${pT.ias} prior.`,action:'Pipeline gap — review lead follow-up, online-booking availability, and marketing spend.',score:4500});}
+    if(active.length>=4&&cT.revenue>0){const top=[...active].sort((a,b)=>b.revenue-a.revenue)[0];const share=top.revenue/cT.revenue*100;if(share>=40)flags.push({sev:'med',title:`Revenue concentration: ${top.name} = ${share.toFixed(0)}% of revenue`,detail:`${fmtMoney(top.revenue)} of ${fmtMoney(cT.revenue)} came from one practitioner.`,action:'Key-person risk — build depth in this service line and protect their schedule.',score:3000});}
     // ── Per-practitioner ──
-    const clinAvgRpv=cT.visits>0?cT.revenue/cT.visits:0;
-    cur.perStaff.forEach(c=>{
+    active.forEach(c=>{
       const p=pm[c.id]||{visits:0,revenue:0,noShows:0,cancels:0,ias:0};
       const cs=sched(c);const nsr=cs>0?c.noShows/cs*100:0;const csr=cs>0?c.cancels/cs*100:0;
       const rpv=c.visits>0?c.revenue/c.visits:0;const first=c.name.split(' ')[0];
-      if(p.visits>=5&&c.visits===0)flags.push({sev:'high',title:`${c.name}: no completed visits`,detail:`Had ${p.visits} ${lastP}; zero this period.`,action:`Confirm ${first}'s availability — is this leave, a data gap, or a real stop?`,score:9000});
-      else if(c.noShows>=3&&nsr>=15)flags.push({sev:nsr>=25?'high':'med',title:`${c.name}: ${c.noShows} no-shows (${nsr.toFixed(0)}% of booked)`,detail:`${c.visits} completed · ${c.noShows} no-shows · ${c.cancels} cancels.`,action:`Review ${first}'s reminder/confirmation flow and rebooking of no-shows.`,score:c.noShows*100});
-      if(c.cancels>=4&&csr>=15)gaps.push({title:`${c.name}: ${c.cancels} cancellations (${csr.toFixed(0)}%)`,detail:'High cancel rate is eroding bookable capacity.',action:`Check booking lead-time and whether cancelled slots get backfilled.`,score:c.cancels*80});
+      const r=ret(c.id);const sp=specLabel(c.id);const spTxt=sp?` (${sp})`:'';
+      if(p.visits>=5&&c.visits===0)flags.push({sev:'high',title:`${c.name}: no completed visits`,detail:`Had ${p.visits} ${lastP}; zero this period.`,action:`Confirm ${first}'s availability — leave, data gap, or a real stop?`,score:9000});
+      else if(c.noShows>=3&&nsr>=15){const lost=Math.round(c.noShows*(rpv||clinAvgRpv));flags.push({sev:nsr>=25?'high':'med',title:`${c.name}: ${c.noShows} no-shows (${nsr.toFixed(0)}% of booked)`,detail:`${c.visits} completed · ${c.noShows} no-shows${lost>0?` · ~${fmtMoney(lost)} lost`:''}.`,action:`Review ${first}'s reminder/confirmation flow and no-show rebooking.`,score:2000+c.noShows*50});}
+      if(medRev>0&&c.revenue<medRev*0.5&&c.visits>=3)flags.push({sev:'med',title:`${c.name}: low revenue (${fmtMoney(c.revenue)})`,detail:`Below half the team median (${fmtMoney(medRev)}) on ${c.visits} visits.`,action:`Capacity available — review ${first}'s schedule fill, service mix, and new-patient flow.`,score:1500+(medRev-c.revenue)});
+      if(c.cancels>=4&&csr>=15)gaps.push({title:`${c.name}: ${c.cancels} cancellations (${csr.toFixed(0)}%)`,detail:'High cancel rate is eroding bookable capacity.',action:'Check booking lead-time and whether cancelled slots get backfilled.',score:c.cancels*80});
       if(c.visits>=5&&clinAvgRpv>0&&rpv<clinAvgRpv*0.6)gaps.push({title:`${c.name}: ${fmtMoney(rpv)}/visit (clinic ${fmtMoney(clinAvgRpv)})`,detail:'Revenue per visit well below the clinic average.',action:`Treatment-plan, rebooking, and service-mix conversation with ${first}.`,score:(clinAvgRpv-rpv)*c.visits});
-      if(isMonth&&c.visits>=8&&c.ias===0)gaps.push({title:`${c.name}: no new patients this month`,detail:`${c.visits} visits but 0 initial assessments — all repeat work.`,action:`Is ${first} open to new-patient bookings? Adjust online availability if so.`,score:c.visits*5});
-      // wins
+      if(r!=null&&r>=80&&c.ias<=Math.max(1,medIA)&&c.visits>=5)gaps.push({title:`${c.name}${spTxt}: ${r.toFixed(0)}% retention but only ${c.ias} new initials`,detail:'Strong retainer who isn’t getting enough new patients.',action:`Route more new-patient bookings to ${first} — they keep who they get.`,score:r*10+(medIA-c.ias)*30});
+      else if(rpv>=clinAvgRpv*1.15&&clinAvgRpv>0&&c.ias<=Math.max(1,medIA)&&c.visits>=4)gaps.push({title:`${c.name}${spTxt}: ${fmtMoney(rpv)}/visit but only ${c.ias} initials`,detail:'High revenue-per-visit — strong return on every new patient sent here.',action:`Prioritise new-patient acquisition into ${first}'s service${sp?' ('+sp+')':''}.`,score:(rpv-clinAvgRpv)*8+(medIA-c.ias)*20});
+      if(longPeriod&&c.visits>=8&&c.ias===0)gaps.push({title:`${c.name}: no new patients this ${pWord}`,detail:`${c.visits} visits but 0 initial assessments — all repeat work.`,action:`Is ${first} open to new-patient bookings? Adjust online availability if so.`,score:c.visits*5});
       const dr=c.revenue-p.revenue,dv=c.visits-p.visits;
       if(dr>=500&&(p.revenue===0||dr/p.revenue>=0.2))wins.push({title:`${c.name}: revenue up ${fmtMoney(dr)}`,detail:`${fmtMoney(p.revenue)} → ${fmtMoney(c.revenue)}.`,score:dr});
       else if(dv>=4)wins.push({title:`${c.name}: +${dv} visits`,detail:`${p.visits} → ${c.visits} completed.`,score:dv*100});
     });
+    if(cT.visits>=20){const ratio=cT.ias/cT.visits*100;if(ratio<8)gaps.push({title:`New-patient mix only ${ratio.toFixed(0)}%`,detail:`${cT.ias} initials across ${cT.visits} visits — growth is leaning on the existing base.`,action:'Acquisition push — referrals, online booking, marketing; protect new-patient slots.',score:6000});}
     if(pSched>0&&prevNoShow-clinicNoShow>=3)wins.push({title:'No-show rate improving',detail:`${prevNoShow.toFixed(0)}% → ${clinicNoShow.toFixed(0)}% clinic-wide.`,score:8000});
+    const retainers=active.filter(c=>{const r=ret(c.id);return r!=null&&r>=90&&c.visits>=5;}).sort((a,b)=>ret(b.id)-ret(a.id));
+    if(retainers.length)wins.push({title:`${retainers[0].name}: ${ret(retainers[0].id).toFixed(0)}% retention`,detail:'Top retention on the team — model the rebooking habit.',score:7000});
     flags.sort((a,b)=>((b.sev==='high')-(a.sev==='high'))||((b.score||0)-(a.score||0)));
     gaps.sort((a,b)=>b.score-a.score);
     wins.sort((a,b)=>b.score-a.score);
-    return{flags:flags.slice(0,7),gaps:gaps.slice(0,6),wins:wins.slice(0,4),clinicNoShow};
+    return{flags:flags.slice(0,8),gaps:gaps.slice(0,7),wins:wins.slice(0,5),clinicNoShow};
   };
 
   const navPeriod=(dir)=>{
     const a=reportAnchor||dailyDateRange.max||new Date().toISOString().slice(0,10);
     if(reportType==='month'){const d=new Date(a+'T12:00');d.setMonth(d.getMonth()+dir);setReportAnchor(d.toISOString().slice(0,10));}
+    else if(reportType==='quarter'){const d=new Date(a+'T12:00');d.setMonth(d.getMonth()+dir*3);setReportAnchor(d.toISOString().slice(0,10));}
     else setReportAnchor(_addDays(_wkStart(a),dir*7));
     setViewingSaved(null);
   };
@@ -3580,7 +3607,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const pPrev=saved?saved.prevLabel:reportPeriod.prevLabel;
     const genAt=saved?saved.generatedAt:new Date().toISOString();
     const notes=saved?saved.notes:'';
-    const isMonth=(saved?saved.type:reportType)==='month';
+    const ptype=(saved?saved.type:reportType);
+    const isMonth=ptype==='month';
+    const pWord=ptype==='quarter'?'quarter':ptype==='month'?'month':'week';
+    const pTitleWord=ptype==='quarter'?'Quarterly':ptype==='month'?'Monthly':'Weekly';
     const delta=(c,p)=>{if(!p)return{pct:c>0?'100.0':'0.0',up:c>=0};const v=(c-p)/p*100;return{pct:Math.abs(v).toFixed(1),up:v>=0};};
     const KPIS=[
       {k:'revenue',label:'Revenue',fmt:fmtMoney,color:'#CAE8C1'},
@@ -3623,8 +3653,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           )}
 
           <div className="flex aic g5" style={{marginBottom:14,flexWrap:'wrap'}}>
-            <button className={`btn btn-sm ${!isMonth?'btn-go':'btn-ghost'}`} onClick={()=>{setReportType('week');setViewingSaved(null);}}>Weekly</button>
-            <button className={`btn btn-sm ${isMonth?'btn-go':'btn-ghost'}`} onClick={()=>{setReportType('month');setViewingSaved(null);}}>Monthly</button>
+            <button className={`btn btn-sm ${ptype==='week'?'btn-go':'btn-ghost'}`} onClick={()=>{setReportType('week');setReportAnchor(null);setViewingSaved(null);}}>Weekly</button>
+            <button className={`btn btn-sm ${ptype==='month'?'btn-go':'btn-ghost'}`} onClick={()=>{setReportType('month');setReportAnchor(null);setViewingSaved(null);}}>Monthly</button>
+            <button className={`btn btn-sm ${ptype==='quarter'?'btn-go':'btn-ghost'}`} onClick={()=>{setReportType('quarter');setReportAnchor(null);setViewingSaved(null);}}>Quarterly</button>
             <span style={{width:1,height:22,background:'var(--border2)',margin:'0 6px'}}/>
             <button className="btn btn-ghost btn-sm" onClick={()=>navPeriod(-1)} disabled={!!saved}>← Prev</button>
             <span style={{minWidth:200,textAlign:'center',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,color:'#ddd'}}>{pLabel}</span>
@@ -3643,7 +3674,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           {/* Header */}
           <div style={{borderBottom:'2px solid var(--go)',paddingBottom:16,marginBottom:20}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'3px',textTransform:'uppercase',color:'#888'}}>Revibe Health — Growth &amp; Development</div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#fff',letterSpacing:'.5px',marginTop:2}}>{isMonth?'Monthly':'Weekly'} Performance Report</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#fff',letterSpacing:'.5px',marginTop:2}}>{pTitleWord} Performance Report</div>
             <div style={{fontSize:15,color:'#CAE8C1',fontWeight:600,marginTop:4}}>{pLabel}</div>
             <div style={{fontSize:12,color:'#666',marginTop:4}}>Compared to {pPrev} · Generated {new Date(genAt).toLocaleString('en-CA',{dateStyle:'medium',timeStyle:'short'})}{saved?' · SAVED':''}</div>
           </div>
@@ -3658,7 +3689,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 <div key={kp.k} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'15px 16px'}}>
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.3px',textTransform:'uppercase',color:'#888',marginBottom:6}}>{kp.label}</div>
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:kp.color,lineHeight:1}}>{kp.fmt(c)}</div>
-                  <div style={{marginTop:8,fontSize:12,fontWeight:700,color:good?'#44CCAA':'#E05252'}}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'#666',fontWeight:400}}>vs prior {isMonth?'month':'week'}</span></div>
+                  <div style={{marginTop:8,fontSize:12,fontWeight:700,color:good?'#44CCAA':'#E05252'}}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'#666',fontWeight:400}}>vs prior {pWord}</span></div>
                 </div>
               );
             })}
@@ -3666,7 +3697,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
           {/* Red flags / gaps / wins — action-planning section */}
           {!noData&&(()=>{
-            const ins=buildInsights(cur,prev,isMonth);
+            const ins=buildInsights(cur,prev,pWord);
             const secTitle={fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:12,fontWeight:700};
             return(
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:14,marginBottom:24}}>
@@ -3731,7 +3762,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
           {/* Practitioner movers */}
           <div style={{marginBottom:notes?24:4}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:8}}>PRACTITIONER CHANGES <span style={{fontSize:12,color:'#666',fontWeight:400,letterSpacing:0}}>(moderate to significant vs prior {isMonth?'month':'week'})</span></div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:8}}>PRACTITIONER CHANGES <span style={{fontSize:12,color:'#666',fontWeight:400,letterSpacing:0}}>(moderate to significant vs prior {pWord})</span></div>
             {movers.length===0?<div style={{color:'#777',fontSize:14,padding:'6px 0'}}>No moderate-to-significant practitioner changes this period.</div>:
              movers.map((m,i)=>(
               <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 0',borderBottom:'1px solid #1e1e1e',gap:12,flexWrap:'wrap'}}>
