@@ -2182,7 +2182,7 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
             <circle cx={c.x} cy={c.y} r="4.5" fill={color} opacity="0.9"/>
             {pts.length<=10&&<text x={c.x} y={c.y-11} textAnchor="middle" fontSize="11" fill={color} opacity="0.85" fontWeight="600">{fmt(c.val)}</text>}
             {showLabel(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">
-              {new Date(c.date+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}
+              {new Date(c.date+'T12:00').toLocaleDateString('en-CA',{month:'short'})+" '"+c.date.slice(2,4)}
             </text>}
           </g>
         ))}
@@ -2197,7 +2197,13 @@ function ClinicLineChart({snapshots,staff,metric,agg,color,label,fmt,timeframe,f
   // Decide whether a snapshot row belongs in the clinic aggregate (exclude non-clinical roles; apply filters)
   const matchRow=(r)=>{
     const s=(staff||[]).find(x=>x.id===r.staffId);
-    if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;
+    if(!s){
+      // No matched staff = retail / front-desk / unmatched-name revenue bucket.
+      // Include it in the unfiltered clinic total so revenue reconciles to the books
+      // (these rows only carry revenue, so other metrics are unaffected).
+      return (!filterDisc||filterDisc==='all')&&(!filterSite||filterSite==='all');
+    }
+    if(['mgmt','ops','edu'].includes(s.discipline))return false;
     if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;
     if(filterSite&&filterSite!=='all'&&s.site!==filterSite)return false;
     return true;
@@ -2314,7 +2320,7 @@ function ClinicLineChart({snapshots,staff,metric,agg,color,label,fmt,timeframe,f
             <circle cx={c.x} cy={c.y} r="4.5" fill={color} opacity="0.9"/>
             {pts.length<=10&&<text x={c.x} y={c.y-11} textAnchor="middle" fontSize="11" fill={color} opacity="0.85" fontWeight="600">{fmt(c.val)}</text>}
             {showLabel(i)&&<text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">
-              {new Date(c.date+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}
+              {new Date(c.date+'T12:00').toLocaleDateString('en-CA',{month:'short'})+" '"+c.date.slice(2,4)}
             </text>}
           </g>
         ))}
@@ -2466,9 +2472,9 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
   };
 
   // Bar chart dimensions
-  const BAR_W=Math.max(28,Math.min(60,Math.floor(460/weeks.length)-8));
-  const GAP=Math.max(4,Math.floor(460/weeks.length)-BAR_W);
-  const CHART_H=160;
+  const BAR_W=Math.max(24,Math.min(54,Math.floor(540/weeks.length)-10));
+  const GAP=Math.max(8,Math.floor(540/weeks.length)-BAR_W);
+  const CHART_H=176;
   const totalW=weeks.length*(BAR_W+GAP)+40;
 
   return(
@@ -2500,63 +2506,81 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
       </div>
 
       {/* Bar chart */}
-      <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'16px',marginBottom:12}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:12}}>
+      <div style={{background:'linear-gradient(180deg,var(--surface2),rgba(0,0,0,.12))',border:'1px solid var(--border)',borderRadius:12,padding:'18px 18px 12px',marginBottom:14}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:14,flexWrap:'wrap',gap:8}}>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:m.color}}>
             {m.label}
-            <span style={{fontSize:13,color:'#555',fontWeight:400,marginLeft:8}}>week-over-week</span>
+            <span style={{fontSize:13,color:'#666',fontWeight:400,marginLeft:8}}>week over week</span>
           </div>
-          <div style={{fontSize:12,color:'#555'}}>avg {m.fmt(Math.round(avg))}/wk</div>
+          <div style={{fontSize:12,color:'#9a9a9a',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:20,padding:'3px 12px'}}>avg {m.fmt(Math.round(avg))}/wk</div>
         </div>
-        <div style={{overflowX:'auto'}}>
-          <svg width={Math.max(totalW,500)} height={CHART_H+52} style={{display:'block',overflow:'visible'}}>
+        <div style={{overflowX:'auto',paddingBottom:4}}>
+          <svg width={Math.max(totalW,500)} height={CHART_H+60} style={{display:'block',overflow:'visible'}}>
+            <defs>
+              <linearGradient id="wkBar" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={m.color} stopOpacity="0.95"/>
+                <stop offset="100%" stopColor={m.color} stopOpacity="0.5"/>
+              </linearGradient>
+              <linearGradient id="wkBarMuted" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={m.color} stopOpacity="0.42"/>
+                <stop offset="100%" stopColor={m.color} stopOpacity="0.16"/>
+              </linearGradient>
+            </defs>
+            {/* gridlines + y-axis scale */}
+            {[0,0.25,0.5,0.75,1].map((f,gi)=>{const gy=CHART_H-f*CHART_H;return(
+              <g key={gi}>
+                <line x1={20} y1={gy} x2={totalW} y2={gy} stroke="#ffffff" strokeWidth="1" opacity={f===0?0.13:0.045}/>
+                <text x={15} y={gy+3} textAnchor="end" fontSize="9" fill="#5a5a5a">{m.fmt(Math.round(maxVal*f))}</text>
+              </g>
+            );})}
             {/* Avg reference line */}
             {(()=>{const avgY=CHART_H-(avg/maxVal)*CHART_H;return(
               <g>
-                <line x1={20} y1={avgY} x2={totalW} y2={avgY} stroke={m.color} strokeWidth="1" strokeDasharray="4,3" opacity="0.3"/>
-                <text x={totalW+4} y={avgY+4} fontSize="10" fill={m.color} opacity="0.5">avg</text>
+                <line x1={20} y1={avgY} x2={totalW} y2={avgY} stroke={m.color} strokeWidth="1.25" strokeDasharray="5,4" opacity="0.5"/>
+                <text x={totalW+10} y={avgY+3} textAnchor="middle" fontSize="9" fill={m.color} opacity="0.85" fontWeight="700">avg</text>
               </g>
             );})()}
             {weeks.map((w,i)=>{
               const val=w[activeMetric];
-              const barH=Math.max(2,Math.round((val/maxVal)*CHART_H));
+              const barH=Math.max(3,Math.round((val/maxVal)*CHART_H));
               const x=20+i*(BAR_W+GAP);
               const y=CHART_H-barH;
               const prev=i>0?weeks[i-1][activeMetric]:null;
               const delta=prev&&prev!==0?((val-prev)/prev*100).toFixed(1):null;
               const up=parseFloat(delta)>=0;
               const isHov=hoveredWeek===w.wk;
+              const isLast=i===weeks.length-1;
               const aboveAvg=val>=avg;
               return(
                 <g key={w.wk} onMouseEnter={()=>setHoveredWeek(w.wk)} onMouseLeave={()=>setHoveredWeek(null)} style={{cursor:'pointer'}}>
-                  {/* Bar background */}
-                  <rect x={x} y={0} width={BAR_W} height={CHART_H} fill={isHov?'rgba(255,255,255,.03)':'transparent'} rx="2"/>
+                  {/* Hover column highlight */}
+                  <rect x={x-3} y={0} width={BAR_W+6} height={CHART_H} fill={isHov?'rgba(255,255,255,.045)':'transparent'} rx="5"/>
                   {/* Bar */}
                   <rect x={x} y={y} width={BAR_W} height={barH}
-                    fill={m.color} opacity={isHov?1:aboveAvg?0.85:0.45} rx="2"/>
-                  {/* Static value label only when few bars and not hovering */}
-                  {weeks.length<=12&&!isHov&&<text x={x+BAR_W/2} y={Math.max(y-5,14)} textAnchor="middle" fontSize="11" fill={m.color} fontWeight="700" opacity="0.8">{m.fmt(val)}</text>}
+                    fill={(aboveAvg||isHov)?'url(#wkBar)':'url(#wkBarMuted)'} rx="4"
+                    stroke={isLast?m.color:'none'} strokeWidth={isLast?1.5:0}/>
+                  {/* Value label when not too crowded */}
+                  {weeks.length<=14&&!isHov&&<text x={x+BAR_W/2} y={Math.max(y-6,11)} textAnchor="middle" fontSize="10" fill={m.color} fontWeight="700" opacity="0.75">{m.fmt(val)}</text>}
                   {/* Hover tooltip */}
                   {isHov&&(()=>{
-                    const tw=110,th=delta!=null?52:38;
+                    const tw=120,th=delta!=null?54:40;
                     let tx=x+BAR_W/2-tw/2;tx=Math.max(2,Math.min(tx,Math.max(totalW,500)-tw-2));
-                    const ty=Math.max(2,y-th-6);
+                    const ty=Math.max(2,y-th-8);
                     return(
                       <g style={{pointerEvents:'none'}}>
-                        <rect x={tx} y={ty} width={tw} height={th} rx="6" fill="#0c0c0c" stroke={m.color} strokeWidth="1.25" opacity="0.98"/>
-                        <text x={tx+tw/2} y={ty+15} textAnchor="middle" fontSize="9" fill="#aaa" fontFamily="'Barlow Condensed',sans-serif" letterSpacing="0.5">{fmtWk(w.wk,true)}</text>
-                        <text x={tx+tw/2} y={ty+32} textAnchor="middle" fontSize="14" fill="#fff" fontWeight="800">{m.fmt(val)}</text>
-                        {delta!=null&&<text x={tx+tw/2} y={ty+46} textAnchor="middle" fontSize="11" fill={up?'#44CCAA':'#E05252'} fontWeight="700">{up?'▲':'▼'}{Math.abs(delta)}%</text>}
+                        <rect x={tx} y={ty} width={tw} height={th} rx="8" fill="#0c0c0c" stroke={m.color} strokeWidth="1.25" opacity="0.98"/>
+                        <text x={tx+tw/2} y={ty+16} textAnchor="middle" fontSize="10" fill="#bbb" fontFamily="'Barlow Condensed',sans-serif" letterSpacing="0.5">{fmtWk(w.wk,true)}</text>
+                        <text x={tx+tw/2} y={ty+34} textAnchor="middle" fontSize="15" fill="#fff" fontWeight="800">{m.fmt(val)}</text>
+                        {delta!=null&&<text x={tx+tw/2} y={ty+48} textAnchor="middle" fontSize="11" fill={up?'#44CCAA':'#E05252'} fontWeight="700">{up?'▲':'▼'} {Math.abs(delta)}% vs prev</text>}
                       </g>
                     );
                   })()}
                   {/* Week label */}
-                  <text x={x+BAR_W/2} y={CHART_H+14} textAnchor="middle" fontSize="10" fill={isHov?'#ccc':'#555'}
-                    transform={weeks.length>8?`rotate(-35,${x+BAR_W/2},${CHART_H+14})`:''}>{fmtWk(w.wk,true)}</text>
+                  <text x={x+BAR_W/2} y={CHART_H+17} textAnchor="middle" fontSize="9.5" fill={isHov?'#ddd':isLast?'#9a9a9a':'#5a5a5a'} fontWeight={isLast?700:400}
+                    transform={weeks.length>10?`rotate(-38,${x+BAR_W/2},${CHART_H+17})`:''}>{fmtWk(w.wk,true)}</text>
                 </g>
               );
             })}
-            <line x1={20} y1={CHART_H} x2={totalW} y2={CHART_H} stroke="#2a2a2a" strokeWidth="1"/>
           </svg>
         </div>
       </div>
@@ -2777,7 +2801,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[trendTo,setTrendTo]=useState('');
   const[trendDisc,setTrendDisc]=useState('all');
   const[trendSite,setTrendSite]=useState('all');
-  const[snapDate,setSnapDate]=useState(new Date().toISOString().slice(0,10));
+  const[snapDate,setSnapDate]=useState(()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,10);});
   const[retentionMonth,setRetentionMonth]=useState(()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);});
   const[revBasis,setRevBasis]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_rev_basis')||'{}');}catch(e){return{};}}); // {month:{billed,collected}} for the billed-vs-collected view
   const[retentionEdits,setRetentionEdits]=useState({});
@@ -4003,7 +4027,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                               <circle cx={c.x} cy={c.y} r="4.5" fill="#BB99FF" opacity="0.9"/>
                               <text x={c.x} y={c.y-11} textAnchor="middle" fontSize="11" fill="#BB99FF" opacity="0.85" fontWeight="600">{c.val}</text>
                               <text x={c.x} y={H+BOTTOM-4} textAnchor="middle" fontSize="11" fill="#777">
-                                {new Date(c.date+'T12:00').toLocaleDateString('en-CA',{month:'short',year:'2-digit'})}
+                                {new Date(c.date+'T12:00').toLocaleDateString('en-CA',{month:'short'})+" '"+c.date.slice(2,4)}
                               </text>
                             </g>
                           ))}
@@ -4399,6 +4423,37 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                     })}
                   </div>
                   <div style={{fontSize:13,color:'#666',marginTop:10,lineHeight:1.6}}>Repeat-visit % (members with more than one visit in the period) is the headline; % returning and counts are shown below it. Per-practitioner retention is entered manually below.</div>
+                </div>
+              </div>
+            );
+          })()}
+          {retentionSummary&&retentionSummary.practitioners&&retentionSummary.practitioners.some(p=>p.staffId)&&(()=>{
+            const repC=(n)=>n==null?'#555':n>=55?'#CAE8C1':n>=45?'#F4DB71':'#E05252';
+            const repLabel=(n)=>n==null?'':n>=55?'Healthy':n>=45?'Watch':'Low';
+            const retC=(n)=>n==null?'#888':n>=85?'#CAE8C1':n>=75?'#44ccaa':n>=65?'#F4DB71':'#E05252';
+            const list=retentionSummary.practitioners.filter(p=>p.staffId).slice().sort((a,b)=>(b.pctRepeatVisits||0)-(a.pctRepeatVisits||0));
+            return(
+              <div className="perf-slot" style={{marginBottom:14}}>
+                <div className="perf-slot-head">
+                  <span className="perf-slot-title" style={{color:'#BB99FF'}}>Retention by Practitioner{retentionSummary.periodLabel?` — ${retentionSummary.periodLabel}`:''}</span>
+                  <span style={{fontSize:13,color:'#777'}}>repeat-visit % · auto-filled from the Member Retention report</span>
+                </div>
+                <div className="perf-slot-body">
+                  {list.map((p,i)=>{
+                    const rep=p.pctRepeatVisits,pr=p.pctReturning;const nm=p.matchedName||p.name;
+                    return(
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 0',borderBottom:i<list.length-1?'1px solid var(--border)':'none'}}>
+                        <div style={{flex:'0 0 180px',minWidth:0}}>
+                          <div style={{fontSize:15,fontWeight:600,color:'#ddd',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nm}</div>
+                          {pr!=null&&<div style={{fontSize:13,color:retC(pr)}}>{pr}% returning</div>}
+                        </div>
+                        <div style={{flex:1,height:8,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',borderRadius:4,background:repC(rep),width:Math.min(100,rep||0)+'%'}}/></div>
+                        <div style={{flex:'0 0 56px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:repC(rep)}}>{rep!=null?rep+'%':'—'}</div>
+                        <span style={{flex:'0 0 64px',fontSize:13,textAlign:'center',background:repC(rep)+'18',color:repC(rep),border:'1px solid '+repC(rep)+'33',borderRadius:3,padding:'2px 0',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{repLabel(rep)}</span>
+                      </div>
+                    );
+                  })}
+                  <div style={{fontSize:13,color:'#666',marginTop:10,lineHeight:1.6}}>Bars show each practitioner's repeat-visit %. Returning % is under the name. These come straight from the imported report; the manual entry below is for overrides or months without an import.</div>
                 </div>
               </div>
             );
