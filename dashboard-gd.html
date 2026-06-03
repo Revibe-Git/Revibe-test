@@ -2555,10 +2555,8 @@ function ProjectionCard({snapshots,filterDisc,filterSite,staff,revBasis,dataMaxM
   const rowOK=(r)=>{if(!r.staffId)return false;const s=(staff||[]).find(x=>x.id===r.staffId);if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;if(filterSite&&filterSite!=='all'&&s.site!==filterSite)return false;return true;};
   const monthRows=(snapshots||[]).filter(s=>s.date&&s.date.startsWith(projMonth)).flatMap(s=>(s.rows||[]).filter(rowOK));
   let revAct;
-  if(unfiltered){
-    // Reliable billed straight from snapshots (all rows incl. the retail/_clinic bucket) —
-    // reconciles to the books and is immune to any revBasis double-count.
-    revAct=(snapshots||[]).filter(s=>s.date&&s.date.startsWith(projMonth)).flatMap(s=>s.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0),0);
+  if(unfiltered&&revBasis&&revBasis[projMonth]){
+    revAct=revBasis[projMonth].billed; // exact books figure
   }else{
     revAct=monthRows.reduce((a,r)=>a+(parseFloat(r.revenue)||0),0);
   }
@@ -3682,7 +3680,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         revenue:jr?.revenue||null,initialAssessments:jr?.initialAssessments||null,
         gva:gvaVal,retention:retVal};
     })
-  ,[staff,filteredRows,data.gva,data.retention,gvaEdits]);
+  ,[staff,filteredRows,data.gva,data.retention,gvaEdits,filterDisc,filterSite]);
 
   const withUtil  =mergedStaff.filter(s=>s.utilization!=null).sort((a,b)=>b.utilization-a.utilization);
   const withAppts =mergedStaff.filter(s=>s.completed!=null).sort((a,b)=>b.completed-a.completed);
@@ -4308,17 +4306,14 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
       {/* ── REVENUE ── */}
       {tab==='revenue'&&Object.keys(revBasis).length>0&&(()=>{
-        // Billed comes from the deduped snapshots (reliable, reconciles to books). Collected
-        // is derived by applying each month's collected/billed RATIO from the sales import —
-        // so even if revBasis absolutes were inflated by repeat imports, the figures stay correct.
-        const snapBilled={};
-        (data.snapshots||[]).forEach(s=>{const m=s.date&&s.date.slice(0,7);if(!m)return;(s.rows||[]).forEach(r=>{snapBilled[m]=(snapBilled[m]||0)+(parseFloat(r.revenue)||0);});});
-        const months=Object.keys(revBasis).filter(m=>(!dateFrom||m>=dateFrom.slice(0,7))&&(!dateTo||m<=dateTo.slice(0,7))).filter(m=>(snapBilled[m]||revBasis[m].billed)).sort();
+        // revBasis holds exact billed (Total, all income/statuses) + collected per month,
+        // captured at Sales import and de-duplicated (replace-on-import). This is the books
+        // figure ($151,349.90 for May etc.) — the authoritative clinic revenue source.
+        const months=Object.keys(revBasis).filter(m=>(!dateFrom||m>=dateFrom.slice(0,7))&&(!dateTo||m<=dateTo.slice(0,7))).filter(m=>revBasis[m].billed||revBasis[m].collected).sort();
         if(!months.length)return null;
-        const rowFor=(m)=>{const rb=revBasis[m];const ratio=(rb&&rb.billed>0)?rb.collected/rb.billed:null;const b=snapBilled[m]!=null?snapBilled[m]:(rb?rb.billed:0);const c=ratio!=null?b*ratio:null;return{b,c,o:c!=null?b-c:null,p:(c!=null&&b>0)?c/b*100:null};};
-        const rows=months.map(m=>({m,...rowFor(m)}));
+        const rows=months.map(m=>{const b=revBasis[m].billed||0,c=revBasis[m].collected||0;return{m,b,c,o:b-c,p:b>0?c/b*100:null};});
         const billed=rows.reduce((a,r)=>a+r.b,0);
-        const collected=rows.reduce((a,r)=>a+(r.c||0),0);
+        const collected=rows.reduce((a,r)=>a+r.c,0);
         const outstanding=billed-collected;const pct=billed>0?collected/billed*100:0;
         return(
           <div className="perf-slot" style={{marginBottom:14}}>
@@ -4347,7 +4342,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <tbody>{rows.map(({m,b,c,o,p})=>(<tr key={m} style={{borderTop:'1px solid var(--border)',color:'#bbb'}}><td style={{textAlign:'left',padding:'4px 8px',color:'#ddd'}}>{m}</td><td style={{textAlign:'right',padding:'4px 8px'}}>{fmtMoney(b)}</td><td style={{textAlign:'right',padding:'4px 8px',color:'#44CCAA'}}>{c!=null?fmtMoney(c):'—'}</td><td style={{textAlign:'right',padding:'4px 8px',color:o>0?'#E0A052':'#888'}}>{o!=null?fmtMoney(o):'—'}</td><td style={{textAlign:'right',padding:'4px 8px'}}>{p!=null?p.toFixed(1)+'%':'—'}</td></tr>))}</tbody>
                 </table>
               </div>
-              <div style={{fontSize:12,color:'#666',marginTop:8,lineHeight:1.6}}>Billed = Total (all income, all statuses) — the figure tracked across the dashboard. Collected = cash actually received. Follows the date window above.</div>
+              <div style={{fontSize:12,color:'#666',marginTop:8,lineHeight:1.6}}>Billed = Total (all income, all statuses) — the figure tracked across the dashboard. Collected = cash actually received.{usingCustomRange?' Revenue is tracked per month, so a partial-week range still shows the full month(s) it overlaps — use the Trends tab for weekly revenue.':' Follows the date window above.'}</div>
             </div>
           </div>
         );
