@@ -10392,6 +10392,56 @@ function SystematicPage(){
   const[form,setForm]=useState({});
   const[saving,setSaving]=useState(false);
 
+  // ── Clinical Playbook: the living curriculum / thought-process taught to leads ──
+  const PBK='rvgd3_systematic_playbook';
+  const SEED_PLAYBOOK=[
+    {id:'pb1',title:'1 · The Mindset Shift',subtitle:'Why we think this way',items:[
+      'From "what service does this guest want?" → "what does this case actually need right now?"',
+      'From discipline identity ("I\u2019m the physio / osteo / RMT") → case-led, team-based care',
+      'From symptom chasing → capacity building',
+      'From transactional visits → consultative, continuity-driven care',
+      'The goal is not more treatment. The goal is more appropriate treatment.']},
+    {id:'pb2',title:'2 · Reading the Case',subtitle:'The questions we ask before we treat',items:[
+      'What phase is it? — acute / subacute / chronic / recurrent / post-op',
+      'How irritable? — tissue tolerance, nervous-system sensitivity',
+      'Structure or capacity? — e.g. a 50% strength deficit is a capacity issue, not a structural failure',
+      'What is the main limitation, what capacity is missing, what system is overloaded?',
+      'What can they tolerate today, and what is the next appropriate progression?',
+      'Readiness & demands — psychological readiness, movement/recovery demands, return-to-function / sport / lifestyle goals']},
+    {id:'pb3',title:'3 · Assigning the Care Team',subtitle:'Lead & Support',items:[
+      'Lead — "the fix": owns the care plan and progression based on capacity and structure',
+      'Support — "the manage": inflammation, circulation, secondary symptoms',
+      'When physio leads, when osteo leads, when RMT supports, when pelvic PT is involved',
+      'When co-treatment helps, when passive care is excessive, when to slow down',
+      'Match to staff strengths (athletic background, sport, niche)']},
+    {id:'pb4',title:'4 · Phase-Based Treatment Logic',subtitle:'Sequencing',items:[
+      'Acute: indirect first — manage inflammation/circulation, not direct tissue work. Refer by pain threshold: high → osteo, lower-grade → RMT, all eventually cleared through physio',
+      'Subacute: progressive loading as tolerance allows',
+      'Chronic / recurrent: target the capacity and structural drivers, not the compensations',
+      'Post-op: restore capacity, address asymmetry, respect progression gates',
+      'When to refer internally — and when NOT to']},
+    {id:'pb5',title:'5 · Communication as Clinical Infrastructure',subtitle:'',items:[
+      'Front desk = clinical intake: capture pain level + swelling on booking, set expectations, route to the right lead/support',
+      'Centralized real-time team comms (WhatsApp) for schedule / treatment changes',
+      'Interdisciplinary handoffs: one care plan, owned by the lead',
+      'Keep control of the plan even when the guest sees outside providers (chiro, coach) → consistent care + referrals']},
+    {id:'pb6',title:'6 · The Care Map',subtitle:'Efficiency & continuity',items:[
+      'Complete the appropriate plan as efficiently as possible',
+      'Proactive case management, follow-up standards, fewer cancellations',
+      'Continuity through vacations — coverage planning + vacation tracker']},
+    {id:'pb7',title:'7 · Retention & Membership Logic',subtitle:'',items:[
+      'Triage: orthopedic case → structured care plan (drives retention); non-ortho → membership lifestyle support',
+      'Membership = Recovery/Relax, with clinical discretion to treat or refer; transition low → standard performers',
+      'Build pelvic health as its own category']},
+    {id:'pb8',title:'8 · Building the Team',subtitle:'Operating model',items:[
+      'Cross-disciplinary pods (PT + RMT + Osteo), assigned leads, rotating over 3 months',
+      'Orthopedic competency baseline for ALL staff, front desk included',
+      'Leadership: plan, strategize, execute — accountability and ownership']},
+  ];
+  const[playbook,setPlaybook]=useState(()=>{try{const s=localStorage.getItem(PBK);return s?JSON.parse(s):SEED_PLAYBOOK;}catch{return SEED_PLAYBOOK;}});
+  const[pbEdit,setPbEdit]=useState(false);
+  const savePlaybook=(pb)=>{setPlaybook(pb);try{localStorage.setItem(PBK,JSON.stringify(pb));}catch(e){}const sb=window.__SB;if(sb)sb.from('systematic_playbook').upsert({id:'singleton',data:pb}).then(()=>{},()=>{});};
+
   useEffect(()=>{
     const sb=window.__SB;if(!sb)return;
     sb.from('systematic_sessions').select('*').order('created_at',{ascending:false}).then(({data,error})=>{
@@ -10400,6 +10450,9 @@ function SystematicPage(){
     sb.from('systematic_concepts').select('*').order('created_at',{ascending:false}).then(({data,error})=>{
       if(!error&&data&&data.length>0){const d=data.map(r=>r.data);setConcepts(d);localStorage.setItem(SK+'_concepts',JSON.stringify(d));}
     });
+    sb.from('systematic_playbook').select('data').eq('id','singleton').maybeSingle().then(({data,error})=>{
+      if(!error&&data&&Array.isArray(data.data)&&data.data.length){setPlaybook(data.data);localStorage.setItem(PBK,JSON.stringify(data.data));}
+    },()=>{});
   },[]);
 
   const save=(s,c)=>{
@@ -10562,6 +10615,53 @@ function SystematicPage(){
     </div>
   );
 
+  // Clinical Playbook view — the living curriculum
+  if(view==='playbook'){
+    const upd=(i,patch)=>{const pb=playbook.map((s,idx)=>idx===i?{...s,...patch}:s);savePlaybook(pb);};
+    const delSec=(i)=>{if(confirm('Delete this section?'))savePlaybook(playbook.filter((_,idx)=>idx!==i));};
+    const addSec=()=>{savePlaybook([...playbook,{id:'pb_'+Date.now(),title:'New Section',subtitle:'',items:[]}]);};
+    const move=(i,d)=>{const j=i+d;if(j<0||j>=playbook.length)return;const pb=[...playbook];[pb[i],pb[j]]=[pb[j],pb[i]];savePlaybook(pb);};
+    return(
+      <div>
+        <div className="flex aic jsb" style={{marginBottom:6,flexWrap:'wrap',gap:8}}>
+          <button className="btn btn-ghost btn-sm" onClick={()=>{setPbEdit(false);setView('home');}}>← Back</button>
+          <div className="flex aic g8">
+            {pbEdit&&<button className="btn btn-ghost btn-sm" onClick={addSec}>+ Section</button>}
+            <button className={`btn btn-sm ${pbEdit?'btn-lime':'btn-ghost'}`} onClick={()=>setPbEdit(!pbEdit)}>{pbEdit?'✓ Done':'✎ Edit'}</button>
+          </div>
+        </div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,letterSpacing:'1px',color:'#CAE8C1',marginBottom:2}}>REVIBE Clinical Thinking System</div>
+        <div style={{fontSize:14,color:'#888',fontStyle:'italic',marginBottom:18,maxWidth:680}}>How we treat as a team. Cases dictate care — the goal is more appropriate treatment, not more treatment. {pbEdit?'Editing: bullets are one per line.':'A living curriculum — expand it with case examples, flow-maps, and timelines as we teach.'}</div>
+
+        {playbook.map((sec,i)=>(
+          <div key={sec.id} className="card" style={{marginBottom:12,padding:'16px 18px'}}>
+            {pbEdit?(
+              <div>
+                <div className="flex aic g8" style={{marginBottom:8}}>
+                  <input value={sec.title} onChange={e=>upd(i,{title:e.target.value})} style={{flex:1,background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'#eee',fontSize:16,fontWeight:700,padding:'7px 10px',fontFamily:"'Barlow Condensed',sans-serif"}}/>
+                  <button className="btn btn-ghost btn-xs" onClick={()=>move(i,-1)} title="Up">↑</button>
+                  <button className="btn btn-ghost btn-xs" onClick={()=>move(i,1)} title="Down">↓</button>
+                  <button className="btn btn-ghost btn-xs" style={{color:'#E05252'}} onClick={()=>delSec(i)}>✕</button>
+                </div>
+                <input value={sec.subtitle||''} placeholder="Subtitle (optional)" onChange={e=>upd(i,{subtitle:e.target.value})} style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'#bbb',fontSize:13,padding:'5px 10px',marginBottom:8}}/>
+                <textarea value={(sec.items||[]).join('\n')} onChange={e=>upd(i,{items:e.target.value.split('\n').map(x=>x.replace(/^[•\-\s]+/,'')).filter(x=>x!=='')})} rows={Math.max(3,(sec.items||[]).length+1)} placeholder="One bullet per line" style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'#ddd',fontSize:14,lineHeight:1.6,padding:'8px 10px',resize:'vertical',fontFamily:'inherit'}}/>
+              </div>
+            ):(
+              <div>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:19,fontWeight:800,color:'#eee',letterSpacing:'.5px'}}>{sec.title}</div>
+                {sec.subtitle&&<div style={{fontSize:13,color:'#888',fontStyle:'italic',marginBottom:8,marginTop:1}}>{sec.subtitle}</div>}
+                <ul style={{margin:sec.subtitle?'0':'8px 0 0',paddingLeft:18,listStyle:'none'}}>
+                  {(sec.items||[]).map((it,k)=>(<li key={k} style={{position:'relative',fontSize:14.5,color:'#ccc',lineHeight:1.65,marginBottom:6,paddingLeft:4}}><span style={{position:'absolute',left:-14,color:'#CAE8C1'}}>›</span>{it}</li>))}
+                </ul>
+              </div>
+            )}
+          </div>
+        ))}
+        <div style={{fontSize:13,color:'#666',marginTop:8,lineHeight:1.6}}>Next to build on this: per-case flow-maps (who sees whom, when), a case library (worked examples like the ACL), referral/timeline rules, and the lifestyle lens. Capture a case the way you teach it and we\u2019ll add the structure.</div>
+      </div>
+    );
+  }
+
   // Home view
   return(
     <div>
@@ -10574,6 +10674,15 @@ function SystematicPage(){
           <button className="btn btn-ghost btn-sm" onClick={newConcept}>+ Concept</button>
           <button className="btn btn-lime btn-sm" onClick={newSession}>+ Log Session</button>
         </div>
+      </div>
+
+      {/* Clinical Playbook — the living curriculum taught to leads */}
+      <div onClick={()=>{setPbEdit(false);setView('playbook');}} style={{cursor:'pointer',background:'linear-gradient(135deg,rgba(202,232,193,.10),rgba(202,232,193,.03))',border:'1px solid rgba(202,232,193,.25)',borderRadius:10,padding:'18px 22px',marginBottom:18,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>
+        <div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:21,fontWeight:800,letterSpacing:'.5px',color:'#CAE8C1'}}>📋 Clinical Thinking Playbook</div>
+          <div style={{fontSize:14,color:'#9bbf92',marginTop:3}}>The team\u2019s treatment thought-process — how we read a case, assign Lead &amp; Support, and route care. {playbook.length} sections.</div>
+        </div>
+        <span className="btn btn-lime btn-sm" style={{flexShrink:0}}>Open →</span>
       </div>
 
       {sessions.length===0&&concepts.length===0?(
