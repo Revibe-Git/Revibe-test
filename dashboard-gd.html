@@ -10442,6 +10442,36 @@ function SystematicPage(){
   const[pbEdit,setPbEdit]=useState(false);
   const savePlaybook=(pb)=>{setPlaybook(pb);try{localStorage.setItem(PBK,JSON.stringify(pb));}catch(e){}const sb=window.__SB;if(sb)sb.from('systematic_playbook').upsert({id:'singleton',data:pb}).then(()=>{},()=>{});};
 
+  // ── Case Mapper: dropdowns in → suggested pathway out. SUGGESTION ONLY. ──
+  // Specific clinical detail comes ONLY from verified rules below; everything else is generic
+  // safe process. Add/verify rules over time so the tool maps from your standards, not guesses.
+  const MC_REGIONS=['Ankle / foot','Knee','Hip / groin','Low back','Neck','Shoulder','Elbow / wrist','Other / multi-region'];
+  const MC_PHASES=['Acute (0–72h)','Subacute (days–weeks)','Chronic (>6–12 wks)','Post-operative','Recurrent'];
+  const MC_IRRIT=['Low','Moderate','High'];
+  const MC_PAIN=['0–3 (mild)','4–6 (moderate)','7–10 (severe)'];
+  const MC_MECH=['Traumatic / specific incident','Overuse / repetitive','Insidious / no clear cause','Post-surgical'];
+  const MC_LIFE=['Competitive athlete','Active adult','General / desk-based','Post-partum','Older adult'];
+  const MC_DX=['Yes — diagnosed by Physio/Chiro','No — not yet assessed'];
+  const RED_FLAGS=[
+    'Suspected fracture / severe deformity / cannot bear weight',
+    'Neuro signs — numbness, progressive weakness, bowel/bladder change',
+    'Systemic — night pain, unexplained weight loss, fever, feeling unwell',
+    'Possible vascular — calf swelling/redness, chest pain, shortness of breath',
+    'Pain not behaving like a typical mechanical pattern',
+  ];
+  // Verified-rule store (clinician-owned). region key → phase key → pathway + basis.
+  const CASE_RULES={
+    'Ankle / foot':{basis:'DRAFT — internal scaffold, NOT yet clinically verified',phases:{
+      'Acute (0–72h)':{lead:'Physio',support:'Osteo if high pain · RMT if lower-grade',goal:'Protect; manage swelling/inflammation & circulation — indirect only',gate:'Pain ↓ · swelling controlled · weight-bearing tolerated'},
+      'Subacute (days–weeks)':{lead:'Physio',support:'RMT',goal:'Restore ROM; progressive loading to tolerance',gate:'Full pain-free ROM · loads without flare'},
+      'Chronic (>6–12 wks)':{lead:'Physio',support:'RMT',goal:'Rebuild capacity; correct asymmetry',gate:'Strength symmetry · meets demands'},
+      'Post-operative':{lead:'Physio (± S&C)',support:'RMT',goal:'Respect surgical protocol; restore capacity',gate:'Per surgeon protocol + capacity gates'},
+    }},
+  };
+  const[mc,setMc]=useState({region:'',phase:'',irritability:'',pain:'',mechanism:'',lifestyle:'',diagnosed:''});
+  const[flags,setFlags]=useState([]);
+  const setMcv=(k,v)=>setMc(p=>({...p,[k]:v}));
+
   useEffect(()=>{
     const sb=window.__SB;if(!sb)return;
     sb.from('systematic_sessions').select('*').order('created_at',{ascending:false}).then(({data,error})=>{
@@ -10627,11 +10657,69 @@ function SystematicPage(){
           <button className="btn btn-ghost btn-sm" onClick={()=>{setPbEdit(false);setView('home');}}>← Back</button>
           <div className="flex aic g8">
             {pbEdit&&<button className="btn btn-ghost btn-sm" onClick={addSec}>+ Section</button>}
+            <button className="btn btn-ghost btn-sm" onClick={()=>setView('mapper')}>🧭 Case Mapper</button>
             <button className={`btn btn-sm ${pbEdit?'btn-lime':'btn-ghost'}`} onClick={()=>setPbEdit(!pbEdit)}>{pbEdit?'✓ Done':'✎ Edit'}</button>
           </div>
         </div>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,letterSpacing:'1px',color:'#CAE8C1',marginBottom:2}}>REVIBE Clinical Thinking System</div>
         <div style={{fontSize:14,color:'#888',fontStyle:'italic',marginBottom:18,maxWidth:680}}>How we treat as a team. Cases dictate care — the goal is more appropriate treatment, not more treatment. {pbEdit?'Editing: bullets are one per line.':'A living curriculum — expand it with case examples, flow-maps, and timelines as we teach.'}</div>
+
+        {!pbEdit&&(()=>{
+          const arrow=<div style={{textAlign:'center',color:'#3f6b4f',fontSize:16,lineHeight:1,margin:'3px 0'}}>▼</div>;
+          const Node=({c,t,s})=>(<div style={{background:'var(--surface3)',borderLeft:'3px solid '+c,borderRadius:6,padding:'10px 14px'}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,letterSpacing:'.5px',color:c}}>{t}</div><div style={{fontSize:13.5,color:'#bbb',marginTop:2,lineHeight:1.5}}>{s}</div></div>);
+          const LIME='#CAE8C1',PUR='#BB99FF',BLU='#7FC8E8',YEL='#F4DB71',ORG='#E0A052';
+          return(<>
+          {/* ── Care-routing flow map ── */}
+          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'18px 20px',marginBottom:14}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:LIME,marginBottom:3}}>🗺 Care-Routing Flow — who sees whom, when</div>
+            <div style={{fontSize:13,color:'#888',marginBottom:16}}>The default decision path from first call to discharge. Lead = the fix · Support = the manage.</div>
+            <Node c={BLU} t="1 · Front Desk Intake" s="Capture pain level + swelling on the call. Set expectations. Route to the right Lead + Support."/>
+            {arrow}
+            <Node c="#9aa" t="2 · Assess (Lead)" s="What phase? How irritable? Capacity vs structure? What's the main limitation and the next appropriate progression?"/>
+            {arrow}
+            <Node c={LIME} t="3 · Assign Lead + Support" s={'Lead ("the fix") owns the plan & progression by capacity/structure. Support ("the manage") handles inflammation, circulation, secondary symptoms.'}/>
+            {arrow}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:10}}>
+              <Node c={ORG} t="ACUTE / high irritability" s="Indirect first — manage inflammation + circulation, no direct tissue work. Route by pain: high → Osteo, lower-grade → RMT. All cleared through Physio."/>
+              <Node c={YEL} t="SUBACUTE" s="Progressive loading as tolerance allows. Lead drives; Support tapers."/>
+              <Node c={PUR} t="CHRONIC / RECURRENT / POST-OP" s="Build the missing capacity, address structure. Lead progresses; Support manages symptoms. Don't chase compensations."/>
+            </div>
+            {arrow}
+            <Node c={LIME} t="Progress by Gates" s="Advance on re-assessed capacity criteria — not the calendar. Re-assess each step."/>
+            {arrow}
+            <Node c={BLU} t="Discharge → Maintenance / Membership  ·  or refer internally" s="Orthopedic plan complete → maintenance or membership. Refer internally when another discipline is better suited; keep the plan owned by the Lead."/>
+          </div>
+
+          {/* ── Worked case example ── */}
+          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'18px 20px',marginBottom:14}}>
+            <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:3}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:YEL}}>📋 Worked Case — Acute Lateral Ankle Sprain</div>
+              <span style={{fontSize:12,color:'#666',fontStyle:'italic'}}>scaffold — refine with real timelines/gates as we teach</span>
+            </div>
+            <div style={{fontSize:13,color:'#888',marginBottom:16}}>Same injury maps differently by phase and by lifestyle. The pathway below is the template; the lifestyle lens flexes it.</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:12}}>
+              {[
+                {c:ORG,ph:'Phase 1 · Acute',when:'0–72h · high irritability',lead:'Physio (sets plan)',sup:'Osteo if high pain · RMT if lower-grade',goal:'Protect; manage swelling/inflammation & circulation — indirect only',gate:'Pain ↓ · swelling controlled · weight-bearing tolerated'},
+                {c:YEL,ph:'Phase 2 · Subacute',when:'~3d–3wk',lead:'Physio',sup:'RMT (circulation, tissue tolerance)',goal:'Restore ROM; begin progressive loading to tolerance',gate:'Full pain-free ROM · loads without flare'},
+                {c:LIME,ph:'Phase 3 · Return',when:'3wk+',lead:'Physio (± Performance/S&C for athletes)',sup:'Taper',goal:'Rebuild capacity; correct asymmetry; return-to-function/sport',gate:'Strength symmetry · meets sport/work demands'},
+              ].map((p,idx)=>(
+                <div key={idx} style={{background:'var(--surface3)',borderRadius:8,overflow:'hidden',border:'1px solid var(--border)'}}>
+                  <div style={{background:p.c,color:'#1a1a1a',padding:'7px 12px',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:800,fontSize:15,letterSpacing:'.5px'}}>{p.ph}<span style={{float:'right',fontWeight:600,fontSize:12,opacity:.8}}>{p.when}</span></div>
+                  <div style={{padding:'10px 12px',fontSize:13.5,lineHeight:1.5}}>
+                    <div style={{marginBottom:6}}><span style={{color:LIME,fontWeight:700}}>Lead:</span> <span style={{color:'#ccc'}}>{p.lead}</span></div>
+                    <div style={{marginBottom:6}}><span style={{color:PUR,fontWeight:700}}>Support:</span> <span style={{color:'#ccc'}}>{p.sup}</span></div>
+                    <div style={{marginBottom:6}}><span style={{color:'#888',fontWeight:700}}>Goal:</span> <span style={{color:'#ccc'}}>{p.goal}</span></div>
+                    <div><span style={{color:ORG,fontWeight:700}}>Advance when:</span> <span style={{color:'#ccc'}}>{p.gate}</span></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{marginTop:12,background:'rgba(127,200,232,.06)',border:'1px solid rgba(127,200,232,.18)',borderRadius:6,padding:'9px 13px',fontSize:13,color:'#9bbfd0',lineHeight:1.55}}>
+              <strong style={{color:BLU}}>Lifestyle lens:</strong> Competitive athlete → compress phases, bring Performance/S&C in earlier, return-to-sport testing. Desk worker → longer indirect phase if irritable, emphasis on function + ergonomics over sport metrics.
+            </div>
+          </div>
+          </>);
+        })()}
 
         {playbook.map((sec,i)=>(
           <div key={sec.id} className="card" style={{marginBottom:12,padding:'16px 18px'}}>
@@ -10658,6 +10746,86 @@ function SystematicPage(){
           </div>
         ))}
         <div style={{fontSize:13,color:'#666',marginTop:8,lineHeight:1.6}}>Next to build on this: per-case flow-maps (who sees whom, when), a case library (worked examples like the ACL), referral/timeline rules, and the lifestyle lens. Capture a case the way you teach it and we\u2019ll add the structure.</div>
+      </div>
+    );
+  }
+
+  // Case Mapper view
+  if(view==='mapper'){
+    const Sel=({label,val,opts,k})=>(<div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>{label}</div>
+      <select value={val} onChange={e=>setMcv(k,e.target.value)} style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,color:val?'#eee':'#777',fontSize:14,padding:'8px 10px'}}>
+        <option value="">—</option>{opts.map(o=><option key={o} value={o}>{o}</option>)}
+      </select></div>);
+    const hasFlags=flags.length>0;
+    const ready=mc.region&&mc.phase;
+    const rule=(CASE_RULES[mc.region]&&CASE_RULES[mc.region].phases||{})[mc.phase];
+    const ruleBasis=CASE_RULES[mc.region]&&CASE_RULES[mc.region].basis;
+    const highIrrit=mc.irritability==='High'||mc.pain==='7–10 (severe)';
+    const needsDx=mc.diagnosed==='No — not yet assessed';
+    const LIME='#CAE8C1',PUR='#BB99FF',BLU='#7FC8E8',ORG='#E0A052',RED='#E05252';
+    const stepCard=(n,c,t,body)=>(<div style={{background:'var(--surface3)',borderLeft:'3px solid '+c,borderRadius:6,padding:'11px 14px',marginBottom:8}}>
+      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:800,letterSpacing:'.5px',color:c}}>{n} · {t}</div>
+      <div style={{fontSize:13.5,color:'#ccc',marginTop:3,lineHeight:1.55}}>{body}</div></div>);
+    return(
+      <div>
+        <button className="btn btn-ghost btn-sm" style={{marginBottom:10}} onClick={()=>setView('playbook')}>← Back to Playbook</button>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,letterSpacing:'1px',color:BLU,marginBottom:2}}>🧭 Case Mapper</div>
+        <div style={{background:'rgba(224,82,82,.07)',border:'1px solid rgba(224,82,82,.25)',borderRadius:7,padding:'9px 13px',fontSize:13,color:'#e0a0a0',lineHeight:1.55,marginBottom:16}}>
+          <strong>Suggestion only — the treating clinician decides.</strong> This assembles a starting pathway from team standards; it does not diagnose. Specific timelines/referrals show only where a <em>verified</em> rule exists. Always re-assess and adjust.
+        </div>
+
+        {/* Red-flag screen */}
+        <div style={{background:'var(--surface2)',border:'1px solid '+(hasFlags?'rgba(224,82,82,.4)':'var(--border)'),borderRadius:9,padding:'14px 16px',marginBottom:14}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,letterSpacing:'.5px',color:hasFlags?RED:'#aaa',marginBottom:8}}>🚩 Medical Screen — check any that apply</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:6}}>
+            {RED_FLAGS.map(f=>(<label key={f} style={{display:'flex',gap:8,alignItems:'flex-start',fontSize:13.5,color:'#ccc',cursor:'pointer',lineHeight:1.4}}>
+              <input type="checkbox" checked={flags.includes(f)} onChange={e=>setFlags(p=>e.target.checked?[...p,f]:p.filter(x=>x!==f))} style={{marginTop:3}}/>{f}</label>))}
+          </div>
+          <div style={{fontSize:12,color:'#666',marginTop:8,fontStyle:'italic'}}>Standard screening prompts — verify against your own protocols.</div>
+        </div>
+
+        {/* Inputs */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:18}}>
+          <Sel label="Body region" val={mc.region} opts={MC_REGIONS} k="region"/>
+          <Sel label="Phase" val={mc.phase} opts={MC_PHASES} k="phase"/>
+          <Sel label="Irritability" val={mc.irritability} opts={MC_IRRIT} k="irritability"/>
+          <Sel label="Pain level" val={mc.pain} opts={MC_PAIN} k="pain"/>
+          <Sel label="Mechanism" val={mc.mechanism} opts={MC_MECH} k="mechanism"/>
+          <Sel label="Lifestyle / goal" val={mc.lifestyle} opts={MC_LIFE} k="lifestyle"/>
+          <Sel label="Diagnosed yet?" val={mc.diagnosed} opts={MC_DX} k="diagnosed"/>
+        </div>
+
+        {/* Output */}
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginBottom:10}}>Suggested Pathway</div>
+        {hasFlags?(
+          <div style={{background:'rgba(224,82,82,.1)',border:'1px solid rgba(224,82,82,.4)',borderRadius:9,padding:'16px 18px'}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:800,color:RED,marginBottom:6}}>🚩 Medical screen flagged — diagnose & clear before a treatment pathway</div>
+            <div style={{fontSize:14,color:'#ddd',lineHeight:1.6}}>One or more medical screening items are present. A <strong>Physio or Chiro assessment</strong> (and medical clearance / imaging if indicated) comes <strong>before</strong> any active treatment plan. RMT or Osteo down-regulation for comfort is acceptable in the interim. <strong>Do not begin active loading.</strong></div>
+          </div>
+        ):!ready?(
+          <div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:9,padding:'28px 20px',textAlign:'center',color:'#777'}}>Choose at least a <strong style={{color:'#aaa'}}>body region</strong> and <strong style={{color:'#aaa'}}>phase</strong> to map a pathway.</div>
+        ):(
+          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'16px 18px'}}>
+            {needsDx&&stepCard('1',BLU,'Diagnose first','Physio or Chiro establishes the diagnosis and owns the plan before treatment proceeds.')}
+            {highIrrit&&stepCard(needsDx?'2':'1',PUR,'Down-regulate before active care','High irritability / pain — settle the nervous system first with RMT or Osteo (indirect) before any active loading.')}
+            {rule?stepCard('★',LIME,`${mc.region} · ${mc.phase} — verified pathway`,
+              <span><span style={{color:LIME,fontWeight:700}}>Lead:</span> {rule.lead} &nbsp;·&nbsp; <span style={{color:PUR,fontWeight:700}}>Support:</span> {rule.support}<br/><span style={{color:'#888',fontWeight:700}}>Goal:</span> {rule.goal}<br/><span style={{color:ORG,fontWeight:700}}>Advance when:</span> {rule.gate}<br/><span style={{fontSize:12,color:'#888',fontStyle:'italic'}}>Basis: {ruleBasis}</span></span>
+            ):stepCard('•','#9aa',`${mc.phase} — general approach`,
+              (mc.phase.startsWith('Acute')?'Indirect first — manage inflammation/circulation, not direct tissue work. Lead = Physio; Support by pain threshold (high → Osteo, lower → RMT).':
+               mc.phase.startsWith('Subacute')?'Progressive loading to tolerance. Lead = Physio; Support = RMT.':
+               mc.phase.startsWith('Chronic')?'Target capacity & structural drivers, not compensations. Lead = Physio.':
+               mc.phase.startsWith('Post')?'Respect surgical protocol; rebuild capacity through gates. Lead = Physio (± S&C).':
+               'Confirm phase and lead.')+' — no region-specific verified rule yet; lead confirms specifics.')}
+            {mc.lifestyle&&stepCard('↳',BLU,'Lifestyle lens',
+              (mc.lifestyle==='Competitive athlete'?'Compress phases as tolerated; bring Performance/S&C in earlier; return-to-sport testing before clearance.':
+               mc.lifestyle==='Post-partum'?'Consider pelvic-floor PT involvement; progress conservatively around recovery demands.':
+               mc.lifestyle==='Older adult'?'More conservative loading; screen for comorbidities; prioritise function and safety.':
+               mc.lifestyle==='General / desk-based'?'Emphasis on function and ergonomics over sport metrics; longer indirect phase if irritable.':
+               'Progress to tolerance toward the patient\u2019s functional goals.'))}
+            {stepCard('→',LIME,'Progress by gates, then discharge','Advance on re-assessed capacity criteria — not the calendar. On completion: maintenance / membership, or refer internally if another discipline is better suited (Lead keeps the plan).')}
+            {!rule&&<div style={{fontSize:12.5,color:'#888',marginTop:6,fontStyle:'italic'}}>Specifics for {mc.region} aren\u2019t standardized yet. Add a verified rule and the mapper will return exact lead/support/timelines for this case.</div>}
+          </div>
+        )}
       </div>
     );
   }
