@@ -2408,7 +2408,7 @@ function LineChart({snapshots,staffId,metric,color,label,fmt,timeframe,clinicAvg
   );
 }
 
-function ClinicLineChart({snapshots,staff,metric,agg,color,label,fmt,timeframe,filterDisc,filterSite}){
+function ClinicLineChart({snapshots,staff,metric,agg,color,label,fmt,timeframe,filterDisc,filterSite,revBasis}){
   // Decide whether a snapshot row belongs in the clinic aggregate (exclude non-clinical roles; apply filters)
   const matchRow=(r)=>{
     const s=(staff||[]).find(x=>x.id===r.staffId);
@@ -2444,6 +2444,13 @@ function ClinicLineChart({snapshots,staff,metric,agg,color,label,fmt,timeframe,f
     const val=agg==='avg'?arr.reduce((a,b)=>a+b,0)/arr.length:arr.reduce((a,b)=>a+b,0);
     return{date:ym+'-01',val:agg==='avg'?Math.round(val):Math.round(val*100)/100};
   });
+
+  // Revenue, unfiltered → use the exact books billed (revBasis) so Trends reconciles to the
+  // same $151,350 shown everywhere else. Filtered views fall back to clinical snapshot sums.
+  if(metric==='revenue'&&revBasis&&(!filterDisc||filterDisc==='all')&&(!filterSite||filterSite==='all')){
+    const months=Array.from(new Set([...Object.keys(monthMap),...Object.keys(revBasis)])).filter(ym=>(revBasis[ym]&&revBasis[ym].billed)||monthMap[ym]).sort();
+    allPts=months.map(ym=>({date:ym+'-01',val:revBasis[ym]&&revBasis[ym].billed!=null?Math.round(revBasis[ym].billed*100)/100:Math.round((monthMap[ym]||[]).reduce((a,b)=>a+b,0)*100)/100}));
+  }
 
   // Apply timeframe filter (same logic as the practitioner LineChart)
   const now=new Date();
@@ -4803,7 +4810,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <div key={key} className="perf-slot">
                     <div className="perf-slot-head"><span className="perf-slot-title" style={{color}}>{label}</span></div>
                     <div style={{padding:'4px 16px 16px'}}>
-                      <ClinicLineChart snapshots={data.snapshots} staff={staff} metric={key} agg={agg} color={color} label={label} fmt={fmt} timeframe={trendTimeframe} filterDisc={trendDisc} filterSite={trendSite}/>
+                      <ClinicLineChart snapshots={data.snapshots} staff={staff} metric={key} agg={agg} color={color} label={label} fmt={fmt} timeframe={trendTimeframe} filterDisc={trendDisc} filterSite={trendSite} revBasis={revBasis}/>
                     </div>
                   </div>
                 ))}
