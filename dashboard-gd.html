@@ -10387,7 +10387,7 @@ function SystematicPage(){
   const SK='rvgd3_systematic';
   const[sessions,setSessions]=useState(()=>{try{const s=localStorage.getItem(SK);return s?JSON.parse(s):[];}catch{return[];}});
   const[concepts,setConcepts]=useState(()=>{try{const s=localStorage.getItem(SK+'_concepts');return s?JSON.parse(s):[];}catch{return[];}});
-  const[view,setView]=useState('home');
+  const[view,setView]=useState('playbook');
   const[active,setActive]=useState(null);
   const[form,setForm]=useState({});
   const[saving,setSaving]=useState(false);
@@ -10651,43 +10651,63 @@ function SystematicPage(){
     const delSec=(i)=>{if(confirm('Delete this section?'))savePlaybook(playbook.filter((_,idx)=>idx!==i));};
     const addSec=()=>{savePlaybook([...playbook,{id:'pb_'+Date.now(),title:'New Section',subtitle:'',items:[]}]);};
     const move=(i,d)=>{const j=i+d;if(j<0||j>=playbook.length)return;const pb=[...playbook];[pb[i],pb[j]]=[pb[j],pb[i]];savePlaybook(pb);};
+    const PB_STYLE=[
+      {c:'#CAE8C1',icon:'🧠'},{c:'#7FC8E8',icon:'🔍'},{c:'#BB99FF',icon:'👥'},{c:'#E0A052',icon:'📈'},
+      {c:'#F4DB71',icon:'💬'},{c:'#6FD0C0',icon:'🗺'},{c:'#E89BC0',icon:'🔁'},{c:'#9DD17F',icon:'🏗'},
+    ];
     return(
       <div>
-        <div className="flex aic jsb" style={{marginBottom:6,flexWrap:'wrap',gap:8}}>
-          <button className="btn btn-ghost btn-sm" onClick={()=>{setPbEdit(false);setView('home');}}>← Back</button>
+        <div className="flex aic jsb" style={{marginBottom:10,flexWrap:'wrap',gap:8}}>
+          <button className="btn btn-go btn-sm" onClick={()=>setView('mapper')}>🧭 Case Mapper</button>
           <div className="flex aic g8">
             {pbEdit&&<button className="btn btn-ghost btn-sm" onClick={addSec}>+ Section</button>}
-            <button className="btn btn-ghost btn-sm" onClick={()=>setView('mapper')}>🧭 Case Mapper</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setPbEdit(false);setView('home');}}>📓 Workshop Log</button>
             <button className={`btn btn-sm ${pbEdit?'btn-lime':'btn-ghost'}`} onClick={()=>setPbEdit(!pbEdit)}>{pbEdit?'✓ Done':'✎ Edit'}</button>
           </div>
         </div>
-        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,letterSpacing:'1px',color:'#CAE8C1',marginBottom:2}}>REVIBE Clinical Thinking System</div>
-        <div style={{fontSize:14,color:'#888',fontStyle:'italic',marginBottom:18,maxWidth:680}}>How we treat as a team. Cases dictate care — the goal is more appropriate treatment, not more treatment. {pbEdit?'Editing: bullets are one per line.':'A living curriculum — expand it with case examples, flow-maps, and timelines as we teach.'}</div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,letterSpacing:'1px',color:'#CAE8C1',marginBottom:2}}>REVIBE Clinical Thinking System</div>
+        <div style={{fontSize:14,color:'#888',marginBottom:18}}>Cases dictate care — more appropriate treatment, not more treatment.{pbEdit&&<span style={{fontStyle:'italic'}}> · Editing: one bullet per line.</span>}</div>
 
         {!pbEdit&&(()=>{
           const arrow=<div style={{textAlign:'center',color:'#3f6b4f',fontSize:16,lineHeight:1,margin:'3px 0'}}>▼</div>;
           const Node=({c,t,s})=>(<div style={{background:'var(--surface3)',borderLeft:'3px solid '+c,borderRadius:6,padding:'10px 14px'}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,letterSpacing:'.5px',color:c}}>{t}</div><div style={{fontSize:13.5,color:'#bbb',marginTop:2,lineHeight:1.5}}>{s}</div></div>);
-          const LIME='#CAE8C1',PUR='#BB99FF',BLU='#7FC8E8',YEL='#F4DB71',ORG='#E0A052';
+          const LIME='#CAE8C1',PUR='#BB99FF',BLU='#7FC8E8',YEL='#F4DB71',ORG='#E0A052',RED='#E0726F';
+          const IT=({c,cond,then,stop})=>(<div style={{display:'flex',gap:9,alignItems:'flex-start',padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,.045)'}}>
+            <span style={{flexShrink:0,fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:800,letterSpacing:'.5px',color:'#161616',background:c,borderRadius:4,padding:'3px 7px',marginTop:1}}>IF</span>
+            <div style={{flex:1}}><div style={{fontSize:14,color:'#e8e8e8',fontWeight:600,lineHeight:1.4}}>{cond}</div>
+              <div style={{marginTop:4,fontSize:13.5,lineHeight:1.45,color:stop?'#e0a0a0':'#bbb'}}><span style={{color:c,fontWeight:700}}>{stop?'⛔ THEN ':'→ THEN '}</span>{then}</div></div></div>);
+          const Branch=({c,cond,then})=>(<div style={{display:'flex',gap:8,alignItems:'flex-start',padding:'5px 0'}}><span style={{color:c,flexShrink:0,fontSize:13,marginTop:1}}>↳</span><div style={{fontSize:13.5,color:'#ccc',lineHeight:1.4}}><span style={{color:'#e8e8e8',fontWeight:600}}>{cond}</span> <span style={{color:c}}>→</span> {then}</div></div>);
+          const SecH=({t})=>(<div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12.5,letterSpacing:'2px',textTransform:'uppercase',color:'#777',margin:'15px 0 4px'}}>{t}</div>);
           return(<>
-          {/* ── Care-routing flow map ── */}
+          {/* ── Decision logic: if this → then who ── */}
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'18px 20px',marginBottom:14}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:LIME,marginBottom:3}}>🗺 Care-Routing Flow — who sees whom, when</div>
-            <div style={{fontSize:13,color:'#888',marginBottom:16}}>The default decision path from first call to discharge. Lead = the fix · Support = the manage.</div>
-            <Node c={BLU} t="1 · Front Desk Intake" s="Capture pain level + swelling on the call. Set expectations. Route to the right Lead + Support."/>
-            {arrow}
-            <Node c="#9aa" t="2 · Assess (Lead)" s="What phase? How irritable? Capacity vs structure? What's the main limitation and the next appropriate progression?"/>
-            {arrow}
-            <Node c={LIME} t="3 · Assign Lead + Support" s={'Lead ("the fix") owns the plan & progression by capacity/structure. Support ("the manage") handles inflammation, circulation, secondary symptoms.'}/>
-            {arrow}
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:10}}>
-              <Node c={ORG} t="ACUTE / high irritability" s="Indirect first — manage inflammation + circulation, no direct tissue work. Route by pain: high → Osteo, lower-grade → RMT. All cleared through Physio."/>
-              <Node c={YEL} t="SUBACUTE" s="Progressive loading as tolerance allows. Lead drives; Support tapers."/>
-              <Node c={PUR} t="CHRONIC / RECURRENT / POST-OP" s="Build the missing capacity, address structure. Lead progresses; Support manages symptoms. Don't chase compensations."/>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:LIME,marginBottom:3}}>🔀 Decision Logic — if this, then who</div>
+            <div style={{fontSize:13,color:'#888',marginBottom:6}}>Read top to bottom. Each branch is a rule — suggestion only, the clinician confirms. Lead = the fix · Support = the manage.</div>
+
+            <SecH t="Safety & sequence — first, every time"/>
+            <IT c={RED} stop cond="Red-flag signs — suspected fracture, neuro changes (numbness/weakness), systemic illness" then="Physio or Chiro diagnoses + medical clearance BEFORE any treatment plan. RMT/Osteo for comfort only. No active loading."/>
+            <IT c={BLU} cond="Not yet diagnosed" then="Physio or Chiro assesses and owns the plan before treatment proceeds."/>
+            <IT c={PUR} cond="High pain or high irritability — too hot for active care" then="Down-regulate the nervous system first, then re-assess for active care:"/>
+            <div style={{marginLeft:20,marginTop:2,marginBottom:4,borderLeft:'2px solid var(--border2)',paddingLeft:13}}>
+              <Branch c={PUR} cond="High pain" then="Osteo settles first"/>
+              <Branch c={PUR} cond="Lower-grade" then="RMT settles first"/>
             </div>
-            {arrow}
-            <Node c={LIME} t="Progress by Gates" s="Advance on re-assessed capacity criteria — not the calendar. Re-assess each step."/>
-            {arrow}
-            <Node c={BLU} t="Discharge → Maintenance / Membership  ·  or refer internally" s="Orthopedic plan complete → maintenance or membership. Refer internally when another discipline is better suited; keep the plan owned by the Lead."/>
+
+            <SecH t="Then treat by phase — Physio leads, Support manages"/>
+            <IT c={ORG} cond="Acute (0–72h)" then="Indirect first — manage inflammation & circulation, no direct tissue work. Physio leads."/>
+            <IT c={YEL} cond="Subacute (days–weeks)" then="Progressive loading to tolerance. Physio leads + RMT supports."/>
+            <IT c={PUR} cond="Chronic / recurrent" then="Build the missing capacity & address structure — don't chase compensations. Physio leads."/>
+            <IT c={BLU} cond="Post-operative" then="Respect surgical protocol & progression gates. Physio (± S&C) leads."/>
+
+            <SecH t="Then flex by activity — frequency & intensity"/>
+            <IT c={LIME} cond="High frequency / intensity — competitive athlete, heavy training" then="Compress phases as tolerated · bring Performance/S&C in earlier · return-to-sport testing before clearance."/>
+            <IT c={LIME} cond="Active adult" then="Progress to tolerance toward functional goals."/>
+            <IT c={LIME} cond="Low activity / desk-based" then="Function & ergonomics focus · longer indirect phase if irritable."/>
+
+            <SecH t="Co-treatment & advancing"/>
+            <IT c={PUR} cond="Symptoms need managing alongside active loading" then="Physio (Lead) + RMT/Osteo (Support) treat together."/>
+            <IT c={RED} stop cond="Passive care dominating / no progression" then="Reduce passive care · escalate active or re-assess the plan."/>
+            <IT c={ORG} cond="Phase gate met — capacity criteria, not the calendar" then="Advance to the next phase. Re-assess each visit. On completion → maintenance/membership, or internal referral (Lead keeps the plan)."/>
           </div>
 
           {/* ── Worked case example ── */}
@@ -10721,9 +10741,10 @@ function SystematicPage(){
           </>);
         })()}
 
-        {playbook.map((sec,i)=>(
+        {pbEdit?(
+          <div>
+          {playbook.map((sec,i)=>(
           <div key={sec.id} className="card" style={{marginBottom:12,padding:'16px 18px'}}>
-            {pbEdit?(
               <div>
                 <div className="flex aic g8" style={{marginBottom:8}}>
                   <input value={sec.title} onChange={e=>upd(i,{title:e.target.value})} style={{flex:1,background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'#eee',fontSize:16,fontWeight:700,padding:'7px 10px',fontFamily:"'Barlow Condensed',sans-serif"}}/>
@@ -10734,17 +10755,27 @@ function SystematicPage(){
                 <input value={sec.subtitle||''} placeholder="Subtitle (optional)" onChange={e=>upd(i,{subtitle:e.target.value})} style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'#bbb',fontSize:13,padding:'5px 10px',marginBottom:8}}/>
                 <textarea value={(sec.items||[]).join('\n')} onChange={e=>upd(i,{items:e.target.value.split('\n').map(x=>x.replace(/^[•\-\s]+/,'')).filter(x=>x!=='')})} rows={Math.max(3,(sec.items||[]).length+1)} placeholder="One bullet per line" style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:5,color:'#ddd',fontSize:14,lineHeight:1.6,padding:'8px 10px',resize:'vertical',fontFamily:'inherit'}}/>
               </div>
-            ):(
-              <div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:19,fontWeight:800,color:'#eee',letterSpacing:'.5px'}}>{sec.title}</div>
-                {sec.subtitle&&<div style={{fontSize:13,color:'#888',fontStyle:'italic',marginBottom:8,marginTop:1}}>{sec.subtitle}</div>}
-                <ul style={{margin:sec.subtitle?'0':'8px 0 0',paddingLeft:18,listStyle:'none'}}>
-                  {(sec.items||[]).map((it,k)=>(<li key={k} style={{position:'relative',fontSize:14.5,color:'#ccc',lineHeight:1.65,marginBottom:6,paddingLeft:4}}><span style={{position:'absolute',left:-14,color:'#CAE8C1'}}>›</span>{it}</li>))}
-                </ul>
-              </div>
-            )}
           </div>
-        ))}
+          ))}
+          </div>
+        ):(
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))',gap:12}}>
+          {playbook.map((sec,i)=>{
+            const st=PB_STYLE[i%PB_STYLE.length];
+            return(
+            <div key={sec.id} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderTop:'3px solid '+st.c,borderRadius:9,padding:'13px 16px 14px'}}>
+              <div style={{display:'flex',alignItems:'center',gap:9}}>
+                <span style={{fontSize:18,lineHeight:1}}>{st.icon}</span>
+                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:800,color:st.c,letterSpacing:'.5px'}}>{sec.title}</span>
+              </div>
+              {sec.subtitle&&<div style={{fontSize:12,color:'#888',fontStyle:'italic',marginTop:2,marginLeft:27}}>{sec.subtitle}</div>}
+              <ul style={{margin:'11px 0 0',padding:0,listStyle:'none'}}>
+                {(sec.items||[]).map((it,k)=>(<li key={k} style={{position:'relative',fontSize:13.5,color:'#cfcfcf',lineHeight:1.5,marginBottom:7,paddingLeft:17}}><span style={{position:'absolute',left:0,top:0,color:st.c,fontSize:12}}>▸</span>{it}</li>))}
+              </ul>
+            </div>);
+          })}
+          </div>
+        )}
         <div style={{fontSize:13,color:'#666',marginTop:8,lineHeight:1.6}}>Next to build on this: per-case flow-maps (who sees whom, when), a case library (worked examples like the ACL), referral/timeline rules, and the lifestyle lens. Capture a case the way you teach it and we\u2019ll add the structure.</div>
       </div>
     );
