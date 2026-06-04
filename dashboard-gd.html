@@ -1904,6 +1904,7 @@ function App(){
       // Staff profiles
       try{
         const{data:staffRows,error}=await sb.from('staff').select('*');
+        if(!error&&staffRows){try{window.__staffCols=staffRows.length?Object.keys(staffRows[0]):window.__staffCols;}catch(e){}}
         if(!error&&staffRows&&staffRows.length>0&&!cancelled){
           const local=ld('staff',SEED_STAFF);
           const merged=staffRows.map(row=>{
@@ -7557,7 +7558,11 @@ function getBandLabel(v){
     const sb=window.__SB;
     if(sb){
       const{files,...staffData}=updated; // exclude base64 files from DB
-      sb.from('staff').update(staffData).eq('id',staff.id).then(({error})=>{
+      // Only send columns that actually exist on the staff table — sending an unknown
+      // column makes Postgres reject the whole update, which silently loses the edit.
+      const cols=window.__staffCols;
+      const payload=cols?Object.fromEntries(Object.entries(staffData).filter(([k])=>cols.includes(k))):staffData;
+      sb.from('staff').update(payload).eq('id',staff.id).then(({error})=>{
         if(error)console.warn('Staff profile sync error:',error);
       });
     }
