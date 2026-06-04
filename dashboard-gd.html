@@ -1773,6 +1773,17 @@ const SPECIALIZATIONS=[
   {id:'stretchTherapy', label:'Stretch Therapy',              disc:['rmt','pt','sc','guest']},
 ];
 const SITES=['Markham','Mississauga','Toronto','Ajax','Oakville'];
+// A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
+const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
+const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
+function SiteMultiSelect({value,onChange}){
+  const sel=String(value||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const toggle=(s)=>{const next=sel.includes(s)?sel.filter(x=>x!==s):[...sel,s];onChange(next.join(', '));};
+  return(<div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+    {SITES.map(s=>{const on=sel.includes(s);return(
+      <button type="button" key={s} onClick={()=>toggle(s)} style={{fontSize:13,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'1px solid '+(on?'var(--go,#7ea668)':'var(--border2)'),background:on?'rgba(202,232,193,.15)':'var(--surface3)',color:on?'var(--lime,#CAE8C1)':'#999',fontWeight:on?700:400}}>{on?'✓ ':''}{s}</button>);})}
+  </div>);
+}
 const PERIODS=['Weekly','Monthly','Quarterly','Annual'];
 const TRACK_META={
   clinical:{label:'Clinical',color:'#CAE8C1',cls:'b-clinical',tpCls:'tp-clinical'},
@@ -2420,7 +2431,7 @@ function ClinicLineChart({snapshots,staff,metric,agg,color,label,fmt,timeframe,f
     }
     if(['mgmt','ops','edu'].includes(s.discipline))return false;
     if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;
-    if(filterSite&&filterSite!=='all'&&s.site!==filterSite)return false;
+    if(!siteMatch(s,filterSite))return false;
     return true;
   };
   // Group by month, aggregating the metric across matching staff rows.
@@ -2562,7 +2573,7 @@ function ProjectionCard({snapshots,filterDisc,filterSite,staff,revBasis,dataMaxM
   if(dailyMaxDate&&dailyMaxDate.slice(0,7)===projMonth){dayOfMonth=parseInt(dailyMaxDate.slice(8,10))||daysInMonth;}
   const partial=projMonth===curM&&dayOfMonth<daysInMonth;
   const unfiltered=(!filterDisc||filterDisc==='all')&&(!filterSite||filterSite==='all');
-  const rowOK=(r)=>{if(!r.staffId)return false;const s=(staff||[]).find(x=>x.id===r.staffId);if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;if(filterSite&&filterSite!=='all'&&s.site!==filterSite)return false;return true;};
+  const rowOK=(r)=>{if(!r.staffId)return false;const s=(staff||[]).find(x=>x.id===r.staffId);if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;if(!siteMatch(s,filterSite))return false;return true;};
   const monthRows=(snapshots||[]).filter(s=>s.date&&s.date.startsWith(projMonth)).flatMap(s=>(s.rows||[]).filter(rowOK));
   let revAct;
   if(unfiltered&&revBasis&&revBasis[projMonth]){
@@ -2612,7 +2623,7 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
     const s=(staff||[]).find(x=>x.id===r.staff_id);
     if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;
     if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;
-    if(filterSite&&filterSite!=='all'&&s.site!==filterSite)return false;
+    if(!siteMatch(s,filterSite))return false;
     return true;
   };
 
@@ -2657,7 +2668,7 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
         const s=staff.find(x=>x.id===r.staffId);if(!s)return;
         if(staffId&&r.staffId!==staffId)return;
         if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
-        if(filterSite!=='all'&&s.site!==filterSite)return;
+        if(!siteMatch(s,filterSite))return;
         monthWeeks.forEach(wk=>{
           if(!weekMap[wk])weekMap[wk]={wk,revenue:0,visits:0,ias:0,noShows:0,cancellations:0};
           weekMap[wk].revenue+=Math.round((parseFloat(r.revenue)||0)/nw*100)/100;
@@ -3287,7 +3298,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const s=staff.find(x=>x.id===r.staff_id);
       if(!s||s.discipline==='mgmt'||s.discipline==='ops'||s.discipline==='edu')return;
       if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
-      if(filterSite!=='all'&&s.site!==filterSite)return;
+      if(!siteMatch(s,filterSite))return;
       if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',completed:0,initialAssessments:0,noShows:0,cancellations:0,revenue:0};
       byStaff[r.staff_id].completed+=(r.completed||0);
       byStaff[r.staff_id].initialAssessments+=(r.initial_assessments||0);
@@ -3301,7 +3312,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const s=staff.find(x=>x.id===r.staff_id);
       if(!s||s.discipline==='mgmt'||s.discipline==='ops'||s.discipline==='edu')return;
       if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
-      if(filterSite!=='all'&&s.site!==filterSite)return;
+      if(!siteMatch(s,filterSite))return;
       if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',completed:0,initialAssessments:0,noShows:0,cancellations:0,revenue:0};
       byStaff[r.staff_id].revenue+=(r.revenue||0);
     });
@@ -3689,7 +3700,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const mergedStaff=useMemo(()=>
     staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu'
       &&(filterDisc==='all'||s.discipline===filterDisc)
-      &&(filterSite==='all'||s.site===filterSite)
+      &&siteMatch(s,filterSite)
     ).map(s=>{
       const jr=filteredRows.find(r=>r.staffId===s.id);
       const gvaVal=parseFloat(gvaEdits[s.id]!==undefined?gvaEdits[s.id]:data.gva[s.id])||null;
@@ -4189,7 +4200,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           <select value={filterSite} onChange={e=>setFilterSite(e.target.value)}
             style={{background:'var(--surface3)',border:'1px solid '+(filterSite!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:filterSite!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer'}}>
             <option value="all">All Locations</option>
-            {[...new Set(staff.map(s=>s.site).filter(Boolean))].sort().map(s=>(
+            {[...new Set(staff.flatMap(s=>siteList(s)))].sort().map(s=>(
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
@@ -4784,7 +4795,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             </div>
             <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
               <select value={trendDisc} onChange={e=>setTrendDisc(e.target.value)} style={{background:'var(--surface3)',border:'1px solid '+(trendDisc!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:trendDisc!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:140}}><option value="all">All Disciplines</option>{[...new Set(staff.filter(s=>s.discipline&&!['mgmt','ops','edu'].includes(s.discipline)).map(s=>s.discipline))].sort().map(d=>(<option key={d} value={d}>{d}</option>))}</select>
-              <select value={trendSite} onChange={e=>setTrendSite(e.target.value)} style={{background:'var(--surface3)',border:'1px solid '+(trendSite!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:trendSite!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:140}}><option value="all">All Locations</option>{[...new Set(staff.filter(s=>s.site).map(s=>s.site))].sort().map(s=>(<option key={s} value={s}>{s}</option>))}</select>
+              <select value={trendSite} onChange={e=>setTrendSite(e.target.value)} style={{background:'var(--surface3)',border:'1px solid '+(trendSite!=='all'?'var(--go)':'var(--border2)'),borderRadius:5,color:trendSite!=='all'?'var(--lime)':'#888',fontSize:13,padding:'5px 8px',outline:'none',cursor:'pointer',flex:1,minWidth:140}}><option value="all">All Locations</option>{[...new Set(staff.flatMap(s=>siteList(s)))].sort().map(s=>(<option key={s} value={s}>{s}</option>))}</select>
               {trendView==='practitioner'&&<div style={{display:'flex',gap:4,flexWrap:'wrap',flex:3}}>{mergedStaff.filter(s=>(trendDisc==='all'||s.discipline===trendDisc)&&(trendSite==='all'||s.site===trendSite)).map(s=>(<button key={s.id} className={`btn btn-sm ${trendStaff?.id===s.id?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendStaff(s)}>{s.name.split(' ')[0]}</button>))}</div>}
             </div>
           </div>
@@ -5891,7 +5902,7 @@ function AddStaffModal({onClose,onSave}){
                   <option>Senior Performance Coach</option>
                 </optgroup>
               </select></div>
-            <div className="fg"><label>Site</label><select value={f.site} onChange={e=>set('site',e.target.value)}>{SITES.map(s=><option key={s}>{s}</option>)}</select></div>
+            <div className="fg"><label>Site(s)</label><SiteMultiSelect value={f.site} onChange={v=>set('site',v)}/></div>
             <div className="fg"><label>Roadmap Phase</label><select value={f.roadmap} onChange={e=>set('roadmap',e.target.value)}><option value="">—</option><option>L1→L2</option><option>L2→L3</option><option>L3→L4</option></select></div>
             <div className="fg full"><label>Rubric Tracks</label>
               <div className="flex aic g6" style={{paddingTop:4}}>
@@ -7655,7 +7666,7 @@ function getBandLabel(v){
                   <option>Senior Performance Coach</option>
                 </optgroup>
               </select></div>
-        <div className="fg"><label>Site</label><select value={f.site} onChange={e=>set('site',e.target.value)}>{SITES.map(s=><option key={s}>{s}</option>)}</select></div>
+        <div className="fg"><label>Site(s)</label><SiteMultiSelect value={f.site} onChange={v=>set('site',v)}/></div>
         <div className="fg"><label>Roadmap Phase</label><select value={f.roadmap} onChange={e=>set('roadmap',e.target.value)}><option value="">—</option><option>L1→L2</option><option>L2→L3</option><option>L3→L4</option></select></div>
         <div className="fg"><label>Archetype</label><input value={f.archetype} onChange={e=>set('archetype',e.target.value)} placeholder="Anchor / Builder / Mentor…"/></div>
         <div className="fg"><label>Split %<span style={{fontSize:15,fontWeight:400,color:'#777',letterSpacing:0,textTransform:'none'}}> — set at yearly G&D</span></label><input value={f.split||''} onChange={e=>set('split',e.target.value)} placeholder="e.g. 45" type="number" min="0" max="100"/></div>
@@ -10307,10 +10318,8 @@ function GDEditPanel({r, onSave, onCancel, onDelete}){
             <input value={f.name} onChange={e=>set('name',e.target.value)} style={inp}/>
           </div>
           <div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:5}}>Site</div>
-            <select value={f.site} onChange={e=>set('site',e.target.value)} style={inp}>
-              <option>Mississauga</option><option>Markham</option><option>Toronto</option><option>Ajax</option><option>Oakville</option>
-            </select>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#777',marginBottom:5}}>Site(s)</div>
+            <SiteMultiSelect value={f.site} onChange={v=>set('site',v)}/>
           </div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
