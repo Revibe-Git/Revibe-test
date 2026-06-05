@@ -3820,6 +3820,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const maxUtil=100,maxAppts=withAppts[0]?.completed||1,maxGva=Math.max(...withGva.map(s=>s.gva),1),maxRev=withRev[0]?.revenue||1;
 
   const avgUtil=withUtil.length?Math.round(withUtil.reduce((a,s)=>a+s.utilization,0)/withUtil.length):null;
+  // Per-site rollup for the headline cards (Mississauga vs Markham). Activity by home site.
+  const locSites=useMemo(()=>{const m={};mergedStaff.forEach(s=>{const site=siteList(s)[0];if(!site)return;m[site]=m[site]||{visits:0,ias:0,util:0,utilN:0};m[site].visits+=(s.completed||0);m[site].ias+=(s.initialAssessments||0);if(s.utilization!=null){m[site].util+=s.utilization;m[site].utilN++;}});return m;},[mergedStaff]);
+  const LOC_C={Mississauga:'#CAE8C1',Markham:'#7FC8E8',Toronto:'#F4DB71',Ajax:'#E0A052',Oakville:'#BB99FF'};
+  const locSplitEl=(getter,fmt)=>{const ks=Object.keys(locSites).sort((a,b)=>(locSites[b].visits||0)-(locSites[a].visits||0));if(ks.length<2)return null;return(<div style={{fontSize:11,color:'#999',marginTop:5,display:'flex',gap:10,flexWrap:'wrap'}}>{ks.map(k=>(<span key={k} style={{whiteSpace:'nowrap'}}><span style={{color:LOC_C[k]||'#bbb'}}>●</span> {k} <b style={{color:'#ddd'}}>{fmt(getter(locSites[k]))}</b></span>))}</div>);};
   const avgGva=withGva.length?Math.round(withGva.reduce((a,s)=>a+(s.gva||0),0)/withGva.length*10)/10:null;
   const totalCompleted=withAppts.reduce((a,s)=>a+(s.completed||0),0);
   const totalInitialAssessments=withAppts.reduce((a,s)=>a+(s.initialAssessments||0),0);
@@ -4244,9 +4248,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
       {/* Stats */}
       <div className="sg4" style={{marginBottom:14}}>
-        <div className="sc go"><div className="sc-lbl">Avg Utilization</div><div className="sc-val">{avgUtil!=null?avgUtil+'%':'—'}</div><div className="sc-sub">{withUtil.length} tracked</div></div>
-        <div className="sc lime"><div className="sc-lbl">Completed Visits</div><div className="sc-val">{totalCompleted||'—'}</div><div className="sc-sub">{withAppts.length} practitioners</div></div>
-        <div className="sc" style={{borderColor:'rgba(187,153,255,.3)'}}><div className="sc-lbl" style={{color:'#BB99FF'}}>Initial Assessments</div><div className="sc-val" style={{color:'#BB99FF'}}>{totalInitialAssessments||'—'}</div><div className="sc-sub">{withAppts.length?`${(totalInitialAssessments/totalCompleted*100).toFixed(1)}% of visits`:'—'}</div></div>
+        <div className="sc go"><div className="sc-lbl">Avg Utilization</div><div className="sc-val">{avgUtil!=null?avgUtil+'%':'—'}</div><div className="sc-sub">{withUtil.length} tracked</div>{locSplitEl(l=>l.utilN?Math.round(l.util/l.utilN):0,v=>v+'%')}</div>
+        <div className="sc lime"><div className="sc-lbl">Completed Visits</div><div className="sc-val">{totalCompleted||'—'}</div><div className="sc-sub">{withAppts.length} practitioners</div>{locSplitEl(l=>l.visits,v=>v.toLocaleString())}</div>
+        <div className="sc" style={{borderColor:'rgba(187,153,255,.3)'}}><div className="sc-lbl" style={{color:'#BB99FF'}}>Initial Assessments</div><div className="sc-val" style={{color:'#BB99FF'}}>{totalInitialAssessments||'—'}</div><div className="sc-sub">{withAppts.length?`${(totalInitialAssessments/totalCompleted*100).toFixed(1)}% of visits`:'—'}</div>{locSplitEl(l=>l.ias,v=>v.toLocaleString())}</div>
         <div className="sc yellow"><div className="sc-lbl">Avg GVA</div><div className="sc-val">{avgGva||'—'}</div><div className="sc-sub">365-day rolling</div></div>
         <div className="sc gray"><div className="sc-lbl">Snapshots</div><div className="sc-val">{data.snapshots.length}</div><div className="sc-sub">{data.lastImport?new Date(data.lastImport).toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'No imports yet'}</div></div>
       </div>
