@@ -1773,6 +1773,10 @@ const SPECIALIZATIONS=[
   {id:'stretchTherapy', label:'Stretch Therapy',              disc:['rmt','pt','sc','guest']},
 ];
 const SITES=['Markham','Mississauga','Toronto','Ajax','Oakville'];
+// Structured sport tags — the matchable lifestyle dimension the Case Mapper uses (alongside Specializations)
+const SPORTS=['Soccer','Basketball','Running','Hockey','Tennis','Golf','Volleyball','Baseball','Football','Weightlifting / Gym','CrossFit','Cycling','Swimming','Combat / MMA','Dance','Yoga / Pilates','Skiing / Snowboard','Endurance / Triathlon'];
+// Accept either a saved array or a seeded comma/slash string and return a clean array
+const asSports=(v)=>Array.isArray(v)?v:(v?String(v).split(/[,/]/).map(s=>s.trim()).filter(Boolean):[]);
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
@@ -7779,8 +7783,8 @@ function getBandLabel(v){
             {seeded&&<span style={{fontSize:11,color:'#888',fontStyle:'italic'}}>pre-filled from GE data — Edit & Save to confirm</span>}
           </div>
           {(mpData.bird||mpData.birdSecondary)&&<div style={{fontSize:13,color:'#bbb',marginBottom:6}}>🐦 <b style={{color:'#ddd'}}>{[mpData.bird,mpData.birdSecondary].filter(Boolean).join(' / ')}</b></div>}
-          {MATCH_FIELDS.filter(([k])=>mpData[k]).map(([k,lbl])=>(
-            <div key={k} style={{marginBottom:6,fontSize:13.5,lineHeight:1.5}}><span style={{color:'#888'}}>{lbl}:</span> <span style={{color:'#ccc'}}>{mpData[k]}</span></div>
+          {MATCH_FIELDS.filter(([k])=>mpData[k]&&(!Array.isArray(mpData[k])||mpData[k].length)).map(([k,lbl])=>(
+            <div key={k} style={{marginBottom:6,fontSize:13.5,lineHeight:1.5}}><span style={{color:'#888'}}>{lbl}:</span> <span style={{color:'#ccc'}}>{Array.isArray(mpData[k])?mpData[k].join(', '):mpData[k]}</span></div>
           ))}
         </div>
       );})()}
@@ -7867,7 +7871,13 @@ function getBandLabel(v){
           </div>
         </div>
         {MATCH_FIELDS.map(([k,lbl])=>(
-          <div className="fg full" key={k}><label style={{textTransform:'none',letterSpacing:0,fontSize:13,color:'#9bbfd0'}}>{lbl}</label><textarea value={(f.match_profile||{})[k]||''} onChange={e=>setMP(k,e.target.value)} style={{minHeight:k==='matchNotes'||k==='personality'?60:42}} placeholder={k==='sports'?'e.g. Soccer, basketball, running':k==='matchNotes'?'e.g. Reach for them when the guest is an athlete or wants a direct, no-fluff approach':''}/></div>
+          k==='sports'?(
+          <div className="fg full" key={k}><label style={{textTransform:'none',letterSpacing:0,fontSize:13,color:'#9bbfd0'}}>{lbl}</label>
+            <div style={{display:'flex',flexWrap:'wrap',gap:6,marginTop:6}}>{SPORTS.map(sp=>{const cur=asSports((f.match_profile||{}).sports);const on=cur.includes(sp);return(<button key={sp} type="button" onClick={()=>{const next=on?cur.filter(x=>x!==sp):[...cur,sp];setMP('sports',next);}} style={{fontSize:13,padding:'4px 10px',borderRadius:5,border:'1px solid '+(on?'rgba(127,200,232,.45)':'var(--border2)'),background:on?'rgba(127,200,232,.14)':'var(--surface3)',color:on?'#7FC8E8':'#666',cursor:'pointer',fontWeight:on?700:400}}>{on?'✓ ':''}{sp}</button>);})}</div>
+          </div>
+          ):(
+          <div className="fg full" key={k}><label style={{textTransform:'none',letterSpacing:0,fontSize:13,color:'#9bbfd0'}}>{lbl}</label><textarea value={(f.match_profile||{})[k]||''} onChange={e=>setMP(k,e.target.value)} style={{minHeight:k==='matchNotes'||k==='personality'?60:42}} placeholder={k==='matchNotes'?'e.g. Reach for them when the guest is an athlete or wants a direct, no-fluff approach':''}/></div>
+          )
         ))}
       </div>
       <div className="flex aic g8" style={{marginTop:14,justifyContent:'flex-end'}}>
@@ -10585,7 +10595,7 @@ function GDEditPanel({r, onSave, onCancel, onDelete}){
 
 
 /* ══ SYSTEMATIC THINKING ══ */
-function SystematicPage(){
+function SystematicPage({staff=[]}){
   const SK='rvgd3_systematic';
   const[sessions,setSessions]=useState(()=>{try{const s=localStorage.getItem(SK);return s?JSON.parse(s):[];}catch{return[];}});
   const[concepts,setConcepts]=useState(()=>{try{const s=localStorage.getItem(SK+'_concepts');return s?JSON.parse(s):[];}catch{return[];}});
@@ -11027,6 +11037,10 @@ function SystematicPage(){
           <Sel label="Lifestyle / goal" val={mc.lifestyle} opts={MC_LIFE} k="lifestyle"/>
           <Sel label="Diagnosed yet?" val={mc.diagnosed} opts={MC_DX} k="diagnosed"/>
         </div>
+        <div style={{marginBottom:18}}>
+          <div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:6}}>Patient sport / activity <span style={{textTransform:'none',letterSpacing:0,color:'#7FC8E8'}}>(optional — powers clinician matching)</span></div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{SPORTS.map(sp=>{const cur=mc.sport||[];const on=cur.includes(sp);return(<button key={sp} type="button" onClick={()=>setMcv('sport',on?cur.filter(x=>x!==sp):[...cur,sp])} style={{fontSize:12.5,padding:'4px 10px',borderRadius:5,border:'1px solid '+(on?'rgba(202,232,193,.45)':'var(--border2)'),background:on?'rgba(202,232,193,.14)':'var(--surface3)',color:on?'#CAE8C1':'#666',cursor:'pointer',fontWeight:on?700:400}}>{on?'✓ ':''}{sp}</button>);})}</div>
+        </div>
 
         {/* Output */}
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginBottom:10}}>Suggested Pathway</div>
@@ -11059,11 +11073,44 @@ function SystematicPage(){
             {!rule&&<div style={{fontSize:12.5,color:'#888',marginTop:6,fontStyle:'italic'}}>Specifics for {mc.region} aren\u2019t standardized yet. Add a verified rule and the mapper will return exact lead/support/timelines for this case.</div>}
           </div>
         )}
+
+        {ready&&!hasFlags&&(()=>{
+          const clinicalDiscs=['pt','chiro','rmt','osteo','naturo'];
+          const caseSport=mc.sport||[];
+          const DISCL={pt:'Physio',chiro:'Chiro',rmt:'RMT',osteo:'Osteo',naturo:'Naturo'};
+          const sugg=(staff||[]).filter(s=>clinicalDiscs.includes(s.discipline)).map(s=>{
+            const mp=s.match_profile||seedMatchFor(s.name)||{};
+            const sSports=asSports(mp.sports);const specs=s.specializations||[];let score=0;const reasons=[];
+            const sportHit=caseSport.filter(c=>sSports.some(x=>x.toLowerCase()===c.toLowerCase()));
+            if(sportHit.length){score+=5;reasons.push('plays '+sportHit.join(' / '));}
+            else if(caseSport.length&&/sport|athlet|run|endurance/.test(((mp.expertise||'')+' '+(mp.bestClients||'')).toLowerCase())){score+=2;reasons.push('sports-injury focus');}
+            if(mc.lifestyle==='Competitive athlete'&&specs.includes('sportsMassage')){score+=2;reasons.push('sports massage');}
+            if(mc.lifestyle==='Post-partum'&&specs.includes('prenatalPostnatal')){score+=4;reasons.push('pre/postnatal');}
+            if(mc.lifestyle==='Older adult'&&/older|geriatric/.test(((mp.bestClients||'')+(mp.expertise||'')).toLowerCase())){score+=1;reasons.push('older-adult fit');}
+            return{s,mp,score,reasons};
+          }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,5);
+          const BLU='#7FC8E8',LIME='#CAE8C1';
+          return(
+            <div style={{marginTop:20}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginBottom:4}}>Suggested Clinicians</div>
+              <div style={{fontSize:12.5,color:'#666',marginBottom:10}}>Ranked by fit from each clinician's Match Profile — availability and the lead's judgment decide the final assignment.</div>
+              {sugg.length?sugg.map(({s,mp,reasons})=>(
+                <div key={s.id} style={{background:'var(--surface3)',borderLeft:'3px solid '+LIME,borderRadius:6,padding:'11px 14px',marginBottom:8}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:6}}>
+                    <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#eee'}}>{s.name} <span style={{fontSize:13,color:BLU,fontWeight:600}}>· {DISCL[s.discipline]||s.discipline} · {(typeof siteList==='function'?siteList(s)[0]:s.site)||s.site||'—'}</span></span>
+                    <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{reasons.map((r,i)=><span key={i} style={{fontSize:11,color:'#1a1a1a',background:LIME,borderRadius:4,padding:'2px 7px',fontWeight:700}}>{r}</span>)}</div>
+                  </div>
+                  {mp.matchNotes&&<div style={{fontSize:13,color:'#bbb',marginTop:5,lineHeight:1.5,fontStyle:'italic'}}>{mp.matchNotes}</div>}
+                </div>
+              )):(
+                <div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:9,padding:'18px 16px',color:'#888',fontSize:13.5,lineHeight:1.6}}>No clinician match for this case yet. Pick a <b style={{color:'#aaa'}}>patient sport</b> above, and make sure clinicians have <b style={{color:'#aaa'}}>Sports tags</b> and <b style={{color:'#aaa'}}>Specializations</b> set on their Match Profile (Staff Profiles → Edit). The more profiles you fill in, the better this gets.</div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     );
   }
-
-  // Home view
   return(
     <div>
       <div className="flex aic jsb" style={{marginBottom:16}}>
