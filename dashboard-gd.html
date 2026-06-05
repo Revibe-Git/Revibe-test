@@ -3825,6 +3825,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const LOC_C={Mississauga:'#CAE8C1',Markham:'#7FC8E8',Toronto:'#F4DB71',Ajax:'#E0A052',Oakville:'#BB99FF'};
   const locSplitEl=(getter,fmt)=>{const ks=Object.keys(locSites).sort((a,b)=>(locSites[b].visits||0)-(locSites[a].visits||0));if(ks.length<2)return null;return(<div style={{fontSize:11,color:'#999',marginTop:5,display:'flex',gap:10,flexWrap:'wrap'}}>{ks.map(k=>(<span key={k} style={{whiteSpace:'nowrap'}}><span style={{color:LOC_C[k]||'#bbb'}}>●</span> {k} <b style={{color:'#ddd'}}>{fmt(getter(locSites[k]))}</b></span>))}</div>);};
   const avgGva=withGva.length?Math.round(withGva.reduce((a,s)=>a+(s.gva||0),0)/withGva.length*10)/10:null;
+  // True only once a Sales file has been (re)imported with the per-location split.
+  const hasLocRevenue=useMemo(()=>data.snapshots.some(s=>(s.rows||[]).some(r=>r.revByLoc&&Object.keys(r.revByLoc).length))||dailyRevenue.some(r=>r.revByLoc&&Object.keys(r.revByLoc).length),[data.snapshots,dailyRevenue]);
+  const locRevNote=(<div style={{background:'rgba(244,219,113,.08)',border:'1px solid rgba(244,219,113,.3)',borderRadius:7,padding:'10px 14px',marginBottom:12,fontSize:13.5,color:'#e8d48a',lineHeight:1.5}}>⚠ Revenue can't be split by location until you re-import the Sales CSV — the per-location detail is read at import time and your saved data predates it. <b>Go to Jane Import and drop the Sales file once</b>; per-site revenue then fills in here. Visits, IAs, no-shows and cancels are unaffected.</div>);
   const totalCompleted=withAppts.reduce((a,s)=>a+(s.completed||0),0);
   const totalInitialAssessments=withAppts.reduce((a,s)=>a+(s.initialAssessments||0),0);
   const totalRev=withRev.reduce((a,s)=>a+(s.revenue||0),0);
@@ -4372,6 +4375,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location</span>
                   <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site</span>
                 </div>
+                {!hasLocRevenue&&locRevNote}
                 <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
                   {sites.map(site=>{const c=COLORS[site]||'#bbb';const rev=locRev[site]||0;const a=locAct[site]||{visits:0,ias:0,heads:0,util:0,utilN:0};const share=totalRev?Math.round(rev/totalRev*100):0;
                     return(<div key={site} style={{background:'var(--surface3)',borderTop:'3px solid '+c,borderRadius:9,padding:'14px 16px'}}>
@@ -4961,6 +4965,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           </div>
 
           {data.snapshots.length<2&&trendGranularity==='monthly'&&<div style={{fontSize:14,color:'#777',padding:'12px 0',fontStyle:'italic'}}>Import at least 2 monthly snapshots to see trend lines.</div>}
+
+          {trendSite!=='all'&&!hasLocRevenue&&locRevNote}
 
           {trendGranularity==='weekly'&&trendView==='clinic'&&(<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe} snapshots={data.snapshots}/>)}
           {trendGranularity==='weekly'&&trendView==='practitioner'&&(trendStaff?<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>:<div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to compare their weeks.</div>)}
