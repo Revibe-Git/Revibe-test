@@ -4353,6 +4353,40 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       )}
       {tab==='overview'&&(
         <>
+          {(()=>{
+            const locRev={};
+            filteredSnaps.forEach(s=>(s.rows||[]).forEach(r=>{if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{locRev[loc]=(locRev[loc]||0)+(parseFloat(v)||0);});}));
+            const locAct={};
+            filteredRows.forEach(r=>{const st=staff.find(x=>x.id===r.staffId);const hs=st?siteList(st)[0]:null;if(!hs)return;if(!locAct[hs])locAct[hs]={visits:0,ias:0,heads:0,util:0,utilN:0};locAct[hs].visits+=(r.completed||0);locAct[hs].ias+=(r.initialAssessments||0);if(r.completed||r.revenue)locAct[hs].heads++;if(r.utilization!=null){locAct[hs].util+=r.utilization;locAct[hs].utilN++;}});
+            const sites=[...new Set([...Object.keys(locRev),...Object.keys(locAct)])].filter(x=>x&&x!=='—').sort((a,b)=>(locRev[b]||0)-(locRev[a]||0));
+            const totalRev=Object.values(locRev).reduce((a,b)=>a+b,0);
+            if(!sites.length||(!totalRev&&!Object.values(locAct).some(a=>a.visits||a.ias)))return null;
+            const COLORS={Mississauga:'#CAE8C1',Markham:'#7FC8E8',Toronto:'#F4DB71',Ajax:'#E0A052',Oakville:'#BB99FF'};
+            return(
+              <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
+                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location</span>
+                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site</span>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
+                  {sites.map(site=>{const c=COLORS[site]||'#bbb';const rev=locRev[site]||0;const a=locAct[site]||{visits:0,ias:0,heads:0,util:0,utilN:0};const share=totalRev?Math.round(rev/totalRev*100):0;
+                    return(<div key={site} style={{background:'var(--surface3)',borderTop:'3px solid '+c,borderRadius:9,padding:'14px 16px'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline'}}>
+                        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:21,fontWeight:800,color:c,letterSpacing:'.5px'}}>{site}</span>
+                        {totalRev>0&&<span style={{fontSize:12,color:'#888'}}>{share}% of revenue</span>}
+                      </div>
+                      <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#eee',margin:'4px 0 2px'}}>{fmtRev(rev)}</div>
+                      <div style={{display:'flex',gap:16,marginTop:9,fontSize:13,color:'#aaa',flexWrap:'wrap'}}>
+                        <span><b style={{color:'#eee'}}>{a.visits}</b> visits</span>
+                        <span><b style={{color:'#eee'}}>{a.ias}</b> IAs</span>
+                        {a.utilN>0&&<span><b style={{color:'#eee'}}>{Math.round(a.util/a.utilN)}%</b> util</span>}
+                        <span><b style={{color:'#eee'}}>{a.heads}</b> staff</span>
+                      </div>
+                    </div>);})}
+                </div>
+              </div>
+            );
+          })()}
           <ProjectionCard snapshots={data.snapshots} filterDisc={filterDisc} filterSite={filterSite} staff={staff} revBasis={revBasis} dataMaxMonth={dataMaxMonth} dailyMaxDate={dailyDateRange.max}/>
           <div className="grid2">
           <div className="perf-slot">
