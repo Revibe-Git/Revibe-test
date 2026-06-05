@@ -3080,6 +3080,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[retentionMonth,setRetentionMonth]=useState(()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7);});
   const[pendingRetention,setPendingRetention]=useState(null); // raw text of a dropped retention file, awaiting month confirmation
   const[pendingRetMonth,setPendingRetMonth]=useState('');
+  const[pendingShift,setPendingShift]=useState(null); // parsed rows of a dropped undated shift report, awaiting month confirmation
+  const[pendingShiftMonth,setPendingShiftMonth]=useState('');
   const[revBasis,setRevBasis]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_rev_basis')||'{}');}catch(e){return{};}}); // {month:{billed,collected}} for the billed-vs-collected view
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
@@ -3499,6 +3501,33 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     setImportMsg({type:'success',msg:`✓ Member Retention imported for ${periodLabel}.${cw} ${filled} practitioner${filled!==1?'s':''}, ${summary.locations.length} location${summary.locations.length!==1?'s':''} matched.`});
   };
 
+  // Import an undated shift report for a chosen month (called from the confirm popup)
+  const doShiftImport=async(rows,month)=>{
+    setImporting(true);setImportMsg(null);
+    try{
+      const {byMonth}=parseShiftByMonth(rows);
+      const parsed=byMonth['_nodate']||Object.values(byMonth).flat();
+      if(!parsed.length){setImportMsg({type:'error',msg:'No staff rows found in shift report.'});setImporting(false);return;}
+      let newSnapshots=[...data.snapshots];
+      const snapDateM=month+'-01';
+      const existingIdx=newSnapshots.findIndex(s=>s.date===snapDateM&&s.type==='shift');
+      if(existingIdx>=0){
+        const existing=newSnapshots[existingIdx];const mergedRows=[...existing.rows];
+        parsed.forEach(nr=>{const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};else mergedRows.push(nr);});
+        newSnapshots[existingIdx]={...existing,rows:mergedRows};
+      }else{
+        newSnapshots.push({id:'snap_shift_'+month,date:snapDateM,rows:parsed,type:'shift'});
+      }
+      newSnapshots=newSnapshots.sort((a,b)=>a.date.localeCompare(b.date)).slice(-36);
+      save({...data,snapshots:newSnapshots,lastImport:new Date().toISOString()});
+      if(window.__SB){for(const snap of newSnapshots)await saveSnapshot(snap);}
+      const matched=parsed.filter(r=>r.staffId).length;
+      const periodLabel=new Date(snapDateM+'T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
+      setImportMsg({type:'success',msg:`✓ Shift report imported for ${periodLabel}. ${parsed.length} practitioners, ${matched} matched (utilization = Appt ÷ Shift hrs).`});
+    }catch(e){setImportMsg({type:'error',msg:'Shift import failed: '+e.message});}
+    setImporting(false);
+  };
+
   const handleFile=async(file)=>{
     if(!file||!file.name.endsWith('.csv')){setImportMsg({type:'error',msg:'Please upload a .csv file from Jane.'});return;}
     setImporting(true);setImportMsg(null);
@@ -3519,6 +3548,11 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const rows=await parseCSVChunked(text,big?(pct=>setImportMsg({type:'info',msg:`Parsing ${(text.length/1048576).toFixed(1)} MB file… ${pct}%`})):null);
       if(!rows.length){setImportMsg({type:'error',msg:'File is empty or unreadable.'});setImporting(false);return;}
       const type=detectFileType(rows);
+      // Undated shift report → confirm which month it covers (Jane's summary has no Date column)
+      if(type==='shift'){
+        const {anyDated}=parseShiftByMonth(rows);
+        if(!anyDated){setPendingShift(rows);setPendingShiftMonth(snapDate.slice(0,7));setImporting(false);return;}
+      }
       if(big)setImportMsg({type:'info',msg:`Processing ${rows.length.toLocaleString()} rows…`});
 
       let newSnapshots=[...data.snapshots];
@@ -3634,7 +3668,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               mrows.forEach(nr=>{const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};else mergedRows.push(nr);});
               newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
             }else{
-              newSnapshots.push({id:'snap_'+Date.now()+'_'+month,date:snapDateM,rows:mrows,files:[file.name],type:'shift'});
+              newSnapshots.push({id:'snap_shift_'+month,date:snapDateM,rows:mrows,files:[file.name],type:'shift'});
             }
             monthsCreated.push(month);
           });
@@ -4285,6 +4319,21 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             {filterSite!=='all'?' · '+filterSite:''}
             {(filterDisc!=='all'||filterSite!=='all')&&<button className="btn btn-xs btn-ghost" style={{marginLeft:6}} onClick={()=>{setFilterDisc('all');setFilterSite('all');}}>Clear filters</button>}
           </span>
+        </div>
+      )}
+
+      {pendingShift&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',backdropFilter:'blur(2px)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}} onClick={()=>setPendingShift(null)}>
+          <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface2)',border:'1px solid #7FC8E855',borderRadius:12,padding:'24px 26px',width:380,maxWidth:'90vw',boxShadow:'0 20px 60px rgba(0,0,0,.5)'}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#7FC8E8',marginBottom:6}}>Which month is this shift report for?</div>
+            <div style={{fontSize:14,color:'#999',lineHeight:1.6,marginBottom:16}}>Jane's shift export has no date column, so pick the month it covers. Utilization (Appt ÷ Shift hrs) will be saved under that month. Import one file per month to build history.</div>
+            <input type="month" value={pendingShiftMonth} onChange={e=>setPendingShiftMonth(e.target.value)} autoFocus
+              style={{width:'100%',background:'var(--surface3)',border:'1px solid #7FC8E855',borderRadius:6,color:'var(--text)',fontSize:18,fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,padding:'9px 12px',outline:'none',marginBottom:18}}/>
+            <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setPendingShift(null)}>Cancel</button>
+              <button className="btn btn-go btn-sm" disabled={!pendingShiftMonth} onClick={async()=>{const rws=pendingShift,mo=pendingShiftMonth;setPendingShift(null);await doShiftImport(rws,mo);}}>Import for {pendingShiftMonth?new Date(pendingShiftMonth+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'}):'…'}</button>
+            </div>
+          </div>
         </div>
       )}
 
