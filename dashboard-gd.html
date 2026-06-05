@@ -11074,37 +11074,58 @@ function SystematicPage({staff=[]}){
           </div>
         )}
 
-        {ready&&!hasFlags&&(()=>{
-          const clinicalDiscs=['pt','chiro','rmt','osteo','naturo'];
-          const caseSport=mc.sport||[];
+        {ready&&(()=>{
           const DISCL={pt:'Physio',chiro:'Chiro',rmt:'RMT',osteo:'Osteo',naturo:'Naturo'};
-          const sugg=(staff||[]).filter(s=>clinicalDiscs.includes(s.discipline)).map(s=>{
-            const mp=s.match_profile||seedMatchFor(s.name)||{};
-            const sSports=asSports(mp.sports);const specs=s.specializations||[];let score=0;const reasons=[];
+          const LIME='#CAE8C1',PUR='#BB99FF',BLU='#7FC8E8';
+          const caseSport=mc.sport||[];
+          const acute=(mc.phase||'').startsWith('Acute');
+          const highIrr=mc.irritability==='High'||mc.pain==='7\u201310 (severe)';
+          // Region → clinically-relevant keywords (general MSK knowledge) to match against what each clinician treats
+          const REGION_KW={'Ankle / foot':['ankle','foot','sprain','plantar','achilles','lower body','run','sport'],'Knee':['knee','acl','mcl','meniscus','patell','ligament','lower body','run','sport','post-surg','rehab'],'Hip / groin':['hip','groin','glute','lower body','mobility','sport'],'Low back':['back','lumbar','spine','disc','sciatic','core','chronic'],'Neck':['neck','cervical','headache','posture','desk','tmj','tension'],'Shoulder':['shoulder','rotator','overhead','rom','sport'],'Elbow / wrist':['elbow','wrist','tendon','tennis','golf','overuse','desk'],'Other / multi-region':[]};
+          const regKW=REGION_KW[mc.region]||[];
+          // Discipline base weight for this case — Physio/Chiro lead; Osteo/RMT support (Osteo↑ when irritable); Naturo only for holistic
+          const baseFor=(d)=>d==='pt'?4:d==='chiro'?3.6:d==='osteo'?(acute||highIrr?3:1.6):d==='rmt'?(acute||highIrr?2.3:2.7):d==='naturo'?(/holistic|fatigue|hormon|wellness|stress/.test(((mc.lifestyle||'')+(mc.mechanism||'')).toLowerCase())?1.6:0):0;
+          const rows=(staff||[]).filter(s=>['pt','chiro','rmt','osteo','naturo'].includes(s.discipline)).map(s=>{
+            const mp=s.match_profile||seedMatchFor(s.name)||{};const specs=s.specializations||[];
+            let score=baseFor(s.discipline);if(score<=0)return null;
+            const blob=((mp.expertise||'')+' '+(mp.conditions||'')+' '+(mp.treatments||'')+' '+(mp.bestClients||'')).toLowerCase();
+            const reasons=[];
+            const hits=regKW.filter(k=>blob.includes(k));
+            if(hits.length){score+=Math.min(hits.length,3)*0.9;reasons.push('treats '+mc.region.split(' / ')[0].toLowerCase());}
+            if(mc.lifestyle==='Post-partum'&&specs.includes('prenatalPostnatal')){score+=3;reasons.push('pre/postnatal');}
+            if(mc.lifestyle==='Competitive athlete'&&(specs.includes('sportsMassage')||/sport|athlet/.test(blob))){score+=1.5;reasons.push('sports focus');}
+            if(mc.lifestyle==='Older adult'&&/older|geriatr|gentle|relax/.test(blob)){score+=1;reasons.push('older-adult fit');}
+            if(mc.lifestyle==='General / desk-based'&&/desk|postur|tension|ergonom/.test(blob)){score+=1;reasons.push('desk/posture');}
+            if(highIrr&&(specs.includes('acupuncture')||specs.includes('triggerPoint'))){score+=0.6;reasons.push('pain modalities');}
+            const sSports=asSports(mp.sports);
             const sportHit=caseSport.filter(c=>sSports.some(x=>x.toLowerCase()===c.toLowerCase()));
-            if(sportHit.length){score+=5;reasons.push('plays '+sportHit.join(' / '));}
-            else if(caseSport.length&&/sport|athlet|run|endurance/.test(((mp.expertise||'')+' '+(mp.bestClients||'')).toLowerCase())){score+=2;reasons.push('sports-injury focus');}
-            if(mc.lifestyle==='Competitive athlete'&&specs.includes('sportsMassage')){score+=2;reasons.push('sports massage');}
-            if(mc.lifestyle==='Post-partum'&&specs.includes('prenatalPostnatal')){score+=4;reasons.push('pre/postnatal');}
-            if(mc.lifestyle==='Older adult'&&/older|geriatric/.test(((mp.bestClients||'')+(mp.expertise||'')).toLowerCase())){score+=1;reasons.push('older-adult fit');}
-            return{s,mp,score,reasons};
-          }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,5);
-          const BLU='#7FC8E8',LIME='#CAE8C1';
+            if(sportHit.length){score+=3;reasons.push('plays '+sportHit.join(' / '));}
+            else if(caseSport.length&&/sport|athlet|run|endurance/.test(blob)){score+=1;reasons.push('sports-injury focus');}
+            const role=(s.discipline==='pt'||s.discipline==='chiro')?'lead':'support';
+            if(!reasons.length)reasons.push(role==='lead'?'assess & lead':s.discipline==='osteo'?'down-regulation':'soft-tissue support');
+            return{s,mp,score,reasons,role};
+          }).filter(Boolean).sort((a,b)=>b.score-a.score||a.s.name.localeCompare(b.s.name));
+          const leads=rows.filter(r=>r.role==='lead').slice(0,3);
+          const supports=rows.filter(r=>r.role==='support').slice(0,3);
+          const Row=({s,mp,reasons,role})=>(
+            <div style={{background:'var(--surface3)',borderLeft:'3px solid '+(role==='lead'?LIME:PUR),borderRadius:6,padding:'11px 14px',marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:6}}>
+                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#eee'}}>{s.name} <span style={{fontSize:13,color:BLU,fontWeight:600}}>· {DISCL[s.discipline]||s.discipline} · {(typeof siteList==='function'?siteList(s)[0]:s.site)||s.site||'\u2014'}</span></span>
+                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{reasons.map((r,i)=><span key={i} style={{fontSize:11,color:'#1a1a1a',background:role==='lead'?LIME:PUR,borderRadius:4,padding:'2px 7px',fontWeight:700}}>{r}</span>)}</div>
+              </div>
+              {mp.matchNotes&&<div style={{fontSize:13,color:'#bbb',marginTop:5,lineHeight:1.5,fontStyle:'italic'}}>{mp.matchNotes}</div>}
+            </div>
+          );
           return(
             <div style={{marginTop:20}}>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginBottom:4}}>Suggested Clinicians</div>
-              <div style={{fontSize:12.5,color:'#666',marginBottom:10}}>Ranked by fit from each clinician's Match Profile — availability and the lead's judgment decide the final assignment.</div>
-              {sugg.length?sugg.map(({s,mp,reasons})=>(
-                <div key={s.id} style={{background:'var(--surface3)',borderLeft:'3px solid '+LIME,borderRadius:6,padding:'11px 14px',marginBottom:8}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:6}}>
-                    <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#eee'}}>{s.name} <span style={{fontSize:13,color:BLU,fontWeight:600}}>· {DISCL[s.discipline]||s.discipline} · {(typeof siteList==='function'?siteList(s)[0]:s.site)||s.site||'—'}</span></span>
-                    <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{reasons.map((r,i)=><span key={i} style={{fontSize:11,color:'#1a1a1a',background:LIME,borderRadius:4,padding:'2px 7px',fontWeight:700}}>{r}</span>)}</div>
-                  </div>
-                  {mp.matchNotes&&<div style={{fontSize:13,color:'#bbb',marginTop:5,lineHeight:1.5,fontStyle:'italic'}}>{mp.matchNotes}</div>}
-                </div>
-              )):(
-                <div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:9,padding:'18px 16px',color:'#888',fontSize:13.5,lineHeight:1.6}}>No clinician match for this case yet. Pick a <b style={{color:'#aaa'}}>patient sport</b> above, and make sure clinicians have <b style={{color:'#aaa'}}>Sports tags</b> and <b style={{color:'#aaa'}}>Specializations</b> set on their Match Profile (Staff Profiles → Edit). The more profiles you fill in, the better this gets.</div>
-              )}
+              <div style={{fontSize:12.5,color:'#666',marginBottom:10}}>Ranked by clinical fit (discipline, what they treat, specializations){caseSport.length?', plus sport':''} — availability and the lead's judgment decide. {hasFlags?<span style={{color:'#e0a0a0'}}>Medical screen flagged: leads below assess & clear first; support is comfort-only in the interim.</span>:''}</div>
+              {leads.length>0&&<div style={{fontSize:12,color:LIME,fontWeight:700,letterSpacing:'.5px',margin:'4px 0 6px'}}>LEAD — diagnose & own the plan</div>}
+              {leads.map(r=><Row key={r.s.id} {...r}/>)}
+              {supports.length>0&&<div style={{fontSize:12,color:PUR,fontWeight:700,letterSpacing:'.5px',margin:'12px 0 6px'}}>SUPPORT — co-treat</div>}
+              {supports.map(r=><Row key={r.s.id} {...r}/>)}
+              {!leads.length&&!supports.length&&<div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:9,padding:'18px 16px',color:'#888',fontSize:13.5}}>No clinical staff found to suggest. Add clinicians with disciplines (Physio/Chiro/RMT/Osteo) to see matches.</div>}
+              <div style={{fontSize:11.5,color:'#5a5a5a',marginTop:8,fontStyle:'italic'}}>Suggestions are reasoning aids from team standards and each clinician's profile — not a directive. The treating lead decides.</div>
             </div>
           );
         })()}
