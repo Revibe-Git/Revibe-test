@@ -1776,6 +1776,10 @@ const SITES=['Markham','Mississauga','Toronto','Ajax','Oakville'];
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
+// Revenue attributable to a given site comes from the transaction's location (revByLoc),
+// NOT the practitioner's home-site tag — so a multi-site person isn't double-counted.
+const revForSite=(row,fs)=>{if(!fs||fs==='all')return row.revenue||0;return (row.revByLoc&&row.revByLoc[fs])||0;};
+const normLoc=(L)=>{const t=String(L||'').trim();if(!t)return'';const low=t.toLowerCase();for(const s of SITES){if(low.includes(s.toLowerCase()))return s;}return t;};
 function SiteMultiSelect({value,onChange}){
   const sel=String(value||'').split(',').map(x=>x.trim()).filter(Boolean);
   const toggle=(s)=>{const next=sel.includes(s)?sel.filter(x=>x!==s):[...sel,s];onChange(next.join(', '));};
@@ -2443,7 +2447,8 @@ function ClinicLineChart({snapshots,staff,metric,agg,color,label,fmt,timeframe,f
     const ym=s.date.slice(0,7);
     (s.rows||[]).forEach(r=>{
       if(!matchRow(r))return;
-      const v=r[metric];
+      let v=r[metric];
+      if(metric==='revenue'&&filterSite&&filterSite!=='all'&&r.staffId)v=revForSite(r,filterSite);
       if(v==null||v==='')return;
       const num=parseFloat(v);if(isNaN(num))return;
       (monthMap[ym]=monthMap[ym]||[]).push(num);
@@ -2579,7 +2584,7 @@ function ProjectionCard({snapshots,filterDisc,filterSite,staff,revBasis,dataMaxM
   if(unfiltered&&revBasis&&revBasis[projMonth]){
     revAct=revBasis[projMonth].billed; // exact books figure
   }else{
-    revAct=monthRows.reduce((a,r)=>a+(parseFloat(r.revenue)||0),0);
+    revAct=monthRows.reduce((a,r)=>a+(filterSite&&filterSite!=='all'?revForSite(r,filterSite):(parseFloat(r.revenue)||0)),0);
   }
   const visAct=monthRows.reduce((a,r)=>a+(parseFloat(r.completed)||0),0);
   const iaAct=monthRows.reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0);
@@ -2641,7 +2646,7 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
     if(!inRange(r.date)||!filterRow(r))return;
     const wk=getWeekStart(r.date);
     if(!weekMap[wk])weekMap[wk]={wk,revenue:0,visits:0,ias:0,noShows:0,cancellations:0};
-    weekMap[wk].revenue+=(r.revenue||0);
+    weekMap[wk].revenue+=(filterSite&&filterSite!=='all'&&!staffId?revForSite(r,filterSite):(r.revenue||0));
   });
 
   // Snapshot fallback if no daily data
@@ -3282,10 +3287,12 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const matched=name?matchStaff(name):null;
       const sid=matched?matched.id:'_clinic';
       const key=sid+'_'+dateStr;
-      if(!byKey[key])byKey[key]={id:key,staff_id:sid,date:dateStr,revenue:0};
+      if(!byKey[key])byKey[key]={id:key,staff_id:sid,date:dateStr,revenue:0,revByLoc:{}};
       byKey[key].revenue+=total;
+      const loc=normLoc(r['location']||'');
+      if(loc)byKey[key].revByLoc[loc]=(byKey[key].revByLoc[loc]||0)+total;
     });
-    return Object.values(byKey).map(r=>({...r,revenue:Math.round(r.revenue*100)/100}));
+    return Object.values(byKey).map(r=>{const rl={};Object.entries(r.revByLoc||{}).forEach(([k,v])=>rl[k]=Math.round(v*100)/100);return{...r,revenue:Math.round(r.revenue*100)/100,revByLoc:rl};});
   };
 
   /* ── Aggregate daily data for any date range ── */
@@ -3313,10 +3320,11 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       if(!s||s.discipline==='mgmt'||s.discipline==='ops'||s.discipline==='edu')return;
       if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
       if(!siteMatch(s,filterSite))return;
-      if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',completed:0,initialAssessments:0,noShows:0,cancellations:0,revenue:0};
+      if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',completed:0,initialAssessments:0,noShows:0,cancellations:0,revenue:0,revByLoc:{}};
       byStaff[r.staff_id].revenue+=(r.revenue||0);
+      if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{byStaff[r.staff_id].revByLoc[loc]=(byStaff[r.staff_id].revByLoc[loc]||0)+(v||0);});
     });
-    return Object.values(byStaff);
+    return Object.values(byStaff).map(r=>({...r,revByLoc:Object.fromEntries(Object.entries(r.revByLoc||{}).map(([k,v])=>[k,Math.round(v*100)/100]))}));
   };
 
   /* ── Get date range of daily data ─────────── */
@@ -3359,7 +3367,42 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     return result;
   };
 
-  /* ── Parse shift report (no date column — single snapshot) */
+  /* ── Parse shift report by month (auto-split when the Date column is populated) ──
+     Sums Shift/Appt hours per practitioner per month, then computes utilization per month.
+     If Date is blank (an all-period summary), everything lands under '_nodate'. */
+  const parseShiftByMonth=(rows)=>{
+    const byMonth={};let anyDated=false;
+    rows.forEach(r=>{
+      const name=(r['staff name']||r['name']||Object.values(r)[0]||'').trim();
+      if(!name||name==='Guest Experience'||name==='Relax Spa')return;
+      if(/^revibe/i.test(name)||/^total/i.test(name)||/^personal training$/i.test(name))return;
+      const month=getMonth(r['date']||'');
+      if(month)anyDated=true;
+      const key=month||'_nodate';
+      const apptHrs=parseFloat(r['appointment total hours']||r['appointment_total_hours']||r['booked (hrs)']||r['booked']||0)||0;
+      const shiftHrs=parseFloat(r['shift total hours']||r['shift_total_hours']||r['scheduled (hrs)']||r['scheduled']||0)||0;
+      const apptCount=parseInt(r['appointment total count']||r['appointment_total_count']||r['total bookings']||0)||0;
+      const pctRaw=(r['% booked']||r['percent booked']||'').toString().replace(/[%\s]/g,'');
+      if(!byMonth[key])byMonth[key]={};
+      if(!byMonth[key][name])byMonth[key][name]={name,apptHrs:0,shiftHrs:0,apptCount:0,pctSum:0,pctN:0};
+      const b=byMonth[key][name];b.apptHrs+=apptHrs;b.shiftHrs+=shiftHrs;b.apptCount+=apptCount;
+      if(pctRaw!==''&&!isNaN(parseFloat(pctRaw))){let p=parseFloat(pctRaw);if(p<=1)p=p*100;b.pctSum+=p;b.pctN++;}
+    });
+    const result={};
+    Object.entries(byMonth).forEach(([month,staffMap])=>{
+      result[month]=Object.values(staffMap).map(s=>{
+        let util=null;
+        if(s.shiftHrs>0)util=Math.round(s.apptHrs/s.shiftHrs*100);          // Appt ÷ Shift (breaks included)
+        else if(s.pctN>0)util=Math.round(s.pctSum/s.pctN);                   // fallback: averaged % Booked
+        const matched=matchStaff(s.name);
+        return{name:s.name,staffId:matched?.id||null,matchedName:matched?.name||null,
+          utilization:util,appointments:s.apptCount,appointmentHours:Math.round(s.apptHrs*100)/100,shiftHours:Math.round(s.shiftHrs*100)/100};
+      }).filter(r=>r.utilization!=null||r.shiftHours>0||r.appointmentHours>0);
+    });
+    return{byMonth:result,anyDated};
+  };
+
+  /* ── Parse shift report (undated summary — single snapshot) */
   const parseShiftReport=(rows)=>{
     return rows.map(r=>{
       const name=(r['staff name']||r['name']||Object.values(r)[0]||'').trim();
@@ -3371,9 +3414,13 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const shiftHrs=parseFloat(r['shift total hours']||r['shift_total_hours']||r['scheduled (hrs)']||r['scheduled']||0)||0;
       const apptCount=parseInt(r['appointment total count']||r['appointment_total_count']||r['total bookings']||0)||0;
       let util=null;
-      const pctRaw=(r['% booked']||r['percent booked']||'').toString().replace(/[%\s]/g,'');
-      if(pctRaw!==''&&!isNaN(parseFloat(pctRaw)))util=Math.round(parseFloat(pctRaw));
-      else if(shiftHrs>0)util=Math.round((apptHrs/shiftHrs)*100);
+      // Prefer Booked ÷ Scheduled (this is exactly how Jane derives "% Booked"); it avoids
+      // the decimal-vs-percent ambiguity of the exported % column.
+      if(shiftHrs>0)util=Math.round((apptHrs/shiftHrs)*100);
+      else{
+        const pctRaw=(r['% booked']||r['percent booked']||'').toString().replace(/[%\s]/g,'');
+        if(pctRaw!==''&&!isNaN(parseFloat(pctRaw))){let p=parseFloat(pctRaw);if(p<=1)p=p*100;util=Math.round(p);}
+      }
       if(util===null&&apptHrs===0&&shiftHrs===0)return null;
       const matched=matchStaff(name);
       return{name,staffId:matched?.id||null,matchedName:matched?.name||null,
@@ -3384,9 +3431,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   /* ── Parse sales by month ────────────────────── */
   const parseSalesByMonth=(rows)=>{
     const norm=(r)=>{const out={};Object.entries(r).forEach(([k,v])=>out[k.toLowerCase().trim()]=v?.toString().trim()||'');return out;};
+    const normLoc=(L)=>{const t=(L||'').trim();if(!t)return'';const low=t.toLowerCase();for(const s of SITES){if(low.includes(s.toLowerCase()))return s;}return t;};
     const byMonth={};
-    rows.forEach(row=>{const r=norm(row);const name=r['staff member']||r['staff_member']||'';const isClinic=!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa';const total=parseFloat((r['total']||'0').toString().replace(/[$,\s]/g,''))||0;if(!total)return;const month=getMonth(r['purchase date']||r['invoice date']);if(!month)return;if(!byMonth[month])byMonth[month]={};const key=isClinic?'_clinic':name;if(!byMonth[month][key])byMonth[month][key]={name:key,revenue:0};byMonth[month][key].revenue+=total;});
-    const result={};Object.entries(byMonth).forEach(([month,staffMap])=>{result[month]=Object.values(staffMap).map(r=>{if(r.name==='_clinic')return{...r,revenue:Math.round(r.revenue*100)/100,staffId:null};const matched=matchStaff(r.name);return{...r,revenue:Math.round(r.revenue*100)/100,staffId:matched?.id||null,matchedName:matched?.name||null};}).filter(r=>r.revenue>0);});
+    rows.forEach(row=>{const r=norm(row);const name=r['staff member']||r['staff_member']||'';const isClinic=!name||name.toLowerCase()==='guest experience'||name.toLowerCase()==='relax spa';const total=parseFloat((r['total']||'0').toString().replace(/[$,\s]/g,''))||0;if(!total)return;const month=getMonth(r['purchase date']||r['invoice date']);if(!month)return;if(!byMonth[month])byMonth[month]={};const key=isClinic?'_clinic':name;if(!byMonth[month][key])byMonth[month][key]={name:key,revenue:0,revByLoc:{}};byMonth[month][key].revenue+=total;const loc=normLoc(r['location']||'');if(loc)byMonth[month][key].revByLoc[loc]=(byMonth[month][key].revByLoc[loc]||0)+total;});
+    const result={};Object.entries(byMonth).forEach(([month,staffMap])=>{result[month]=Object.values(staffMap).map(r=>{const rl={};Object.entries(r.revByLoc||{}).forEach(([k,v])=>rl[k]=Math.round(v*100)/100);if(r.name==='_clinic')return{name:'_clinic',revenue:Math.round(r.revenue*100)/100,revByLoc:rl,staffId:null};const matched=matchStaff(r.name);return{name:r.name,revenue:Math.round(r.revenue*100)/100,revByLoc:rl,staffId:matched?.id||null,matchedName:matched?.name||null};}).filter(r=>r.revenue>0);});
     return result;
   };
 
@@ -3544,7 +3592,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             const mergedRows=[...existing.rows];
             parsed.forEach(nr=>{
               const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
-              if(idx>=0){if(nr.revenue!=null)mergedRows[idx]={...mergedRows[idx],revenue:nr.revenue};}
+              if(idx>=0){if(nr.revenue!=null)mergedRows[idx]={...mergedRows[idx],revenue:nr.revenue,revByLoc:nr.revByLoc||mergedRows[idx].revByLoc};}
               else if(nr.name==='_clinic'){const ci=mergedRows.findIndex(r=>r.name==='_clinic');if(ci>=0)mergedRows[ci]={...mergedRows[ci],revenue:nr.revenue};else mergedRows.push(nr);}else mergedRows.push(nr);
             });
             newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
@@ -3570,25 +3618,39 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           }
         }
       }else if(type==='shift'){
-        // Shift report has no date column — use the snapDate picker as before
-        const parsed=parseShiftReport(rows);
-        if(!parsed.length){setImportMsg({type:'error',msg:'No staff rows found in shift report.'});setImporting(false);return;}
-        totalPractitioners=parsed.length;
-        totalMatched=parsed.filter(r=>r.staffId).length;
-        const existingIdx=newSnapshots.findIndex(s=>s.date===snapDate);
-        if(existingIdx>=0){
-          const existing=newSnapshots[existingIdx];
-          const mergedRows=[...existing.rows];
-          parsed.forEach(nr=>{
-            const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
-            if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
-            else mergedRows.push(nr);
+        const {byMonth:shiftByMonth,anyDated}=parseShiftByMonth(rows);
+        const allRows=Object.values(shiftByMonth).flat();
+        if(!allRows.length){setImportMsg({type:'error',msg:'No staff rows found in shift report.'});setImporting(false);return;}
+        totalPractitioners=allRows.length;
+        totalMatched=allRows.filter(r=>r.staffId).length;
+        if(anyDated){
+          // Dated export → auto-split into one shift snapshot per month (merge into the month's snapshot)
+          Object.entries(shiftByMonth).forEach(([month,mrows])=>{
+            if(month==='_nodate'||!mrows.length)return;
+            const snapDateM=month+'-01';
+            const existingIdx=newSnapshots.findIndex(s=>s.date&&s.date.startsWith(month)&&s.type==='shift');
+            if(existingIdx>=0){
+              const existing=newSnapshots[existingIdx];const mergedRows=[...existing.rows];
+              mrows.forEach(nr=>{const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};else mergedRows.push(nr);});
+              newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
+            }else{
+              newSnapshots.push({id:'snap_'+Date.now()+'_'+month,date:snapDateM,rows:mrows,files:[file.name],type:'shift'});
+            }
+            monthsCreated.push(month);
           });
-          newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
         }else{
-          newSnapshots.push({id:'snap_'+Date.now(),date:snapDate,rows:parsed,files:[file.name],type:'shift'});
+          // Undated all-period summary → single snapshot at the picked month
+          const parsed=shiftByMonth['_nodate']||[];
+          const existingIdx=newSnapshots.findIndex(s=>s.date===snapDate&&s.type==='shift');
+          if(existingIdx>=0){
+            const existing=newSnapshots[existingIdx];const mergedRows=[...existing.rows];
+            parsed.forEach(nr=>{const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};else mergedRows.push(nr);});
+            newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
+          }else{
+            newSnapshots.push({id:'snap_'+Date.now(),date:snapDate,rows:parsed,files:[file.name],type:'shift'});
+          }
+          monthsCreated=[snapDate.slice(0,7)];
         }
-        monthsCreated=[snapDate.slice(0,7)];
       }else{
         setImportMsg({type:'error',msg:'Could not identify this file type. Columns found: '+Object.keys(rows[0]).join(', ')});
         setImporting(false);return;
@@ -3656,7 +3718,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const isShift=snap.type==='shift';
       (snap.rows||[]).forEach(r=>{
         if(!r.staffId)return;
-        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
+        if(!byStaff[r.staffId])byStaff[r.staffId]={staffId:r.staffId,name:r.name,completed:0,noShows:0,cancellations:0,rescheduled:0,revenue:0,revByLoc:{},utilization:null,utilizationCount:0,appointments:0,initialAssessments:0};
         const b=byStaff[r.staffId];
         if(!isShift){
           if(r.completed)b.completed+=(parseFloat(r.completed)||0);
@@ -3664,6 +3726,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           if(r.cancellations)b.cancellations+=(parseFloat(r.cancellations)||0);
           if(r.rescheduled)b.rescheduled+=(parseFloat(r.rescheduled)||0);
           if(r.revenue)b.revenue+=(parseFloat(r.revenue)||0);
+          if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{b.revByLoc[loc]=(b.revByLoc[loc]||0)+(parseFloat(v)||0);});
           if(r.appointments)b.appointments+=(parseFloat(r.appointments)||0);
           if(r.initialAssessments)b.initialAssessments+=(parseFloat(r.initialAssessments)||0);
         }
@@ -3677,6 +3740,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     return Object.values(byStaff).map(r=>({
       ...r,
       revenue:Math.round(r.revenue*100)/100,
+      revByLoc:Object.fromEntries(Object.entries(r.revByLoc||{}).map(([k,v])=>[k,Math.round(v*100)/100])),
       // Average the utilization across however many shift snapshots exist
       utilization:r.utilizationCount>0?Math.round(r.utilization/r.utilizationCount):null,
     }));
@@ -3709,7 +3773,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         completed:jr?.completed||null,utilization:jr?.utilization||null,
         appointments:jr?.appointments||null,noShows:jr?.noShows||null,
         cancellations:jr?.cancellations||null,rescheduled:jr?.rescheduled||null,
-        revenue:jr?.revenue||null,initialAssessments:jr?.initialAssessments||null,
+        revenue:jr?(filterSite&&filterSite!=='all'?revForSite(jr,filterSite):(jr.revenue||null)):null,initialAssessments:jr?.initialAssessments||null,
         gva:gvaVal,retention:retVal};
     })
   ,[staff,filteredRows,data.gva,data.retention,gvaEdits,filterDisc,filterSite]);
@@ -3818,15 +3882,24 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
   const reportAgg=(from,to)=>{
     const byStaff={};
-    const touch=(id)=>{const s=staff.find(x=>x.id===id);if(!s||['mgmt','ops','edu'].includes(s.discipline))return null;if(!byStaff[id])byStaff[id]={id,name:s.name,disc:s.discipline,site:s.site||'—',visits:0,ias:0,noShows:0,cancels:0,revenue:0};return byStaff[id];};
+    const touch=(id)=>{const s=staff.find(x=>x.id===id);if(!s||['mgmt','ops','edu'].includes(s.discipline))return null;if(!byStaff[id])byStaff[id]={id,name:s.name,disc:s.discipline,site:s.site||'—',visits:0,ias:0,noShows:0,cancels:0,revenue:0,revByLoc:{}};return byStaff[id];};
     dailyAppts.forEach(r=>{if(r.date<from||r.date>to)return;const b=touch(r.staff_id);if(!b)return;b.visits+=(r.completed||0);b.ias+=(r.initial_assessments||0);b.noShows+=(r.no_shows||0);b.cancels+=(r.cancellations||0);});
     let otherRev=0;
-    dailyRevenue.forEach(r=>{if(r.date<from||r.date>to)return;const b=touch(r.staff_id);if(!b){otherRev+=(r.revenue||0);return;}b.revenue+=(r.revenue||0);});
+    dailyRevenue.forEach(r=>{if(r.date<from||r.date>to)return;const b=touch(r.staff_id);if(!b){otherRev+=(r.revenue||0);return;}b.revenue+=(r.revenue||0);if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{b.revByLoc[loc]=(b.revByLoc[loc]||0)+(v||0);});});
     const list=Object.values(byStaff);
     const totals=list.reduce((a,b)=>({revenue:a.revenue+b.revenue,visits:a.visits+b.visits,ias:a.ias+b.ias,noShows:a.noShows+b.noShows,cancels:a.cancels+b.cancels}),{revenue:0,visits:0,ias:0,noShows:0,cancels:0});
     totals.revenue=Math.round((totals.revenue+otherRev)*100)/100; // include front-desk / retail / unmatched so the total matches the books
     const byDisc={};DISC_CLIN.forEach(d=>{const rows=list.filter(x=>x.disc===d.id);if(rows.length)byDisc[d.id]={label:d.label,abbr:d.abbr,revenue:rows.reduce((a,b)=>a+b.revenue,0),visits:rows.reduce((a,b)=>a+b.visits,0),ias:rows.reduce((a,b)=>a+b.ias,0)};});
-    const byLoc={};list.forEach(x=>{const k=x.site||'—';if(!byLoc[k])byLoc[k]={revenue:0,visits:0,ias:0};byLoc[k].revenue+=x.revenue;byLoc[k].visits+=x.visits;byLoc[k].ias+=x.ias;});
+    // Location split: revenue follows the actual transaction location (revByLoc); visits/IAs
+    // follow the practitioner's home site (appointment data carries no location).
+    const byLoc={};const bump=(k,f,v)=>{const key=k||'—';if(!byLoc[key])byLoc[key]={revenue:0,visits:0,ias:0};byLoc[key][f]+=v;};
+    list.forEach(x=>{
+      const rbl=x.revByLoc||{};
+      if(Object.keys(rbl).length)Object.entries(rbl).forEach(([loc,v])=>bump(loc,'revenue',v));
+      else bump(siteList(x)[0]||x.site,'revenue',x.revenue);
+      const hs=siteList(x)[0]||x.site;bump(hs,'visits',x.visits);bump(hs,'ias',x.ias);
+    });
+    Object.values(byLoc).forEach(o=>{o.revenue=Math.round(o.revenue*100)/100;});
     return{totals,byDisc,byLoc,perStaff:list,otherRev:Math.round(otherRev*100)/100};
   };
 
