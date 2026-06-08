@@ -3654,9 +3654,21 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           if(SB){
             const chunks=[];
             for(let i=0;i<newDailyRev.length;i+=500)chunks.push(newDailyRev.slice(i,i+500));
+            let stripped=false,revErr=null;
             for(const chunk of chunks){
-              await SB.from('daily_revenue').upsert(chunk);
+              const{error}=await SB.from('daily_revenue').upsert(chunk);
+              if(error){
+                // The daily_revenue table may not have the revByLoc column yet — without this
+                // fallback the whole upsert fails and revenue silently never persists. Retry with
+                // just the core columns so revenue still saves (location split needs the column).
+                const bare=chunk.map(({revByLoc,...r})=>r);
+                const r2=await SB.from('daily_revenue').upsert(bare);
+                if(r2.error){revErr=r2.error.message;break;}
+                stripped=true;
+              }
             }
+            window.__revLocUnsynced=stripped&&!revErr;
+            if(revErr)console.warn('daily_revenue sync error:',revErr);
           }
         }
       }else if(type==='shift'){
@@ -3933,8 +3945,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const byStaff={};
     const touch=(id)=>{const s=staff.find(x=>x.id===id);if(!s||['mgmt','ops','edu'].includes(s.discipline))return null;if(!byStaff[id])byStaff[id]={id,name:s.name,disc:s.discipline,site:s.site||'—',visits:0,ias:0,noShows:0,cancels:0,revenue:0,revByLoc:{}};return byStaff[id];};
     dailyAppts.forEach(r=>{if(r.date<from||r.date>to)return;const b=touch(r.staff_id);if(!b)return;b.visits+=(r.completed||0);b.ias+=(r.initial_assessments||0);b.noShows+=(r.no_shows||0);b.cancels+=(r.cancellations||0);});
-    let otherRev=0;
-    dailyRevenue.forEach(r=>{if(r.date<from||r.date>to)return;const b=touch(r.staff_id);if(!b){otherRev+=(r.revenue||0);return;}b.revenue+=(r.revenue||0);if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{b.revByLoc[loc]=(b.revByLoc[loc]||0)+(v||0);});});
+    let otherRev=0,revRows=0;
+    dailyRevenue.forEach(r=>{if(r.date<from||r.date>to)return;revRows++;const b=touch(r.staff_id);if(!b){otherRev+=(r.revenue||0);return;}b.revenue+=(r.revenue||0);if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{b.revByLoc[loc]=(b.revByLoc[loc]||0)+(v||0);});});
     const list=Object.values(byStaff);
     const totals=list.reduce((a,b)=>({revenue:a.revenue+b.revenue,visits:a.visits+b.visits,ias:a.ias+b.ias,noShows:a.noShows+b.noShows,cancels:a.cancels+b.cancels}),{revenue:0,visits:0,ias:0,noShows:0,cancels:0});
     totals.revenue=Math.round((totals.revenue+otherRev)*100)/100; // include front-desk / retail / unmatched so the total matches the books
@@ -3949,7 +3961,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const hs=siteList(x)[0]||x.site;bump(hs,'visits',x.visits);bump(hs,'ias',x.ias);
     });
     Object.values(byLoc).forEach(o=>{o.revenue=Math.round(o.revenue*100)/100;});
-    return{totals,byDisc,byLoc,perStaff:list,otherRev:Math.round(otherRev*100)/100};
+    return{totals,byDisc,byLoc,perStaff:list,otherRev:Math.round(otherRev*100)/100,hasRev:revRows>0};
   };
 
   const computeMovers=(cur,prev)=>{
@@ -3991,7 +4003,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const medRev=med(active.map(x=>x.revenue));
     const medIA=med(active.map(x=>x.ias));
     // ── Clinic-level flags ──
-    if(pT.revenue>0){const dr=(cT.revenue-pT.revenue)/pT.revenue*100;
+    if(pT.revenue>0&&cur.hasRev){const dr=(cT.revenue-pT.revenue)/pT.revenue*100;
       if(dr<=-15)flags.push({sev:'high',title:`Clinic revenue down ${Math.abs(dr).toFixed(0)}% ${per}`,detail:`${fmtMoney(cT.revenue)} this period vs ${fmtMoney(pT.revenue)} prior.`,action:'Pinpoint which disciplines/practitioners drove it (see movers) and rule out a holiday or missing-import artifact.',score:8000});
       else if(dr<=-10)flags.push({sev:'med',title:`Clinic revenue down ${Math.abs(dr).toFixed(0)}% ${per}`,detail:`${fmtMoney(cT.revenue)} vs ${fmtMoney(pT.revenue)}.`,action:'Watch into next period; check schedule fill across the team.',score:4000});}
     if(clinicNoShow>=12){const lost=Math.round(cT.noShows*clinAvgRpv);flags.push({sev:clinicNoShow>=18?'high':'med',title:`Clinic no-show rate ${clinicNoShow.toFixed(0)}%`,detail:`${cT.noShows} no-shows of ~${cSched} booked${pSched?` (was ${prevNoShow.toFixed(0)}%)`:''}${lost>0?` · ~${fmtMoney(lost)} of lost capacity`:''}.`,action:'Tighten confirmations (48h + day-of) and revisit deposit / late-cancel policy.',score:5000});}
@@ -4122,15 +4134,18 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
           {noData&&<div style={{background:'rgba(224,82,82,.08)',border:'1px solid #5a2a2a',borderRadius:8,padding:'10px 14px',marginBottom:18,color:'#E0A052',fontSize:13}}>No appointment or revenue data found for this period — make sure the Jane CSVs for these dates have been imported.</div>}
 
+          {!noData&&!cur.hasRev&&cur.totals.visits>0&&<div style={{background:'rgba(244,219,113,.08)',border:'1px solid rgba(244,219,113,.3)',borderRadius:8,padding:'10px 14px',marginBottom:18,color:'#e8d48a',fontSize:13,lineHeight:1.5}}>⚠ Revenue isn't imported for this period yet. Visits and assessments come from your appointment data, but daily sales only run through your last Sales import. Import the Sales CSV covering these dates (Performance &rarr; Jane Import) to fill in revenue — the $0 below isn't a real drop.</div>}
+
           {/* KPI tiles */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(165px,1fr))',gap:12,marginBottom:24}}>
             {KPIS.map(kp=>{
               const c=cur.totals[kp.k],p=prev.totals[kp.k];const d=delta(c,p);const good=kp.inv?!d.up:d.up;
+              const revMissing=kp.k==='revenue'&&!cur.hasRev;
               return(
                 <div key={kp.k} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'15px 16px'}}>
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.3px',textTransform:'uppercase',color:'#888',marginBottom:6}}>{kp.label}</div>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:kp.color,lineHeight:1}}>{kp.fmt(c)}</div>
-                  <div style={{marginTop:8,fontSize:12,fontWeight:700,color:good?'#44CCAA':'#E05252'}}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'#666',fontWeight:400}}>vs prior {pWord}</span></div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:revMissing?'#555':kp.color,lineHeight:1}}>{revMissing?'—':kp.fmt(c)}</div>
+                  {revMissing?<div style={{marginTop:8,fontSize:11.5,fontWeight:600,color:'#E0A052'}}>not imported yet</div>:<div style={{marginTop:8,fontSize:12,fontWeight:700,color:good?'#44CCAA':'#E05252'}}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'#666',fontWeight:400}}>vs prior {pWord}</span></div>}
                 </div>
               );
             })}
