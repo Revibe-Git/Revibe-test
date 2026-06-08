@@ -1877,6 +1877,23 @@ function Stars({n}){return<div style={{display:'flex',gap:3}}>{[1,2,3,4,5].map(i
 /* ══════════════════════════════════════════════
    APP
 ══════════════════════════════════════════════ */
+class PageBoundary extends React.Component{
+  constructor(p){super(p);this.state={err:null};}
+  static getDerivedStateFromError(err){return{err};}
+  componentDidCatch(err,info){try{console.error('Page error:',err,info&&info.componentStack);}catch(e){}}
+  render(){
+    if(this.state.err){const e=this.state.err;return(
+      <div style={{padding:'28px 26px',maxWidth:760}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'#E05252',letterSpacing:'.5px',marginBottom:8}}>This view hit an error</div>
+        <div style={{fontSize:13.5,color:'#bbb',marginBottom:6}}>The rest of the dashboard is fine — this just stops one view from white/black-screening. If you can, screenshot the message below so it can be fixed.</div>
+        <div style={{background:'var(--surface2)',border:'1px solid #5a2a2a',borderRadius:8,padding:'12px 14px',fontFamily:'monospace',fontSize:12.5,color:'#E0A052',whiteSpace:'pre-wrap',marginBottom:14,maxHeight:220,overflow:'auto'}}>{String((e&&e.message)||e)}{e&&e.stack?'\n\n'+String(e.stack).split('\n').slice(0,6).join('\n'):''}</div>
+        <button className="btn btn-ghost btn-sm" onClick={()=>this.setState({err:null})}>Try again</button>
+        <button className="btn btn-ghost btn-sm" style={{marginLeft:8}} onClick={()=>window.location.reload()}>Reload</button>
+      </div>
+    );}
+    return this.props.children;
+  }
+}
 function App(){
   const[page,setPage]=useState('overview');
   const[staff,setStaff]=useState(()=>ld('staff',SEED_STAFF));
@@ -2053,7 +2070,9 @@ function App(){
         </div>
         <div className="scroll">
           <div className="pg">
+            <PageBoundary key={page}>
             <PageComp page={page} staff={staff} evals={evals} setEvals={setEvals} sessions={sessions} mentors={MENTORS} setPage={setPage} openProfile={openProfile} setModal={setModal} setStaff={setStaff} meetings={meetings} setMeetings={setMeetings} addNotif={addNotif} currentUser='Dave' perfData={perfData} setPerfData={setPerfData} sbHelpers={sbHelpers}/>
+            </PageBoundary>
           </div>
         </div>
       </div>
@@ -2104,23 +2123,29 @@ function CallHistoryPage(){
 
   const[view,setView]=useState('calls');
   const[loc,setLoc]=useState('Mississauga');
-  const[tf,setTf]=useState('90');
+  const[tf,setTf]=useState('all');
+  const[metric,setMetric]=useState('calls');
+  const cOf=(v)=>(typeof v==='object'&&v)?(+v.c||0):(+v||0);
+  const bOf=(v)=>(typeof v==='object'&&v)?(+v.b||0):0;
   const discList=SITE_DISC[loc];
 
   const[entryDate,setEntryDate]=useState(today);
   const[entry,setEntry]=useState({});
   const[savedFlag,setSavedFlag]=useState(false);
-  useEffect(()=>{const e=(data.calls[loc]||{})[entryDate]||{};setEntry(Object.fromEntries(discList.map(([id])=>[id,e[id]?String(e[id]):''])));setSavedFlag(false);},[entryDate,loc,data]);// eslint-disable-line
-  const saveEntry=()=>{const day={};discList.forEach(([id])=>{const n=parseInt(entry[id])||0;if(n)day[id]=n;});const calls={...data.calls,[loc]:{...(data.calls[loc]||{})}};if(Object.keys(day).length)calls[loc][entryDate]=day;else delete calls[loc][entryDate];persist({...data,calls},true);setSavedFlag(true);setTimeout(()=>setSavedFlag(false),1600);};
+  useEffect(()=>{const e=(data.calls[loc]||{})[entryDate]||{};setEntry(Object.fromEntries(discList.map(([id])=>[id,{c:cOf(e[id])?String(cOf(e[id])):'',b:bOf(e[id])?String(bOf(e[id])):''}])));setSavedFlag(false);},[entryDate,loc,data]);// eslint-disable-line
+  const saveEntry=()=>{const day={};discList.forEach(([id])=>{const c=parseInt(entry[id]&&entry[id].c)||0;const b=parseInt(entry[id]&&entry[id].b)||0;if(c||b)day[id]=b?{c,b}:c;});const calls={...data.calls,[loc]:{...(data.calls[loc]||{})}};if(Object.keys(day).length)calls[loc][entryDate]=day;else delete calls[loc][entryDate];persist({...data,calls},true);setSavedFlag(true);setTimeout(()=>setSavedFlag(false),1600);};
   const inTf=(d)=>{if(tf==='all')return true;if(tf==='month')return d.slice(0,7)===today.slice(0,7);const cut=new Date(Date.now()-parseInt(tf)*86400000).toISOString().slice(0,10);return d>=cut;};
   const locDays=Object.keys(data.calls[loc]||{}).filter(inTf).sort();
-  const discTotals=discList.map(([id,label])=>({id,label,color:DISC_COLOR[id]||'#999',n:locDays.reduce((a,d)=>a+((data.calls[loc][d]||{})[id]||0),0)}));
+  const discTotals=discList.map(([id,label])=>{const calls=locDays.reduce((a,d)=>a+cOf((data.calls[loc][d]||{})[id]),0);const booked=locDays.reduce((a,d)=>a+bOf((data.calls[loc][d]||{})[id]),0);return{id,label,color:DISC_COLOR[id]||'#999',calls,booked,n:metric==='booked'?booked:calls};});
+  const locCalls=discTotals.reduce((a,x)=>a+x.calls,0);
+  const locBooked=discTotals.reduce((a,x)=>a+x.booked,0);
+  const locRate=locCalls?locBooked/locCalls*100:0;
   const locTotal=discTotals.reduce((a,x)=>a+x.n,0);
   const otherLoc=loc==='Mississauga'?'Markham':'Mississauga';
-  const otherTotal=Object.keys(data.calls[otherLoc]||{}).filter(inTf).reduce((a,d)=>a+Object.values(data.calls[otherLoc][d]||{}).reduce((s,v)=>s+v,0),0);
+  const otherTotal=Object.keys(data.calls[otherLoc]||{}).filter(inTf).reduce((a,d)=>a+Object.values(data.calls[otherLoc][d]||{}).reduce((s,v)=>s+cOf(v),0),0);
   const busiest=discTotals.slice().sort((a,b)=>b.n-a.n)[0];
   const discMax=Math.max(1,...discTotals.map(x=>x.n));
-  const ts=locDays.slice(-40).map(d=>({d,n:Object.values(data.calls[loc][d]||{}).reduce((s,v)=>s+v,0)}));
+  const ts=locDays.slice(-40).map(d=>({d,n:Object.values(data.calls[loc][d]||{}).reduce((s,v)=>s+(metric==='booked'?bOf(v):cOf(v)),0)}));
   const tsMax=Math.max(1,...ts.map(t=>t.n));
   const CW=Math.max(560,ts.length*30),CH=180,padB=30,padL=4,padT=10;
   const bw=ts.length?Math.min(24,(CW-padL)/ts.length-7):20;
@@ -2155,7 +2180,7 @@ function CallHistoryPage(){
     {view==='calls'&&(<>
       <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap',alignItems:'center'}}>
         <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginRight:2}}>Location</span>
-        {['Mississauga','Markham'].map(L=>(<button key={L} className={`btn btn-sm ${loc===L?'btn-lime':'btn-ghost'}`} onClick={()=>setLoc(L)} style={loc===L?{borderColor:LOC_C[L],color:LOC_C[L]}:{}}>{L}</button>))}
+        {['Mississauga','Markham'].map(L=>(<button key={L} className="btn btn-sm btn-ghost" onClick={()=>setLoc(L)} style={loc===L?{background:LOC_C[L],borderColor:LOC_C[L],color:'#10231a',fontWeight:800}:{}}>{L}</button>))}
       </div>
 
       <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'14px 16px',marginBottom:16}}>
@@ -2163,10 +2188,13 @@ function CallHistoryPage(){
           <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:'#aaa'}}>Log calls — {loc}</span>
           <input type="date" value={entryDate} max={today} onChange={e=>setEntryDate(e.target.value)} style={{...inp,width:'auto'}}/>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(120px,1fr))',gap:8}}>
-          {discList.map(([id,label])=>(<div key={id}>
-            <div style={{fontSize:11,color:'#888',marginBottom:3,display:'flex',alignItems:'center',gap:5}}><span style={{color:DISC_COLOR[id]}}>●</span>{label}</div>
-            <input type="text" inputMode="numeric" value={entry[id]||''} onChange={e=>setEntry(p=>({...p,[id]:e.target.value.replace(/[^0-9]/g,'')}))} placeholder="0" style={inp}/>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:8}}>
+          {discList.map(([id,label])=>(<div key={id} style={{background:'var(--surface3)',borderRadius:6,padding:'8px 9px'}}>
+            <div style={{fontSize:11,color:'#999',marginBottom:5,display:'flex',alignItems:'center',gap:5}}><span style={{color:DISC_COLOR[id]}}>●</span>{label}</div>
+            <div style={{display:'flex',gap:6}}>
+              <div style={{flex:1}}><div style={{fontSize:9,color:'#666',marginBottom:2,textTransform:'uppercase',letterSpacing:'.5px'}}>Calls</div><input type="text" inputMode="numeric" value={(entry[id]&&entry[id].c)||''} onChange={e=>setEntry(p=>({...p,[id]:{...p[id],c:e.target.value.replace(/[^0-9]/g,'')}}))} placeholder="0" style={{...inp,background:'var(--surface2)'}}/></div>
+              <div style={{flex:1}}><div style={{fontSize:9,color:'#44CCAA',marginBottom:2,textTransform:'uppercase',letterSpacing:'.5px'}}>Booked</div><input type="text" inputMode="numeric" value={(entry[id]&&entry[id].b)||''} onChange={e=>setEntry(p=>({...p,[id]:{...p[id],b:e.target.value.replace(/[^0-9]/g,'')}}))} placeholder="0" style={{...inp,background:'var(--surface2)'}}/></div>
+            </div>
           </div>))}
         </div>
         <div style={{marginTop:12,display:'flex',alignItems:'center',gap:10}}>
@@ -2180,16 +2208,23 @@ function CallHistoryPage(){
         {[['30','30d'],['90','90d'],['month','This Month'],['all','All Time']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${tf===v?'btn-go':'btn-ghost'}`} onClick={()=>setTf(v)}>{l}</button>))}
       </div>
 
+      <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
+        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginRight:2}}>Show</span>
+        {[['calls','📞 Call totals'],['booked','✅ Conversions']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${metric===v?'btn-go':'btn-ghost'}`} onClick={()=>setMetric(v)}>{l}</button>))}
+        <span style={{fontSize:12,color:'#666',marginLeft:4}}>drives the breakdown &amp; chart below</span>
+      </div>
+
       <div style={{display:'flex',flexWrap:'wrap',gap:12,marginBottom:16}}>
-        {card(loc+' Calls',fmt(locTotal),locDays.length+' day'+(locDays.length===1?'':'s')+' logged',LOC_C[loc])}
-        {card('Busiest',busiest&&busiest.n>0?busiest.label:'—',busiest&&busiest.n>0?busiest.n+' calls':'no calls yet',busiest?busiest.color:'#888')}
+        {card(loc+' Calls',fmt(locCalls),locDays.length+' day'+(locDays.length===1?'':'s')+' logged',LOC_C[loc])}
+        {card('Conversions',fmt(locBooked),'booked from calls','#44CCAA')}
+        {card('Booking Rate',locCalls?locRate.toFixed(0)+'%':'—',locBooked+' of '+locCalls+' calls',locRate>=50?'#CAE8C1':locRate>=30?'#F4DB71':'#E05252')}
         {card(otherLoc,fmt(otherTotal),'calls (this window)',LOC_C[otherLoc])}
       </div>
 
       <div className="perf-slot" style={{marginBottom:14}}>
-        <div className="perf-slot-head"><span className="perf-slot-title" style={{color:LOC_C[loc]}}>Calls by Discipline — {loc}</span></div>
+        <div className="perf-slot-head"><span className="perf-slot-title" style={{color:LOC_C[loc]}}>{metric==='booked'?'Conversions':'Calls'} by Discipline — {loc}</span></div>
         <div className="perf-slot-body">
-          {locTotal===0?<div style={{color:'#666',padding:'18px 0',textAlign:'center'}}>No calls logged for {loc} in this window.</div>:
+          {locTotal===0?<div style={{color:'#666',padding:'18px 0',textAlign:'center'}}>No {metric==='booked'?'conversions':'calls'} for {loc} in this window.</div>:
           discTotals.filter(x=>x.n>0).sort((a,b)=>b.n-a.n).map(x=>(<div key={x.id} style={{display:'flex',alignItems:'center',gap:10,padding:'5px 0'}}>
             <div style={{width:110,fontSize:13,color:'#bbb'}}>{x.label}</div>
             <div style={{flex:1,height:18,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',width:(x.n/discMax*100)+'%',background:x.color,borderRadius:4}}/></div>
@@ -2199,7 +2234,7 @@ function CallHistoryPage(){
       </div>
 
       <div className="perf-slot" style={{marginBottom:14}}>
-        <div className="perf-slot-head"><span className="perf-slot-title" style={{color:LOC_C[loc]}}>Daily Call Volume — {loc}</span></div>
+        <div className="perf-slot-head"><span className="perf-slot-title" style={{color:LOC_C[loc]}}>Daily {metric==='booked'?'Conversions':'Call Volume'} — {loc}</span></div>
         <div className="perf-slot-body" style={{overflowX:'auto'}}>
           {ts.length===0?<div style={{color:'#666',padding:'18px 0',textAlign:'center'}}>No entries in this window.</div>:
           <svg viewBox={`0 0 ${CW} ${CH}`} style={{width:'100%',minWidth:Math.min(CW,560),height:CH}}>
@@ -2215,12 +2250,12 @@ function CallHistoryPage(){
       <div className="perf-slot">
         <div className="perf-slot-head"><span className="perf-slot-title">Recent Entries — {loc}</span></div>
         <div className="perf-slot-body">
-          {locDays.slice(-14).reverse().map(d=>{const day=data.calls[loc][d]||{};const tot=Object.values(day).reduce((s,v)=>s+v,0);return(<div key={d} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+          {locDays.slice(-14).reverse().map(d=>{const day=data.calls[loc][d]||{};const tot=Object.values(day).reduce((s,v)=>s+cOf(v),0);const tb=Object.values(day).reduce((s,v)=>s+bOf(v),0);return(<div key={d} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
               <span style={{fontSize:13,color:'#ccc',width:90}}>{d}</span>
-              <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{discList.filter(([id])=>day[id]).map(([id,label])=>(<span key={id} style={{fontSize:11,color:'#1a1a1a',background:DISC_COLOR[id],borderRadius:4,padding:'1px 6px',fontWeight:700}}>{label.split(' ')[0]} {day[id]}</span>))}</div>
+              <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{discList.filter(([id])=>day[id]).map(([id,label])=>(<span key={id} style={{fontSize:11,color:'#1a1a1a',background:DISC_COLOR[id],borderRadius:4,padding:'1px 6px',fontWeight:700}}>{label.split(' ')[0]} {cOf(day[id])}{bOf(day[id])?'→'+bOf(day[id]):''}</span>))}</div>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:13,fontWeight:700,color:'#ddd'}}>{tot}</span><button className="btn btn-ghost btn-xs" onClick={()=>{const calls={...data.calls,[loc]:{...data.calls[loc]}};delete calls[loc][d];persist({...data,calls},true);}}>✕</button></div>
+            <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:13,fontWeight:700,color:'#ddd'}}>{tot}{tb?' / '+tb+' booked':''}</span><button className="btn btn-ghost btn-xs" onClick={()=>{const calls={...data.calls,[loc]:{...data.calls[loc]}};delete calls[loc][d];persist({...data,calls},true);}}>✕</button></div>
           </div>);})}
           {locDays.length===0&&<div style={{color:'#666',padding:'14px 0',textAlign:'center'}}>Nothing logged in this window.</div>}
         </div>
