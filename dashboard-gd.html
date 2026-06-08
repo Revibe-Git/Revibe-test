@@ -2148,13 +2148,13 @@ function CallHistoryPage(){
   const busiest=discTotals.slice().sort((a,b)=>b.n-a.n)[0];
   const discMax=Math.max(1,...discTotals.map(x=>x.n));
   const _wkStart=(ds)=>{const dt=new Date(ds+'T12:00');const dow=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-dow);return dt.toISOString().slice(0,10);};
-  const _tsRaw=locDays.map(d=>({d,n:Object.values(data.calls[loc][d]||{}).reduce((s,v)=>s+(metric==='booked'?bOf(v):cOf(v)),0)}));
+  const _tsRaw=locDays.map(d=>{const day=data.calls[loc][d]||{};return{d,calls:Object.values(day).reduce((s,v)=>s+cOf(v),0),booked:Object.values(day).reduce((s,v)=>s+bOf(v),0)};});
   let ts;
-  if(gran==='week'){const wk={};_tsRaw.forEach(t=>{const w=_wkStart(t.d);wk[w]=(wk[w]||0)+t.n;});ts=Object.keys(wk).sort().slice(-26).map(w=>({d:w,n:wk[w]}));}
-  else{ts=_tsRaw.slice(-40);}
-  const tsMax=Math.max(1,...ts.map(t=>t.n));
-  const CW=Math.max(560,ts.length*30),CH=180,padB=30,padL=4,padT=10;
-  const bw=ts.length?Math.min(24,(CW-padL)/ts.length-7):20;
+  if(gran==='week'){const wk={};_tsRaw.forEach(t=>{const w=_wkStart(t.d);if(!wk[w])wk[w]={calls:0,booked:0};wk[w].calls+=t.calls;wk[w].booked+=t.booked;});ts=Object.keys(wk).sort().slice(-26).map(w=>({d:w,calls:wk[w].calls,booked:wk[w].booked}));}
+  else{ts=_tsRaw.slice(-45);}
+  const tsMax=Math.max(1,...ts.map(t=>t.calls));
+  const CW=Math.max(560,ts.length*32),CH=200,padB=30,padL=4,padT=14;
+  const bw=ts.length?Math.min(26,(CW-padL)/ts.length-7):20;
 
   const sources=(data.sources&&data.sources.length)?data.sources:DEFAULT_SOURCES;
   const[selSource,setSelSource]=useState(sources[0]?sources[0].id:'form');
@@ -2220,7 +2220,7 @@ function CallHistoryPage(){
       <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
         <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginRight:2}}>Show</span>
         {[['calls','📞 Call totals'],['booked','✅ Conversions']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${metric===v?'btn-go':'btn-ghost'}`} onClick={()=>setMetric(v)}>{l}</button>))}
-        <span style={{fontSize:12,color:'#666',marginLeft:4}}>drives the breakdown &amp; chart below</span>
+        <span style={{fontSize:12,color:'#666',marginLeft:4}}>drives the discipline breakdown below</span>
       </div>
 
       {tf!=='all'&&locDays.length===0&&Object.keys(data.calls[loc]||{}).length>0&&(()=>{const all=Object.keys(data.calls[loc]).sort();return(<div style={{background:'rgba(244,219,113,.08)',border:'1px solid rgba(244,219,113,.3)',borderRadius:8,padding:'10px 14px',marginBottom:14,fontSize:13.5,color:'#e8d48a',lineHeight:1.5}}>No {loc} calls in this window. Your logged {loc} history runs {all[0]} → {all[all.length-1]} (mostly imported), which is outside the last {tf==='month'?'month':tf+' days'}. <button onClick={()=>setTf('all')} style={{background:'none',border:'none',color:'#CAE8C1',textDecoration:'underline',cursor:'pointer',font:'inherit',padding:0}}>Switch to All Time</button> to see it, or log recent calls above.</div>);})()}
@@ -2245,16 +2245,26 @@ function CallHistoryPage(){
       </div>
 
       <div className="perf-slot" style={{marginBottom:14}}>
-        <div className="perf-slot-head"><span className="perf-slot-title" style={{color:LOC_C[loc]}}>{gran==='week'?'Weekly':'Daily'} {metric==='booked'?'Conversions':'Call Volume'} — {loc}</span></div>
+        <div className="perf-slot-head" style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
+          <span className="perf-slot-title" style={{color:LOC_C[loc]}}>{gran==='week'?'Weekly':'Daily'} Calls &amp; Conversions — {loc}</span>
+          <div style={{display:'flex',gap:14,fontSize:12,color:'#999'}}>
+            <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:11,height:11,borderRadius:2,background:LOC_C[loc],opacity:.35,display:'inline-block'}}/>Calls</span>
+            <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:11,height:11,borderRadius:2,background:'#44CCAA',display:'inline-block'}}/>Converted</span>
+          </div>
+        </div>
         <div className="perf-slot-body" style={{overflowX:'auto'}}>
           {ts.length===0?<div style={{color:'#666',padding:'18px 0',textAlign:'center'}}>No entries in this window.</div>:
           <svg viewBox={`0 0 ${CW} ${CH}`} style={{width:'100%',minWidth:Math.min(CW,560),height:CH}}>
             {[0,.5,1].map(g=>{const y=padT+(1-g)*(CH-padB-padT);return(<g key={g}><line x1={padL} y1={y} x2={CW} y2={y} stroke="var(--border)" strokeDasharray="2 4"/><text x={padL} y={y-3} fontSize="9" fill="#666">{Math.round(tsMax*g)}</text></g>);})}
-            {ts.map((t,i)=>{const x=padL+i*((CW-padL)/ts.length)+((CW-padL)/ts.length-bw)/2;const h=(t.n/tsMax)*(CH-padB-padT);return(<g key={t.d}>
-              <rect x={x} y={CH-padB-h} width={bw} height={h} rx={2} fill={LOC_C[loc]}/>
+            {ts.map((t,i)=>{const x=padL+i*((CW-padL)/ts.length)+((CW-padL)/ts.length-bw)/2;const hc=(t.calls/tsMax)*(CH-padB-padT);const hb=(t.booked/tsMax)*(CH-padB-padT);const rate=t.calls?Math.round(t.booked/t.calls*100):0;return(<g key={t.d}>
+              <title>{t.d}: {t.calls} call{t.calls===1?'':'s'} · {t.booked} booked{t.calls?` · ${rate}%`:''}</title>
+              <rect x={x} y={CH-padB-hc} width={bw} height={hc} rx={2} fill={LOC_C[loc]} opacity={0.32}/>
+              {t.booked>0&&<rect x={x} y={CH-padB-hb} width={bw} height={hb} rx={2} fill="#44CCAA"/>}
+              {t.calls>0&&bw>=18&&<text x={x+bw/2} y={CH-padB-hc-3} fontSize="9" fill="#aaa" textAnchor="middle">{t.calls}</text>}
               {i%Math.ceil(ts.length/12||1)===0&&<text x={x+bw/2} y={CH-padB+13} fontSize="9" fill="#777" textAnchor="middle">{t.d.slice(5)}</text>}
             </g>);})}
           </svg>}
+          <div style={{fontSize:12,color:'#666',marginTop:6}}>Each bar is total calls; the solid green portion is how many converted to a booking. Hover any bar for the exact split.</div>
         </div>
       </div>
 
