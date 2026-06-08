@@ -2214,6 +2214,8 @@ function CallHistoryPage(){
         <span style={{fontSize:12,color:'#666',marginLeft:4}}>drives the breakdown &amp; chart below</span>
       </div>
 
+      {tf!=='all'&&locDays.length===0&&Object.keys(data.calls[loc]||{}).length>0&&(()=>{const all=Object.keys(data.calls[loc]).sort();return(<div style={{background:'rgba(244,219,113,.08)',border:'1px solid rgba(244,219,113,.3)',borderRadius:8,padding:'10px 14px',marginBottom:14,fontSize:13.5,color:'#e8d48a',lineHeight:1.5}}>No {loc} calls in this window. Your logged {loc} history runs {all[0]} → {all[all.length-1]} (mostly imported), which is outside the last {tf==='month'?'month':tf+' days'}. <button onClick={()=>setTf('all')} style={{background:'none',border:'none',color:'#CAE8C1',textDecoration:'underline',cursor:'pointer',font:'inherit',padding:0}}>Switch to All Time</button> to see it, or log recent calls above.</div>);})()}
+
       <div style={{display:'flex',flexWrap:'wrap',gap:12,marginBottom:16}}>
         {card(loc+' Calls',fmt(locCalls),locDays.length+' day'+(locDays.length===1?'':'s')+' logged',LOC_C[loc])}
         {card('Conversions',fmt(locBooked),'booked from calls','#44CCAA')}
@@ -3394,7 +3396,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       if(!s||s.discipline==='mgmt'||s.discipline==='ops'||s.discipline==='edu')return;
       if(filterDisc!=='all'&&s.discipline!==filterDisc)return;
       if(!siteMatch(s,filterSite))return;
-      if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',completed:0,initialAssessments:0,noShows:0,cancellations:0,revenue:0};
+      if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',completed:0,initialAssessments:0,noShows:0,cancellations:0,revenue:0,revByLoc:{}};
       byStaff[r.staff_id].completed+=(r.completed||0);
       byStaff[r.staff_id].initialAssessments+=(r.initial_assessments||0);
       byStaff[r.staff_id].noShows+=(r.no_shows||0);
@@ -3410,7 +3412,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       if(!siteMatch(s,filterSite))return;
       if(!byStaff[r.staff_id])byStaff[r.staff_id]={staffId:r.staff_id,name:s.name,site:s.site||'',completed:0,initialAssessments:0,noShows:0,cancellations:0,revenue:0,revByLoc:{}};
       byStaff[r.staff_id].revenue+=(r.revenue||0);
-      if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{byStaff[r.staff_id].revByLoc[loc]=(byStaff[r.staff_id].revByLoc[loc]||0)+(v||0);});
+      if(r.revByLoc){if(!byStaff[r.staff_id].revByLoc)byStaff[r.staff_id].revByLoc={};Object.entries(r.revByLoc).forEach(([loc,v])=>{byStaff[r.staff_id].revByLoc[loc]=(byStaff[r.staff_id].revByLoc[loc]||0)+(v||0);});}
     });
     return Object.values(byStaff).map(r=>({...r,revByLoc:Object.fromEntries(Object.entries(r.revByLoc||{}).map(([k,v])=>[k,Math.round(v*100)/100]))}));
   };
