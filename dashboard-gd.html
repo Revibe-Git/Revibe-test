@@ -2212,6 +2212,9 @@ function CallHistoryPage(){
       <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
         <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginRight:2}}>View</span>
         {[['30','30d'],['90','90d'],['month','This Month'],['all','All Time']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${tf===v?'btn-go':'btn-ghost'}`} onClick={()=>setTf(v)}>{l}</button>))}
+        <div style={{width:1,height:20,background:'var(--border2)',margin:'0 4px'}}/>
+        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginRight:2}}>By</span>
+        {[['day','Day'],['week','Week']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${gran===v?'btn-go':'btn-ghost'}`} onClick={()=>setGran(v)}>{l}</button>))}
       </div>
 
       <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
@@ -2242,8 +2245,7 @@ function CallHistoryPage(){
       </div>
 
       <div className="perf-slot" style={{marginBottom:14}}>
-        <div className="perf-slot-head" style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}><span className="perf-slot-title" style={{color:LOC_C[loc]}}>{gran==='week'?'Weekly':'Daily'} {metric==='booked'?'Conversions':'Call Volume'} — {loc}</span>
-          <div style={{display:'flex',gap:4}}>{[['day','Day'],['week','Week']].map(([v,l])=>(<button key={v} className={`btn btn-xs ${gran===v?'btn-go':'btn-ghost'}`} onClick={()=>setGran(v)}>{l}</button>))}</div></div>
+        <div className="perf-slot-head"><span className="perf-slot-title" style={{color:LOC_C[loc]}}>{gran==='week'?'Weekly':'Daily'} {metric==='booked'?'Conversions':'Call Volume'} — {loc}</span></div>
         <div className="perf-slot-body" style={{overflowX:'auto'}}>
           {ts.length===0?<div style={{color:'#666',padding:'18px 0',textAlign:'center'}}>No entries in this window.</div>:
           <svg viewBox={`0 0 ${CW} ${CH}`} style={{width:'100%',minWidth:Math.min(CW,560),height:CH}}>
