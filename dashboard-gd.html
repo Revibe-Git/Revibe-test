@@ -2576,7 +2576,7 @@ function ClinicLineChart({snapshots,staff,metric,agg,color,label,fmt,timeframe,f
   );
 }
 
-function ProjectionCard({snapshots,filterDisc,filterSite,staff,revBasis,dataMaxMonth,dailyMaxDate}){
+function ProjectionCard({snapshots,filterDisc,filterSite,staff,revBasis,dataMaxMonth,dailyMaxDate,staffId,title}){
   const projMonth=dataMaxMonth;
   if(!projMonth)return null;
   const parts=projMonth.split('-').map(Number);const yy=parts[0],mm=parts[1];
@@ -2585,8 +2585,8 @@ function ProjectionCard({snapshots,filterDisc,filterSite,staff,revBasis,dataMaxM
   let dayOfMonth=daysInMonth;
   if(dailyMaxDate&&dailyMaxDate.slice(0,7)===projMonth){dayOfMonth=parseInt(dailyMaxDate.slice(8,10))||daysInMonth;}
   const partial=projMonth===curM&&dayOfMonth<daysInMonth;
-  const unfiltered=(!filterDisc||filterDisc==='all')&&(!filterSite||filterSite==='all');
-  const rowOK=(r)=>{if(!r.staffId)return false;const s=(staff||[]).find(x=>x.id===r.staffId);if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;if(!siteMatch(s,filterSite))return false;return true;};
+  const unfiltered=(!filterDisc||filterDisc==='all')&&(!filterSite||filterSite==='all')&&!staffId;
+  const rowOK=(r)=>{if(!r.staffId)return false;if(staffId)return r.staffId===staffId;const s=(staff||[]).find(x=>x.id===r.staffId);if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;if(!siteMatch(s,filterSite))return false;return true;};
   const monthRows=(snapshots||[]).filter(s=>s.date&&s.date.startsWith(projMonth)).flatMap(s=>(s.rows||[]).filter(rowOK));
   let revAct;
   if(unfiltered&&revBasis&&revBasis[projMonth]){
@@ -2603,7 +2603,7 @@ function ProjectionCard({snapshots,filterDisc,filterSite,staff,revBasis,dataMaxM
   const monthLbl=new Date(projMonth+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
   return(<div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'18px 20px',marginBottom:14}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
-      <div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA',fontWeight:700,marginBottom:2}}>📈 {monthLbl} — {partial?'Month-End Projection':'Month Total'}</div><div style={{fontSize:13,color:'#555'}}>{partial?`${dayOfMonth} of ${daysInMonth} days complete (${pct}%)`:'complete month'}</div></div>
+      <div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA',fontWeight:700,marginBottom:2}}>📈 {title?title+' · ':''}{monthLbl} — {partial?'Month-End Projection':'Month Total'}</div><div style={{fontSize:13,color:'#555'}}>{partial?`${dayOfMonth} of ${daysInMonth} days complete (${pct}%)${title?' · projected at current pace':''}`:'complete month'}</div></div>
       {partial&&<div style={{flex:1,minWidth:120,maxWidth:200}}><div style={{height:6,background:'var(--surface3)',borderRadius:3}}><div style={{height:'100%',borderRadius:3,background:'#44CCAA',width:pct+'%'}}/></div></div>}
     </div>
     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:12}}>
@@ -4975,6 +4975,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           {data.snapshots.length<2&&trendGranularity==='monthly'&&<div style={{fontSize:14,color:'#777',padding:'12px 0',fontStyle:'italic'}}>Import at least 2 monthly snapshots to see trend lines.</div>}
 
           {trendSite!=='all'&&!hasLocRevenue&&locRevNote}
+
+          {trendView==='practitioner'&&trendStaff&&<ProjectionCard snapshots={data.snapshots} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} staff={staff} revBasis={revBasis} dataMaxMonth={dataMaxMonth} dailyMaxDate={dailyDateRange.max} title={trendStaff.name}/>}
 
           {trendGranularity==='weekly'&&trendView==='clinic'&&(<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe} snapshots={data.snapshots}/>)}
           {trendGranularity==='weekly'&&trendView==='practitioner'&&(trendStaff?<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>:<div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to compare their weeks.</div>)}
