@@ -3651,6 +3651,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           setDailyRevenue(merged);
           try{localStorage.setItem('rvgd3_daily_rev',JSON.stringify(merged));}catch(e){}
           const SB=window.__SB;
+          window.__dailyRevCount=newDailyRev.length;window.__dailyRevErr=null;window.__revLocUnsynced=false;
           if(SB){
             const chunks=[];
             for(let i=0;i<newDailyRev.length;i+=500)chunks.push(newDailyRev.slice(i,i+500));
@@ -3667,7 +3668,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 stripped=true;
               }
             }
-            window.__revLocUnsynced=stripped&&!revErr;
+            window.__revLocUnsynced=stripped&&!revErr;window.__dailyRevErr=revErr;
             if(revErr)console.warn('daily_revenue sync error:',revErr);
           }
         }
@@ -3728,6 +3729,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       let msg=`✓ ${type} report auto-split into ${uniqMonths.length} monthly snapshot${uniqMonths.length!==1?'s':''}: ${monthNames.join(', ')}. ${totalPractitioners} practitioners, ${totalMatched} matched.${totalIA>0?` ${totalIA} initial assessments detected.`:''}`;
       if(!sbOk)msg+=` (Saved locally — Supabase unavailable)`;
       else msg+=` Saved to Supabase ✓`;
+      if(type==='sales'){
+        if(window.__dailyRevErr)msg+=` ⚠ Daily revenue did NOT sync (${window.__dailyRevErr}) — weekly & custom-range revenue won't update until this is resolved.`;
+        else if(window.__dailyRevCount)msg+=` Daily revenue synced (${window.__dailyRevCount} day-rows) — weekly & custom-range revenue will now populate${window.__revLocUnsynced?'. Note: per-location split not stored — add the "revByLoc" column to daily_revenue to enable it':''}.`;
+      }
       setImportMsg({type:'success',msg});
     }catch(e){setImportMsg({type:'error',msg:'Error: '+e.message});}
     setImporting(false);
