@@ -2117,8 +2117,10 @@ function CallHistoryPage(){
     st.seedV=SEED_V;return st;
   };
   const sbTimer=React.useRef(null);
+  const[sync,setSync]=useState({s:'idle',at:null});
+  const _push=(next)=>{const SB=window.__SB;if(!SB){setSync({s:'local',at:Date.now()});return;}try{const r=SB.from('call_log').upsert({id:'singleton',data:next});if(r&&r.then)r.then(({error})=>setSync({s:error?'error':'synced',at:Date.now()})).catch(()=>setSync({s:'error',at:Date.now()}));else setSync({s:'synced',at:Date.now()});}catch(e){setSync({s:'error',at:Date.now()});}};
   const[data,setData]=useState(()=>{let raw={};try{raw=JSON.parse(localStorage.getItem('rvgd3_call_log')||'{}');}catch(e){}return seedMerge(migrate(raw));});
-  const persist=(next,sbNow)=>{setData(next);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(next));}catch(e){}const SB=window.__SB;if(!SB)return;if(sbNow){SB.from('call_log').upsert({id:'singleton',data:next});return;}if(sbTimer.current)clearTimeout(sbTimer.current);sbTimer.current=setTimeout(()=>SB.from('call_log').upsert({id:'singleton',data:next}),1200);};
+  const persist=(next,sbNow)=>{setData(next);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(next));}catch(e){}if(!window.__SB){setSync({s:'local',at:Date.now()});return;}setSync(p=>({s:'saving',at:p.at}));if(sbNow){_push(next);return;}if(sbTimer.current)clearTimeout(sbTimer.current);sbTimer.current=setTimeout(()=>_push(next),1200);};
   useEffect(()=>{try{localStorage.setItem('rvgd3_call_log',JSON.stringify(data));}catch(e){}},[]);// eslint-disable-line
   useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data:row}=await SB.from('call_log').select('data').eq('id','singleton').maybeSingle();if(!c&&row&&row.data&&typeof row.data==='object'){const merged=seedMerge(migrate(row.data));setData(merged);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(merged));}catch(e){}SB.from('call_log').upsert({id:'singleton',data:merged});}}catch(e){}};ld();return()=>{c=true;};},[]);// eslint-disable-line
 
@@ -2179,8 +2181,9 @@ function CallHistoryPage(){
       <h2 style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,letterSpacing:'1px',textTransform:'uppercase',color:'#eee',margin:0}}>Call History</h2>
       <span style={{fontSize:13,color:'#777'}}>Guest Experience · call volume by location + lead sources</span>
     </div>
-    <div style={{display:'flex',gap:4,marginBottom:16}}>
+    <div style={{display:'flex',gap:4,marginBottom:16,alignItems:'center'}}>
       {[['calls','📞 Call Volume'],['leads','🎯 Lead Sources']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${view===v?'btn-go':'btn-ghost'}`} onClick={()=>setView(v)}>{l}</button>))}
+      {(()=>{const t=sync.at?new Date(sync.at).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}):null;const map={idle:['#666','●','All changes save automatically'],saving:['#F4DB71','◌','Saving…'],synced:['#44CCAA','●','Synced to cloud'+(t?' · '+t:'')],local:['#E0A052','⚠','Saved on this device — cloud unavailable'],error:['#E05252','⚠','Saved locally — cloud sync failed']};const[c,icon,txt]=map[sync.s]||map.idle;return(<span style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,fontSize:12.5,color:c}}><span>{icon}</span>{txt}</span>);})()}
     </div>
 
     {view==='calls'&&(<>
