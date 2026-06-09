@@ -4076,15 +4076,17 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const pm={};prev.perStaff.forEach(p=>pm[p.id]=p);
     const out=[];
     cur.perStaff.forEach(c=>{
-      const p=pm[c.id]||{visits:0,revenue:0};
-      const dv=c.visits-p.visits,dr=c.revenue-p.revenue;
+      const p=pm[c.id]||{visits:0,revenue:0,ias:0};
+      const dv=c.visits-p.visits,dr=c.revenue-p.revenue,di=c.ias-p.ias;
       const vpct=p.visits>0?dv/p.visits*100:(c.visits>0?100:0);
       const rpct=p.revenue>0?dr/p.revenue*100:(c.revenue>0?100:0);
+      const ipct=p.ias>0?di/p.ias*100:(c.ias>0?100:0);
       const sigV=Math.abs(dv)>=3&&Math.abs(vpct)>=25;
       const sigR=Math.abs(dr)>=300&&Math.abs(rpct)>=20;
-      if(sigV||sigR)out.push({name:c.name,disc:c.disc,dv,dr,vpct,rpct,sigV,sigR,score:Math.abs(dr)+Math.abs(dv)*60});
+      const sigI=Math.abs(di)>=2&&Math.abs(ipct)>=30;
+      if(sigV||sigR||sigI)out.push({name:c.name,disc:c.disc,dv,dr,di,vpct,rpct,ipct,sigV,sigR,sigI,score:Math.abs(dr)+Math.abs(dv)*60+Math.abs(di)*120});
     });
-    return out.sort((a,b)=>b.score-a.score).slice(0,8);
+    return out.sort((a,b)=>b.score-a.score).slice(0,10);
   };
 
   const buildReport=()=>{const cur=reportAgg(reportPeriod.from,reportPeriod.to);const prev=reportAgg(reportPeriod.prevFrom,reportPeriod.prevTo);return{cur,prev,movers:computeMovers(cur,prev)};};
@@ -4164,6 +4166,25 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const saved=viewingSaved?savedReports.find(r=>r.id===viewingSaved):null;
     const built=saved?{cur:saved.cur,prev:saved.prev,movers:saved.movers}:buildReport();
     const cur=built.cur,prev=built.prev,movers=built.movers;
+    const selfRows=(()=>{
+      const pm={};prev.perStaff.forEach(p=>pm[p.id]=p);const cm={};cur.perStaff.forEach(c=>cm[c.id]=c);
+      const ids=Array.from(new Set([...cur.perStaff.map(s=>s.id),...prev.perStaff.map(s=>s.id)]));
+      const rows=ids.map(id=>{
+        const c=cm[id]||{visits:0,revenue:0,ias:0};const p=pm[id]||{visits:0,revenue:0,ias:0};
+        const ref=cm[id]||pm[id]||{};const name=ref.name||'—';const disc=ref.disc;
+        const dr=c.revenue-p.revenue,di=c.ias-p.ias,dv=c.visits-p.visits;
+        const rpct=p.revenue>0?dr/p.revenue*100:(c.revenue>0?100:null);
+        const ipct=p.ias>0?di/p.ias*100:(c.ias>0?100:null);
+        const stopped=p.visits>=5&&c.visits===0;
+        const revDrop=p.revenue>=400&&dr<=-0.2*p.revenue;
+        const iaDrop=p.ias>=2&&di<=-1;
+        const attn=stopped||revDrop||iaDrop;
+        const sev=stopped||(p.revenue>=400&&dr<=-0.4*p.revenue)||(p.ias>=3&&di<=-Math.ceil(p.ias*0.5))?'high':(attn?'med':null);
+        return{id,name,disc,cRev:c.revenue,pRev:p.revenue,dr,rpct,cIa:c.ias,pIa:p.ias,di,ipct,cVis:c.visits,pVis:p.visits,dv,attn,sev,
+          score:(attn?100000:0)+(sev==='high'?50000:0)+Math.abs(dr)+Math.abs(di)*250+Math.abs(dv)*40};
+      });
+      return rows.sort((a,b)=>b.score-a.score);
+    })();
     const pLabel=saved?saved.label:reportPeriod.label;
     const pPrev=saved?saved.prevLabel:reportPeriod.prevLabel;
     const genAt=saved?saved.generatedAt:new Date().toISOString();
@@ -4171,6 +4192,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const ptype=(saved?saved.type:reportType);
     const isMonth=ptype==='month';
     const pWord=ptype==='quarter'?'quarter':ptype==='month'?'month':'week';
+    const lastP='last '+pWord;
     const pTitleWord=ptype==='quarter'?'Quarterly':ptype==='month'?'Monthly':'Weekly';
     const delta=(c,p)=>{if(!p)return{pct:c>0?'100.0':'0.0',up:c>=0};const v=(c-p)/p*100;return{pct:Math.abs(v).toFixed(1),up:v>=0};};
     const KPIS=[
@@ -4333,11 +4355,45 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 <div><span style={{color:'#eee',fontWeight:600,fontSize:14}}>{m.name}</span> <span style={{color:'#666',fontSize:12,marginLeft:4}}>{(DISC.find(x=>x.id===m.disc)||{}).abbr||''}</span></div>
                 <div style={{display:'flex',gap:16,fontSize:13,flexWrap:'wrap'}}>
                   {m.sigV&&<span style={{color:m.dv>=0?'#44CCAA':'#E05252',fontWeight:600}}>{m.dv>=0?'▲':'▼'} {Math.abs(m.dv)} visits ({Math.abs(Math.round(m.vpct))}%)</span>}
+                  {m.sigI&&<span style={{color:m.di>=0?'#44CCAA':'#E05252',fontWeight:600}}>{m.di>=0?'▲':'▼'} {Math.abs(m.di)} initials ({Math.abs(Math.round(m.ipct))}%)</span>}
                   {m.sigR&&<span style={{color:m.dr>=0?'#44CCAA':'#E05252',fontWeight:600}}>{m.dr>=0?'▲':'▼'} {fmtMoney(Math.abs(m.dr))} ({Math.abs(Math.round(m.rpct))}%)</span>}
                 </div>
               </div>
             ))}
           </div>
+
+          {/* Each clinician vs their OWN prior period — self-relative, accounts for different schedules */}
+          {selfRows.length>0&&(()=>{
+            const dAbbr=(id)=>(DISC.find(x=>x.id===id)||{}).abbr||'';
+            const delta=(v,money,suffix)=>{if(v===0)return<span style={{color:'#666'}}>—</span>;const up=v>0;return<span style={{color:up?'#44CCAA':'#E05252',fontWeight:600}}>{up?'▲':'▼'}{money?fmtMoney(Math.abs(v)):Math.abs(v)}{suffix||''}</span>;};
+            const pctTxt=(p)=>p==null?'':` (${p>=0?'+':''}${Math.round(p)}%)`;
+            const attnRows=selfRows.filter(r=>r.attn);
+            return(
+            <div style={{marginBottom:notes?24:4,marginTop:24}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:3}}>EACH CLINICIAN vs THEIR OWN PRIOR {pWord.toUpperCase()}</div>
+              <div style={{fontSize:12,color:'#777',marginBottom:10}}>Self-relative — each person measured against their own {lastP}, not the clinic average. {attnRows.length>0?<span style={{color:'#E0A052'}}>⚠ {attnRows.length} need{attnRows.length===1?'s':''} a look (own revenue or initials slipping).</span>:<span style={{color:'#44CCAA'}}>No one is slipping against their own prior {pWord}.</span>}</div>
+              <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,minWidth:560}}>
+                <thead><tr style={{textAlign:'right',color:'#888',fontSize:11,textTransform:'uppercase',letterSpacing:'.5px'}}>
+                  <th style={{textAlign:'left',padding:'6px 8px'}}>Clinician</th>
+                  <th style={{padding:'6px 8px'}}>Revenue ({lastP} → now)</th>
+                  <th style={{padding:'6px 8px'}}>Initials</th>
+                  <th style={{padding:'6px 8px'}}>Visits</th>
+                </tr></thead>
+                <tbody>
+                {selfRows.map(r=>(
+                  <tr key={r.id} style={{borderTop:'1px solid #1c1c1c',background:r.sev==='high'?'rgba(224,82,82,.07)':(r.attn?'rgba(224,160,82,.06)':'transparent')}}>
+                    <td style={{textAlign:'left',padding:'8px',color:'#eee'}}>{r.attn&&<span title="Needs a look" style={{marginRight:5}}>{r.sev==='high'?'🔴':'🟠'}</span>}{r.name} <span style={{color:'#666',fontSize:11,marginLeft:3}}>{dAbbr(r.disc)}</span></td>
+                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'#bbb'}}>{fmtMoney(r.pRev)} → {fmtMoney(r.cRev)}</span><br/><span style={{fontSize:12}}>{delta(r.dr,true)}{r.dr!==0&&<span style={{color:'#666'}}>{pctTxt(r.rpct)}</span>}</span></td>
+                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'#bbb'}}>{r.pIa} → {r.cIa}</span><br/><span style={{fontSize:12}}>{delta(r.di)}{r.di!==0&&<span style={{color:'#666'}}>{pctTxt(r.ipct)}</span>}</span></td>
+                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'#bbb'}}>{r.pVis} → {r.cVis}</span><br/><span style={{fontSize:12}}>{delta(r.dv)}</span></td>
+                  </tr>
+                ))}
+                </tbody>
+              </table>
+              </div>
+            </div>);
+          })()}
 
           {notes&&(
             <div style={{marginTop:18,borderTop:'1px solid var(--border)',paddingTop:14}}>
