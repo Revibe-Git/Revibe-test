@@ -2108,8 +2108,13 @@ function CallHistoryPage(){
   const DEFAULT_SOURCES=[{id:'form',name:'Form Fills',kind:'form'},{id:'meta',name:'Meta Leads',kind:'meta'},{id:'caremap',name:'Care Map Leads',kind:'caremap'}];
   const LEAD_STATUS=['New','Contacted','Responded','Booked','Not a fit'];
   const STATUS_C={New:'#888',Contacted:'#7FC8E8',Responded:'#F4DB71',Booked:'#44CCAA','Not a fit':'#E05252'};
+  const FU_METHODS=[['call','☎ Call'],['text','💬 Text'],['email','✉ Email']];
+  const methIcon=(m)=>m==='text'?'💬':m==='email'?'✉':'☎';
   const LOC_C={Mississauga:'#CAE8C1',Markham:'#7FC8E8'};
   const today=new Date().toISOString().slice(0,10);
+  const dueDelta=(d)=>Math.round((new Date(d+'T12:00')-new Date(today+'T12:00'))/86400000);
+  const dueColor=(d)=>{const n=dueDelta(d);return n<0?'#E05252':n===0?'#F4DB71':'#7FC8E8';};
+  const dueLabel=(d)=>{const n=dueDelta(d);return n<0?'overdue '+(-n)+'d':n===0?'due today':n===1?'tomorrow':'in '+n+'d';};
 
   const SEED_V=2;
   const migrate=(raw)=>{
@@ -2180,7 +2185,19 @@ function CallHistoryPage(){
   const addSource=()=>{const name=prompt('New lead source / event name (e.g. "Jackalope 2026", "Sutherland Chan", "COMP Sessions")');if(!name||!name.trim())return;const id='src_'+Date.now().toString(36);persist({...data,sources:[...sources,{id,name:name.trim(),kind:'event'}]},true);setSelSource(id);};
   const renameSource=(sid)=>{const s=sources.find(x=>x.id===sid);const name=prompt('Rename source',s?s.name:'');if(!name||!name.trim())return;persist({...data,sources:sources.map(x=>x.id===sid?{...x,name:name.trim()}:x)},true);};
   const delSource=(sid)=>{if(!confirm('Delete this source and all its leads? This cannot be undone.'))return;const nl={...data.leads};delete nl[sid];const ns=sources.filter(x=>x.id!==sid);persist({...data,sources:ns,leads:nl},true);if(selSource===sid)setSelSource(ns[0]?ns[0].id:null);};
-  const addLead=(sid)=>{const lead={id:'ld_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:today,first:'',last:'',email:'',phone:'',location:'',interest:'',status:'New',practice:'',notes:''};persist({...data,leads:{...data.leads,[sid]:[lead,...leadsOf(sid)]}},true);};
+  const addLead=(sid)=>{const lead={id:'ld_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:today,first:'',last:'',email:'',phone:'',location:'',interest:'',status:'New',practice:'',notes:'',nextDate:'',nextTime:'',nextMethod:'call',followups:[]};persist({...data,leads:{...data.leads,[sid]:[lead,...leadsOf(sid)]}},true);};
+  const patchLead=(sid,lid,patch,now)=>{persist({...data,leads:{...data.leads,[sid]:leadsOf(sid).map(l=>l.id===lid?{...l,...patch}:l)}},now);};
+  const addAttempt=(sid,lid,method,outcome)=>{const l=leadsOf(sid).find(x=>x.id===lid)||{};const fu=[{at:today,method:method||'call',outcome:outcome||'',note:''},...(l.followups||[])];const patch={followups:fu};
+    if(outcome==='Booked'){patch.status='Booked';patch.nextDate='';patch.nextTime='';}
+    else if(outcome==='Not interested'){patch.status='Not a fit';patch.nextDate='';patch.nextTime='';}
+    else if(outcome==='Reached — no decision'){if(l.status==='New'||l.status==='Contacted')patch.status='Responded';}
+    else if(outcome==='No answer'||outcome==='Left voicemail'){if(l.status==='New')patch.status='Contacted';const d=new Date(today+'T12:00');d.setDate(d.getDate()+(outcome==='No answer'?1:2));patch.nextDate=d.toISOString().slice(0,10);patch.nextMethod=method||l.nextMethod||'call';}
+    else if(outcome==='Callback requested'){if(l.status==='New')patch.status='Contacted';}
+    patchLead(sid,lid,patch,true);};
+  const updAttempt=(sid,lid,idx,k,v)=>{const l=leadsOf(sid).find(x=>x.id===lid);if(!l)return;patchLead(sid,lid,{followups:(l.followups||[]).map((e,i)=>i===idx?{...e,[k]:v}:e)});};
+  const delAttempt=(sid,lid,idx)=>{const l=leadsOf(sid).find(x=>x.id===lid);if(!l)return;patchLead(sid,lid,{followups:(l.followups||[]).filter((e,i)=>i!==idx)},true);};
+  const allFollowups=()=>{const out=[];sources.forEach(s=>{(data.leads[s.id]||[]).forEach(l=>{if(l.nextDate&&l.status!=='Booked'&&l.status!=='Not a fit')out.push({...l,_sid:s.id,_sname:s.name});});});return out.sort((a,b)=>(a.nextDate+(a.nextTime||'')).localeCompare(b.nextDate+(b.nextTime||'')));};
+  const dueN=allFollowups().filter(l=>l.nextDate<=today).length;
   const updLead=(sid,lid,k,v)=>{persist({...data,leads:{...data.leads,[sid]:leadsOf(sid).map(l=>l.id===lid?{...l,[k]:v}:l)}});};
   const delLead=(sid,lid)=>{persist({...data,leads:{...data.leads,[sid]:leadsOf(sid).filter(l=>l.id!==lid)}},true);};
 
@@ -2197,7 +2214,7 @@ function CallHistoryPage(){
       <span style={{fontSize:13,color:'#777'}}>Guest Experience · call volume by location + lead sources</span>
     </div>
     <div style={{display:'flex',gap:4,marginBottom:16,alignItems:'center'}}>
-      {[['calls','📞 Call Volume'],['leads','🎯 Lead Sources']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${view===v?'btn-go':'btn-ghost'}`} onClick={()=>setView(v)}>{l}</button>))}
+      {[['calls','📞 Call Volume'],['leads','🎯 Lead Sources'],['agenda','🗓 Follow-ups'+(dueN>0?' ('+dueN+')':'')]].map(([v,l])=>(<button key={v} className={`btn btn-sm ${view===v?'btn-go':'btn-ghost'}`} onClick={()=>setView(v)}>{l}</button>))}
       {(()=>{const t=sync.at?new Date(sync.at).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}):null;const map={idle:['#666','●','All changes save automatically'],saving:['#F4DB71','◌','Saving…'],synced:['#44CCAA','●','Synced to cloud'+(t?' · '+t:'')],local:['#E0A052','⚠','Saved on this device — cloud unavailable'],error:['#E05252','⚠','Saved locally — cloud sync failed']};const[c,icon,txt]=map[sync.s]||map.idle;return(<span style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,fontSize:12.5,color:c}}><span>{icon}</span>{txt}</span>);})()}
     </div>
 
@@ -2338,10 +2355,63 @@ function CallHistoryPage(){
               <div style={{flex:1}}><div style={{fontSize:10,color:'#777',marginBottom:2}}>Notes</div><input value={l.notes||''} onChange={e=>updLead(s.id,l.id,'notes',e.target.value)} placeholder="follow-up notes…" style={inp}/></div>
               <button className="btn btn-ghost btn-xs" onClick={()=>delLead(s.id,l.id)} style={{color:'#E05252'}}>Delete</button>
             </div>
+            <div style={{marginTop:9,paddingTop:9,borderTop:'1px dashed var(--border2)'}}>
+              <div style={{display:'flex',gap:8,alignItems:'flex-end',flexWrap:'wrap',marginBottom:8}}>
+                <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Next follow-up</div><input type="date" value={l.nextDate||''} onChange={e=>updLead(s.id,l.id,'nextDate',e.target.value)} style={{...inp,width:150}}/></div>
+                <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Time</div><input type="time" value={l.nextTime||''} onChange={e=>updLead(s.id,l.id,'nextTime',e.target.value)} style={{...inp,width:120}}/></div>
+                <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Via</div><select value={l.nextMethod||'call'} onChange={e=>updLead(s.id,l.id,'nextMethod',e.target.value)} style={{...inp,width:100}}>{FU_METHODS.map(([v,lb])=><option key={v} value={v}>{lb}</option>)}</select></div>
+                {l.nextDate&&<span style={{fontSize:11.5,fontWeight:700,color:dueColor(l.nextDate),alignSelf:'center',paddingBottom:7}}>{dueLabel(l.nextDate)}</span>}
+              </div>
+              <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
+                <span style={{fontSize:10,color:'#777',marginRight:2}}>LOG OUTCOME</span>
+                <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'No answer')}>No answer → +1d</button>
+                <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Left voicemail')}>Left msg → +2d</button>
+                <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Callback requested')}>Callback set ↑</button>
+                <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Reached — no decision')}>Reached</button>
+                <button className="btn btn-ghost btn-xs" style={{color:'#44CCAA'}} onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Booked')}>Booked ✓</button>
+                <button className="btn btn-ghost btn-xs" style={{color:'#E05252'}} onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Not interested')}>Not interested</button>
+              </div>
+              {(l.followups||[]).length>0&&<div style={{display:'flex',flexDirection:'column',gap:3,marginTop:8}}>
+                {(l.followups||[]).map((e,i)=>(<div key={i} style={{display:'flex',gap:8,alignItems:'center',fontSize:12,color:'#aaa',background:'var(--surface3)',borderRadius:5,padding:'4px 8px'}}>
+                  <span style={{color:'#888',minWidth:74}}>{e.at}</span><span title={e.method}>{methIcon(e.method)}</span><span style={{color:'#ccc',minWidth:130}}>{e.outcome||'—'}</span>
+                  <input value={e.note||''} onChange={ev=>updAttempt(s.id,l.id,i,'note',ev.target.value)} placeholder="note…" style={{...inp,flex:1,padding:'3px 7px',fontSize:12}}/>
+                  <button className="btn btn-ghost btn-xs" style={{color:'#777'}} onClick={()=>delAttempt(s.id,l.id,i)}>✕</button>
+                </div>))}
+              </div>}
+            </div>
           </div>))}
         </div>}
       </div>);})()}
     </>)}
+    {view==='agenda'&&(()=>{
+      const all=allFollowups();
+      const groups=[
+        {k:'overdue',label:'Overdue',color:'#E05252',items:all.filter(l=>l.nextDate<today)},
+        {k:'today',label:'Due today',color:'#F4DB71',items:all.filter(l=>l.nextDate===today)},
+        {k:'week',label:'Next 7 days',color:'#7FC8E8',items:all.filter(l=>l.nextDate>today&&dueDelta(l.nextDate)<=7)},
+        {k:'later',label:'Later',color:'#888',items:all.filter(l=>dueDelta(l.nextDate)>7)},
+      ];
+      return(<>
+        <div style={{fontSize:13,color:'#888',marginBottom:16,lineHeight:1.55}}>Every lead with a scheduled follow-up — across call leads, event leads and all other sources. Your call-back &amp; reminder queue, overdue and due-today first. Logging an outcome on a lead updates this automatically.</div>
+        {all.length===0?<div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:9,padding:'28px 20px',textAlign:'center',color:'#777'}}>No follow-ups scheduled. Set a <b style={{color:'#aaa'}}>Next follow-up</b> date on any lead in <b style={{color:'#aaa'}}>Lead Sources</b> (or log a "No answer" outcome) and it shows up here.</div>:
+        groups.filter(g=>g.items.length).map(g=>(<div key={g.k} style={{marginBottom:18}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,letterSpacing:'1px',color:g.color,marginBottom:8}}>{g.label} <span style={{color:'#666',fontSize:13}}>· {g.items.length}</span></div>
+          <div style={{display:'flex',flexDirection:'column',gap:6}}>
+            {g.items.map(l=>{const nm=((l.first||'')+' '+(l.last||'')).trim()||'(no name)';return(<div key={l._sid+l.id} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',background:'var(--surface2)',border:'1px solid var(--border)',borderLeft:'3px solid '+g.color,borderRadius:8,padding:'9px 12px'}}>
+              <span style={{minWidth:120,fontSize:12.5,color:g.color,fontWeight:700}}>{l.nextDate}{l.nextTime?' · '+l.nextTime:''}</span>
+              <span style={{fontSize:15,fontWeight:700,color:'#eee',minWidth:140}}>{nm}</span>
+              <span style={{fontSize:12.5,color:'#bbb'}}>{methIcon(l.nextMethod)} {l.nextMethod||'call'}</span>
+              <span style={{fontSize:12,color:'#999'}}>{l._sname}{l.interest?' · '+l.interest:''}{l.phone?' · '+l.phone:''}{l.location?' · '+l.location:''}</span>
+              <span style={{flex:1}}/>
+              <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(l._sid,l.id,l.nextMethod,'No answer')}>No answer +1d</button>
+              <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(l._sid,l.id,l.nextMethod,'Reached — no decision')}>Reached</button>
+              <button className="btn btn-ghost btn-xs" style={{color:'#44CCAA'}} onClick={()=>addAttempt(l._sid,l.id,l.nextMethod,'Booked')}>Booked</button>
+              <button className="btn btn-ghost btn-xs" onClick={()=>{setSelSource(l._sid);setView('leads');}}>Open →</button>
+            </div>);})}
+          </div>
+        </div>))}
+      </>);
+    })()}
   </div>);
 }
 
