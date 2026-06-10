@@ -3043,6 +3043,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[reportNotes,setReportNotes]=useState('');
   const[viewingSaved,setViewingSaved]=useState(null);
   const[repDisc,setRepDisc]=useState('all');
+  const[repLoc,setRepLoc]=useState('all');
   const[savedReports,setSavedReports]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_reports'))||[];}catch(e){return[];}});
   const[sessionLog,setSessionLog]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_sessions_log')||'{}');}catch(e){return{};}});
   useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data}=await SB.from('session_log').select('data').eq('id','singleton').maybeSingle();if(!c&&data&&data.data&&typeof data.data==='object')setSessionLog(data.data);}catch(e){}};ld();return()=>{c=true;};},[]);// eslint-disable-line
@@ -4196,7 +4197,16 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   if(page==='reports'){
     const saved=viewingSaved?savedReports.find(r=>r.id===viewingSaved):null;
     const built=saved?{cur:saved.cur,prev:saved.prev,movers:saved.movers}:buildReport();
-    const cur=built.cur,prev=built.prev,movers=built.movers;
+    const scopeLoc=(agg,loc)=>{
+      if(!agg||loc==='all')return agg;
+      const ps=agg.perStaff.map(x=>{const home=(siteList(x)[0]||x.site);const hasRBL=x.revByLoc&&Object.keys(x.revByLoc).length;const locRev=hasRBL?(x.revByLoc[loc]||0):(home===loc?x.revenue:0);const atHome=home===loc;return {...x,revenue:Math.round(locRev*100)/100,visits:atHome?x.visits:0,ias:atHome?x.ias:0,noShows:atHome?x.noShows:0,cancels:atHome?x.cancels:0,_in:atHome||locRev>0};}).filter(x=>x._in);
+      const totals=ps.reduce((a,b)=>({revenue:a.revenue+b.revenue,visits:a.visits+b.visits,ias:a.ias+b.ias,noShows:a.noShows+b.noShows,cancels:a.cancels+b.cancels}),{revenue:0,visits:0,ias:0,noShows:0,cancels:0});
+      totals.revenue=Math.round(totals.revenue*100)/100;
+      const byDisc={};DISC_CLIN.forEach(d=>{const rows=ps.filter(x=>x.disc===d.id);if(rows.length)byDisc[d.id]={label:d.label,abbr:d.abbr,revenue:rows.reduce((a,b)=>a+b.revenue,0),visits:rows.reduce((a,b)=>a+b.visits,0),ias:rows.reduce((a,b)=>a+b.ias,0)};});
+      const byLoc={[loc]:{revenue:totals.revenue,visits:totals.visits,ias:totals.ias}};
+      return {...agg,perStaff:ps,totals,byDisc,byLoc,otherRev:0,scopedLoc:loc};
+    };
+    const cur=scopeLoc(built.cur,repLoc),prev=scopeLoc(built.prev,repLoc),movers=computeMovers(cur,prev);
     const selfRows=(()=>{
       const pm={};prev.perStaff.forEach(p=>pm[p.id]=p);const cm={};cur.perStaff.forEach(c=>cm[c.id]=c);
       const ids=Array.from(new Set([...cur.perStaff.map(s=>s.id),...prev.perStaff.map(s=>s.id)]));
@@ -4277,6 +4287,14 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             {saved&&<button className="btn btn-ghost btn-sm" onClick={()=>setViewingSaved(null)} style={{marginLeft:8}}>↩ Back to live</button>}
           </div>
 
+          {(()=>{const locs=Array.from(new Set((staff||[]).flatMap(s=>siteList(s)).filter(x=>x&&x!=='—')));if(locs.length<2)return null;return(
+          <div className="flex aic g5 no-print" style={{marginBottom:16,flexWrap:'wrap'}}>
+            <span style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginRight:2}}>Location</span>
+            <button className={`btn btn-sm ${repLoc==='all'?'btn-go':'btn-ghost'}`} onClick={()=>setRepLoc('all')}>All Revibe</button>
+            {locs.map(l=><button key={l} className={`btn btn-sm ${repLoc===l?'btn-go':'btn-ghost'}`} onClick={()=>setRepLoc(l)}>{l}</button>)}
+            {repLoc!=='all'&&<span style={{fontSize:12,color:'#666',marginLeft:6}}>visits/assessments follow each practitioner's home site; revenue follows transaction location · unmatched/retail shown only in All Revibe</span>}
+          </div>);})()}
+
           {!saved&&(
             <textarea value={reportNotes} onChange={e=>setReportNotes(e.target.value)} placeholder="Meeting notes / context for this report (optional) — saved with the report"
               style={{width:'100%',minHeight:60,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,color:'#ddd',padding:'10px 12px',fontSize:13,marginBottom:16,fontFamily:'inherit',resize:'vertical'}}/>
@@ -4288,7 +4306,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           {/* Header */}
           <div style={{borderBottom:'2px solid var(--go)',paddingBottom:16,marginBottom:20}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'3px',textTransform:'uppercase',color:'#888'}}>Revibe Health — Growth &amp; Development</div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#fff',letterSpacing:'.5px',marginTop:2}}>{pTitleWord} Performance Report</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#fff',letterSpacing:'.5px',marginTop:2}}>{pTitleWord} Performance Report <span style={{color:repLoc==='all'?'#7FC8E8':'#E0A052',fontSize:22}}>· {repLoc==='all'?'All Revibe':repLoc}</span></div>
             <div style={{fontSize:15,color:'#CAE8C1',fontWeight:600,marginTop:4}}>{pLabel}</div>
             <div style={{fontSize:12,color:'#666',marginTop:4}}>Compared to {pPrev} · Generated {new Date(genAt).toLocaleString('en-CA',{dateStyle:'medium',timeStyle:'short'})}{saved?' · SAVED':''}</div>
           </div>
