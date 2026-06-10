@@ -2158,10 +2158,14 @@ function CallHistoryPage(){
   const _tsRaw=locDays.map(d=>{const day=data.calls[loc][d]||{};return{d,calls:Object.values(day).reduce((s,v)=>s+cOf(v),0),booked:Object.values(day).reduce((s,v)=>s+bOf(v),0)};});
   let ts;
   if(gran==='week'){const wk={};_tsRaw.forEach(t=>{const w=_wkStart(t.d);if(!wk[w])wk[w]={calls:0,booked:0};wk[w].calls+=t.calls;wk[w].booked+=t.booked;});ts=Object.keys(wk).sort().slice(-26).map(w=>({d:w,calls:wk[w].calls,booked:wk[w].booked}));}
-  else{ts=_tsRaw.slice(-45);}
-  const tsMax=Math.max(1,...ts.map(t=>t.calls));
-  const CW=Math.max(560,ts.length*32),CH=200,padB=30,padL=4,padT=14;
-  const bw=ts.length?Math.min(26,(CW-padL)/ts.length-7):20;
+  else{ts=_tsRaw.slice(-30);}
+  const _calls=ts.map(t=>t.calls).filter(v=>v>0).sort((a,b)=>a-b);
+  const _p90=_calls.length?_calls[Math.min(_calls.length-1,Math.floor(_calls.length*0.9))]:0;
+  const _realMax=Math.max(1,...ts.map(t=>t.calls));
+  const tsMax=Math.min(_realMax,Math.max(6,Math.ceil(_p90*1.25)));
+  const _clipped=_realMax>tsMax;
+  const CW=Math.max(560,ts.length*34),CH=230,padB=28,padL=6,padT=18;
+  const bw=ts.length?Math.min(30,(CW-padL)/ts.length-8):20;
 
   const sources=(data.sources&&data.sources.length)?data.sources:DEFAULT_SOURCES;
   const[selSource,setSelSource]=useState(sources[0]?sources[0].id:'form');
@@ -2222,7 +2226,7 @@ function CallHistoryPage(){
         {[['30','30d'],['90','90d'],['month','This Month'],['all','All Time']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${tf===v?'btn-go':'btn-ghost'}`} onClick={()=>setTf(v)}>{l}</button>))}
         <div style={{width:1,height:20,background:'var(--border2)',margin:'0 4px'}}/>
         <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginRight:2}}>By</span>
-        {[['day','Day'],['week','Week']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${gran===v?'btn-go':'btn-ghost'}`} onClick={()=>setGran(v)}>{l}</button>))}
+        {[['day','Daily'],['week','Weekly']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${gran===v?'btn-go':'btn-ghost'}`} onClick={()=>setGran(v)}>{l}</button>))}
       </div>
 
       <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
@@ -2264,15 +2268,16 @@ function CallHistoryPage(){
           {ts.length===0?<div style={{color:'#666',padding:'18px 0',textAlign:'center'}}>No entries in this window.</div>:
           <svg viewBox={`0 0 ${CW} ${CH}`} style={{width:'100%',minWidth:Math.min(CW,560),height:CH}}>
             {[0,.5,1].map(g=>{const y=padT+(1-g)*(CH-padB-padT);return(<g key={g}><line x1={padL} y1={y} x2={CW} y2={y} stroke="var(--border)" strokeDasharray="2 4"/><text x={padL} y={y-3} fontSize="9" fill="#666">{Math.round(tsMax*g)}</text></g>);})}
-            {ts.map((t,i)=>{const x=padL+i*((CW-padL)/ts.length)+((CW-padL)/ts.length-bw)/2;const hc=(t.calls/tsMax)*(CH-padB-padT);const hb=(t.booked/tsMax)*(CH-padB-padT);const rate=t.calls?Math.round(t.booked/t.calls*100):0;return(<g key={t.d}>
+            {ts.map((t,i)=>{const x=padL+i*((CW-padL)/ts.length)+((CW-padL)/ts.length-bw)/2;const usableH=CH-padB-padT;const hc=(Math.min(t.calls,tsMax)/tsMax)*usableH;const hb=(Math.min(t.booked,tsMax)/tsMax)*usableH;const over=t.calls>tsMax;const rate=t.calls?Math.round(t.booked/t.calls*100):0;return(<g key={t.d}>
               <title>{t.d}: {t.calls} call{t.calls===1?'':'s'} · {t.booked} booked{t.calls?` · ${rate}%`:''}</title>
-              <rect x={x} y={CH-padB-hc} width={bw} height={hc} rx={2} fill={LOC_C[loc]} opacity={0.32}/>
+              <rect x={x} y={CH-padB-hc} width={bw} height={hc} rx={2} fill={LOC_C[loc]} opacity={0.42}/>
               {t.booked>0&&<rect x={x} y={CH-padB-hb} width={bw} height={hb} rx={2} fill="#44CCAA"/>}
-              {t.calls>0&&bw>=18&&<text x={x+bw/2} y={CH-padB-hc-3} fontSize="9" fill="#aaa" textAnchor="middle">{t.calls}</text>}
+              {over&&<rect x={x} y={CH-padB-hc-3} width={bw} height={2.5} rx={1} fill="#F4DB71"/>}
+              {t.calls>0&&bw>=16&&<text x={x+bw/2} y={CH-padB-hc-(over?7:3)} fontSize="9.5" fill={over?'#F4DB71':'#bbb'} textAnchor="middle" fontWeight={over?700:400}>{t.calls}</text>}
               {i%Math.ceil(ts.length/12||1)===0&&<text x={x+bw/2} y={CH-padB+13} fontSize="9" fill="#777" textAnchor="middle">{t.d.slice(5)}</text>}
             </g>);})}
           </svg>}
-          <div style={{fontSize:12,color:'#666',marginTop:6}}>Each bar is total calls; the solid green portion is how many converted to a booking. Hover any bar for the exact split.</div>
+          <div style={{fontSize:12,color:'#666',marginTop:6}}>Each bar is total calls; the solid green portion is how many converted. Hover any bar for the exact split.{_clipped&&<span style={{color:'#F4DB71'}}> Busy days above {tsMax} are capped (gold tick) so the typical range stays readable — the number on top is the true count.</span>}</div>
         </div>
       </div>
 
@@ -2387,6 +2392,23 @@ function SessionsLog({defaultMonth,readOnly}){
         </table>
       </div>}
     </div>
+  </div>);
+}
+
+function SessSummary({log,fromM,toM,note}){
+  const money=(n)=>'$'+Math.round(n||0).toLocaleString();
+  let memS=0,memD=0,trS=0,trD=0,mos=0;
+  Object.keys(log||{}).forEach(mo=>{if((!fromM||mo>=fromM)&&(!toM||mo<=toM)){const e=log[mo]||{};const m=e.membership||{},t=e.training||{};memS+=+m.sessions||0;memD+=+m.dollars||0;trS+=+t.sessions||0;trD+=+t.dollars||0;mos++;}});
+  if(!memD&&!trD&&!memS&&!trS)return null;
+  const stat=(c,lbl,s,d)=>(<div style={{minWidth:150}}><div style={{display:'flex',alignItems:'center',gap:6,marginBottom:4}}><span style={{width:9,height:9,borderRadius:2,background:c,display:'inline-block'}}/><span style={{fontSize:12,color:'#999',textTransform:'uppercase',letterSpacing:'.5px'}}>{lbl}</span></div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,color:'#eee'}}>{money(d)}</div><div style={{fontSize:12,color:'#777'}}>{s} session{s===1?'':'s'}</div></div>);
+  return(<div className="perf-slot" style={{marginBottom:14}}>
+    <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Performance Training &amp; Memberships — logged{note?' · '+note:''}</span></div>
+    <div className="perf-slot-body" style={{display:'flex',flexWrap:'wrap',gap:26,alignItems:'flex-start'}}>
+      {stat('#F4DB71','Performance Training',trS,trD)}
+      {stat('#BB99FF','Memberships',memS,memD)}
+      <div style={{minWidth:130}}><div style={{fontSize:12,color:'#999',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>Combined</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,color:'#CAE8C1'}}>{money(memD+trD)}</div><div style={{fontSize:12,color:'#777'}}>{memS+trS} sessions{mos>1?' · '+mos+' mo':''}</div></div>
+    </div>
+    <div style={{fontSize:11.5,color:'#666',padding:'0 14px 10px',fontStyle:'italic'}}>Manually logged on the Import tab — separate from Jane per-practitioner revenue.</div>
   </div>);
 }
 
@@ -3022,6 +3044,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[viewingSaved,setViewingSaved]=useState(null);
   const[repDisc,setRepDisc]=useState('all');
   const[savedReports,setSavedReports]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_reports'))||[];}catch(e){return[];}});
+  const[sessionLog,setSessionLog]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_sessions_log')||'{}');}catch(e){return{};}});
+  useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data}=await SB.from('session_log').select('data').eq('id','singleton').maybeSingle();if(!c&&data&&data.data&&typeof data.data==='object')setSessionLog(data.data);}catch(e){}};ld();return()=>{c=true;};},[]);// eslint-disable-line
   // ── Clinic/location retention summary (from Jane Member Retention report upload) ──
   // Retention is stored per month so multiple report periods coexist (Jan, May, …).
   const[retentionSummaries,setRetentionSummaries]=useState(()=>{
@@ -4353,6 +4377,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             </div>
           </div>
 
+          {(()=>{const rf=(saved?saved.from:reportPeriod.from||'').slice(0,7);const rt=(saved?saved.to:reportPeriod.to||'').slice(0,7);return<SessSummary log={sessionLog} fromM={rf} toM={rt} note={rf&&rt?(rf===rt?rf:rf+'→'+rt):''}/>;})()}
           {/* Practitioner movers */}
           <div style={{marginBottom:notes?24:4}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:8}}>PRACTITIONER CHANGES <span style={{fontSize:12,color:'#666',fontWeight:400,letterSpacing:0}}>(moderate to significant vs prior {pWord})</span></div>
@@ -4568,6 +4593,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       )}
       {tab==='overview'&&(
         <>
+          {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7);const t=(usingCustomRange?customTo:dateTo||'').slice(0,7);return<SessSummary log={sessionLog} fromM={f} toM={t}/>;})()}
           {(()=>{
             const locRev={};
             filteredSnaps.forEach(s=>(s.rows||[]).forEach(r=>{if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{locRev[loc]=(locRev[loc]||0)+(parseFloat(v)||0);});}));
@@ -5172,6 +5198,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               {trendView==='practitioner'&&<div style={{display:'flex',gap:4,flexWrap:'wrap',flex:3}}>{mergedStaff.filter(s=>(trendDisc==='all'||s.discipline===trendDisc)&&(trendSite==='all'||s.site===trendSite)).map(s=>(<button key={s.id} className={`btn btn-sm ${trendStaff?.id===s.id?'btn-lime':'btn-ghost'}`} onClick={()=>setTrendStaff(s)}>{s.name.split(' ')[0]}</button>))}</div>}
             </div>
           </div>
+
+          {(()=>{const maxM=dataMaxMonth||new Date().toISOString().slice(0,7);let fromM='',toM='';if(trendFrom||trendTo){fromM=(trendFrom||'').slice(0,7);toM=(trendTo||'').slice(0,7);}else if(trendTimeframe==='ytd'){fromM=maxM.slice(0,4)+'-01';toM=maxM;}else if(trendTimeframe&&trendTimeframe!=='all'){const n=trendTimeframe==='3m'?3:trendTimeframe==='6m'?6:12;const d=new Date(maxM+'-01T12:00');d.setMonth(d.getMonth()-(n-1));fromM=d.toISOString().slice(0,7);toM=maxM;}return<SessSummary log={sessionLog} fromM={fromM} toM={toM}/>;})()}
 
           {data.snapshots.length<2&&trendGranularity==='monthly'&&<div style={{fontSize:14,color:'#777',padding:'12px 0',fontStyle:'italic'}}>Import at least 2 monthly snapshots to see trend lines.</div>}
 
@@ -10865,7 +10893,7 @@ function SystematicPage({staff=[]}){
   // Specific clinical detail comes ONLY from verified rules below; everything else is generic
   // safe process. Add/verify rules over time so the tool maps from your standards, not guesses.
   const MC_REGIONS=['Ankle / foot','Knee','Hip / groin','Low back','Neck','Shoulder','Elbow / wrist','Other / multi-region'];
-  const MC_PHASES=['Acute (0–72h)','Subacute (days–weeks)','Chronic (>6–12 wks)','Post-operative','Recurrent'];
+  const MC_PHASES=['Acute (0–2 wk)','Subacute (2–6 wk)','Remodeling (6+ wk)','Post-operative','Recurrent'];
   const MC_IRRIT=['Low','Moderate','High'];
   const MC_PAIN=['0–3 (mild)','4–6 (moderate)','7–10 (severe)'];
   const MC_MECH=['Traumatic / specific incident','Overuse / repetitive','Insidious / no clear cause','Post-surgical'];
@@ -10885,9 +10913,9 @@ function SystematicPage({staff=[]}){
   // Verified-rule store (clinician-owned). region key → phase key → pathway + basis.
   const CASE_RULES={
     'Ankle / foot':{basis:'DRAFT — internal scaffold, NOT yet clinically verified',phases:{
-      'Acute (0–72h)':{lead:'Physio',support:'Osteo if high pain · RMT if lower-grade',goal:'Protect; manage swelling/inflammation & circulation — indirect only',gate:'Pain ↓ · swelling controlled · weight-bearing tolerated'},
-      'Subacute (days–weeks)':{lead:'Physio',support:'RMT',goal:'Restore ROM; progressive loading to tolerance',gate:'Full pain-free ROM · loads without flare'},
-      'Chronic (>6–12 wks)':{lead:'Physio',support:'RMT',goal:'Rebuild capacity; correct asymmetry',gate:'Strength symmetry · meets demands'},
+      'Acute (0–2 wk)':{lead:'Physio',support:'Osteo if high pain · RMT if lower-grade',goal:'Protect; manage swelling/inflammation & circulation — indirect only',gate:'Pain ↓ · swelling controlled · weight-bearing tolerated'},
+      'Subacute (2–6 wk)':{lead:'Physio',support:'RMT',goal:'Restore ROM; progressive loading to tolerance',gate:'Full pain-free ROM · loads without flare'},
+      'Remodeling (6+ wk)':{lead:'Physio',support:'RMT',goal:'Rebuild capacity; correct asymmetry',gate:'Strength symmetry · meets demands'},
       'Post-operative':{lead:'Physio (± S&C)',support:'RMT',goal:'Respect surgical protocol; restore capacity',gate:'Per surgeon protocol + capacity gates'},
     }},
   };
@@ -11226,6 +11254,18 @@ function SystematicPage({staff=[]}){
     const unruled=ruleRegions.filter(r=>!((CASE_RULES[r]&&CASE_RULES[r].phases||{})[mc.phase]));
     const highIrrit=mc.irritability==='High'||mc.pain==='7–10 (severe)';
     const needsDx=mc.diagnosed==='No — not yet assessed';
+    const _acute=(mc.phase||'').startsWith('Acute');
+    // ── Clinical classification (assembled from the signals above) ──
+    const cls_stage=mc.phase||null;
+    const cls_irrit=mc.irritability||(mc.pain?(mc.pain.startsWith('7')?'High':mc.pain.startsWith('4')?'Moderate':'Low'):null);
+    const cls_capacity=(()=>{const a=mc.activity;let t=a==='Very high (8+ hrs/wk)'?'Performance':a==='High (5–8 hrs/wk)'?'High':a==='Moderate (2.5–5 hrs/wk)'?'Moderate':a==='Light (<2.5 hrs/wk)'?'Low':a==='Sedentary / minimal'?'Very low':null;if(!t)return null;const q=[];if(mc.sitting==='8+ hrs/day')q.push('high sedentary load');if(mc.selfcare==='Trains + own mobility')q.push('self-manages');else if(mc.selfcare==='Little / none')q.push('no self-care');return{tier:t,note:q.join(' · ')};})();
+    const cls_goal=(()=>{if(highIrrit&&_acute)return'Pain relief → restore function';if(lifestyles.includes('Competitive athlete')||mc.activity==='Very high (8+ hrs/wk)')return'Return to sport / performance';if(lifestyles.includes('Post-partum'))return'Postnatal function & recovery';if(lifestyles.includes('Older adult'))return'Function & safety';if((mc.phase||'').startsWith('Post'))return'Return to function (post-op protocol)';if(lifestyles.includes('General / desk-based'))return'Function & ergonomics';return'Restore function';})();
+    const cls_lead=(()=>{if(lifestyles.includes('Post-partum'))return'Pelvic Physio (or Physio)';if(ruleHits.length&&ruleHits[0].rule.lead)return ruleHits[0].rule.lead;return'Physio / Chiro';})();
+    const cls_support=(()=>{if(ruleHits.length&&ruleHits[0].rule.support)return ruleHits[0].rule.support;return(_acute||highIrrit)?'Osteo (down-regulate) → RMT (soft tissue)':'RMT (soft tissue) · Osteo';})();
+    const cls_freq=(()=>{if(highIrrit||_acute)return'Higher early — re-assess ~1–2 wk, taper as it settles';if(mc.selfcare==='Little / none')return'Regular until self-management is established';if(mc.selfcare==='Trains + own mobility')return'Lower / check-in cadence';return'By capacity gates, not the calendar';})();
+    const cls_progress=(ruleHits.length&&ruleHits[0].rule.gate)?ruleHits[0].rule.gate:'Advance on re-assessed capacity (pain-free ROM, load tolerance), not time';
+    const cls_comms=hasFlags?'Medical screen flagged — clear before active care':needsDx?'Diagnose & confirm the plan owner first':(contribRegions.length||histRegions.length)?'Multi-region — Physio to assess whether contributing/history areas drive the primary; coordinate lead + support':'Lead owns the plan; support coordinates around it';
+    const cls_summary=`CLINICAL CLASSIFICATION — ${regions.join(' + ')||'—'}\nStage: ${cls_stage||'—'} · Irritability: ${cls_irrit||'—'} · Capacity: ${cls_capacity?cls_capacity.tier:'—'}${cls_capacity&&cls_capacity.note?' ('+cls_capacity.note+')':''}\nGoal: ${cls_goal}\nLead: ${cls_lead} · Support: ${cls_support}\nReview: ${cls_freq}\nAdvance when: ${cls_progress}\nNote: ${cls_comms}\n(Suggestion only — treating clinician decides.)`;
     const LIME='#CAE8C1',PUR='#BB99FF',BLU='#7FC8E8',ORG='#E0A052',RED='#E05252';
     const stepCard=(n,c,t,body)=>(<div style={{background:'var(--surface3)',borderLeft:'3px solid '+c,borderRadius:6,padding:'11px 14px',marginBottom:8}}>
       <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:800,letterSpacing:'.5px',color:c}}>{n} · {t}</div>
@@ -11291,6 +11331,18 @@ function SystematicPage({staff=[]}){
           <div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:9,padding:'28px 20px',textAlign:'center',color:'#777'}}>Choose at least a <strong style={{color:'#aaa'}}>body region</strong> and <strong style={{color:'#aaa'}}>phase</strong> to map a pathway.</div>
         ):(
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'16px 18px'}}>
+            <div style={{background:'linear-gradient(180deg,rgba(127,200,232,.08),rgba(127,200,232,.02))',border:'1px solid rgba(127,200,232,.3)',borderRadius:9,padding:'14px 16px',marginBottom:14}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:10}}>
+                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,fontWeight:800,letterSpacing:'.5px',color:BLU}}>🧬 Clinical Classification{regions.length>0&&<span style={{color:'#888',fontSize:14,fontWeight:600}}> · {regions.join(' + ')}</span>}</span>
+                <button className="btn btn-ghost btn-xs" onClick={e=>{try{navigator.clipboard.writeText(cls_summary);const b=e.currentTarget;b.textContent='✓ Copied';setTimeout(()=>{try{b.textContent='⧉ Copy summary';}catch(x){}},1500);}catch(x){}}}>⧉ Copy summary</button>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:'10px 16px'}}>
+                {[['Stage',cls_stage||'—',ORG],['Irritability',cls_irrit||'—',cls_irrit==='High'?RED:cls_irrit==='Moderate'?ORG:LIME],['Capacity',cls_capacity?cls_capacity.tier:'—',PUR],['Goal',cls_goal,LIME],['Lead',cls_lead,LIME],['Support',cls_support,PUR],['Review frequency',cls_freq,BLU],['Advance when',cls_progress,ORG]].map(([k,v,c])=>(
+                  <div key={k}><div style={{fontSize:10,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:2}}>{k}</div><div style={{fontSize:13.5,color:c||'#ddd',fontWeight:600,lineHeight:1.35}}>{v}</div>{k==='Capacity'&&cls_capacity&&cls_capacity.note&&<div style={{fontSize:11,color:'#777',marginTop:1}}>{cls_capacity.note}</div>}</div>
+                ))}
+              </div>
+              <div style={{fontSize:12.5,color:'#999',marginTop:10,borderTop:'1px solid var(--border)',paddingTop:8}}><strong style={{color:'#aaa'}}>Communication:</strong> {cls_comms}</div>
+            </div>
             {needsDx&&stepCard('1',BLU,'Diagnose first','Physio or Chiro establishes the diagnosis and owns the plan before treatment proceeds.')}
             {highIrrit&&stepCard(needsDx?'2':'1',PUR,'Settle first — sequence by pain','High irritability / pain — calm it before active loading. Typical order: Osteo to down-regulate → RMT for soft-tissue on the painful region → then Physio leads the active plan and the root-cause work. Adjust to the patient.')}
             {ruleHits.map(h=>stepCard('★',LIME,`${h.region} · ${mc.phase} — verified pathway`,
@@ -11299,7 +11351,7 @@ function SystematicPage({staff=[]}){
             {unruled.length>0&&stepCard('•','#9aa',`${mc.phase} — general approach${ruleHits.length>0?' · '+unruled.join(', '):''}`,
               (mc.phase.startsWith('Acute')?'Indirect first — manage inflammation/circulation, not direct tissue work. Lead = Physio; Support by pain threshold (high → Osteo, lower → RMT).':
                mc.phase.startsWith('Subacute')?'Progressive loading to tolerance. Lead = Physio; Support = RMT.':
-               mc.phase.startsWith('Chronic')?'Target capacity & structural drivers, not compensations. Lead = Physio.':
+               mc.phase.startsWith('Remodeling')?'Target capacity & structural drivers, not compensations. Lead = Physio.':
                mc.phase.startsWith('Post')?'Respect surgical protocol; rebuild capacity through gates. Lead = Physio (± S&C).':
                'Confirm phase and lead.')+' — no region-specific verified rule yet; lead confirms specifics.')}
             {lifestyles.map(lf=>stepCard('↳',BLU,'Lifestyle lens — '+lf,lensText(lf)))}
