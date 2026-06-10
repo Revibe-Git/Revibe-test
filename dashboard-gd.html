@@ -3019,6 +3019,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[reportAnchor,setReportAnchor]=useState(null);
   const[reportNotes,setReportNotes]=useState('');
   const[viewingSaved,setViewingSaved]=useState(null);
+  const[repDisc,setRepDisc]=useState('all');
   const[savedReports,setSavedReports]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_reports'))||[];}catch(e){return[];}});
   // ── Clinic/location retention summary (from Jane Member Retention report upload) ──
   // Retention is stored per month so multiple report periods coexist (Jan, May, …).
@@ -4373,10 +4374,17 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             const delta=(v,money,suffix)=>{if(v===0)return<span style={{color:'#666'}}>—</span>;const up=v>0;return<span style={{color:up?'#44CCAA':'#E05252',fontWeight:600}}>{up?'▲':'▼'}{money?fmtMoney(Math.abs(v)):Math.abs(v)}{suffix||''}</span>;};
             const pctTxt=(p)=>p==null?'':` (${p>=0?'+':''}${Math.round(p)}%)`;
             const attnRows=selfRows.filter(r=>r.attn);
+            const discsPresent=DISC_CLIN.filter(d=>selfRows.some(r=>r.disc===d.id));
+            const repRows=repDisc==='all'?selfRows:selfRows.filter(r=>r.disc===repDisc);
             return(
             <div style={{marginBottom:notes?24:4,marginTop:24}}>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:3}}>EACH CLINICIAN vs THEIR OWN PRIOR {pWord.toUpperCase()}</div>
               <div style={{fontSize:12,color:'#777',marginBottom:10}}>Self-relative — each person measured against their own {lastP}, not the clinic average. {attnRows.length>0?<span style={{color:'#E0A052'}}>⚠ {attnRows.length} need{attnRows.length===1?'s':''} a look (own revenue or initials slipping).</span>:<span style={{color:'#44CCAA'}}>No one is slipping against their own prior {pWord}.</span>}</div>
+              <div className="no-print" style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:10,alignItems:'center'}}>
+                <span style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginRight:2}}>Discipline</span>
+                <button className={`btn btn-xs ${repDisc==='all'?'btn-go':'btn-ghost'}`} onClick={()=>setRepDisc('all')}>All</button>
+                {discsPresent.map(d=><button key={d.id} className={`btn btn-xs ${repDisc===d.id?'btn-go':'btn-ghost'}`} onClick={()=>setRepDisc(d.id)}>{d.label}</button>)}
+              </div>
               <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,minWidth:560}}>
                 <thead><tr style={{textAlign:'right',color:'#888',fontSize:11,textTransform:'uppercase',letterSpacing:'.5px'}}>
@@ -4386,7 +4394,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <th style={{padding:'6px 8px'}}>Visits</th>
                 </tr></thead>
                 <tbody>
-                {selfRows.map(r=>(
+                {repRows.map(r=>(
                   <tr key={r.id} style={{borderTop:'1px solid #1c1c1c',background:r.sev==='high'?'rgba(224,82,82,.07)':(r.attn?'rgba(224,160,82,.06)':'transparent')}}>
                     <td style={{textAlign:'left',padding:'8px',color:'#eee'}}>{r.attn&&<span title="Needs a look" style={{marginRight:5}}>{r.sev==='high'?'🔴':'🟠'}</span>}{r.name} <span style={{color:'#666',fontSize:11,marginLeft:3}}>{dAbbr(r.disc)}</span></td>
                     <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'#bbb'}}>{fmtMoney(r.pRev)} → {fmtMoney(r.cRev)}</span><br/><span style={{fontSize:12}}>{delta(r.dr,true)}{r.dr!==0&&<span style={{color:'#666'}}>{pctTxt(r.rpct)}</span>}</span></td>
@@ -10855,7 +10863,9 @@ function SystematicPage({staff=[]}){
   const MC_LIFE=['Competitive athlete','Active adult','General / desk-based','Post-partum','Older adult'];
   const MC_DX=['Yes — diagnosed by Physio/Chiro','No — not yet assessed'];
   const MC_SITTING=['<4 hrs/day','4–8 hrs/day','8+ hrs/day'];
-  const SITTING_RULE={'<4 hrs/day':{min:'2.5 hrs/week',strong:'5+ hrs/week'},'4–8 hrs/day':{min:'2.5–5 hrs/week',strong:'5–7.5 hrs/week'},'8+ hrs/day':{min:'5 hrs/week',strong:'7–8.75 hrs/week'}};
+  const MC_SELFCARE=['Trains + own mobility','Some self-care','Little / none'];
+  const MC_ACTIVITY=['Sedentary / minimal','Light (<2.5 hrs/wk)','Moderate (2.5–5 hrs/wk)','High (5–8 hrs/wk)','Very high (8+ hrs/wk)'];
+  const SITTING_RULE={'<4 hrs/day':'≤2.5 hrs/week','4–8 hrs/day':'2.5–5 hrs/week','8+ hrs/day':'5 hrs/week'};
   const RED_FLAGS=[
     'Suspected fracture / severe deformity / cannot bear weight',
     'Neuro signs — numbness, progressive weakness, bowel/bladder change',
@@ -11193,13 +11203,18 @@ function SystematicPage({staff=[]}){
       </select></div>);
     const asArr=(v)=>Array.isArray(v)?v:(v?[v]:[]);
     const regions=asArr(mc.region);const lifestyles=asArr(mc.lifestyle);
+    const roleOf=(r)=>(mc.roles||{})[r]||'Acute / now';
+    const acuteRegions=regions.filter(r=>roleOf(r)==='Acute / now');
+    const contribRegions=regions.filter(r=>roleOf(r)==='Contributing');
+    const histRegions=regions.filter(r=>roleOf(r)==='Past history');
+    const ruleRegions=acuteRegions.length?acuteRegions:regions;
     const Multi=({label,opts,k,col})=>{const cur=asArr(mc[k]);return(<div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:6}}>{label}</div>
       <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{opts.map(o=>{const on=cur.includes(o);return(<button key={o} type="button" onClick={()=>setMcv(k,on?cur.filter(x=>x!==o):[...cur,o])} style={{fontSize:12.5,padding:'4px 10px',borderRadius:5,border:'1px solid '+(on?col[0]:'var(--border2)'),background:on?col[1]:'var(--surface3)',color:on?col[2]:'#666',cursor:'pointer',fontWeight:on?700:400}}>{on?'✓ ':''}{o}</button>);})}</div></div>);};
     const lensText=(lf)=>lf==='Competitive athlete'?'Compress phases as tolerated; bring Performance/S&C in earlier; return-to-sport testing before clearance.':lf==='Post-partum'?'Consider pelvic-floor PT involvement; progress conservatively around recovery demands.':lf==='Older adult'?'More conservative loading; screen for comorbidities; prioritise function and safety.':lf==='General / desk-based'?'Emphasis on function and ergonomics over sport metrics; longer indirect phase if irritable.':lf==='Active adult'?'Keep them moving — modify load rather than rest fully; progress toward their usual activity.':'Progress to tolerance toward the patient\u2019s functional goals.';
     const hasFlags=flags.length>0;
     const ready=regions.length>0&&mc.phase;
-    const ruleHits=regions.map(r=>({region:r,rule:(CASE_RULES[r]&&CASE_RULES[r].phases||{})[mc.phase],basis:CASE_RULES[r]&&CASE_RULES[r].basis})).filter(x=>x.rule);
-    const unruled=regions.filter(r=>!((CASE_RULES[r]&&CASE_RULES[r].phases||{})[mc.phase]));
+    const ruleHits=ruleRegions.map(r=>({region:r,rule:(CASE_RULES[r]&&CASE_RULES[r].phases||{})[mc.phase],basis:CASE_RULES[r]&&CASE_RULES[r].basis})).filter(x=>x.rule);
+    const unruled=ruleRegions.filter(r=>!((CASE_RULES[r]&&CASE_RULES[r].phases||{})[mc.phase]));
     const highIrrit=mc.irritability==='High'||mc.pain==='7–10 (severe)';
     const needsDx=mc.diagnosed==='No — not yet assessed';
     const LIME='#CAE8C1',PUR='#BB99FF',BLU='#7FC8E8',ORG='#E0A052',RED='#E05252';
@@ -11226,13 +11241,25 @@ function SystematicPage({staff=[]}){
 
         {/* Inputs */}
         <div style={{marginBottom:6}}><Multi label="Body region(s) — select all that apply" opts={MC_REGIONS} k="region" col={['rgba(127,200,232,.45)','rgba(127,200,232,.14)','#7FC8E8']}/></div>
-        <div style={{fontSize:11.5,color:'#666',marginBottom:14,fontStyle:'italic'}}>Add every area in play (e.g. acute low back <em>plus</em> a history of ankle issues). Phase, irritability &amp; pain below describe the active/primary complaint.</div>
+        {regions.length>0&&(
+          <div style={{marginBottom:14,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 12px'}}>
+            <div style={{fontSize:10,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:7}}>Role of each area <span style={{textTransform:'none',letterSpacing:0,color:'#666'}}>— which is the immediate problem vs background / history</span></div>
+            {regions.map(r=>{const cur=roleOf(r);const ROLES=[['Acute / now','#E0A052'],['Contributing','#BB99FF'],['Past history','#7d8a99']];return(
+              <div key={r} style={{display:'flex',alignItems:'center',gap:8,marginBottom:5,flexWrap:'wrap'}}>
+                <span style={{minWidth:130,fontSize:13,color:'#ddd'}}>{r}</span>
+                <div style={{display:'flex',gap:4}}>{ROLES.map(([role,c])=>{const on=cur===role;return(<button key={role} type="button" onClick={()=>setMcv('roles',{...(mc.roles||{}),[r]:role})} style={{fontSize:11.5,padding:'3px 9px',borderRadius:5,border:'1px solid '+(on?c:'var(--border2)'),background:on?c+'22':'var(--surface3)',color:on?c:'#666',cursor:'pointer',fontWeight:on?700:400}}>{role}</button>);})}</div>
+              </div>);})}
+          </div>
+        )}
+        <div style={{fontSize:11.5,color:'#666',marginBottom:14,fontStyle:'italic'}}>Mark the live complaint <em>Acute / now</em>, and tag others as <em>Contributing</em> or <em>Past history</em> (e.g. acute low back, with old ankle issues as history). Phase, irritability &amp; pain below describe the acute complaint.</div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:14}}>
           <Sel label="Phase" val={mc.phase} opts={MC_PHASES} k="phase"/>
           <Sel label="Irritability" val={mc.irritability} opts={MC_IRRIT} k="irritability"/>
           <Sel label="Pain level" val={mc.pain} opts={MC_PAIN} k="pain"/>
           <Sel label="Mechanism" val={mc.mechanism} opts={MC_MECH} k="mechanism"/>
           <Sel label="Daily sitting" val={mc.sitting} opts={MC_SITTING} k="sitting"/>
+          <Sel label="Current weekly activity" val={mc.activity} opts={MC_ACTIVITY} k="activity"/>
+          <Sel label="Self-care / training" val={mc.selfcare} opts={MC_SELFCARE} k="selfcare"/>
           <Sel label="Diagnosed yet?" val={mc.diagnosed} opts={MC_DX} k="diagnosed"/>
         </div>
         <div style={{marginBottom:18}}><Multi label="Lifestyle / goal — select all that apply" opts={MC_LIFE} k="lifestyle" col={['rgba(187,153,255,.45)','rgba(187,153,255,.14)','#BB99FF']}/></div>
@@ -11267,12 +11294,35 @@ function SystematicPage({staff=[]}){
                mc.phase.startsWith('Post')?'Respect surgical protocol; rebuild capacity through gates. Lead = Physio (± S&C).':
                'Confirm phase and lead.')+' — no region-specific verified rule yet; lead confirms specifics.')}
             {lifestyles.map(lf=>stepCard('↳',BLU,'Lifestyle lens — '+lf,lensText(lf)))}
-            {mc.sitting&&SITTING_RULE[mc.sitting]&&stepCard('🪑',BLU,'Activity baseline & target',
-              <span>Sits ~{mc.sitting}. Movement goal: aim for at least <strong style={{color:LIME}}>{SITTING_RULE[mc.sitting].min}</strong>, ideally <strong style={{color:LIME}}>{SITTING_RULE[mc.sitting].strong}</strong>. The more they sit, the more counter-dosing is needed — build this into the home plan and the discharge target.</span>)}
-            {stepCard('🔍',ORG,'Treat the immediate issue — but find the driver',
-              regions.length>1
-                ? <span>Several areas are in play ({regions.join(' + ')}). Calm the active complaint first, then have <strong style={{color:LIME}}>Physio assess whether one region is driving another</strong> — e.g. ankle mechanics loading the low back. Don’t discharge on symptom relief alone; the loudest site isn’t always the source.</span>
-                : <span>Relieve the presenting {regions[0]} now, but have <strong style={{color:LIME}}>Physio screen up and down the chain</strong> for a contributing driver (mobility, motor control, load history, old injuries). Treating only the painful site is how recurrences start.</span>)}
+            {mc.sitting&&SITTING_RULE[mc.sitting]&&stepCard('🪑',BLU,'Activity baseline — general population (CSEP)',
+              <span>CSEP 24-Hour Movement Guidelines (adults 18–64): at least <strong style={{color:LIME}}>150 min/week (2.5 hrs)</strong> moderate-to-vigorous activity, muscle-strengthening <strong style={{color:LIME}}>2×/week</strong>, sedentary time <strong>≤8 hrs/day</strong> (break up long sitting), and 7–9 hrs sleep. Sits ~{mc.sitting} → counter-dose toward <strong style={{color:LIME}}>{SITTING_RULE[mc.sitting]}</strong>{mc.sitting==='8+ hrs/day'?'; they’re over the ≤8h sedentary mark, so actively break up sitting too':''}.<br/><span style={{fontSize:12,color:'#888'}}>General-population baseline — athletes / high performers follow the high-performance card below instead.</span></span>)}
+            {(()=>{
+              const others=[...contribRegions,...histRegions];
+              const focus=(acuteRegions.length?acuteRegions:regions).join(' + ');
+              return stepCard('🔍',ORG,'Treat the immediate issue — but find the driver',
+                others.length
+                  ? <span>Address <strong style={{color:'#E0A052'}}>{focus}</strong> now. {contribRegions.length>0&&<>Flagged as contributing: <strong style={{color:PUR}}>{contribRegions.join(', ')}</strong>. </>}{histRegions.length>0&&<>History: <strong style={{color:'#9aa6b2'}}>{histRegions.join(', ')}</strong>. </>}Have <strong style={{color:LIME}}>Physio assess whether these are driving the acute problem</strong> — e.g. an old ankle changing how the low back loads. Don’t discharge on symptom relief alone; the loudest site isn’t always the source.</span>
+                  : <span>Relieve the presenting {regions[0]} now, but have <strong style={{color:LIME}}>Physio screen up and down the chain</strong> for a contributing driver (mobility, motor control, load history, old injuries). Treating only the painful site is how recurrences start.</span>);
+            })()}
+            {(()=>{
+              const sportTags=(mc.sport||[]).filter(t=>LIFE_CONTEXT[0].t.includes(t));
+              const highDemand=sportTags.length>0||lifestyles.includes('Competitive athlete')||lifestyles.includes('Active adult')||['High (5–8 hrs/wk)','Very high (8+ hrs/wk)'].includes(mc.activity);
+              const sit=mc.sitting==='8+ hrs/day'?'high':mc.sitting==='4–8 hrs/day'?'moderate':mc.sitting?'low':null;
+              const sc=mc.selfcare;
+              if(!highDemand&&!sit&&!sc)return null;
+              const demandTxt=highDemand?(sportTags.length?sportTags.join(', '):'active goals'):'lower training load';
+              const mismatch=highDemand&&(sit==='high'||sit==='moderate');
+              const lead=mismatch
+                ? `High demand (${demandTxt}) on a body that’s sedentary ${mc.sitting} — their capacity has to be built up to meet what they’re asking of it, and recovery prioritised. `
+                : highDemand
+                ? `Demand is real (${demandTxt}) — match capacity to it and keep recovery adequate. `
+                : `Lower training demand — focus on restoring function for daily life. `;
+              const scTxt=sc==='Trains + own mobility'?'They already train and do their own mobility — lean toward load/programming guidance and periodic check-ins over high-frequency hands-on.':sc==='Some self-care'?'Some self-care in place — reinforce a consistent home program alongside treatment.':sc==='Little / none'?'They’re not doing their own work — a home mobility/strength program is essential; treatment alone won’t keep up with their demands.':'Establish what they currently do on their own — it sets how much falls on treatment vs self-management.';
+              const freq=mismatch&&sc==='Little / none'?'Lean to higher frequency early (recovery + capacity), tapering as they build their own tolerance.':mismatch?'Moderate frequency early, shifting toward load guidance as capacity catches up.':sc==='Trains + own mobility'?'Lower frequency / check-in cadence is reasonable.':'Frequency follows the gap between what they can do and what they’re asking of themselves.';
+              return stepCard('⚖️',BLU,'Capacity vs demand → frequency',<span>{lead}{scTxt} <span style={{color:'#888'}}>{freq}</span></span>);
+            })()}
+            {(()=>{const hp=mc.activity==='Very high (8+ hrs/wk)'||mc.activity==='High (5–8 hrs/wk)';if(!hp)return null;const vol=(mc.activity.match(/\(([^)]+)\)/)||[])[1]||'';return stepCard('🏆','#F4DB71','High-performance load — recover hard, don’t just add volume',
+              <span>Already training <strong style={{color:'#F4DB71'}}>{vol}</strong>. For this person the win is keeping capacity ahead of demand and recovering well — not piling on more hours:<br/>· <strong style={{color:'#F4DB71'}}>Activity:</strong> hold / periodise volume; add quality (technique, targeted strength) over more time.<br/>· <strong style={{color:'#F4DB71'}}>Recovery:</strong> RMT / Osteo for tissue load, protect sleep &amp; fuelling, schedule lighter weeks &amp; planned deloads.<br/>· <strong style={{color:'#F4DB71'}}>Nervous system:</strong> down-regulate between hard sessions (breathing, parasympathetic work); watch for overreaching — poor sleep, rising resting HR, mood/irritability.<br/>· <strong style={{color:'#F4DB71'}}>Frequency:</strong> tie hands-on to training blocks — more around peak / competition, less in base phases.</span>);})()}
             {stepCard('→',LIME,'Progress by gates, then discharge','Advance on re-assessed capacity criteria — not the calendar. On completion: maintenance / membership, or refer internally if another discipline is better suited (Lead keeps the plan).')}
             {unruled.length>0&&<div style={{fontSize:12.5,color:'#888',marginTop:6,fontStyle:'italic'}}>Specifics for {unruled.join(', ')} aren\u2019t standardized yet. Add a verified rule and the mapper will return exact lead/support/timelines.</div>}
           </div>
