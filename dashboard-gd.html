@@ -2338,7 +2338,7 @@ function CallHistoryPage(){
 
 
 /* ══ MEMBERSHIP / TRAINING SESSIONS (manual log) ══ */
-function SessionsLog({defaultMonth}){
+function SessionsLog({defaultMonth,readOnly}){
   const CATS=[{id:'membership',label:'Membership Sessions',color:'#BB99FF'},{id:'training',label:'Performance Training',color:'#F4DB71'}];
   const money=(n)=>'$'+Math.round(n||0).toLocaleString();
   const[log,setLog]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_sessions_log')||'{}');}catch(e){return{};}});
@@ -2356,8 +2356,8 @@ function SessionsLog({defaultMonth}){
   return(<div className="perf-slot" style={{marginBottom:14}}>
     <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#BB99FF'}}>Memberships &amp; Training Sessions — Manual Log</span>{saved&&<span style={{fontSize:13,color:'#CAE8C1'}}>✓ Saved</span>}</div>
     <div className="perf-slot-body">
-      <div style={{fontSize:13,color:'#999',lineHeight:1.6,marginBottom:14}}>Memberships and packages don't break out per-session in the Sales report, so log here how many <strong style={{color:'#ccc'}}>sessions were delivered</strong> each month and the <strong style={{color:'#ccc'}}>dollars</strong> attributed to them. Stored on this device.</div>
-      <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginBottom:14}}>
+      <div style={{fontSize:13,color:'#999',lineHeight:1.6,marginBottom:14}}>Memberships and packages don't break out per-session in the Sales report, so {readOnly?'these are logged on the ':'log here how many '}<strong style={{color:'#ccc'}}>{readOnly?'Import tab':'sessions were delivered'}</strong> {readOnly?'and shown here.':<>each month and the <strong style={{color:'#ccc'}}>dollars</strong> attributed to them. Stored on this device, shown on the Revenue tab.</>}</div>
+      {!readOnly&&(<><div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginBottom:14}}>
         <div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>Month</div>
           <input type="month" value={m} onChange={e=>setM(e.target.value)} style={{background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'8px 10px',color:'#eee',fontSize:14}}/></div>
       </div>
@@ -2370,7 +2370,8 @@ function SessionsLog({defaultMonth}){
           </div>
         </div>))}
       </div>
-      <button className="btn btn-go" onClick={saveM}>{log[m]?'Update':'Save'} {new Date(m+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</button>
+      <button className="btn btn-go" onClick={saveM}>{log[m]?'Update':'Save'} {new Date(m+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'})}</button></>)}
+      {readOnly&&months.length===0&&<div style={{fontSize:13,color:'#777',padding:'8px 0'}}>No sessions logged yet — add them on the <strong style={{color:'#aaa'}}>Import</strong> tab.</div>}
       {months.length>0&&<div style={{overflowX:'auto',marginTop:16}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
           <thead><tr style={{color:'#888'}}><th style={{textAlign:'left',padding:'5px 8px'}}>Month</th><th style={{textAlign:'right',padding:'5px 8px'}}>Mbr Sess</th><th style={{textAlign:'right',padding:'5px 8px'}}>Mbr $</th><th style={{textAlign:'right',padding:'5px 8px'}}>Train Sess</th><th style={{textAlign:'right',padding:'5px 8px'}}>Train $</th><th style={{textAlign:'right',padding:'5px 8px'}}>Total $</th><th></th></tr></thead>
@@ -2381,7 +2382,7 @@ function SessionsLog({defaultMonth}){
             <td style={{textAlign:'right',padding:'5px 8px'}}>{tns.sessions||0}</td>
             <td style={{textAlign:'right',padding:'5px 8px',color:'#F4DB71'}}>{money(tns.dollars)}</td>
             <td style={{textAlign:'right',padding:'5px 8px',color:'#CAE8C1',fontWeight:600}}>{money(tot)}</td>
-            <td style={{textAlign:'right',padding:'5px 8px'}}><button className="btn btn-ghost btn-xs" style={{color:'#E05252'}} onClick={()=>delM(mo)}>✕</button></td>
+            <td style={{textAlign:'right',padding:'5px 8px'}}>{!readOnly&&<button className="btn btn-ghost btn-xs" style={{color:'#E05252'}} onClick={()=>delM(mo)}>✕</button>}</td>
           </tr>);})}</tbody>
         </table>
       </div>}
@@ -4751,7 +4752,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           </div>
         );
       })()}
-      {tab==='revenue'&&<SessionsLog defaultMonth={dataMaxMonth}/>}
+      {tab==='revenue'&&<SessionsLog defaultMonth={dataMaxMonth} readOnly/>}
       {tab==='revenue'&&(
         <div className="perf-slot">
           <div className="perf-slot-head">
@@ -5262,6 +5263,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       {/* ── IMPORT ── */}
       {tab==='import'&&(
         <div>
+          <SessionsLog defaultMonth={dataMaxMonth}/>
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'16px 18px',marginBottom:14}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',fontWeight:700,marginBottom:10}}>How to Export from Jane</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:12}}>
