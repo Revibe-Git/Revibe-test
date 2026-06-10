@@ -1782,6 +1782,10 @@ const LIFE_CONTEXT=[
 const SPORTS=LIFE_CONTEXT.reduce((a,g)=>a.concat(g.t),[]);
 // Accept either a saved array or a seeded comma/slash string and return a clean array
 const asSports=(v)=>Array.isArray(v)?v:(v?String(v).split(/[,/]/).map(s=>s.trim()).filter(Boolean):[]);
+const SPORT_NAMES=(LIFE_CONTEXT.find(g=>g.g==='Sports & training')||{t:[]}).t;
+const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball','Badminton','Netball'],['Soccer','Football','Hockey','Rugby','Baseball','Lacrosse'],['Running','Triathlon / Endurance','Cycling','Swimming','Hyrox'],['Weightlifting / Gym','CrossFit','Hyrox','General fitness','Powerlifting'],['Combat / MMA','Boxing','Kickboxing','Muay Thai'],['Skiing / Snowboard','Climbing'],['Dance','Yoga / Pilates','Gymnastics']];
+const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
+const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
@@ -11435,7 +11439,7 @@ function SystematicPage({staff=[]}){
           const acute=(mc.phase||'').startsWith('Acute');
           const highIrr=mc.irritability==='High'||mc.pain==='7\u201310 (severe)';
           // Region → clinically-relevant keywords (general MSK knowledge) to match against what each clinician treats
-          const REGION_KW={'Ankle / foot':['ankle','foot','sprain','plantar','achilles','lower body','run','sport'],'Knee':['knee','acl','mcl','meniscus','patell','ligament','lower body','run','sport','post-surg','rehab'],'Hip / groin':['hip','groin','glute','lower body','mobility','sport'],'Low back':['back','lumbar','spine','disc','sciatic','core','chronic'],'Neck':['neck','cervical','headache','posture','desk','tmj','tension'],'Shoulder':['shoulder','rotator','overhead','rom','sport'],'Elbow / wrist':['elbow','wrist','tendon','tennis','golf','overuse','desk'],'Other / multi-region':[]};
+          const REGION_KW={'Ankle / foot':['ankle','foot','feet','plantar','achilles','heel','sprain'],'Knee':['knee','acl','mcl','lcl','pcl','meniscus','patell','it band','itb'],'Hip / groin':['hip','groin','glute','hamstring','pelvis','pelvic','adductor','si joint','si pain'],'Low back':['low back','lower back','back','lumbar','lumbo','spine','disc','sciatic'],'Neck':['neck','cervical','cervicogenic','headache','migraine','tmj','jaw'],'Shoulder':['shoulder','rotator','impingement','labrum','overhead','scapula'],'Elbow / wrist':['elbow','wrist','forearm','tennis elbow','carpal','tendon'],'Other / multi-region':[]};
           const regKW=Array.from(new Set(regions.flatMap(r=>REGION_KW[r]||[])));
           // Discipline base weight for this case — Physio/Chiro lead; Osteo/RMT support (Osteo↑ when irritable); Naturo only for holistic
           const baseFor=(d)=>d==='pt'?4:d==='chiro'?3.6:d==='osteo'?(acute||highIrr?3:1.6):d==='rmt'?(acute||highIrr?2.3:2.7):d==='naturo'?(/holistic|fatigue|hormon|wellness|stress/.test((lifestyles.join(' ')+(mc.mechanism||'')).toLowerCase())?1.6:0):0;
@@ -11445,19 +11449,29 @@ function SystematicPage({staff=[]}){
             const blob=((mp.expertise||'')+' '+(mp.conditions||'')+' '+(mp.treatments||'')+' '+(mp.bestClients||'')).toLowerCase();
             const reasons=[];
             const hits=regKW.filter(k=>blob.includes(k));
-            if(hits.length){score+=Math.min(hits.length,3)*0.9;reasons.push('treats '+Array.from(new Set(regions.map(r=>r.split(' / ')[0].toLowerCase()))).join(' & '));}
+            if(hits.length){score+=Math.min(hits.length,3)*0.9;reasons.push('profile: '+Array.from(new Set(hits)).slice(0,3).join(', '));}
             if(lifestyles.includes('Post-partum')&&specs.includes('prenatalPostnatal')){score+=3;reasons.push('pre/postnatal');}
             if(lifestyles.includes('Competitive athlete')&&(specs.includes('sportsMassage')||/sport|athlet/.test(blob))){score+=1.5;reasons.push('sports focus');}
             if(lifestyles.includes('Older adult')&&/older|geriatr|gentle|relax/.test(blob)){score+=1;reasons.push('older-adult fit');}
             if(lifestyles.includes('General / desk-based')&&/desk|postur|tension|ergonom/.test(blob)){score+=1;reasons.push('desk/posture');}
             if(highIrr&&(specs.includes('acupuncture')||specs.includes('triggerPoint'))){score+=0.6;reasons.push('pain modalities');}
-            const sSports=asSports(mp.sports);
-            const sportHit=caseSport.filter(c=>sSports.some(x=>x.toLowerCase()===c.toLowerCase()));
+            const sSports=asSports(mp.sports);const sLower=sSports.map(x=>x.toLowerCase());
+            const caseSports=caseSport.filter(c=>isSportName(c));const caseLife=caseSport.filter(c=>!isSportName(c));
             let rapport=0;
-            if(sportHit.length){const b=3.5+Math.min(sportHit.length-1,2)*1.5;score+=b;rapport+=b;reasons.unshift('shares: '+sportHit.join(' / '));}
-            else if(caseSport.length&&/sport|athlet|run|endurance/.test(blob)){score+=1;reasons.push('sports-injury focus');}
+            const sportHit=caseSports.filter(c=>sLower.includes(c.toLowerCase()));
+            if(sportHit.length){const b=3.5+Math.min(sportHit.length-1,2)*1.5;score+=b;rapport+=b;reasons.unshift('plays '+sportHit.join(' / '));}
+            const relHit=caseSports.filter(c=>!sLower.includes(c.toLowerCase())&&sSports.some(x=>relatedSport(c,x)));
+            if(relHit.length){const b=1.6;score+=b;rapport+=b*0.7;reasons.push('related sport: '+relHit.slice(0,2).join(', '));}
+            const lifeHit=caseLife.filter(c=>sLower.includes(c.toLowerCase()));
+            if(lifeHit.length){const b=Math.min(lifeHit.length,2)*1.8;score+=b;rapport+=b;reasons.unshift('shares: '+lifeHit.join(' / '));}
+            if(!sportHit.length&&!relHit.length&&caseSports.length&&/sport|athlet|run|endurance/.test(blob)){score+=0.8;reasons.push('sports-injury focus');}
             const excl=(mp.excludes||'').toLowerCase();
-            if(excl){if(lifestyles.includes('Post-partum')&&/post.?natal|prenatal|pregnan|pelvic|pre.?post/.test(excl)){score-=6;reasons.push('⚠ excl. pre/postnatal');}regions.forEach(r=>{const w=r.split(' / ')[0].toLowerCase();if(w.length>3&&excl.includes(w)){score-=4;reasons.push('⚠ excl. '+w);}});}
+            if(excl){
+              const exHit=regKW.filter(k=>k.length>=3&&excl.includes(k));
+              if(exHit.length){score-=5;reasons.push('⚠ won’t take: '+Array.from(new Set(exHit)).slice(0,2).join(', '));}
+              if(lifestyles.includes('Post-partum')&&/post.?natal|prenatal|pregnan|pelvic|pre.?post/.test(excl)){score-=6;if(!exHit.length)reasons.push('⚠ excl. pre/postnatal');}
+              if(/post|surg/.test((mc.mechanism||'').toLowerCase())&&/post.?op|surg/.test(excl)){score-=4;reasons.push('⚠ excl. post-op');}
+            }
             const role=(s.discipline==='pt'||s.discipline==='chiro')?'lead':'support';
             if(!reasons.length)reasons.push(role==='lead'?'assess & lead':s.discipline==='osteo'?'down-regulation':'soft-tissue support');
             return{s,mp,score,reasons,role,rapport};
@@ -11478,11 +11492,11 @@ function SystematicPage({staff=[]}){
             <div style={{marginTop:20}}>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginBottom:4}}>Suggested Clinicians</div>
               <div style={{fontSize:12.5,color:'#666',marginBottom:10}}>Ranked by clinical fit (discipline, what they treat, specializations){caseSport.length?', plus shared sport / lifestyle for rapport':''} — availability and the lead's judgment decide. {hasFlags?<span style={{color:'#e0a0a0'}}>Medical screen flagged: leads below assess & clear first; support is comfort-only in the interim.</span>:''}</div>
-              {bestFit&&(()=>{const sp=(bestFit.reasons.find(r=>r.indexOf('shares:')===0)||'').replace('shares: ','');const disc=DISCL[bestFit.s.discipline]||bestFit.s.discipline;const site=(typeof siteList==='function'?siteList(bestFit.s)[0]:bestFit.s.site)||bestFit.s.site||'';return(
+              {bestFit&&(()=>{const rr=bestFit.reasons.find(r=>r.indexOf('plays ')===0||r.indexOf('shares:')===0||r.indexOf('related sport')===0)||'';const sp=rr.replace('plays ','').replace('shares: ','').replace('related sport: ','');const disc=DISCL[bestFit.s.discipline]||bestFit.s.discipline;const site=(typeof siteList==='function'?siteList(bestFit.s)[0]:bestFit.s.site)||bestFit.s.site||'';return(
                 <div style={{background:'linear-gradient(180deg,rgba(202,232,193,.11),rgba(202,232,193,.02))',border:'1px solid rgba(202,232,193,.45)',borderRadius:9,padding:'13px 16px',marginBottom:14}}>
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:800,letterSpacing:'1px',color:LIME,marginBottom:4}}>★ START HERE — STRONGEST CONNECTION</div>
                   <div style={{fontSize:17,fontWeight:800,color:'#fff'}}>{bestFit.s.name} <span style={{fontSize:13,color:BLU,fontWeight:600}}>· {disc} · {site}</span></div>
-                  <div style={{fontSize:13,color:'#cde8c4',marginTop:5,lineHeight:1.55}}>{sp?<>Also into <strong style={{color:LIME}}>{sp}</strong> — l</>:'L'}eading with that connection builds rapport, buy-in and trust, which drives retention and a faster recovery. They make the patient feel understood and are the best entry point. They set and own the appropriate co-treatment plan with the lead/support team below — not a lock to one clinician, but the strongest place to start.</div>
+                  <div style={{fontSize:13,color:'#cde8c4',marginTop:5,lineHeight:1.55}}>{sp?<>Shares <strong style={{color:LIME}}>{sp}</strong> with the patient — l</>:'L'}eading with that connection builds rapport, buy-in and trust, which drives retention and a faster recovery. They make the patient feel understood and are the best entry point. They set and own the appropriate co-treatment plan with the lead/support team below — not a lock to one clinician, but the strongest place to start.</div>
                 </div>);})()}
               {leads.length>0&&<div style={{fontSize:12,color:LIME,fontWeight:700,letterSpacing:'.5px',margin:'4px 0 6px'}}>LEAD — diagnose & own the plan</div>}
               {leads.map(r=><Row key={r.s.id} {...r}/>)}
