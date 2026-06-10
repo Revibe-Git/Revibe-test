@@ -10854,6 +10854,8 @@ function SystematicPage({staff=[]}){
   const MC_MECH=['Traumatic / specific incident','Overuse / repetitive','Insidious / no clear cause','Post-surgical'];
   const MC_LIFE=['Competitive athlete','Active adult','General / desk-based','Post-partum','Older adult'];
   const MC_DX=['Yes — diagnosed by Physio/Chiro','No — not yet assessed'];
+  const MC_SITTING=['<4 hrs/day','4–8 hrs/day','8+ hrs/day'];
+  const SITTING_RULE={'<4 hrs/day':{min:'2.5 hrs/week',strong:'5+ hrs/week'},'4–8 hrs/day':{min:'2.5–5 hrs/week',strong:'5–7.5 hrs/week'},'8+ hrs/day':{min:'5 hrs/week',strong:'7–8.75 hrs/week'}};
   const RED_FLAGS=[
     'Suspected fracture / severe deformity / cannot bear weight',
     'Neuro signs — numbness, progressive weakness, bowel/bladder change',
@@ -11189,10 +11191,15 @@ function SystematicPage({staff=[]}){
       <select value={val} onChange={e=>setMcv(k,e.target.value)} style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,color:val?'#eee':'#777',fontSize:14,padding:'8px 10px'}}>
         <option value="">—</option>{opts.map(o=><option key={o} value={o}>{o}</option>)}
       </select></div>);
+    const asArr=(v)=>Array.isArray(v)?v:(v?[v]:[]);
+    const regions=asArr(mc.region);const lifestyles=asArr(mc.lifestyle);
+    const Multi=({label,opts,k,col})=>{const cur=asArr(mc[k]);return(<div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:6}}>{label}</div>
+      <div style={{display:'flex',flexWrap:'wrap',gap:6}}>{opts.map(o=>{const on=cur.includes(o);return(<button key={o} type="button" onClick={()=>setMcv(k,on?cur.filter(x=>x!==o):[...cur,o])} style={{fontSize:12.5,padding:'4px 10px',borderRadius:5,border:'1px solid '+(on?col[0]:'var(--border2)'),background:on?col[1]:'var(--surface3)',color:on?col[2]:'#666',cursor:'pointer',fontWeight:on?700:400}}>{on?'✓ ':''}{o}</button>);})}</div></div>);};
+    const lensText=(lf)=>lf==='Competitive athlete'?'Compress phases as tolerated; bring Performance/S&C in earlier; return-to-sport testing before clearance.':lf==='Post-partum'?'Consider pelvic-floor PT involvement; progress conservatively around recovery demands.':lf==='Older adult'?'More conservative loading; screen for comorbidities; prioritise function and safety.':lf==='General / desk-based'?'Emphasis on function and ergonomics over sport metrics; longer indirect phase if irritable.':lf==='Active adult'?'Keep them moving — modify load rather than rest fully; progress toward their usual activity.':'Progress to tolerance toward the patient\u2019s functional goals.';
     const hasFlags=flags.length>0;
-    const ready=mc.region&&mc.phase;
-    const rule=(CASE_RULES[mc.region]&&CASE_RULES[mc.region].phases||{})[mc.phase];
-    const ruleBasis=CASE_RULES[mc.region]&&CASE_RULES[mc.region].basis;
+    const ready=regions.length>0&&mc.phase;
+    const ruleHits=regions.map(r=>({region:r,rule:(CASE_RULES[r]&&CASE_RULES[r].phases||{})[mc.phase],basis:CASE_RULES[r]&&CASE_RULES[r].basis})).filter(x=>x.rule);
+    const unruled=regions.filter(r=>!((CASE_RULES[r]&&CASE_RULES[r].phases||{})[mc.phase]));
     const highIrrit=mc.irritability==='High'||mc.pain==='7–10 (severe)';
     const needsDx=mc.diagnosed==='No — not yet assessed';
     const LIME='#CAE8C1',PUR='#BB99FF',BLU='#7FC8E8',ORG='#E0A052',RED='#E05252';
@@ -11218,15 +11225,17 @@ function SystematicPage({staff=[]}){
         </div>
 
         {/* Inputs */}
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:18}}>
-          <Sel label="Body region" val={mc.region} opts={MC_REGIONS} k="region"/>
+        <div style={{marginBottom:6}}><Multi label="Body region(s) — select all that apply" opts={MC_REGIONS} k="region" col={['rgba(127,200,232,.45)','rgba(127,200,232,.14)','#7FC8E8']}/></div>
+        <div style={{fontSize:11.5,color:'#666',marginBottom:14,fontStyle:'italic'}}>Add every area in play (e.g. acute low back <em>plus</em> a history of ankle issues). Phase, irritability &amp; pain below describe the active/primary complaint.</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12,marginBottom:14}}>
           <Sel label="Phase" val={mc.phase} opts={MC_PHASES} k="phase"/>
           <Sel label="Irritability" val={mc.irritability} opts={MC_IRRIT} k="irritability"/>
           <Sel label="Pain level" val={mc.pain} opts={MC_PAIN} k="pain"/>
           <Sel label="Mechanism" val={mc.mechanism} opts={MC_MECH} k="mechanism"/>
-          <Sel label="Lifestyle / goal" val={mc.lifestyle} opts={MC_LIFE} k="lifestyle"/>
+          <Sel label="Daily sitting" val={mc.sitting} opts={MC_SITTING} k="sitting"/>
           <Sel label="Diagnosed yet?" val={mc.diagnosed} opts={MC_DX} k="diagnosed"/>
         </div>
+        <div style={{marginBottom:18}}><Multi label="Lifestyle / goal — select all that apply" opts={MC_LIFE} k="lifestyle" col={['rgba(187,153,255,.45)','rgba(187,153,255,.14)','#BB99FF']}/></div>
         <div style={{marginBottom:18}}>
           <div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:6}}>Patient activity &amp; lifestyle <span style={{textTransform:'none',letterSpacing:0,color:'#7FC8E8'}}>(optional — sport, work demands, life stage; powers clinician matching)</span></div>
           {LIFE_CONTEXT.map(grp=>(<div key={grp.g} style={{marginBottom:8}}>
@@ -11247,23 +11256,25 @@ function SystematicPage({staff=[]}){
         ):(
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'16px 18px'}}>
             {needsDx&&stepCard('1',BLU,'Diagnose first','Physio or Chiro establishes the diagnosis and owns the plan before treatment proceeds.')}
-            {highIrrit&&stepCard(needsDx?'2':'1',PUR,'Down-regulate before active care','High irritability / pain — settle the nervous system first with RMT or Osteo (indirect) before any active loading.')}
-            {rule?stepCard('★',LIME,`${mc.region} · ${mc.phase} — verified pathway`,
-              <span><span style={{color:LIME,fontWeight:700}}>Lead:</span> {rule.lead} &nbsp;·&nbsp; <span style={{color:PUR,fontWeight:700}}>Support:</span> {rule.support}<br/><span style={{color:'#888',fontWeight:700}}>Goal:</span> {rule.goal}<br/><span style={{color:ORG,fontWeight:700}}>Advance when:</span> {rule.gate}<br/><span style={{fontSize:12,color:'#888',fontStyle:'italic'}}>Basis: {ruleBasis}</span></span>
-            ):stepCard('•','#9aa',`${mc.phase} — general approach`,
+            {highIrrit&&stepCard(needsDx?'2':'1',PUR,'Settle first — sequence by pain','High irritability / pain — calm it before active loading. Typical order: Osteo to down-regulate → RMT for soft-tissue on the painful region → then Physio leads the active plan and the root-cause work. Adjust to the patient.')}
+            {ruleHits.map(h=>stepCard('★',LIME,`${h.region} · ${mc.phase} — verified pathway`,
+              <span><span style={{color:LIME,fontWeight:700}}>Lead:</span> {h.rule.lead} &nbsp;·&nbsp; <span style={{color:PUR,fontWeight:700}}>Support:</span> {h.rule.support}<br/><span style={{color:'#888',fontWeight:700}}>Goal:</span> {h.rule.goal}<br/><span style={{color:ORG,fontWeight:700}}>Advance when:</span> {h.rule.gate}<br/><span style={{fontSize:12,color:'#888',fontStyle:'italic'}}>Basis: {h.basis}</span></span>
+            ))}
+            {unruled.length>0&&stepCard('•','#9aa',`${mc.phase} — general approach${ruleHits.length>0?' · '+unruled.join(', '):''}`,
               (mc.phase.startsWith('Acute')?'Indirect first — manage inflammation/circulation, not direct tissue work. Lead = Physio; Support by pain threshold (high → Osteo, lower → RMT).':
                mc.phase.startsWith('Subacute')?'Progressive loading to tolerance. Lead = Physio; Support = RMT.':
                mc.phase.startsWith('Chronic')?'Target capacity & structural drivers, not compensations. Lead = Physio.':
                mc.phase.startsWith('Post')?'Respect surgical protocol; rebuild capacity through gates. Lead = Physio (± S&C).':
                'Confirm phase and lead.')+' — no region-specific verified rule yet; lead confirms specifics.')}
-            {mc.lifestyle&&stepCard('↳',BLU,'Lifestyle lens',
-              (mc.lifestyle==='Competitive athlete'?'Compress phases as tolerated; bring Performance/S&C in earlier; return-to-sport testing before clearance.':
-               mc.lifestyle==='Post-partum'?'Consider pelvic-floor PT involvement; progress conservatively around recovery demands.':
-               mc.lifestyle==='Older adult'?'More conservative loading; screen for comorbidities; prioritise function and safety.':
-               mc.lifestyle==='General / desk-based'?'Emphasis on function and ergonomics over sport metrics; longer indirect phase if irritable.':
-               'Progress to tolerance toward the patient\u2019s functional goals.'))}
+            {lifestyles.map(lf=>stepCard('↳',BLU,'Lifestyle lens — '+lf,lensText(lf)))}
+            {mc.sitting&&SITTING_RULE[mc.sitting]&&stepCard('🪑',BLU,'Activity baseline & target',
+              <span>Sits ~{mc.sitting}. Movement goal: aim for at least <strong style={{color:LIME}}>{SITTING_RULE[mc.sitting].min}</strong>, ideally <strong style={{color:LIME}}>{SITTING_RULE[mc.sitting].strong}</strong>. The more they sit, the more counter-dosing is needed — build this into the home plan and the discharge target.</span>)}
+            {stepCard('🔍',ORG,'Treat the immediate issue — but find the driver',
+              regions.length>1
+                ? <span>Several areas are in play ({regions.join(' + ')}). Calm the active complaint first, then have <strong style={{color:LIME}}>Physio assess whether one region is driving another</strong> — e.g. ankle mechanics loading the low back. Don’t discharge on symptom relief alone; the loudest site isn’t always the source.</span>
+                : <span>Relieve the presenting {regions[0]} now, but have <strong style={{color:LIME}}>Physio screen up and down the chain</strong> for a contributing driver (mobility, motor control, load history, old injuries). Treating only the painful site is how recurrences start.</span>)}
             {stepCard('→',LIME,'Progress by gates, then discharge','Advance on re-assessed capacity criteria — not the calendar. On completion: maintenance / membership, or refer internally if another discipline is better suited (Lead keeps the plan).')}
-            {!rule&&<div style={{fontSize:12.5,color:'#888',marginTop:6,fontStyle:'italic'}}>Specifics for {mc.region} aren\u2019t standardized yet. Add a verified rule and the mapper will return exact lead/support/timelines for this case.</div>}
+            {unruled.length>0&&<div style={{fontSize:12.5,color:'#888',marginTop:6,fontStyle:'italic'}}>Specifics for {unruled.join(', ')} aren\u2019t standardized yet. Add a verified rule and the mapper will return exact lead/support/timelines.</div>}
           </div>
         )}
 
@@ -11275,20 +11286,20 @@ function SystematicPage({staff=[]}){
           const highIrr=mc.irritability==='High'||mc.pain==='7\u201310 (severe)';
           // Region → clinically-relevant keywords (general MSK knowledge) to match against what each clinician treats
           const REGION_KW={'Ankle / foot':['ankle','foot','sprain','plantar','achilles','lower body','run','sport'],'Knee':['knee','acl','mcl','meniscus','patell','ligament','lower body','run','sport','post-surg','rehab'],'Hip / groin':['hip','groin','glute','lower body','mobility','sport'],'Low back':['back','lumbar','spine','disc','sciatic','core','chronic'],'Neck':['neck','cervical','headache','posture','desk','tmj','tension'],'Shoulder':['shoulder','rotator','overhead','rom','sport'],'Elbow / wrist':['elbow','wrist','tendon','tennis','golf','overuse','desk'],'Other / multi-region':[]};
-          const regKW=REGION_KW[mc.region]||[];
+          const regKW=Array.from(new Set(regions.flatMap(r=>REGION_KW[r]||[])));
           // Discipline base weight for this case — Physio/Chiro lead; Osteo/RMT support (Osteo↑ when irritable); Naturo only for holistic
-          const baseFor=(d)=>d==='pt'?4:d==='chiro'?3.6:d==='osteo'?(acute||highIrr?3:1.6):d==='rmt'?(acute||highIrr?2.3:2.7):d==='naturo'?(/holistic|fatigue|hormon|wellness|stress/.test(((mc.lifestyle||'')+(mc.mechanism||'')).toLowerCase())?1.6:0):0;
+          const baseFor=(d)=>d==='pt'?4:d==='chiro'?3.6:d==='osteo'?(acute||highIrr?3:1.6):d==='rmt'?(acute||highIrr?2.3:2.7):d==='naturo'?(/holistic|fatigue|hormon|wellness|stress/.test((lifestyles.join(' ')+(mc.mechanism||'')).toLowerCase())?1.6:0):0;
           const rows=(staff||[]).filter(s=>['pt','chiro','rmt','osteo','naturo'].includes(s.discipline)).map(s=>{
             const mp=s.match_profile||seedMatchFor(s.name)||{};const specs=s.specializations||[];
             let score=baseFor(s.discipline);if(score<=0)return null;
             const blob=((mp.expertise||'')+' '+(mp.conditions||'')+' '+(mp.treatments||'')+' '+(mp.bestClients||'')).toLowerCase();
             const reasons=[];
             const hits=regKW.filter(k=>blob.includes(k));
-            if(hits.length){score+=Math.min(hits.length,3)*0.9;reasons.push('treats '+mc.region.split(' / ')[0].toLowerCase());}
-            if(mc.lifestyle==='Post-partum'&&specs.includes('prenatalPostnatal')){score+=3;reasons.push('pre/postnatal');}
-            if(mc.lifestyle==='Competitive athlete'&&(specs.includes('sportsMassage')||/sport|athlet/.test(blob))){score+=1.5;reasons.push('sports focus');}
-            if(mc.lifestyle==='Older adult'&&/older|geriatr|gentle|relax/.test(blob)){score+=1;reasons.push('older-adult fit');}
-            if(mc.lifestyle==='General / desk-based'&&/desk|postur|tension|ergonom/.test(blob)){score+=1;reasons.push('desk/posture');}
+            if(hits.length){score+=Math.min(hits.length,3)*0.9;reasons.push('treats '+Array.from(new Set(regions.map(r=>r.split(' / ')[0].toLowerCase()))).join(' & '));}
+            if(lifestyles.includes('Post-partum')&&specs.includes('prenatalPostnatal')){score+=3;reasons.push('pre/postnatal');}
+            if(lifestyles.includes('Competitive athlete')&&(specs.includes('sportsMassage')||/sport|athlet/.test(blob))){score+=1.5;reasons.push('sports focus');}
+            if(lifestyles.includes('Older adult')&&/older|geriatr|gentle|relax/.test(blob)){score+=1;reasons.push('older-adult fit');}
+            if(lifestyles.includes('General / desk-based')&&/desk|postur|tension|ergonom/.test(blob)){score+=1;reasons.push('desk/posture');}
             if(highIrr&&(specs.includes('acupuncture')||specs.includes('triggerPoint'))){score+=0.6;reasons.push('pain modalities');}
             const sSports=asSports(mp.sports);
             const sportHit=caseSport.filter(c=>sSports.some(x=>x.toLowerCase()===c.toLowerCase()));
