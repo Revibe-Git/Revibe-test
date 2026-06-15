@@ -2811,6 +2811,12 @@ function ProjectionCard({snapshots,filterDisc,filterSite,staff,revBasis,dataMaxM
   const metrics=[mk('Revenue','#CAE8C1',revAct,v=>'$'+Math.round(v).toLocaleString()),mk('Completed Visits','#BB99FF',visAct,v=>Math.round(v).toLocaleString()),mk('Initial Assessments','#F4DB71',iaAct,v=>Math.round(v).toString())].filter(m=>m.actual>0);
   if(!metrics.length)return null;
   const monthLbl=new Date(projMonth+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
+  const projRev=(v)=>partial?Math.round(v/dayOfMonth*daysInMonth):Math.round(v);
+  const allClin=(snapshots||[]).filter(s=>s.date&&s.date.startsWith(projMonth)).flatMap(s=>(s.rows||[]).filter(r=>{if(!r.staffId)return false;const s2=(staff||[]).find(x=>x.id===r.staffId);return s2&&!['mgmt','ops','edu'].includes(s2.discipline);}));
+  const _discMap={};allClin.forEach(r=>{const s2=(staff||[]).find(x=>x.id===r.staffId);if(!s2)return;_discMap[s2.discipline]=(_discMap[s2.discipline]||0)+(parseFloat(r.revenue)||0);});
+  const byDisc=Object.entries(_discMap).map(([d,v])=>({label:DISCL[d]||d,rev:projRev(v)})).filter(x=>x.rev>0).sort((a,b)=>b.rev-a.rev);
+  const _locMap={};allClin.forEach(r=>{(SITES||[]).forEach(site=>{const rv=revForSite(r,site);if(rv)_locMap[site]=(_locMap[site]||0)+rv;});});
+  const byLoc=Object.entries(_locMap).map(([l,v])=>({label:l,rev:projRev(v)})).filter(x=>x.rev>0).sort((a,b)=>b.rev-a.rev);
   return(<div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'18px 20px',marginBottom:14}}>
     <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:8}}>
       <div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#44CCAA',fontWeight:700,marginBottom:2}}>📈 {title?title+' · ':''}{monthLbl} — {partial?'Month-End Projection':'Month Total'}</div><div style={{fontSize:13,color:'#555'}}>{partial?`${dayOfMonth} of ${daysInMonth} days complete (${pct}%)${title?' · projected at current pace':''}`:'complete month'}</div></div>
@@ -2824,6 +2830,25 @@ function ProjectionCard({snapshots,filterDisc,filterSite,staff,revBasis,dataMaxM
         {partial&&<div style={{marginTop:10,height:3,background:'var(--surface2)',borderRadius:2}}><div style={{height:'100%',borderRadius:2,background:color,width:Math.min(100,pct)+'%'}}/></div>}
       </div>))}
     </div>
+    {!staffId&&(byDisc.length>1||byLoc.length>1)&&(<div style={{marginTop:14,paddingTop:14,borderTop:'1px solid var(--border)'}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:18}}>
+        {byDisc.length>1&&<div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:8}}>{partial?'Projected':'Month'} revenue by discipline</div>
+          {byDisc.map(d=>{const w=Math.round(d.rev/byDisc[0].rev*100);return(<div key={d.label} style={{marginBottom:6}}>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:2}}><span style={{color:'#ccc'}}>{d.label}</span><span style={{color:'#CAE8C1',fontWeight:600}}>${d.rev.toLocaleString()}</span></div>
+            <div style={{height:5,background:'var(--surface3)',borderRadius:3}}><div style={{height:'100%',borderRadius:3,background:'#BB99FF',width:w+'%'}}/></div>
+          </div>);})}
+        </div>}
+        {byLoc.length>1&&<div>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:8}}>{partial?'Projected':'Month'} revenue by location</div>
+          {byLoc.map(d=>{const w=Math.round(d.rev/byLoc[0].rev*100);return(<div key={d.label} style={{marginBottom:6}}>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:2}}><span style={{color:'#ccc'}}>{d.label}</span><span style={{color:'#CAE8C1',fontWeight:600}}>${d.rev.toLocaleString()}</span></div>
+            <div style={{height:5,background:'var(--surface3)',borderRadius:3}}><div style={{height:'100%',borderRadius:3,background:'#7FC8E8',width:w+'%'}}/></div>
+          </div>);})}
+        </div>}
+      </div>
+      <div style={{fontSize:11,color:'#555',marginTop:8}}>{partial?'Projected to month-end at current daily pace. ':'Month totals. '}Spans all clinical staff &amp; locations, regardless of the filters above.</div>
+    </div>)}
   </div>);
 }
 function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filterSite,dateFrom,dateTo,timeframe,snapshots}){
@@ -3306,6 +3331,14 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[pendingShift,setPendingShift]=useState(null); // parsed rows of a dropped undated shift report, awaiting month confirmation
   const[pendingShiftMonth,setPendingShiftMonth]=useState('');
   const[revBasis,setRevBasis]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_rev_basis')||'{}');}catch(e){return{};}}); // {month:{billed,collected}} for the billed-vs-collected view
+  // Reconcile the month billed total from the (correctly-merged, all-weeks) daily store. This
+  // self-heals months whose total was overwritten by an older weekly import that replaced
+  // instead of accumulating. Only touches months that actually have daily rows; collected kept.
+  useEffect(()=>{
+    if(!dailyRevenue||!dailyRevenue.length)return;
+    const d={};dailyRevenue.forEach(r=>{const m=(r.date||'').slice(0,7);if(m.length!==7)return;d[m]=(d[m]||0)+(parseFloat(r.revenue)||0);});
+    setRevBasis(prev=>{let changed=false;const n={...prev};Object.keys(d).forEach(m=>{const b=Math.round(d[m]*100)/100;const cur=n[m]||{};if(Math.abs((cur.billed||0)-b)>0.5){n[m]={billed:b,collected:cur.collected||0};changed=true;}});if(changed){try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(n));}catch(e){}try{const SB=window.__SB;if(SB)SB.from('revenue_basis').upsert({id:'singleton',data:n});}catch(e){}}return changed?n:prev;});
+  },[dailyRevenue]);// eslint-disable-line
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
   const[periodFilter,setPeriodFilter]=useState(()=>new Date().toISOString().slice(0,7));
@@ -3512,12 +3545,13 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const matched=name?matchStaff(name):null;
       const sid=matched?matched.id:'_clinic';
       const key=sid+'_'+dateStr;
-      if(!byKey[key])byKey[key]={id:key,staff_id:sid,date:dateStr,revenue:0,revByLoc:{}};
+      if(!byKey[key])byKey[key]={id:key,staff_id:sid,date:dateStr,revenue:0,collected:0,revByLoc:{}};
       byKey[key].revenue+=total;
+      byKey[key].collected+=(parseFloat((r['collected']||'0').toString().replace(/[$,\s]/g,''))||0);
       const loc=normLoc(r['location']||'');
       if(loc)byKey[key].revByLoc[loc]=(byKey[key].revByLoc[loc]||0)+total;
     });
-    return Object.values(byKey).map(r=>{const rl={};Object.entries(r.revByLoc||{}).forEach(([k,v])=>rl[k]=Math.round(v*100)/100);return{...r,revenue:Math.round(r.revenue*100)/100,revByLoc:rl};});
+    return Object.values(byKey).map(r=>{const rl={};Object.entries(r.revByLoc||{}).forEach(([k,v])=>rl[k]=Math.round(v*100)/100);return{...r,revenue:Math.round(r.revenue*100)/100,collected:Math.round((r.collected||0)*100)/100,revByLoc:rl};});
   };
 
   /* ── Aggregate daily data for any date range ── */
@@ -3825,48 +3859,20 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           }
         }
       }else if(type==='sales'){
-        const byMonth=parseSalesByMonth(rows);
-        const _n2=(r)=>{const o={};Object.entries(r).forEach(([k,v])=>o[k.toLowerCase().trim()]=v?.toString().trim()||'');return o;};
-        // Billed vs collected per month (for the comparison view) — kept in localStorage, no DB column needed
-        // Build this import's months fresh, then REPLACE those months in the store
-        // (re-importing the same file must not stack on top of prior totals).
-        const _fresh={};
-        rows.forEach(row=>{const r=_n2(row);const billed=parseFloat((r['total']||'0').replace(/[$,\s]/g,''))||0;const coll=parseFloat((r['collected']||'0').replace(/[$,\s]/g,''))||0;if(!billed&&!coll)return;const m=getMonth(r['purchase date']||r['invoice date']);if(!m)return;if(!_fresh[m])_fresh[m]={billed:0,collected:0};_fresh[m].billed+=billed;_fresh[m].collected+=coll;});
-        Object.keys(_fresh).forEach(m=>{_fresh[m].billed=Math.round(_fresh[m].billed*100)/100;_fresh[m].collected=Math.round(_fresh[m].collected*100)/100;});
-        const _basis={...revBasis,..._fresh};
-        setRevBasis(_basis);try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(_basis));}catch(e){}
-        try{const SB=window.__SB;if(SB)await SB.from('revenue_basis').upsert({id:'singleton',data:_basis});}catch(e){console.warn('revenue_basis sync',e);}
-        const _sd=rows.map(r=>{const n=_n2(r);return(n['purchase date']||n['invoice date']||'').slice(0,10);}).filter(d=>d.length===10).sort();
-        const _lastSaleDate=_sd.length?_sd[_sd.length-1]:null;
-        Object.entries(byMonth).forEach(([month,parsed])=>{
-          totalPractitioners=Math.max(totalPractitioners,parsed.length);
-          totalMatched=Math.max(totalMatched,parsed.filter(r=>r.staffId).length);
-          monthsCreated.push(month);
-          const snapDate=month+'-01';
-          const existingIdx=newSnapshots.findIndex(s=>s.date.startsWith(month));
-          if(existingIdx>=0){
-            const existing=newSnapshots[existingIdx];
-            const mergedRows=[...existing.rows];
-            parsed.forEach(nr=>{
-              const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
-              if(idx>=0){if(nr.revenue!=null)mergedRows[idx]={...mergedRows[idx],revenue:nr.revenue,revByLoc:nr.revByLoc||mergedRows[idx].revByLoc};}
-              else if(nr.name==='_clinic'){const ci=mergedRows.findIndex(r=>r.name==='_clinic');if(ci>=0)mergedRows[ci]={...mergedRows[ci],revenue:nr.revenue};else mergedRows.push(nr);}else mergedRows.push(nr);
-            });
-            newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
-          }else{
-            newSnapshots.push({id:'snap_'+month+'_sales',date:snapDate,rows:parsed,files:[file.name],type:'sales'});
-          }
-        });
-        // Also build daily revenue data
+        // Daily revenue is the source of truth: parse this file's day-rows and MERGE into the
+        // running store keyed by staff+date. Re-importing the same dates overwrites just those
+        // days (no double-count); a new week adds new days. The month total + per-staff snapshot
+        // revenue are then DERIVED from the merged daily data, so weekly uploads accumulate
+        // instead of the latest file replacing the month.
         const newDailyRev=parseDailyRevenue(rows);
+        const existing=new Map(dailyRevenue.map(r=>[r.id,r]));
+        newDailyRev.forEach(r=>existing.set(r.id,r));
+        const merged=[...existing.values()];
+        setDailyRevenue(merged);
+        try{localStorage.setItem('rvgd3_daily_rev',JSON.stringify(merged));}catch(e){}
+        window.__dailyRevCount=newDailyRev.length;window.__dailyRevErr=null;window.__revLocUnsynced=false;
         if(newDailyRev.length>0){
-          const existing=new Map(dailyRevenue.map(r=>[r.id,r]));
-          newDailyRev.forEach(r=>existing.set(r.id,r));
-          const merged=[...existing.values()];
-          setDailyRevenue(merged);
-          try{localStorage.setItem('rvgd3_daily_rev',JSON.stringify(merged));}catch(e){}
           const SB=window.__SB;
-          window.__dailyRevCount=newDailyRev.length;window.__dailyRevErr=null;window.__revLocUnsynced=false;
           if(SB){
             const chunks=[];
             for(let i=0;i<newDailyRev.length;i+=500)chunks.push(newDailyRev.slice(i,i+500));
@@ -3874,10 +3880,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             for(const chunk of chunks){
               const{error}=await SB.from('daily_revenue').upsert(chunk);
               if(error){
-                // The daily_revenue table may not have the revByLoc column yet — without this
-                // fallback the whole upsert fails and revenue silently never persists. Retry with
-                // just the core columns so revenue still saves (location split needs the column).
-                const bare=chunk.map(({revByLoc,...r})=>r);
+                // daily_revenue may lack the revByLoc / collected columns — retry with core columns
+                const bare=chunk.map(({revByLoc,collected,...r})=>r);
                 const r2=await SB.from('daily_revenue').upsert(bare);
                 if(r2.error){revErr=r2.error.message;break;}
                 stripped=true;
@@ -3887,6 +3891,33 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             if(revErr)console.warn('daily_revenue sync error:',revErr);
           }
         }
+        // Months that have daily data, derived from the MERGED store (accumulates all weeks)
+        const rbDerived={};
+        merged.forEach(r=>{const m=(r.date||'').slice(0,7);if(!m||m.length!==7)return;if(!rbDerived[m])rbDerived[m]={billed:0,collected:0};rbDerived[m].billed+=(parseFloat(r.revenue)||0);rbDerived[m].collected+=(parseFloat(r.collected)||0);});
+        const _basis={...revBasis};
+        Object.keys(rbDerived).forEach(m=>{const b=Math.round(rbDerived[m].billed*100)/100;const c=Math.round(rbDerived[m].collected*100)/100;const prev=revBasis[m]||{};_basis[m]={billed:b,collected:c>0?c:(prev.collected||0)};});
+        setRevBasis(_basis);try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(_basis));}catch(e){}
+        try{const SB=window.__SB;if(SB)await SB.from('revenue_basis').upsert({id:'singleton',data:_basis});}catch(e){console.warn('revenue_basis sync',e);}
+        // Derive per-staff snapshot revenue for each affected month from the merged daily data,
+        // preserving any appointment fields (completed / IA) already on those rows.
+        Object.keys(rbDerived).forEach(month=>{
+          const dayRows=merged.filter(r=>(r.date||'').slice(0,7)===month);
+          const byStaff={};
+          dayRows.forEach(r=>{const k=r.staff_id||'_clinic';if(!byStaff[k])byStaff[k]={revenue:0,revByLoc:{}};byStaff[k].revenue+=(parseFloat(r.revenue)||0);Object.entries(r.revByLoc||{}).forEach(([l,v])=>byStaff[k].revByLoc[l]=(byStaff[k].revByLoc[l]||0)+v);});
+          Object.keys(byStaff).forEach(k=>{byStaff[k].revenue=Math.round(byStaff[k].revenue*100)/100;Object.keys(byStaff[k].revByLoc).forEach(l=>byStaff[k].revByLoc[l]=Math.round(byStaff[k].revByLoc[l]*100)/100);});
+          totalPractitioners=Math.max(totalPractitioners,Object.keys(byStaff).filter(k=>k!=='_clinic').length);
+          totalMatched=Math.max(totalMatched,Object.keys(byStaff).filter(k=>k!=='_clinic').length);
+          monthsCreated.push(month);
+          const mapRow=(sid)=>{const isClin=sid==='_clinic';const nm=isClin?'_clinic':((staff.find(x=>x.id===sid)||{}).name||sid);return{name:nm,staffId:isClin?null:sid,matchedName:isClin?null:nm,revenue:byStaff[sid].revenue,revByLoc:byStaff[sid].revByLoc};};
+          const idx=newSnapshots.findIndex(s=>s.date&&s.date.startsWith(month));
+          if(idx>=0){
+            const rows2=[...newSnapshots[idx].rows];
+            Object.keys(byStaff).forEach(sid=>{const rIdx=sid==='_clinic'?rows2.findIndex(r=>r.name==='_clinic'):rows2.findIndex(r=>r.staffId===sid);if(rIdx>=0)rows2[rIdx]={...rows2[rIdx],revenue:byStaff[sid].revenue,revByLoc:byStaff[sid].revByLoc};else rows2.push(mapRow(sid));});
+            newSnapshots[idx]={...newSnapshots[idx],rows:rows2,files:[...(newSnapshots[idx].files||[]),file.name].filter((v,i,a)=>a.indexOf(v)===i)};
+          }else{
+            newSnapshots.push({id:'snap_'+month+'_sales',date:month+'-01',rows:Object.keys(byStaff).map(mapRow),files:[file.name],type:'sales'});
+          }
+        });
       }else if(type==='shift'){
         const {byMonth:shiftByMonth,anyDated}=parseShiftByMonth(rows);
         const allRows=Object.values(shiftByMonth).flat();
@@ -5395,7 +5426,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:12}}>
               {[
                 {n:1,title:'Appointments Report',where:'Reports → Appointments',action:'Set date range → ··· menu → Export CSV',cols:'staff_member_name, state, no_show_at, cancelled_at',note:'Gives: completed visits, no-shows, cancellations per practitioner'},
-                {n:2,title:'Shift Report',where:'Reports → Payroll → Timesheets',action:'Set date range → Export CSV',cols:'Staff Name, Appointment Total Hours, Shift Total Hours',note:'Gives: utilization % (Appt Hours ÷ Shift Hours)'},
+                {n:2,title:'Shift Report',where:'Reports → Hours Scheduled / Booked tab',action:'Set date range → Export CSV',cols:'Staff Name, Hours Booked, Hours Scheduled',note:'Gives: utilization % (Booked ÷ Scheduled hrs)'},
                 {n:3,title:'Sales Report',where:'Reports → Sales',action:'Set date range → Export CSV',cols:'Staff Member, Status, Income Category, Collected',note:'Gives: revenue per practitioner (paid treatment income only)'},
                 {n:4,title:'Member Retention',where:'Reports → Member Retention',action:'Set the month → Export CSV → set "Retention report month" below before dropping',cols:'New Patients, % Returning (clinic, per location, per practitioner)',note:'Gives: clinic & location retention + auto-fills each practitioner’s retention %'},
               ].map(s=>(
