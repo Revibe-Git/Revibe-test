@@ -5449,7 +5449,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 {n:1,title:'Appointments Report',where:'Reports → Appointments',action:'Set date range → ··· menu → Export CSV',cols:'staff_member_name, state, no_show_at, cancelled_at',note:'Gives: completed visits, no-shows, cancellations per practitioner'},
                 {n:2,title:'Shift Report',where:'Reports → Hours Scheduled / Booked tab',action:'Set date range → Export CSV',cols:'Staff Name, Hours Booked, Hours Scheduled',note:'Gives: utilization % (Booked ÷ Scheduled hrs)'},
                 {n:3,title:'Sales Report',where:'Reports → Sales',action:'Set date range → Export CSV',cols:'Staff Member, Status, Income Category, Collected',note:'Gives: revenue per practitioner (paid treatment income only)'},
-                {n:4,title:'Member Retention',where:'Reports → Member Retention',action:'Set the month → Export CSV → set "Retention report month" below before dropping',cols:'New Patients, % Returning (clinic, per location, per practitioner)',note:'Gives: clinic & location retention + auto-fills each practitioner’s retention %'},
+                {n:4,title:'Member Retention',where:'Reports → Member Retention',action:'Export the FULL month range (end of month) → set "Retention report month" below before dropping',cols:'New Patients, % Returning (clinic, per location, per practitioner)',note:'Full-month only — retention counts distinct patients over a window, so it can’t stack week-to-week. Each upload replaces that month.'},
               ].map(s=>(
                 <div key={s.n} style={{background:'var(--surface3)',borderRadius:5,padding:'12px 14px',border:'1px solid var(--border)'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
@@ -5508,7 +5508,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#BB99FF'}}>Retention Report Month</div>
               <input type="month" value={retentionMonth} onChange={e=>setRetentionMonth(e.target.value)}
                 style={{background:'var(--surface2)',border:'1px solid #BB99FF55',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none'}}/>
-              <span style={{fontSize:13,color:'#666'}}>set this before dropping the Member Retention CSV</span>
+              <span style={{fontSize:13,color:'#666'}}>set this before dropping the Member Retention CSV · export the <strong style={{color:'#888'}}>full month</strong> (do it at month-end) — it replaces, doesn’t stack</span>
             </div>
           </div>
 
