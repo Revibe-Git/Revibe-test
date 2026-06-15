@@ -3142,6 +3142,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   // Daily granular data — stores per-staff per-day aggregates
   const[dailyAppts,setDailyAppts]=useState([]);
   const[dailyRevenue,setDailyRevenue]=useState([]);
+  const[dailyShift,setDailyShift]=useState([]);
   // ── Weekly/Monthly reports ──
   const[reportType,setReportType]=useState('week');
   const[reportAnchor,setReportAnchor]=useState(null);
@@ -3174,6 +3175,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   useEffect(()=>{
     try{const s=localStorage.getItem('rvgd3_daily_appts');if(s)setDailyAppts(JSON.parse(s));}catch(e){}
     try{const s=localStorage.getItem('rvgd3_daily_rev');if(s)setDailyRevenue(JSON.parse(s));}catch(e){}
+    try{const s=localStorage.getItem('rvgd3_daily_shift');if(s)setDailyShift(JSON.parse(s));}catch(e){}
   },[]);
 
   // Load daily data from Supabase
@@ -3250,6 +3252,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       try{
         const{data:rb}=await SB.from('revenue_basis').select('data').eq('id','singleton').maybeSingle();
         if(rb&&rb.data&&typeof rb.data==='object'){setRevBasis(rb.data);try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(rb.data));}catch(e){}}
+      }catch(e){}
+      try{
+        const{data:sd}=await SB.from('shift_daily').select('data').eq('id','singleton').maybeSingle();
+        if(sd&&Array.isArray(sd.data)){setDailyShift(sd.data);try{localStorage.setItem('rvgd3_daily_shift',JSON.stringify(sd.data));}catch(e){}}
       }catch(e){}
       try{
         const{data:rs}=await SB.from('retention_summaries').select('data').eq('id','singleton').maybeSingle();
@@ -3516,7 +3522,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const dateStr=(r['start_at']||'').slice(0,10);
       if(!dateStr||dateStr.length!==10)return;
       const key=matched.id+'_'+dateStr;
-      if(!byKey[key])byKey[key]={id:key,staff_id:matched.id,date:dateStr,completed:0,initial_assessments:0,no_shows:0,cancellations:0};
+      if(!byKey[key])byKey[key]={id:key,staff_id:matched.id,date:dateStr,completed:0,initial_assessments:0,no_shows:0,cancellations:0,rescheduled:0};
       const state=(r['state']||'').toLowerCase();
       const treatmentName=(r['treatment_name']||'').toLowerCase();
       const isInitial=treatmentName.startsWith('initial');
@@ -3525,11 +3531,29 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         if(isInitial)byKey[key].initial_assessments++;
       } else if(state==='no_show')byKey[key].no_shows++;
       else if(state==='cancelled')byKey[key].cancellations++;
+      else if(state==='rescheduled')byKey[key].rescheduled++;
     });
     return Object.values(byKey);
   };
 
-  /* ── Parse daily revenue ───────────────────── */
+  /* ── Parse daily shift (per-day hours, for weekly-stacking utilization) ── */
+  const parseDailyShift=(rows)=>{
+    const byKey={};
+    rows.forEach(r=>{
+      const name=(r['staff name']||r['name']||Object.values(r)[0]||'').trim();
+      if(!name||/^revibe|^total|^personal training$/i.test(name)||name==='Guest Experience'||name==='Relax Spa')return;
+      const dateStr=(r['date']||'').slice(0,10);
+      if(!dateStr||dateStr.length!==10)return;
+      const matched=matchStaff(name);if(!matched)return;
+      const apptHrs=parseFloat(r['appointment total hours']||r['appointment_total_hours']||r['booked (hrs)']||r['booked']||0)||0;
+      const shiftHrs=parseFloat(r['shift total hours']||r['shift_total_hours']||r['scheduled (hrs)']||r['scheduled']||0)||0;
+      const apptCount=parseInt(r['appointment total count']||r['appointment_total_count']||r['total bookings']||0)||0;
+      const key=matched.id+'_'+dateStr;
+      if(!byKey[key])byKey[key]={id:key,staff_id:matched.id,date:dateStr,apptHrs:0,shiftHrs:0,apptCount:0};
+      byKey[key].apptHrs+=apptHrs;byKey[key].shiftHrs+=shiftHrs;byKey[key].apptCount+=apptCount;
+    });
+    return Object.values(byKey).map(r=>({...r,apptHrs:Math.round(r.apptHrs*100)/100,shiftHrs:Math.round(r.shiftHrs*100)/100}));
+  };
   const parseDailyRevenue=(rows)=>{
     // Match the books: billed Total, ALL income categories, ALL statuses, by purchase date.
     // Matched clinical practitioners get their own staff_id; everything else (front desk,
@@ -3816,48 +3840,44 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       let totalPractitioners=0,totalMatched=0,monthsCreated=[];
 
       if(type==='appointments'){
-        const byMonth=aggregateAppointmentsByMonth(rows);
-        Object.entries(byMonth).forEach(([month,parsed])=>{
-          totalPractitioners=Math.max(totalPractitioners,parsed.length);
-          totalMatched=Math.max(totalMatched,parsed.filter(r=>r.staffId).length);
-          monthsCreated.push(month);
-          const snapDate=month+'-01';
-          const existingIdx=newSnapshots.findIndex(s=>s.date.startsWith(month));
-          if(existingIdx>=0){
-            const existing=newSnapshots[existingIdx];
-            const mergedRows=[...existing.rows];
-            parsed.forEach(nr=>{
-              const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));
-              if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};
-              else mergedRows.push(nr);
-            });
-            newSnapshots[existingIdx]={...existing,rows:mergedRows,lastSaleDate:existing.lastSaleDate,files:[...(existing.files||[]),file.name]};
-          }else{
-            newSnapshots.push({id:'snap_'+month+'_appt',date:snapDate,rows:parsed,files:[file.name],type:'appointments'});
-          }
-        });
-        // Also build daily granular data
+        // Daily appointments are the source of truth: parse + MERGE by staff+date (re-importing
+        // the same days overwrites just those days; new weeks add). Per-staff month counts are
+        // DERIVED from the merged store, so weekly uploads accumulate instead of the latest file
+        // replacing the month.
         const newDailyAppts=parseDailyAppointments(rows);
-        if(newDailyAppts.length>0){
-          // Merge with existing daily data (upsert by id)
-          const existing=new Map(dailyAppts.map(r=>[r.id,r]));
-          newDailyAppts.forEach(r=>existing.set(r.id,r));
-          const merged=[...existing.values()];
-          setDailyAppts(merged);
-          try{localStorage.setItem('rvgd3_daily_appts',JSON.stringify(merged));}catch(e){}
-          // Save to Supabase
-          const SB=window.__SB;
-          if(SB){
-            const chunks=[];
-            for(let i=0;i<newDailyAppts.length;i+=500)chunks.push(newDailyAppts.slice(i,i+500));
-            let done=0;
-            for(const chunk of chunks){
-              await SB.from('daily_appointments').upsert(chunk);
-              done++;
-              if(chunks.length>1)setImportMsg({type:'info',msg:`Saving to Supabase… ${Math.round(done/chunks.length*100)}%`});
-            }
+        const existing=new Map(dailyAppts.map(r=>[r.id,r]));
+        newDailyAppts.forEach(r=>existing.set(r.id,r));
+        const merged=[...existing.values()];
+        setDailyAppts(merged);
+        try{localStorage.setItem('rvgd3_daily_appts',JSON.stringify(merged));}catch(e){}
+        const SB=window.__SB;
+        if(SB&&newDailyAppts.length>0){
+          const chunks=[];for(let i=0;i<newDailyAppts.length;i+=500)chunks.push(newDailyAppts.slice(i,i+500));
+          let done=0;
+          for(const chunk of chunks){
+            const{error}=await SB.from('daily_appointments').upsert(chunk);
+            if(error){const bare=chunk.map(({rescheduled,...r})=>r);await SB.from('daily_appointments').upsert(bare);}
+            done++;if(chunks.length>1)setImportMsg({type:'info',msg:`Saving to Supabase… ${Math.round(done/chunks.length*100)}%`});
           }
         }
+        const months=Array.from(new Set(newDailyAppts.map(r=>(r.date||'').slice(0,7)).filter(m=>m.length===7)));
+        months.forEach(month=>{
+          const dayRows=merged.filter(r=>(r.date||'').slice(0,7)===month);
+          const byStaff={};
+          dayRows.forEach(r=>{const k=r.staff_id;if(!k)return;if(!byStaff[k])byStaff[k]={completed:0,initialAssessments:0,noShows:0,cancellations:0,rescheduled:0};byStaff[k].completed+=(r.completed||0);byStaff[k].initialAssessments+=(r.initial_assessments||0);byStaff[k].noShows+=(r.no_shows||0);byStaff[k].cancellations+=(r.cancellations||0);byStaff[k].rescheduled+=(r.rescheduled||0);});
+          totalPractitioners=Math.max(totalPractitioners,Object.keys(byStaff).length);
+          totalMatched=Math.max(totalMatched,Object.keys(byStaff).length);
+          monthsCreated.push(month);
+          const mapRow=(sid)=>{const nm=(staff.find(x=>x.id===sid)||{}).name||sid;return{name:nm,staffId:sid,matchedName:nm,...byStaff[sid]};};
+          const idx=newSnapshots.findIndex(s=>s.date&&s.date.startsWith(month));
+          if(idx>=0){
+            const rows2=[...newSnapshots[idx].rows];
+            Object.keys(byStaff).forEach(sid=>{const v=byStaff[sid];const rIdx=rows2.findIndex(r=>r.staffId===sid);const resched=v.rescheduled||(rIdx>=0?rows2[rIdx].rescheduled:0)||0;if(rIdx>=0)rows2[rIdx]={...rows2[rIdx],completed:v.completed,initialAssessments:v.initialAssessments,noShows:v.noShows,cancellations:v.cancellations,rescheduled:resched};else rows2.push({...mapRow(sid),rescheduled:resched});});
+            newSnapshots[idx]={...newSnapshots[idx],rows:rows2,files:[...(newSnapshots[idx].files||[]),file.name].filter((v,i,a)=>a.indexOf(v)===i)};
+          }else{
+            newSnapshots.push({id:'snap_'+month+'_appt',date:month+'-01',rows:Object.keys(byStaff).map(mapRow),type:'appointments',files:[file.name]});
+          }
+        });
       }else if(type==='sales'){
         // Daily revenue is the source of truth: parse this file's day-rows and MERGE into the
         // running store keyed by staff+date. Re-importing the same dates overwrites just those
@@ -3919,38 +3939,39 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           }
         });
       }else if(type==='shift'){
-        const {byMonth:shiftByMonth,anyDated}=parseShiftByMonth(rows);
-        const allRows=Object.values(shiftByMonth).flat();
-        if(!allRows.length){setImportMsg({type:'error',msg:'No staff rows found in shift report.'});setImporting(false);return;}
-        totalPractitioners=allRows.length;
-        totalMatched=allRows.filter(r=>r.staffId).length;
-        if(anyDated){
-          // Dated export → auto-split into one shift snapshot per month (merge into the month's snapshot)
-          Object.entries(shiftByMonth).forEach(([month,mrows])=>{
-            if(month==='_nodate'||!mrows.length)return;
-            const snapDateM=month+'-01';
+        const newDailyShift=parseDailyShift(rows);
+        if(newDailyShift.length>0){
+          // Dated per-day rows → per-day store keyed by staff+date. Weekly uploads stack;
+          // re-importing the same days overwrites just those days (no double-count). The month
+          // utilization is DERIVED by summing hours across all stored days and recomputing %.
+          const existing=new Map(dailyShift.map(r=>[r.id,r]));
+          newDailyShift.forEach(r=>existing.set(r.id,r));
+          const merged=[...existing.values()];
+          setDailyShift(merged);
+          try{localStorage.setItem('rvgd3_daily_shift',JSON.stringify(merged));}catch(e){}
+          try{const SB=window.__SB;if(SB)await SB.from('shift_daily').upsert({id:'singleton',data:merged});}catch(e){}
+          const months=Array.from(new Set(newDailyShift.map(r=>(r.date||'').slice(0,7)).filter(m=>m.length===7)));
+          months.forEach(month=>{
+            const dayRows=merged.filter(r=>(r.date||'').slice(0,7)===month);
+            const byStaff={};
+            dayRows.forEach(r=>{const k=r.staff_id;if(!byStaff[k])byStaff[k]={apptHrs:0,shiftHrs:0,apptCount:0};byStaff[k].apptHrs+=(r.apptHrs||0);byStaff[k].shiftHrs+=(r.shiftHrs||0);byStaff[k].apptCount+=(r.apptCount||0);});
+            const parsed=Object.keys(byStaff).map(sid=>{const v=byStaff[sid];const nm=(staff.find(x=>x.id===sid)||{}).name||sid;return{name:nm,staffId:sid,matchedName:nm,appointmentHours:Math.round(v.apptHrs*100)/100,shiftHours:Math.round(v.shiftHrs*100)/100,appointments:v.apptCount,utilization:v.shiftHrs>0?Math.round(v.apptHrs/v.shiftHrs*100):null};});
+            totalPractitioners=Math.max(totalPractitioners,parsed.length);totalMatched=Math.max(totalMatched,parsed.length);monthsCreated.push(month);
             const existingIdx=newSnapshots.findIndex(s=>s.date&&s.date.startsWith(month)&&s.type==='shift');
-            if(existingIdx>=0){
-              const existing=newSnapshots[existingIdx];const mergedRows=[...existing.rows];
-              mrows.forEach(nr=>{const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};else mergedRows.push(nr);});
-              newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
-            }else{
-              newSnapshots.push({id:'snap_shift_'+month,date:snapDateM,rows:mrows,files:[file.name],type:'shift'});
-            }
-            monthsCreated.push(month);
+            if(existingIdx>=0)newSnapshots[existingIdx]={...newSnapshots[existingIdx],rows:parsed,files:[...(newSnapshots[existingIdx].files||[]),file.name].filter((v,i,a)=>a.indexOf(v)===i)};
+            else newSnapshots.push({id:'snap_shift_'+month,date:month+'-01',rows:parsed,files:[file.name],type:'shift'});
           });
         }else{
-          // Undated all-period summary → single snapshot at the picked month
-          const parsed=shiftByMonth['_nodate']||[];
+          // Undated summary (no per-row date) → can't dedupe weeks, so replace the picked month.
+          const {byMonth:shiftByMonth}=parseShiftByMonth(rows);
+          const parsed=shiftByMonth['_nodate']||Object.values(shiftByMonth).flat();
+          if(!parsed.length){setImportMsg({type:'error',msg:'No staff rows found in shift report.'});setImporting(false);return;}
+          totalPractitioners=parsed.length;totalMatched=parsed.filter(r=>r.staffId).length;
           const existingIdx=newSnapshots.findIndex(s=>s.date===snapDate&&s.type==='shift');
-          if(existingIdx>=0){
-            const existing=newSnapshots[existingIdx];const mergedRows=[...existing.rows];
-            parsed.forEach(nr=>{const idx=mergedRows.findIndex(r=>r.staffId===nr.staffId||(r.name===nr.name));if(idx>=0)mergedRows[idx]={...mergedRows[idx],...nr};else mergedRows.push(nr);});
-            newSnapshots[existingIdx]={...existing,rows:mergedRows,files:[...(existing.files||[]),file.name]};
-          }else{
-            newSnapshots.push({id:'snap_'+Date.now(),date:snapDate,rows:parsed,files:[file.name],type:'shift'});
-          }
+          if(existingIdx>=0)newSnapshots[existingIdx]={...newSnapshots[existingIdx],rows:parsed,files:[...(newSnapshots[existingIdx].files||[]),file.name]};
+          else newSnapshots.push({id:'snap_'+Date.now(),date:snapDate,rows:parsed,files:[file.name],type:'shift'});
           monthsCreated=[snapDate.slice(0,7)];
+          window.__shiftUndated=true;
         }
       }else{
         setImportMsg({type:'error',msg:'Could not identify this file type. Columns found: '+Object.keys(rows[0]).join(', ')});
@@ -5471,7 +5492,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   if(!window.confirm(`Purge all ${type} data?`))return;
                   const SB=window.__SB;let err=null;
                   if(type==='retention'){if(SB){const r1=await SB.from('retention_entries').delete().neq('staff_id','_none_');if(r1.error)err=r1.error.message;try{await SB.from('retention_summaries').upsert({id:'singleton',data:{}});}catch(e){}}setRetentionSummaries({});try{localStorage.removeItem('rvgd3_retention_summaries');localStorage.removeItem('rvgd3_retention_summary');}catch(e){}save({...data,retention:{}});}
-                  else{const remaining=data.snapshots.filter(s=>s.type!==type);if(SB){const toDel=data.snapshots.filter(s=>s.type===type);for(const s of toDel){const r=await SB.from('performance_snapshots').delete().eq('id',s.id);if(r.error)err=r.error.message;}if(type==='appointments'){const r=await SB.from('daily_appointments').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyAppts([]);try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}}if(type==='sales'){const r=await SB.from('daily_revenue').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyRevenue([]);try{localStorage.removeItem('rvgd3_daily_rev');}catch(e){}}}save({...data,snapshots:remaining});}
+                  else{const remaining=data.snapshots.filter(s=>s.type!==type);if(SB){const toDel=data.snapshots.filter(s=>s.type===type);for(const s of toDel){const r=await SB.from('performance_snapshots').delete().eq('id',s.id);if(r.error)err=r.error.message;}if(type==='appointments'){const r=await SB.from('daily_appointments').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyAppts([]);try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}}if(type==='sales'){const r=await SB.from('daily_revenue').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyRevenue([]);try{localStorage.removeItem('rvgd3_daily_rev');}catch(e){}}if(type==='shift'){try{await SB.from('shift_daily').upsert({id:'singleton',data:[]});}catch(e){}setDailyShift([]);try{localStorage.removeItem('rvgd3_daily_shift');}catch(e){}}}save({...data,snapshots:remaining});}
                   if(err){setImportMsg({type:'error',msg:`Purge error: ${err}`});return;}
                   setImportMsg({type:'success',msg:`✓ ${type} purged. Reloading…`});setTimeout(()=>window.location.reload(),800);
                 }}>🗑 {label}</button>
