@@ -3826,7 +3826,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     if(!name||!text)return;
     const rec={id:name,name,content:text,month:month||'',at:new Date().toISOString()};
     setSourceFiles(prev=>[...prev.filter(f=>f.id!==name),rec]);
-    try{const SB=window.__SB;if(SB)SB.from('source_files').upsert(rec).then(({error})=>{if(error)console.warn('source_files save:',error.message);});}catch(e){}
+    try{const SB=window.__SB;if(SB&&text.length<4500000)SB.from('source_files').upsert(rec).then(({error})=>{if(error)console.warn('source_files save:',error.message);}).catch(e=>console.warn('source_files fetch:',e&&e.message));}catch(e){}
   };
   const deleteSourceFile=(id)=>{
     setSourceFiles(prev=>prev.filter(f=>f.id!==id));
@@ -3883,11 +3883,13 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         if(SB&&newDailyAppts.length>0){
           const chunks=[];for(let i=0;i<newDailyAppts.length;i+=500)chunks.push(newDailyAppts.slice(i,i+500));
           let done=0;
-          for(const chunk of chunks){
-            const{error}=await SB.from('daily_appointments').upsert(chunk);
-            if(error){const bare=chunk.map(({rescheduled,...r})=>r);await SB.from('daily_appointments').upsert(bare);}
-            done++;if(chunks.length>1)setImportMsg({type:'info',msg:`Saving to Supabase… ${Math.round(done/chunks.length*100)}%`});
-          }
+          try{
+            for(const chunk of chunks){
+              const{error}=await SB.from('daily_appointments').upsert(chunk);
+              if(error){const bare=chunk.map(({rescheduled,...r})=>r);await SB.from('daily_appointments').upsert(bare);}
+              done++;if(chunks.length>1)setImportMsg({type:'info',msg:`Saving to Supabase… ${Math.round(done/chunks.length*100)}%`});
+            }
+          }catch(e){window.__sbUnreachable=true;}
         }
         const months=Array.from(new Set(newDailyAppts.map(r=>(r.date||'').slice(0,7)).filter(m=>m.length===7)));
         months.forEach(month=>{
@@ -4601,14 +4603,34 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             const ctxOf=(r)=>{const ds=discStats[r.disc];if(!ds||!(r.cVis>0||r.cRev>0))return null;const lowVol=r.cVis>0&&r.cVis<ds.medVis*0.6;if(!lowVol)return null;const myRpv=r.cVis>0?r.cRev/r.cVis:0;const well=ds.medRpv>0&&myRpv>=ds.medRpv*0.95;return (well?'Treats well per visit but low volume':'Low volume')+' for '+dAbbr(r.disc)+' ('+r.cVis+' visits vs ~'+Math.round(ds.medVis)+' peer median) — capacity to fill via new patients / internal referrals.';};
             const discsPresent=DISC_CLIN.filter(d=>selfRows.some(r=>r.disc===d.id));
             const repRows=repDisc==='all'?selfRows:selfRows.filter(r=>r.disc===repDisc);
+            const discName=repDisc==='all'?'All clinicians':((DISC.find(x=>x.id===repDisc)||{}).label||'');
+            const sum=(k)=>repRows.reduce((a,r)=>a+(r[k]||0),0);
+            const tRev=sum('cRev'),tpRev=sum('pRev'),tIa=sum('cIa'),tpIa=sum('pIa'),tVis=sum('cVis'),tpVis=sum('pVis');
+            const pctOf=(c,p)=>p>0?((c-p)/p*100):(c>0?null:0);
             return(
-            <div style={{marginBottom:notes?24:4,marginTop:24}}>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:3}}>EACH CLINICIAN vs THEIR OWN PRIOR {pWord.toUpperCase()}</div>
+            <div className="disc-print-area" style={{marginBottom:notes?24:4,marginTop:24}}>
+              <style>{`@media print{body.disc-print *{visibility:hidden!important}body.disc-print .disc-print-area,body.disc-print .disc-print-area *{visibility:visible!important}body.disc-print .disc-print-area{position:absolute!important;left:0;top:0;width:100%!important}body.disc-print .no-print{display:none!important}}`}</style>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',flexWrap:'wrap',gap:8,marginBottom:3}}>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px'}}>EACH CLINICIAN vs THEIR OWN PRIOR {pWord.toUpperCase()}</div>
+                <button className="btn btn-ghost btn-xs no-print" onClick={()=>{document.body.classList.add('disc-print');window.print();setTimeout(()=>document.body.classList.remove('disc-print'),500);}}>🖨 Print / save this discipline</button>
+              </div>
               <div style={{fontSize:12,color:'#777',marginBottom:10}}>Self-relative — each person measured against their own {lastP}, not the clinic average. {attnRows.length>0?<span style={{color:'#E0A052'}}>⚠ {attnRows.length} need{attnRows.length===1?'s':''} a look (own revenue or initials slipping).</span>:<span style={{color:'#44CCAA'}}>No one is slipping against their own prior {pWord}.</span>}</div>
               <div className="no-print" style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:10,alignItems:'center'}}>
                 <span style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginRight:2}}>Discipline</span>
                 <button className={`btn btn-xs ${repDisc==='all'?'btn-go':'btn-ghost'}`} onClick={()=>setRepDisc('all')}>All</button>
                 {discsPresent.map(d=><button key={d.id} className={`btn btn-xs ${repDisc===d.id?'btn-go':'btn-ghost'}`} onClick={()=>setRepDisc(d.id)}>{d.label}</button>)}
+              </div>
+              {/* Discipline total — for the lead presenting their discipline in the weekly meeting */}
+              <div style={{background:'rgba(127,200,232,.05)',border:'1px solid rgba(127,200,232,.25)',borderRadius:9,padding:'12px 16px',marginBottom:12}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:6,marginBottom:8}}>
+                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1.5px',textTransform:'uppercase',color:'#7FC8E8'}}>{discName} — discipline total</span>
+                  <span style={{fontSize:12,color:'#888'}}>{pLabel} · {repRows.length} clinician{repRows.length!==1?'s':''}</span>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:14}}>
+                  <div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Revenue ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'#eee',fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtMoney(tpRev)} → {fmtMoney(tRev)}</div><div style={{fontSize:13,marginTop:2}}>{delta(tRev-tpRev,true)}<span style={{color:'#666'}}>{pctTxt(pctOf(tRev,tpRev))}</span></div></div>
+                  <div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Initials ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'#eee',fontFamily:"'Barlow Condensed',sans-serif"}}>{tpIa} → {tIa}</div><div style={{fontSize:13,marginTop:2}}>{delta(tIa-tpIa)}<span style={{color:'#666'}}>{pctTxt(pctOf(tIa,tpIa))}</span></div></div>
+                  <div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Visits ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'#eee',fontFamily:"'Barlow Condensed',sans-serif"}}>{tpVis} → {tVis}</div><div style={{fontSize:13,marginTop:2}}>{delta(tVis-tpVis)}<span style={{color:'#666'}}>{pctTxt(pctOf(tVis,tpVis))}</span></div></div>
+                </div>
               </div>
               <div style={{fontSize:11,color:'#666',marginBottom:10}}>🟢 up vs their own prior · 🟠/🔴 needs a look · ⚪ flat &nbsp;·&nbsp; <span style={{color:'#E0A052'}}>↳</span> up but still low volume for their discipline (where the growth is)</div>
               <div style={{overflowX:'auto'}}>
