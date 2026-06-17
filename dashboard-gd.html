@@ -11364,15 +11364,28 @@ function SystematicPage({staff=[]}){
     ];
     return(
       <div>
-        <div className="flex aic jsb" style={{marginBottom:10,flexWrap:'wrap',gap:8}}>
-          <button className="btn btn-go btn-sm" onClick={()=>setView('mapper')}>🧭 Case Mapper</button>
+        <div className="flex aic jsb" style={{marginBottom:14,flexWrap:'wrap',gap:8}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#6a8a78'}}>🧠 Systematic Thinking</div>
           <div className="flex aic g8">
             {pbEdit&&<button className="btn btn-ghost btn-sm" onClick={addSec}>+ Section</button>}
             <button className="btn btn-ghost btn-sm" onClick={()=>{setPbEdit(false);setView('home');}}>📓 Workshop Log</button>
             <button className={`btn btn-sm ${pbEdit?'btn-lime':'btn-ghost'}`} onClick={()=>setPbEdit(!pbEdit)}>{pbEdit?'✓ Done':'✎ Edit'}</button>
           </div>
         </div>
-        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:28,fontWeight:800,letterSpacing:'1px',color:'#CAE8C1',marginBottom:2}}>REVIBE Clinical Thinking System</div>
+
+        {/* Case Mapper — the focus / working tool of this section */}
+        <div onClick={()=>setView('mapper')} style={{cursor:'pointer',background:'linear-gradient(135deg,rgba(127,200,232,.18),rgba(127,200,232,.035) 70%)',border:'1.5px solid rgba(127,200,232,.55)',borderRadius:16,padding:'24px 28px',marginBottom:26,display:'flex',alignItems:'center',gap:22,flexWrap:'wrap',boxShadow:'0 10px 34px rgba(127,200,232,.10)'}}>
+          <div style={{fontSize:52,lineHeight:1,filter:'drop-shadow(0 2px 8px rgba(127,200,232,.4))'}}>🧭</div>
+          <div style={{flex:1,minWidth:210}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2.5px',textTransform:'uppercase',color:'#7FC8E8',opacity:.85,marginBottom:3}}>Start here</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:34,fontWeight:800,letterSpacing:'.5px',color:'#7FC8E8',lineHeight:1.02}}>Case Mapper</div>
+            <div style={{fontSize:14.5,color:'#cfdbe0',marginTop:6,lineHeight:1.55,maxWidth:580}}>Map a patient presentation to a clinical classification, the right lead and support clinicians, and a clear starting point — the working tool of this section.</div>
+          </div>
+          <button className="btn btn-go" style={{fontSize:15,fontWeight:700,padding:'13px 24px',whiteSpace:'nowrap',flexShrink:0}} onClick={(e)=>{e.stopPropagation();setView('mapper');}}>Open Case Mapper →</button>
+        </div>
+
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12.5,letterSpacing:'2px',textTransform:'uppercase',color:'#5f7a6a',marginBottom:4}}>The thinking system behind it</div>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,letterSpacing:'1px',color:'#CAE8C1',marginBottom:2}}>REVIBE Clinical Thinking System</div>
         <div style={{fontSize:14,color:'#888',marginBottom:18}}>Cases dictate care — more appropriate treatment, not more treatment.{pbEdit&&<span style={{fontStyle:'italic'}}> · Editing: one bullet per line.</span>}</div>
 
         {!pbEdit&&(()=>{
@@ -11676,16 +11689,19 @@ function SystematicPage({staff=[]}){
             if(highIrr&&(specs.includes('acupuncture')||specs.includes('triggerPoint'))){score+=0.6;reasons.push('pain modalities');}
             const sSports=asSports(mp.sports);const sLower=sSports.map(x=>x.toLowerCase());
             const caseSports=caseSport.filter(c=>isSportName(c));const caseLife=caseSport.filter(c=>!isSportName(c));
-            let rapport=0;
+            let rapport=0;const hooks=[];
             const sportHit=caseSports.filter(c=>sLower.includes(c.toLowerCase()));
-            if(sportHit.length){const b=3.5+Math.min(sportHit.length-1,2)*1.5;score+=b;rapport+=b;reasons.unshift('plays '+sportHit.join(' / '));}
-            const relHit=caseSports.filter(c=>!sLower.includes(c.toLowerCase())&&sSports.some(x=>relatedSport(c,x)));
-            if(relHit.length){const b=1.6;score+=b;rapport+=b*0.7;reasons.push('related sport: '+relHit.slice(0,2).join(', '));}
+            if(sportHit.length){const b=3.5+Math.min(sportHit.length-1,2)*1.5;score+=b;rapport+=b;const t=sportHit.join(' / ');reasons.unshift('plays '+t);hooks.push({v:b,info:{kind:'sport',clin:t}});}
+            // Treats the patient's specific sport (in their clinical profile) without playing it — highlighted, ranks below a play-match
+            const treatHit=caseSports.filter(c=>!sLower.includes(c.toLowerCase())&&blob.includes(c.toLowerCase()));
+            if(treatHit.length){const b=1.6;score+=b;rapport+=b*0.7;const t=treatHit.slice(0,2).join(' / ');reasons.unshift('treats '+t);hooks.push({v:b*0.7,info:{kind:'athlete',clin:t}});}
             const lifeHit=caseLife.filter(c=>sLower.includes(c.toLowerCase()));
-            if(lifeHit.length){const b=Math.min(lifeHit.length,2)*1.8;score+=b;rapport+=b;reasons.unshift('shares: '+lifeHit.join(' / '));}
-            if(!sportHit.length&&!relHit.length&&caseSports.length&&/sport|athlet|run|endurance/.test(blob)){score+=0.8;reasons.push('sports-injury focus');}
+            if(lifeHit.length){const b=Math.min(lifeHit.length,2)*1.8;score+=b;rapport+=b;const t=lifeHit.join(' / ');reasons.unshift('shares: '+t);hooks.push({v:b,info:{kind:'life',clin:t}});}
+            // Generic athlete-treating fit (athletic patient, no specific-sport match) — highlighted, lowest priority
+            if(!sportHit.length&&!treatHit.length&&caseSports.length&&/sport|athlet|run|endurance|perform/.test(blob)){const b=0.9;score+=b;rapport+=0.5;reasons.unshift('treats athletes');hooks.push({v:0.5,info:{kind:'athlete',clin:'athletes'}});}
             const cLang=(mp.languages||'').toLowerCase();
-            if(mc.language&&cLang.includes(mc.language.toLowerCase())){score+=2.5;rapport+=2;reasons.unshift('speaks '+mc.language);}
+            if(mc.language&&cLang.includes(mc.language.toLowerCase())){score+=2.5;rapport+=2;reasons.unshift('speaks '+mc.language);hooks.push({v:2,info:{kind:'lang',clin:mc.language}});}
+            const rapportInfo=hooks.length?hooks.sort((a,b)=>b.v-a.v)[0].info:null;
             const excl=(mp.excludes||'').toLowerCase();
             if(excl){
               const exHit=regKW.filter(k=>k.length>=3&&excl.includes(k));
@@ -11695,7 +11711,7 @@ function SystematicPage({staff=[]}){
             }
             const role=(s.discipline==='pt'||s.discipline==='chiro')?'lead':'support';
             if(!reasons.length)reasons.push(role==='lead'?'assess & lead':s.discipline==='osteo'?'down-regulation':'soft-tissue support');
-            return{s,mp,score,reasons,role,rapport};
+            return{s,mp,score,reasons,role,rapport,rapportInfo};
           }).filter(Boolean).sort((a,b)=>b.score-a.score||a.s.name.localeCompare(b.s.name));
           const leads=rows.filter(r=>r.role==='lead').slice(0,3);
           const supports=rows.filter(r=>r.role==='support').slice(0,3);
@@ -11704,7 +11720,7 @@ function SystematicPage({staff=[]}){
             <div style={{background:'var(--surface3)',borderLeft:'3px solid '+(role==='lead'?LIME:PUR),borderRadius:6,padding:'11px 14px',marginBottom:8}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:6}}>
                 <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#eee'}}>{s.name} <span style={{fontSize:13,color:BLU,fontWeight:600}}>· {DISCL[s.discipline]||s.discipline} · {(typeof siteList==='function'?siteList(s)[0]:s.site)||s.site||'\u2014'}</span></span>
-                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{reasons.map((r,i)=><span key={i} style={{fontSize:11,color:'#1a1a1a',background:role==='lead'?LIME:PUR,borderRadius:4,padding:'2px 7px',fontWeight:700}}>{r}</span>)}</div>
+                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{reasons.map((r,i)=>{const isPlay=r.indexOf('plays ')===0;const isAth=r.indexOf('treats ')===0;const bg=isPlay?'#8FE0C0':isAth?'#E0A052':(role==='lead'?LIME:PUR);return <span key={i} style={{fontSize:11,color:'#1a1a1a',background:bg,borderRadius:4,padding:'2px 7px',fontWeight:700,boxShadow:(isPlay||isAth)?'0 0 0 1px rgba(255,255,255,.25)':'none'}}>{(isPlay?'🎯 ':isAth?'🏅 ':'')+r}</span>;})}</div>
               </div>
               {mp.matchNotes&&<div style={{fontSize:13,color:'#bbb',marginTop:5,lineHeight:1.5,fontStyle:'italic'}}>{mp.matchNotes}</div>}
             </div>
@@ -11713,11 +11729,19 @@ function SystematicPage({staff=[]}){
             <div style={{marginTop:20}}>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginBottom:4}}>Suggested Clinicians</div>
               <div style={{fontSize:12.5,color:'#666',marginBottom:10}}>Ranked by clinical fit (discipline, what they treat, specializations){caseSport.length?', plus shared sport / lifestyle for rapport':''} — availability and the lead's judgment decide. {hasFlags?<span style={{color:'#e0a0a0'}}>Medical screen flagged: leads below assess & clear first; support is comfort-only in the interim.</span>:''}</div>
-              {bestFit&&(()=>{const rr=bestFit.reasons.find(r=>r.indexOf('plays ')===0||r.indexOf('shares:')===0||r.indexOf('related sport')===0)||'';const sp=rr.replace('plays ','').replace('shares: ','').replace('related sport: ','');const disc=DISCL[bestFit.s.discipline]||bestFit.s.discipline;const site=(typeof siteList==='function'?siteList(bestFit.s)[0]:bestFit.s.site)||bestFit.s.site||'';return(
+              {bestFit&&(()=>{const ri=bestFit.rapportInfo;const disc=DISCL[bestFit.s.discipline]||bestFit.s.discipline;const site=(typeof siteList==='function'?siteList(bestFit.s)[0]:bestFit.s.site)||bestFit.s.site||'';
+                let lead=null;
+                if(ri){
+                  if(ri.kind==='sport')lead=<>Both play <strong style={{color:LIME}}>{ri.clin}</strong> — </>;
+                  else if(ri.kind==='life')lead=<>Shares <strong style={{color:LIME}}>{ri.clin}</strong> with the patient — </>;
+                  else if(ri.kind==='lang')lead=<>Speaks <strong style={{color:LIME}}>{ri.clin}</strong> with the patient — </>;
+                  else if(ri.kind==='athlete')lead=<>Treats <strong style={{color:LIME}}>{ri.clin}</strong>{ri.clin==='athletes'?'':' athletes'} — </>;
+                }
+                return(
                 <div style={{background:'linear-gradient(180deg,rgba(202,232,193,.11),rgba(202,232,193,.02))',border:'1px solid rgba(202,232,193,.45)',borderRadius:9,padding:'13px 16px',marginBottom:14}}>
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:800,letterSpacing:'1px',color:LIME,marginBottom:4}}>★ START HERE — STRONGEST CONNECTION</div>
                   <div style={{fontSize:17,fontWeight:800,color:'#fff'}}>{bestFit.s.name} <span style={{fontSize:13,color:BLU,fontWeight:600}}>· {disc} · {site}</span></div>
-                  <div style={{fontSize:13,color:'#cde8c4',marginTop:5,lineHeight:1.55}}>{sp?<>Shares <strong style={{color:LIME}}>{sp}</strong> with the patient — l</>:'L'}eading with that connection builds rapport, buy-in and trust, which drives retention and a faster recovery. They make the patient feel understood and are the best entry point. They set and own the appropriate co-treatment plan with the lead/support team below — not a lock to one clinician, but the strongest place to start.</div>
+                  <div style={{fontSize:13,color:'#cde8c4',marginTop:5,lineHeight:1.55}}>{lead}{lead?'l':'L'}eading with that connection builds rapport, buy-in and trust, which drives retention and a faster recovery. They make the patient feel understood and are the best entry point. They set and own the appropriate co-treatment plan with the lead/support team below — not a lock to one clinician, but the strongest place to start.</div>
                 </div>);})()}
               {leads.length>0&&<div style={{fontSize:12,color:LIME,fontWeight:700,letterSpacing:'.5px',margin:'4px 0 6px'}}>LEAD — diagnose & own the plan</div>}
               {leads.map(r=><Row key={r.s.id} {...r}/>)}
