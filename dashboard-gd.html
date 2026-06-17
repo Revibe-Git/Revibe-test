@@ -11541,12 +11541,34 @@ function SystematicPage({staff=[]}){
       <div style={{fontSize:13.5,color:'#ccc',marginTop:3,lineHeight:1.55}}>{body}</div></div>);
     return(
       <div className="case-print-area">
-        <style>{`@media print{body *{visibility:hidden!important;}.case-print-area,.case-print-area *{visibility:visible!important;}.case-print-area{position:absolute!important;left:0;top:0;width:100%!important;}.case-print-area .no-print{display:none!important;}.case-print-area input,.case-print-area select,.case-print-area textarea{border:none!important;-webkit-appearance:none;appearance:none;background:transparent!important;}}`}</style>
+        <style>{`
+.case-print-letterhead,.case-print-foot{display:none;}
+@media print{
+  @page{margin:9mm;}
+  html,body{background:#0e1512!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+  body *{visibility:hidden!important;}
+  .case-print-area,.case-print-area *{visibility:visible!important;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+  .case-print-area{position:absolute!important;left:0;top:0;width:100%!important;background:#0e1512!important;padding:20px 24px 8px!important;}
+  .case-print-area .no-print{display:none!important;}
+  .case-print-area .screen-only-title{display:none!important;}
+  .case-print-area input,.case-print-area select,.case-print-area textarea{border:none!important;-webkit-appearance:none;appearance:none;background:transparent!important;color:inherit!important;}
+  .case-print-letterhead{display:flex!important;}
+  .case-print-foot{display:block!important;}
+}
+`}</style>
         <div className="no-print" style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}>
           <button className="btn btn-ghost btn-sm" onClick={()=>setView('playbook')}>← Back to Playbook</button>
           <button className="btn btn-go btn-sm" onClick={()=>window.print()}>🖨 Print / Save PDF</button>
         </div>
-        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,letterSpacing:'1px',color:BLU,marginBottom:2}}>🧭 Case Mapper{regions.length>0?' — '+regions.join(' + '):''}</div>
+        <div className="case-print-letterhead" style={{justifyContent:'space-between',alignItems:'flex-end',borderBottom:'2px solid '+BLU,paddingBottom:10,marginBottom:18,gap:16}}>
+          <div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'3px',textTransform:'uppercase',color:BLU,marginBottom:1}}>Revibe Health</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:25,fontWeight:800,color:'#fff',letterSpacing:'.5px',lineHeight:1.05}}>Clinical Case Map{regions.length?<span style={{color:BLU}}> · {regions.join(' + ')}</span>:''}</div>
+            <div style={{fontSize:11.5,color:'#8aa39a',marginTop:2}}>Growth &amp; Development Portal · Suggestion only — the treating clinician decides</div>
+          </div>
+          <div style={{textAlign:'right',fontSize:11.5,color:'#8aa39a',whiteSpace:'nowrap'}}>{new Date().toLocaleDateString('en-CA',{weekday:'short',year:'numeric',month:'long',day:'numeric'})}</div>
+        </div>
+        <div className="screen-only-title" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,letterSpacing:'1px',color:BLU,marginBottom:2}}>🧭 Case Mapper{regions.length>0?' — '+regions.join(' + '):''}</div>
         <div style={{background:'rgba(224,82,82,.07)',border:'1px solid rgba(224,82,82,.25)',borderRadius:7,padding:'9px 13px',fontSize:13,color:'#e0a0a0',lineHeight:1.55,marginBottom:16}}>
           <strong>Suggestion only — the treating clinician decides.</strong> This assembles a starting pathway from team standards; it does not diagnose. Specific timelines/referrals show only where a <em>verified</em> rule exists. Always re-assess and adjust.
         </div>
@@ -11752,6 +11774,7 @@ function SystematicPage({staff=[]}){
             </div>
           );
         })()}
+        <div className="case-print-foot" style={{marginTop:22,borderTop:'1px solid #25332d',paddingTop:9,fontSize:10,color:'#6f8379',textAlign:'center',letterSpacing:'.3px'}}>Revibe Health — Growth &amp; Development Portal · Clinical Case Map · Suggestion only; not a diagnosis — re-assess and adjust · Generated {new Date().toLocaleDateString('en-CA',{dateStyle:'medium'})}</div>
       </div>
     );
   }
