@@ -11388,6 +11388,12 @@ function SystematicPage({staff=[]}){
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,letterSpacing:'1px',color:'#CAE8C1',marginBottom:2}}>REVIBE Clinical Thinking System</div>
         <div style={{fontSize:14,color:'#888',marginBottom:18}}>Cases dictate care — more appropriate treatment, not more treatment.{pbEdit&&<span style={{fontStyle:'italic'}}> · Editing: one bullet per line.</span>}</div>
 
+        <div style={{background:'linear-gradient(135deg,rgba(127,200,232,.10),rgba(202,232,193,.05))',border:'1px solid rgba(127,200,232,.35)',borderRadius:11,padding:'15px 18px',marginBottom:18}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,letterSpacing:'1px',color:'#7FC8E8',marginBottom:6}}>The Revive System — Osteo · Physio · Performance</div>
+          <div style={{fontSize:13.5,color:'#cdd6d2',lineHeight:1.6}}>Assessment leans on the <strong style={{color:'#7FC8E8'}}>osteo approach</strong>: read the whole body, find the driver and the compensation pattern — the painful site is usually not the source. <strong style={{color:'#CAE8C1'}}>Physio integrates for reintegration</strong>: once the driver is identified, rebuild capacity and return the patient to load, function and sport. <strong style={{color:'#F4DB71'}}>Performance</strong> extends that to athletic demand.</div>
+          <div style={{fontSize:12.5,color:'#8a9a93',lineHeight:1.55,marginTop:7,fontStyle:'italic'}}>Applied per case — only where the presentation genuinely calls for both. It is not a rule that every case routes to Osteo and Physio; the case decides.</div>
+        </div>
+
         {!pbEdit&&(()=>{
           const arrow=<div style={{textAlign:'center',color:'#3f6b4f',fontSize:16,lineHeight:1,margin:'3px 0'}}>▼</div>;
           const Node=({c,t,s})=>(<div style={{background:'var(--surface3)',borderLeft:'3px solid '+c,borderRadius:6,padding:'10px 14px'}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,letterSpacing:'.5px',color:c}}>{t}</div><div style={{fontSize:13.5,color:'#bbb',marginTop:2,lineHeight:1.5}}>{s}</div></div>);
@@ -11663,6 +11669,18 @@ function SystematicPage({staff=[]}){
                 others.length
                   ? <span>Address <strong style={{color:'#E0A052'}}>{focus}</strong> now. {contribRegions.length>0&&<>Flagged as contributing: <strong style={{color:PUR}}>{contribRegions.join(', ')}</strong>. </>}{histRegions.length>0&&<>History: <strong style={{color:'#9aa6b2'}}>{histRegions.join(', ')}</strong>. </>}Have <strong style={{color:LIME}}>Physio assess whether these are driving the acute problem</strong> — e.g. an old ankle changing how the low back loads. Don’t discharge on symptom relief alone; the loudest site isn’t always the source.</span>
                   : <span>Relieve the presenting {regions[0]} now, but have <strong style={{color:LIME}}>Physio screen up and down the chain</strong> for a contributing driver (mobility, motor control, load history, old injuries). Treating only the painful site is how recurrences start.</span>);
+            })()}
+            {(()=>{
+              const others=[...contribRegions,...histRegions];
+              const insidious=/insidious|gradual|no clear|overuse|unsure|unknown/i.test(mc.mechanism||'');
+              const persistent=(mc.phase||'').startsWith('Remodeling');
+              const osteoLayer=others.length>0||insidious||persistent;
+              const physioLayer=lifestyles.includes('Competitive athlete')||lifestyles.includes('Active adult')||/sport|performance/i.test(cls_goal)||['Moderate (2.5–5 hrs/wk)','High (5–8 hrs/wk)','Very high (8+ hrs/wk)'].includes(mc.activity);
+              if(!(osteoLayer&&physioLayer))return null;
+              const driverWhy=others.length>0?<>other areas are in play (<strong style={{color:PUR}}>{others.join(', ')}</strong>)</>:persistent?<>it’s persisting past normal healing</>:<>there’s no clear single mechanism</>;
+              const reintTarget=/sport|performance/i.test(cls_goal)?cls_goal.toLowerCase():(mc.activity&&mc.activity!=='Sedentary / minimal'?'their usual training load':'function');
+              return stepCard('🔗',BLU,'Revive lens — assess osteo, reintegrate physio',
+                <span>This case shows <strong>both</strong> layers, so bridge them — this is not an automatic Osteo + Physio route:<br/>· <strong style={{color:BLU}}>Assess (osteo approach):</strong> read the whole body to find the driver — {driverWhy}. The loudest site usually isn’t the source.<br/>· <strong style={{color:LIME}}>Reintegrate (physio):</strong> once the driver is clear, rebuild capacity and reintegrate toward <strong style={{color:LIME}}>{reintTarget}</strong>.<br/><span style={{fontSize:12,color:'#888',fontStyle:'italic'}}>Lead &amp; support still follow the case below — this is the assessment-to-reintegration arc, shown here because both layers are genuinely present.</span></span>);
             })()}
             {(()=>{
               const sportTags=(mc.sport||[]).filter(t=>LIFE_CONTEXT[0].t.includes(t));
