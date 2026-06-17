@@ -3143,6 +3143,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[dailyAppts,setDailyAppts]=useState([]);
   const[dailyRevenue,setDailyRevenue]=useState([]);
   const[dailyShift,setDailyShift]=useState([]);
+  const[sourceFiles,setSourceFiles]=useState([]); // raw uploaded CSVs, so edits don't require re-upload
+  // Refs mirror the import stores so a batch re-process threads correctly (React state is async;
+  // without these, processing several files in a row would overwrite each other). Synced below.
+  const dailyApptsRef=useRef([]),dailyRevRef=useRef([]),dailyShiftRef=useRef([]),snapshotsRef=useRef([]),revBasisRef=useRef({});
   // ── Weekly/Monthly reports ──
   const[reportType,setReportType]=useState('week');
   const[reportAnchor,setReportAnchor]=useState(null);
@@ -3258,6 +3262,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         if(sd&&Array.isArray(sd.data)){setDailyShift(sd.data);try{localStorage.setItem('rvgd3_daily_shift',JSON.stringify(sd.data));}catch(e){}}
       }catch(e){}
       try{
+        const{data:sf}=await SB.from('source_files').select('*');
+        if(Array.isArray(sf))setSourceFiles(sf);
+      }catch(e){}
+      try{
         const{data:rs}=await SB.from('retention_summaries').select('data').eq('id','singleton').maybeSingle();
         if(rs&&rs.data&&typeof rs.data==='object'){setRetentionSummaries(rs.data);try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(rs.data));}catch(e){}}
       }catch(e){}
@@ -3345,6 +3353,11 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const d={};dailyRevenue.forEach(r=>{const m=(r.date||'').slice(0,7);if(m.length!==7)return;d[m]=(d[m]||0)+(parseFloat(r.revenue)||0);});
     setRevBasis(prev=>{let changed=false;const n={...prev};Object.keys(d).forEach(m=>{const b=Math.round(d[m]*100)/100;const cur=n[m]||{};if(Math.abs((cur.billed||0)-b)>0.5){n[m]={billed:b,collected:cur.collected||0};changed=true;}});if(changed){try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(n));}catch(e){}try{const SB=window.__SB;if(SB)SB.from('revenue_basis').upsert({id:'singleton',data:n});}catch(e){}}return changed?n:prev;});
   },[dailyRevenue]);// eslint-disable-line
+  useEffect(()=>{dailyApptsRef.current=dailyAppts;},[dailyAppts]);
+  useEffect(()=>{dailyRevRef.current=dailyRevenue;},[dailyRevenue]);
+  useEffect(()=>{dailyShiftRef.current=dailyShift;},[dailyShift]);
+  useEffect(()=>{revBasisRef.current=revBasis;},[revBasis]);
+  useEffect(()=>{snapshotsRef.current=data.snapshots;},[data.snapshots]);
   const[retentionEdits,setRetentionEdits]=useState({});
   const[retSaved,setRetSaved]=useState(false);
   const[periodFilter,setPeriodFilter]=useState(()=>new Date().toISOString().slice(0,7));
@@ -3809,15 +3822,28 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     setImporting(false);
   };
 
-  const handleFile=async(file)=>{
+  const storeSourceFile=(name,text,month)=>{
+    if(!name||!text)return;
+    const rec={id:name,name,content:text,month:month||'',at:new Date().toISOString()};
+    setSourceFiles(prev=>[...prev.filter(f=>f.id!==name),rec]);
+    try{const SB=window.__SB;if(SB)SB.from('source_files').upsert(rec).then(({error})=>{if(error)console.warn('source_files save:',error.message);});}catch(e){}
+  };
+  const deleteSourceFile=(id)=>{
+    setSourceFiles(prev=>prev.filter(f=>f.id!==id));
+    try{const SB=window.__SB;if(SB)SB.from('source_files').delete().eq('id',id).then(()=>{});}catch(e){}
+  };
+
+  const handleFile=async(file,opts={})=>{
     if(!file||!file.name.endsWith('.csv')){setImportMsg({type:'error',msg:'Please upload a .csv file from Jane.'});return;}
     setImporting(true);setImportMsg(null);
     try{
       setImportMsg({type:'info',msg:'Reading file…'});
       const text=await file.text();
+      if(!opts.reprocess)storeSourceFile(file.name,text,retentionMonth||snapDate.slice(0,7));
 
       // ── Member Retention summary report — confirm the month via popup before importing ──
       if(looksLikeRetention(text)){
+        if(opts.reprocess){await doRetentionImport(text,opts.month||retentionMonth);setImporting(false);return;}
         setPendingRetention(text);
         setPendingRetMonth(retentionMonth);
         setImporting(false);
@@ -3832,11 +3858,14 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       // Undated shift report → confirm which month it covers (Jane's summary has no Date column)
       if(type==='shift'){
         const {anyDated}=parseShiftByMonth(rows);
-        if(!anyDated){setPendingShift(rows);setPendingShiftMonth(snapDate.slice(0,7));setImporting(false);return;}
+        if(!anyDated){
+          if(opts.reprocess){await doShiftImport(rows,opts.month||snapDate.slice(0,7));setImporting(false);return;}
+          setPendingShift(rows);setPendingShiftMonth(snapDate.slice(0,7));setImporting(false);return;
+        }
       }
       if(big)setImportMsg({type:'info',msg:`Processing ${rows.length.toLocaleString()} rows…`});
 
-      let newSnapshots=[...data.snapshots];
+      let newSnapshots=[...snapshotsRef.current];
       let totalPractitioners=0,totalMatched=0,monthsCreated=[];
 
       if(type==='appointments'){
@@ -3845,10 +3874,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         // DERIVED from the merged store, so weekly uploads accumulate instead of the latest file
         // replacing the month.
         const newDailyAppts=parseDailyAppointments(rows);
-        const existing=new Map(dailyAppts.map(r=>[r.id,r]));
+        const existing=new Map(dailyApptsRef.current.map(r=>[r.id,r]));
         newDailyAppts.forEach(r=>existing.set(r.id,r));
         const merged=[...existing.values()];
-        setDailyAppts(merged);
+        setDailyAppts(merged);dailyApptsRef.current=merged;
         try{localStorage.setItem('rvgd3_daily_appts',JSON.stringify(merged));}catch(e){}
         const SB=window.__SB;
         if(SB&&newDailyAppts.length>0){
@@ -3885,10 +3914,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         // revenue are then DERIVED from the merged daily data, so weekly uploads accumulate
         // instead of the latest file replacing the month.
         const newDailyRev=parseDailyRevenue(rows);
-        const existing=new Map(dailyRevenue.map(r=>[r.id,r]));
+        const existing=new Map(dailyRevRef.current.map(r=>[r.id,r]));
         newDailyRev.forEach(r=>existing.set(r.id,r));
         const merged=[...existing.values()];
-        setDailyRevenue(merged);
+        setDailyRevenue(merged);dailyRevRef.current=merged;
         try{localStorage.setItem('rvgd3_daily_rev',JSON.stringify(merged));}catch(e){}
         window.__dailyRevCount=newDailyRev.length;window.__dailyRevErr=null;window.__revLocUnsynced=false;
         if(newDailyRev.length>0){
@@ -3914,9 +3943,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         // Months that have daily data, derived from the MERGED store (accumulates all weeks)
         const rbDerived={};
         merged.forEach(r=>{const m=(r.date||'').slice(0,7);if(!m||m.length!==7)return;if(!rbDerived[m])rbDerived[m]={billed:0,collected:0};rbDerived[m].billed+=(parseFloat(r.revenue)||0);rbDerived[m].collected+=(parseFloat(r.collected)||0);});
-        const _basis={...revBasis};
-        Object.keys(rbDerived).forEach(m=>{const b=Math.round(rbDerived[m].billed*100)/100;const c=Math.round(rbDerived[m].collected*100)/100;const prev=revBasis[m]||{};_basis[m]={billed:b,collected:c>0?c:(prev.collected||0)};});
-        setRevBasis(_basis);try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(_basis));}catch(e){}
+        const _basis={...revBasisRef.current};
+        Object.keys(rbDerived).forEach(m=>{const b=Math.round(rbDerived[m].billed*100)/100;const c=Math.round(rbDerived[m].collected*100)/100;const prev=revBasisRef.current[m]||{};_basis[m]={billed:b,collected:c>0?c:(prev.collected||0)};});
+        setRevBasis(_basis);revBasisRef.current=_basis;try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(_basis));}catch(e){}
         try{const SB=window.__SB;if(SB)await SB.from('revenue_basis').upsert({id:'singleton',data:_basis});}catch(e){console.warn('revenue_basis sync',e);}
         // Derive per-staff snapshot revenue for each affected month from the merged daily data,
         // preserving any appointment fields (completed / IA) already on those rows.
@@ -3944,10 +3973,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           // Dated per-day rows → per-day store keyed by staff+date. Weekly uploads stack;
           // re-importing the same days overwrites just those days (no double-count). The month
           // utilization is DERIVED by summing hours across all stored days and recomputing %.
-          const existing=new Map(dailyShift.map(r=>[r.id,r]));
+          const existing=new Map(dailyShiftRef.current.map(r=>[r.id,r]));
           newDailyShift.forEach(r=>existing.set(r.id,r));
           const merged=[...existing.values()];
-          setDailyShift(merged);
+          setDailyShift(merged);dailyShiftRef.current=merged;
           try{localStorage.setItem('rvgd3_daily_shift',JSON.stringify(merged));}catch(e){}
           try{const SB=window.__SB;if(SB)await SB.from('shift_daily').upsert({id:'singleton',data:merged});}catch(e){}
           const months=Array.from(new Set(newDailyShift.map(r=>(r.date||'').slice(0,7)).filter(m=>m.length===7)));
@@ -3980,7 +4009,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
       // Sort snapshots by date, keep last 36
       newSnapshots=newSnapshots.sort((a,b)=>a.date.localeCompare(b.date)).slice(-36);
-      const newData={...data,snapshots:newSnapshots,lastImport:new Date().toISOString()};
+      const newData={...data,snapshots:newSnapshots,lastImport:new Date().toISOString()};snapshotsRef.current=newSnapshots;
       save(newData);
       // Save to Supabase
       let sbOk=true;
@@ -4003,6 +4032,20 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       setImportMsg({type:'success',msg});
     }catch(e){setImportMsg({type:'error',msg:'Error: '+e.message});}
     setImporting(false);
+  };
+
+  const reprocessAll=async()=>{
+    if(!sourceFiles.length){setImportMsg({type:'error',msg:'No stored files yet. Upload each report once and they’re saved here for re-processing.'});return;}
+    setImporting(true);
+    const ordered=[...sourceFiles].sort((a,b)=>(a.at||'').localeCompare(b.at||''));
+    let i=0;
+    for(const f of ordered){
+      setImportMsg({type:'info',msg:`Re-processing ${f.name} (${++i}/${ordered.length})…`});
+      try{await handleFile({name:f.name,text:async()=>f.content},{reprocess:true,month:f.month});}
+      catch(e){console.warn('reprocess failed:',f.name,e);}
+    }
+    setImporting(false);
+    setImportMsg({type:'success',msg:`✓ Re-processed ${ordered.length} stored file${ordered.length!==1?'s':''} with the current version — no re-upload needed.`});
   };
 
   /* ── Period helpers ─────────────────────────── */
@@ -5484,6 +5527,26 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               }}}>
               ⚠ Reset All Data
             </button>
+          </div>
+          <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'14px 16px',marginBottom:14}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:8}}>
+              <div>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'1.5px',textTransform:'uppercase',color:'#7FC8E8'}}>📁 Stored source files</div>
+                <div style={{fontSize:12.5,color:'#777',marginTop:2}}>Your uploaded CSVs are saved here. After a dashboard update, hit re-process to rebuild from these — no need to re-upload.</div>
+              </div>
+              <button className="btn btn-go btn-sm" disabled={importing||!sourceFiles.length} onClick={reprocessAll}>↻ Re-process all ({sourceFiles.length})</button>
+            </div>
+            {sourceFiles.length===0?<div style={{fontSize:12.5,color:'#666'}}>No files stored yet — upload each report once and it’s saved here automatically.</div>:
+            <div style={{display:'flex',flexDirection:'column',gap:4,maxHeight:180,overflowY:'auto'}}>
+              {[...sourceFiles].sort((a,b)=>(b.at||'').localeCompare(a.at||'')).map(f=>(
+                <div key={f.id} style={{display:'flex',alignItems:'center',gap:10,fontSize:12.5,color:'#aaa',background:'var(--surface3)',borderRadius:5,padding:'5px 9px'}}>
+                  <span style={{flex:1,color:'#ccc',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{f.name}</span>
+                  <span style={{color:'#777'}}>{(f.content?(f.content.length/1024).toFixed(0):'0')} KB</span>
+                  <span style={{color:'#666'}}>{(f.at||'').slice(0,10)}</span>
+                  <button className="btn btn-ghost btn-xs" style={{color:'#777'}} onClick={()=>deleteSourceFile(f.id)}>✕</button>
+                </div>
+              ))}
+            </div>}
           </div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:4}}>
             {[{label:'Purge Sales',type:'sales'},{label:'Purge Appointments',type:'appointments'},{label:'Purge Shift Reports',type:'shift'},{label:'Purge Retention',type:'retention'}].map(({label,type})=>(
