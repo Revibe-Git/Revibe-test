@@ -11558,7 +11558,10 @@ function SystematicPage({staff=[]}){
 `}</style>
         <div className="no-print" style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,marginBottom:10}}>
           <button className="btn btn-ghost btn-sm" onClick={()=>setView('playbook')}>← Back to Playbook</button>
-          <button className="btn btn-go btn-sm" onClick={()=>window.print()}>🖨 Print / Save PDF</button>
+          <div className="flex aic g8">
+            <button className="btn btn-ghost btn-sm" onClick={()=>{setMc({region:'',phase:'',irritability:'',pain:'',mechanism:'',lifestyle:'',diagnosed:'',language:''});setFlags([]);}}>↺ Clear case</button>
+            <button className="btn btn-go btn-sm" onClick={()=>window.print()}>🖨 Print / Save PDF</button>
+          </div>
         </div>
         <div className="case-print-letterhead" style={{justifyContent:'space-between',alignItems:'flex-end',borderBottom:'2px solid '+BLU,paddingBottom:10,marginBottom:18,gap:16}}>
           <div>
