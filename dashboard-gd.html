@@ -2384,7 +2384,7 @@ function CallHistoryPage(){
           <div style={{display:'flex',alignItems:'baseline',gap:10}}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#eee'}}>{s.name}</span><span style={{fontSize:12,color:'#777'}}>{r.total} leads · {r.contacted} contacted · {r.responded} responded · {r.booked} booked · {r.conv.toFixed(0)}% conversion</span></div>
           <div style={{display:'flex',gap:6}}>
             <button className="btn btn-lime btn-sm" onClick={()=>addLead(s.id)}>+ Add lead</button>
-            <button className="btn btn-ghost btn-xs" onClick={()=>renameSource(s.id)}>Rename</button>
+            <button className="btn btn-ghost btn-xs" onClick={()=>renameSource(s.id)} title="Rename this lead source / category (not the lead)">Rename source</button>
             {s.kind==='event'&&<button className="btn btn-ghost btn-xs" onClick={()=>delSource(s.id)} style={{color:'#E05252'}}>Delete</button>}
           </div>
         </div>
@@ -2403,34 +2403,34 @@ function CallHistoryPage(){
               <span style={{fontWeight:700,color:'#eee',fontSize:14}}>{nm||<span style={{color:'#777',fontStyle:'italic',fontWeight:400}}>Unnamed lead</span>}</span>
               <span style={{fontSize:11,fontWeight:700,color:STATUS_C[l.status]||'#aaa',background:'var(--surface3)',borderRadius:4,padding:'2px 8px'}}>{l.status||'New'}</span>
               {l.interest&&<span style={{fontSize:12,color:'#9aaaa0'}}>{l.interest}</span>}
-              <span style={{fontSize:12,color:'#888'}}>{l.phone||l.email||'—'}</span>
+              <span style={{fontSize:12,color:'#aaa'}}>{l.phone||l.email||'—'}</span>
               {(l.followups||[]).length>0&&<span style={{fontSize:11,color:'#777'}}>{(l.followups||[]).length} attempt{(l.followups||[]).length>1?'s':''}</span>}
               <span style={{marginLeft:'auto',fontSize:11.5,fontWeight:700,color:l.nextDate?dueColor(l.nextDate):'#666'}}>{l.nextDate?dueLabel(l.nextDate):'no follow-up'}</span>
             </div>
             {open&&(<><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:8,marginBottom:7,marginTop:10}}>
-              <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Date</div><input type="date" value={l.date||''} onChange={e=>updLead(s.id,l.id,'date',e.target.value)} style={inp}/></div>
-              <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>First name</div><input value={l.first||''} onChange={e=>updLead(s.id,l.id,'first',e.target.value)} style={inp}/></div>
-              <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Last name</div><input value={l.last||''} onChange={e=>updLead(s.id,l.id,'last',e.target.value)} style={inp}/></div>
-              <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Phone</div><input value={l.phone||''} onChange={e=>updLead(s.id,l.id,'phone',e.target.value)} style={inp}/></div>
-              <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Email</div><input value={l.email||''} onChange={e=>updLead(s.id,l.id,'email',e.target.value)} style={inp}/></div>
-              <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Location</div><select value={l.location||''} onChange={e=>updLead(s.id,l.id,'location',e.target.value)} style={inp}><option value="">—</option><option>Mississauga</option><option>Markham</option></select></div>
-              <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Interested in</div><input value={l.interest||''} onChange={e=>updLead(s.id,l.id,'interest',e.target.value)} placeholder="e.g. Physio, RMT" style={inp}/></div>
-              <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Status</div><select value={l.status||'New'} onChange={e=>updLead(s.id,l.id,'status',e.target.value)} style={{...inp,color:STATUS_C[l.status]||'#eee',fontWeight:700}}>{LEAD_STATUS.map(st=>(<option key={st} value={st}>{st}</option>))}</select></div>
-              {l.status==='Booked'&&<div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Booked — which practice?</div><input value={l.practice||''} onChange={e=>updLead(s.id,l.id,'practice',e.target.value)} placeholder="e.g. Physio w/ Zee" style={inp}/></div>}
+              <div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Date</div><input type="date" value={l.date||''} onChange={e=>updLead(s.id,l.id,'date',e.target.value)} style={inp}/></div>
+              <div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>First name</div><input value={l.first||''} onChange={e=>updLead(s.id,l.id,'first',e.target.value)} style={inp}/></div>
+              <div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Last name</div><input value={l.last||''} onChange={e=>updLead(s.id,l.id,'last',e.target.value)} style={inp}/></div>
+              <div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Phone</div><input value={l.phone||''} onChange={e=>updLead(s.id,l.id,'phone',e.target.value)} style={inp}/></div>
+              <div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Email</div><input value={l.email||''} onChange={e=>updLead(s.id,l.id,'email',e.target.value)} style={inp}/></div>
+              <div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Location</div><select value={l.location||''} onChange={e=>updLead(s.id,l.id,'location',e.target.value)} style={inp}><option value="">—</option><option>Mississauga</option><option>Markham</option></select></div>
+              <div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Interested in</div><input value={l.interest||''} onChange={e=>updLead(s.id,l.id,'interest',e.target.value)} placeholder="e.g. Physio, RMT" style={inp}/></div>
+              <div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Status</div><select value={l.status||'New'} onChange={e=>updLead(s.id,l.id,'status',e.target.value)} style={{...inp,color:STATUS_C[l.status]||'#eee',fontWeight:700}}>{LEAD_STATUS.map(st=>(<option key={st} value={st}>{st}</option>))}</select></div>
+              {l.status==='Booked'&&<div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Booked — which practice?</div><input value={l.practice||''} onChange={e=>updLead(s.id,l.id,'practice',e.target.value)} placeholder="e.g. Physio w/ Zee" style={inp}/></div>}
             </div>
             <div style={{display:'flex',gap:8,alignItems:'flex-end'}}>
-              <div style={{flex:1}}><div style={{fontSize:10,color:'#777',marginBottom:2}}>Notes</div><input value={l.notes||''} onChange={e=>updLead(s.id,l.id,'notes',e.target.value)} placeholder="follow-up notes…" style={inp}/></div>
+              <div style={{flex:1}}><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Notes</div><input value={l.notes||''} onChange={e=>updLead(s.id,l.id,'notes',e.target.value)} placeholder="follow-up notes…" style={inp}/></div>
               <button className="btn btn-ghost btn-xs" onClick={()=>delLead(s.id,l.id)} style={{color:'#E05252'}}>Delete</button>
             </div>
             <div style={{marginTop:9,paddingTop:9,borderTop:'1px dashed var(--border2)'}}>
               <div style={{display:'flex',gap:8,alignItems:'flex-end',flexWrap:'wrap',marginBottom:8}}>
-                <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Next follow-up</div><input type="date" value={l.nextDate||''} onChange={e=>updLead(s.id,l.id,'nextDate',e.target.value)} style={{...inp,width:150}}/></div>
-                <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Time</div><input type="time" value={l.nextTime||''} onChange={e=>updLead(s.id,l.id,'nextTime',e.target.value)} style={{...inp,width:120}}/></div>
-                <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Via</div><select value={l.nextMethod||'call'} onChange={e=>updLead(s.id,l.id,'nextMethod',e.target.value)} style={{...inp,width:100}}>{FU_METHODS.map(([v,lb])=><option key={v} value={v}>{lb}</option>)}</select></div>
+                <div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Next follow-up</div><input type="date" value={l.nextDate||''} onChange={e=>updLead(s.id,l.id,'nextDate',e.target.value)} style={{...inp,width:150}}/></div>
+                <div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Time</div><input type="time" value={l.nextTime||''} onChange={e=>updLead(s.id,l.id,'nextTime',e.target.value)} style={{...inp,width:120}}/></div>
+                <div><div style={{fontSize:11.5,color:'#9a9a9a',marginBottom:3}}>Via</div><select value={l.nextMethod||'call'} onChange={e=>updLead(s.id,l.id,'nextMethod',e.target.value)} style={{...inp,width:100}}>{FU_METHODS.map(([v,lb])=><option key={v} value={v}>{lb}</option>)}</select></div>
                 {l.nextDate&&<span style={{fontSize:11.5,fontWeight:700,color:dueColor(l.nextDate),alignSelf:'center',paddingBottom:7}}>{dueLabel(l.nextDate)}</span>}
               </div>
               <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center'}}>
-                <span style={{fontSize:10,color:'#777',marginRight:2}}>LOG OUTCOME</span>
+                <span style={{fontSize:11,color:'#9a9a9a',marginRight:2}}>LOG OUTCOME</span>
                 <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'No answer')}>No answer → +1d</button>
                 <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Left voicemail')}>Left msg → +2d</button>
                 <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Callback requested')}>Callback set ↑</button>
@@ -2440,7 +2440,7 @@ function CallHistoryPage(){
               </div>
               {(l.followups||[]).length>0&&<div style={{display:'flex',flexDirection:'column',gap:3,marginTop:8}}>
                 {(l.followups||[]).map((e,i)=>(<div key={i} style={{display:'flex',gap:8,alignItems:'center',fontSize:12,color:'#aaa',background:'var(--surface3)',borderRadius:5,padding:'4px 8px'}}>
-                  <span style={{color:'#888',minWidth:74}}>{e.at}</span><span title={e.method}>{methIcon(e.method)}</span><span style={{color:'#ccc',minWidth:130}}>{e.outcome||'—'}</span>
+                  <span style={{color:'#9a9a9a',minWidth:74}}>{e.at}</span><span title={e.method}>{methIcon(e.method)}</span><span style={{color:'#ccc',minWidth:130}}>{e.outcome||'—'}</span>
                   <input value={e.note||''} onChange={ev=>updAttempt(s.id,l.id,i,'note',ev.target.value)} placeholder="note…" style={{...inp,flex:1,padding:'3px 7px',fontSize:12}}/>
                   <button className="btn btn-ghost btn-xs" style={{color:'#777'}} onClick={()=>delAttempt(s.id,l.id,i)}>✕</button>
                 </div>))}
