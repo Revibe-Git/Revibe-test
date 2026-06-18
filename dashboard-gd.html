@@ -2222,6 +2222,15 @@ function CallHistoryPage(){
 
   const sources=(data.sources&&data.sources.length)?data.sources:DEFAULT_SOURCES;
   const[selSource,setSelSource]=useState(sources[0]?sources[0].id:'form');
+  const[expandedLead,setExpandedLead]=useState(null);
+  const[leadFilter,setLeadFilter]=useState('all');
+  const sortLeads=(arr)=>[...arr].sort((a,b)=>{
+    const closed=l=>(l.status==='Booked'||l.status==='Not a fit')?1:0;
+    const ca=closed(a),cb=closed(b);if(ca!==cb)return ca-cb;
+    const da=a.nextDate||'',db=b.nextDate||'';
+    if(da&&db)return da<db?-1:da>db?1:0;
+    if(da)return -1;if(db)return 1;return 0;
+  });
   const leadsOf=(sid)=>data.leads[sid]||[];
   const rollup=(sid)=>{const ls=leadsOf(sid);const c=ls.filter(l=>['Contacted','Responded','Booked'].includes(l.status)).length;const r=ls.filter(l=>['Responded','Booked'].includes(l.status)).length;const b=ls.filter(l=>l.status==='Booked').length;return{total:ls.length,contacted:c,responded:r,booked:b,conv:ls.length?b/ls.length*100:0};};
   const addSource=()=>{const name=prompt('New lead source / event name (e.g. "Jackalope 2026", "Sutherland Chan", "COMP Sessions")');if(!name||!name.trim())return;const id='src_'+Date.now().toString(36);persist({...data,sources:[...sources,{id,name:name.trim(),kind:'event'}]},true);setSelSource(id);};
@@ -2370,7 +2379,7 @@ function CallHistoryPage(){
         <button onClick={addSource} style={{cursor:'pointer',background:'transparent',border:'1px dashed var(--border2)',borderRadius:9,padding:'13px 15px',color:'#888',fontSize:14,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'.5px'}}>+ Add source / event</button>
       </div>
 
-      {selSource&&(()=>{const s=sources.find(x=>x.id===selSource);if(!s)return null;const r=rollup(s.id);const ls=leadsOf(s.id);return(<div>
+      {selSource&&(()=>{const s=sources.find(x=>x.id===selSource);if(!s)return null;const r=rollup(s.id);const lsAll=leadsOf(s.id);const ls=sortLeads(leadFilter==='all'?lsAll:lsAll.filter(l=>(l.status||'New')===leadFilter));return(<div>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:10}}>
           <div style={{display:'flex',alignItems:'baseline',gap:10}}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#eee'}}>{s.name}</span><span style={{fontSize:12,color:'#777'}}>{r.total} leads · {r.contacted} contacted · {r.responded} responded · {r.booked} booked · {r.conv.toFixed(0)}% conversion</span></div>
           <div style={{display:'flex',gap:6}}>
@@ -2379,10 +2388,26 @@ function CallHistoryPage(){
             {s.kind==='event'&&<button className="btn btn-ghost btn-xs" onClick={()=>delSource(s.id)} style={{color:'#E05252'}}>Delete</button>}
           </div>
         </div>
-        {ls.length===0?<div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:8,padding:'26px 18px',textAlign:'center',color:'#777'}}>No leads yet — click <b>+ Add lead</b> to start tracking {s.name}.</div>:
+        {lsAll.length===0?<div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:8,padding:'26px 18px',textAlign:'center',color:'#777'}}>No leads yet — click <b>+ Add lead</b> to start tracking {s.name}.</div>:
+        <>
+        <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center',marginBottom:9}}>
+          <span style={{fontSize:10,color:'#777',textTransform:'uppercase',letterSpacing:'1px',marginRight:2}}>Filter</span>
+          {['all',...LEAD_STATUS.filter(st=>lsAll.some(l=>(l.status||'New')===st))].map(st=>{const n=st==='all'?lsAll.length:lsAll.filter(l=>(l.status||'New')===st).length;return <button key={st} className={`btn btn-xs ${leadFilter===st?'btn-go':'btn-ghost'}`} onClick={()=>setLeadFilter(st)}>{st==='all'?'All':st}<span style={{opacity:.55,marginLeft:4}}>{n}</span></button>;})}
+          <span style={{fontSize:11,color:'#666',marginLeft:'auto'}}>sorted by soonest follow-up</span>
+        </div>
+        {ls.length===0?<div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:8,padding:'18px',textAlign:'center',color:'#777',fontSize:13}}>No <b style={{color:'#aaa'}}>{leadFilter}</b> leads. <span style={{color:'#7FC8E8',cursor:'pointer'}} onClick={()=>setLeadFilter('all')}>Show all</span></div>:
         <div style={{display:'flex',flexDirection:'column',gap:8}}>
-          {ls.map(l=>(<div key={l.id} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderLeft:'3px solid '+(STATUS_C[l.status]||'#888'),borderRadius:8,padding:'10px 12px'}}>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:8,marginBottom:7}}>
+          {ls.map(l=>{const open=expandedLead===l.id;const nm=((l.first||'')+' '+(l.last||'')).trim();return(<div key={l.id} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderLeft:'3px solid '+(STATUS_C[l.status]||'#888'),borderRadius:8,padding:open?'10px 12px':'8px 12px'}}>
+            <div onClick={()=>setExpandedLead(open?null:l.id)} style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',cursor:'pointer'}}>
+              <span style={{color:'#777',fontSize:11,width:10,flexShrink:0}}>{open?'▾':'▸'}</span>
+              <span style={{fontWeight:700,color:'#eee',fontSize:14}}>{nm||<span style={{color:'#777',fontStyle:'italic',fontWeight:400}}>Unnamed lead</span>}</span>
+              <span style={{fontSize:11,fontWeight:700,color:STATUS_C[l.status]||'#aaa',background:'var(--surface3)',borderRadius:4,padding:'2px 8px'}}>{l.status||'New'}</span>
+              {l.interest&&<span style={{fontSize:12,color:'#9aaaa0'}}>{l.interest}</span>}
+              <span style={{fontSize:12,color:'#888'}}>{l.phone||l.email||'—'}</span>
+              {(l.followups||[]).length>0&&<span style={{fontSize:11,color:'#777'}}>{(l.followups||[]).length} attempt{(l.followups||[]).length>1?'s':''}</span>}
+              <span style={{marginLeft:'auto',fontSize:11.5,fontWeight:700,color:l.nextDate?dueColor(l.nextDate):'#666'}}>{l.nextDate?dueLabel(l.nextDate):'no follow-up'}</span>
+            </div>
+            {open&&(<><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:8,marginBottom:7,marginTop:10}}>
               <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Date</div><input type="date" value={l.date||''} onChange={e=>updLead(s.id,l.id,'date',e.target.value)} style={inp}/></div>
               <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>First name</div><input value={l.first||''} onChange={e=>updLead(s.id,l.id,'first',e.target.value)} style={inp}/></div>
               <div><div style={{fontSize:10,color:'#777',marginBottom:2}}>Last name</div><input value={l.last||''} onChange={e=>updLead(s.id,l.id,'last',e.target.value)} style={inp}/></div>
@@ -2421,8 +2446,10 @@ function CallHistoryPage(){
                 </div>))}
               </div>}
             </div>
-          </div>))}
+            </>)}
+          </div>);})}
         </div>}
+        </>}
       </div>);})()}
     </>)}
     {view==='agenda'&&(()=>{
