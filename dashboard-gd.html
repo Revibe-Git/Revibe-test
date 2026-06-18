@@ -5335,7 +5335,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   return(<button key={mo} className={`btn btn-sm ${retActiveMonth===mo?'btn-go':'btn-ghost'}`} onClick={()=>setRetViewMonth(mo)}>{lbl}</button>);
                 })}
               </div>
-              {retMonthsAvail.length===1&&<span style={{fontSize:13,color:'#666'}}>import more months to compare — set the Retention Report Month on the Jane Import tab before dropping</span>}
+              {retMonthsAvail.length===1&&<span style={{fontSize:13,color:'#666'}}>import more months to compare — pick the month in the popup when you drop the Member Retention CSV</span>}
             </div>
           )}
           {retentionSummary&&(()=>{
@@ -5552,7 +5552,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 {n:1,title:'Appointments Report',where:'Reports → Appointments',action:'Set date range → ··· menu → Export CSV',cols:'staff_member_name, state, no_show_at, cancelled_at',note:'Gives: completed visits, no-shows, cancellations per practitioner'},
                 {n:2,title:'Shift Report',where:'Reports → Hours Scheduled / Booked tab',action:'Set date range → Export CSV',cols:'Staff Name, Hours Booked, Hours Scheduled',note:'Gives: utilization % (Booked ÷ Scheduled hrs)'},
                 {n:3,title:'Sales Report',where:'Reports → Sales',action:'Set date range → Export CSV',cols:'Staff Member, Status, Income Category, Collected',note:'Gives: revenue per practitioner (paid treatment income only)'},
-                {n:4,title:'Member Retention',where:'Reports → Member Retention',action:'Export the FULL month range (end of month) → set "Retention report month" below before dropping',cols:'New Patients, % Returning (clinic, per location, per practitioner)',note:'Full-month only — retention counts distinct patients over a window, so it can’t stack week-to-week. Each upload replaces that month.'},
+                {n:4,title:'Member Retention',where:'Reports → Member Retention',action:'Export the FULL month range (end of month) → drop it, then confirm the month in the popup',cols:'New Patients, % Returning (clinic, per location, per practitioner)',note:'Full-month only — retention counts distinct patients over a window, so it can’t stack week-to-week. Each upload replaces that month.'},
               ].map(s=>(
                 <div key={s.n} style={{background:'var(--surface3)',borderRadius:5,padding:'12px 14px',border:'1px solid var(--border)'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:7}}>
@@ -5574,7 +5574,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
             <div style={{fontSize:14,color:'#777',lineHeight:1.6}}>
               <strong style={{color:'#aaa'}}>Appointments</strong> and <strong style={{color:'#aaa'}}>Sales</strong> CSVs auto-split by month from the row dates — just drop them in.<br/>
-              <strong style={{color:'#aaa'}}>Shift Report</strong> has no date column, so set the month it covers below.
+              <strong style={{color:'#aaa'}}>Shift Report</strong> with no date column will ask which month it covers in a popup when you drop it.
             </div>
             <button className="btn btn-ghost btn-xs" style={{color:'#E05252',marginLeft:'auto',flexShrink:0}}
               onClick={async()=>{if(confirm('Reset ALL performance data? This clears all snapshots, GVA, and retention entries. Cannot be undone.')){
@@ -5620,19 +5620,6 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   setImportMsg({type:'success',msg:`✓ ${type} purged. Reloading…`});setTimeout(()=>window.location.reload(),800);
                 }}>🗑 {label}</button>
             ))}
-          </div>
-          <div style={{marginBottom:12,display:'flex',alignItems:'center',gap:18,flexWrap:'wrap'}}>
-            <div style={{display:'flex',alignItems:'center',gap:12}}>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#777'}}>Shift Report Month</div>
-              <input type="month" value={snapDate.slice(0,7)} onChange={e=>setSnapDate(e.target.value+'-01')}
-                style={{background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none'}}/>
-            </div>
-            <div style={{display:'flex',alignItems:'center',gap:12}}>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'2px',textTransform:'uppercase',color:'#BB99FF'}}>Retention Report Month</div>
-              <input type="month" value={retentionMonth} onChange={e=>setRetentionMonth(e.target.value)}
-                style={{background:'var(--surface2)',border:'1px solid #BB99FF55',borderRadius:5,color:'var(--text)',fontSize:14,padding:'5px 10px',outline:'none'}}/>
-              <span style={{fontSize:13,color:'#666'}}>set this before dropping the Member Retention CSV · export the <strong style={{color:'#888'}}>full month</strong> (do it at month-end) — it replaces, doesn’t stack</span>
-            </div>
           </div>
 
           <div className={`perf-drop${dragging?' drag':''}`}
