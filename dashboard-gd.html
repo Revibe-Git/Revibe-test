@@ -486,6 +486,41 @@ textarea{resize:vertical;min-height:60px;}
 .gva-input-row:last-child{border-bottom:none;}
 .gva-num{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:800;line-height:1;}
 
+/* ───────── MOBILE / RESPONSIVE ───────── */
+.menu-btn{display:none;background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:5px;width:36px;height:36px;font-size:19px;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;margin-right:10px;}
+.nav-backdrop{display:none;}
+@media (max-width:820px){
+  html,body{overflow:auto;-webkit-text-size-adjust:100%;}
+  .shell{flex-direction:column;height:auto;min-height:100vh;}
+  .menu-btn{display:inline-flex;}
+  /* Sidebar becomes a slide-in drawer */
+  .sidebar{position:fixed;top:0;left:0;z-index:1200;height:100vh;width:82vw;max-width:300px;transform:translateX(-100%);transition:transform .22s ease;box-shadow:0 0 40px rgba(0,0,0,.65);}
+  .shell.nav-open .sidebar{transform:translateX(0);}
+  .nav-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1150;}
+  .shell.nav-open .nav-backdrop{display:block;}
+  .main{height:auto;overflow:visible;min-height:0;}
+  .scroll{overflow:visible;}
+  .topbar{position:sticky;top:0;z-index:500;height:auto;min-height:50px;padding:7px 12px;flex-wrap:wrap;gap:6px;}
+  .topbar-r{order:3;width:100%;}
+  .topbar-r .btn{flex:1;justify-content:center;}
+  .pipe,.crumb{display:none;}
+  .page-title{font-size:17px;letter-spacing:1px;}
+  .pg{padding:13px 13px;}
+  /* Stat / card grids collapse */
+  .sg4,.sg3,.grid3{grid-template-columns:1fr 1fr!important;}
+  .sg2,.grid2{grid-template-columns:1fr!important;}
+  /* Generic flex rows wrap instead of overflowing */
+  .flex{flex-wrap:wrap;}
+  /* Tables that aren't already wrapped can scroll sideways */
+  table{max-width:100%;}
+}
+@media (max-width:470px){
+  .sg4,.sg3,.sg2,.grid2,.grid3{grid-template-columns:1fr!important;}
+  .sc-val{font-size:27px;}
+  .foot-val{font-size:30px;}
+  .pg{padding:11px 10px;}
+}
+
 </style>
 </head>
 <body>
@@ -1909,6 +1944,7 @@ class PageBoundary extends React.Component{
 }
 function App(){
   const[page,setPage]=useState('overview');
+  const[navOpen,setNavOpen]=useState(false);
   const[staff,setStaff]=useState(()=>ld('staff',SEED_STAFF));
   const[evals,setEvals]=useState(()=>ld('evals',[]));
   const[sessions,setSessions]=useState(()=>ld('sessions',[]));
@@ -2040,7 +2076,8 @@ function App(){
   const PageComp=PAGES[page]||Overview;
 
   return(
-    <div className="shell">
+    <div className={"shell"+(navOpen?" nav-open":"")}>
+      <div className="nav-backdrop" onClick={()=>setNavOpen(false)}/>
       <div className="sidebar">
         <div className="logo-wrap">
           <img src={LOGO} className="logo-img" alt="Revibe"/>
@@ -2048,14 +2085,14 @@ function App(){
         </div>
         <div className="nav-group">
           <div className="nav-lbl">Menu</div>
-          {NAV.map(n=><div key={n.id} className={`nav-item${page===n.id?' active':''}`} onClick={()=>setPage(n.id)}><span className="nav-icon">{n.icon}</span>{n.label}</div>)}
+          {NAV.map(n=><div key={n.id} className={`nav-item${page===n.id?' active':''}`} onClick={()=>{setPage(n.id);setNavOpen(false);}}><span className="nav-icon">{n.icon}</span>{n.label}</div>)}
         </div>
         <div className="sidebar-hr"/>
         <div className="nav-group">
           <div className="nav-lbl">Quick Add</div>
-          <div className="nav-item" onClick={()=>setModal('addStaff')}><span className="nav-icon">+</span>Add Staff</div>
-          <div className="nav-item" onClick={()=>setModal('addEval')}><span className="nav-icon">+</span>Log Evaluation</div>
-          <div className="nav-item" onClick={()=>setModal('addSess')}><span className="nav-icon">+</span>Log Edu Session</div>
+          <div className="nav-item" onClick={()=>{setModal('addStaff');setNavOpen(false);}}><span className="nav-icon">+</span>Add Staff</div>
+          <div className="nav-item" onClick={()=>{setModal('addEval');setNavOpen(false);}}><span className="nav-icon">+</span>Log Evaluation</div>
+          <div className="nav-item" onClick={()=>{setModal('addSess');setNavOpen(false);}}><span className="nav-icon">+</span>Log Edu Session</div>
         </div>
         <div className="sidebar-foot">
           <div className="foot-card">
@@ -2070,6 +2107,7 @@ function App(){
         <div className="stripe"/>
         <div className="topbar">
           <div className="flex aic">
+            <button className="menu-btn" onClick={()=>setNavOpen(o=>!o)} aria-label="Menu">☰</button>
             <span className="page-title">{NAV.find(n=>n.id===page)?.label}</span>
             <span className="pipe">|</span>
             <span className="crumb">Revibe Health — G&amp;D Portal</span>
