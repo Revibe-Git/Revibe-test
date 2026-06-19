@@ -11762,7 +11762,7 @@ function SystematicPage({staff=[]}){
           );
           return(
             <div style={{marginTop:20}}>
-              <div className="no-print" style={{background:'#0e1512',border:'1px solid #1d2a25',borderRadius:10,padding:'10px 6px 2px',marginBottom:16}}>
+              <div className="no-print" style={{background:'#0e1512',border:'1px solid #1d2a25',borderRadius:10,padding:'10px 6px 2px',maxWidth:430,margin:'0 auto 16px'}}>
                 <svg viewBox="0 0 680 360" style={{width:'100%',height:'auto',display:'block'}}>
                   {WEB.map((n,i)=>{const m=WEB[(i+1)%WEB.length];return <line key={'p'+i} x1={n.x} y1={n.y} x2={m.x} y2={m.y} stroke="#22332d" strokeWidth="1.5"/>;})}
                   {WEB.map((n,i)=>{const on=discTier[n.d]&&discTier[n.d]!=='off';return <line key={'s'+i} x1={CX} y1={CY} x2={n.x} y2={n.y} stroke={on?'#00aa88':'#22332d'} strokeWidth={on?3:1.5}/>;})}
