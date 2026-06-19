@@ -2122,7 +2122,7 @@ function App(){
             <button className="menu-btn" onClick={()=>setNavOpen(o=>!o)} aria-label="Menu">☰</button>
             <span className="page-title">{NAV.find(n=>n.id===page)?.label}</span>
             <span className="pipe">|</span>
-            <span className="crumb">Revibe Health — G&amp;D Portal</span>
+            <span className="crumb">Revibe — G&amp;D Portal</span>
           
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
           <NotificationBell notifs={notifs} markRead={markRead} markAllRead={markAllRead} setPage={setPage}/>
@@ -4559,7 +4559,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         <div className="report-print-area" style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:'24px 26px'}}>
           {/* Header */}
           <div style={{borderBottom:'2px solid var(--go)',paddingBottom:16,marginBottom:20}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'3px',textTransform:'uppercase',color:'#888'}}>Revibe Health — Growth &amp; Development</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'3px',textTransform:'uppercase',color:'#888'}}>Revibe — Growth &amp; Development</div>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#fff',letterSpacing:'.5px',marginTop:2}}>{pTitleWord} Performance Report <span style={{color:repLoc==='all'?'#7FC8E8':'#E0A052',fontSize:22}}>· {repLoc==='all'?'All Revibe':repLoc}</span></div>
             <div style={{fontSize:15,color:'#CAE8C1',fontWeight:600,marginTop:4}}>{pLabel}</div>
             <div style={{fontSize:12,color:'#666',marginTop:4}}>Compared to {pPrev} · Generated {new Date(genAt).toLocaleString('en-CA',{dateStyle:'medium',timeStyle:'short'})}{saved?' · SAVED':''}</div>
@@ -7754,7 +7754,7 @@ function ResourcesPage(){
           {ContentComp ? <ContentComp/> : <div className="sop-p">Select a section from the left.</div>}
           <div className="sop-divider"/>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <span style={{fontSize:14,color:'#999'}}>Revibe Health — Internal Lead Reference · Confidential</span>
+            <span style={{fontSize:14,color:'#999'}}>Revibe — Internal Lead Reference · Confidential</span>
             <div className="flex aic g6">
               {(()=>{
                 const chapters = SOP_SECTIONS[activeDoc].chapters;
@@ -9442,7 +9442,7 @@ function ScheduleMeetingModal({onClose, onSave, staff, existing}){
     // Build the event payload for Google Calendar MCP
     const eventBody = {
       summary: f.title,
-      description: f.description + (f.description?'\n\n':'') + `Meeting Type: ${mt.label}\nOrganized by: ${f.organizer||'Revibe Health Management'}`,
+      description: f.description + (f.description?'\n\n':'') + `Meeting Type: ${mt.label}\nOrganized by: ${f.organizer||'Revibe Management'}`,
       start: {dateTime: startDt.toISOString(), timeZone: 'America/Toronto'},
       end:   {dateTime: endDt.toISOString(),   timeZone: 'America/Toronto'},
       location: f.location,
@@ -11635,13 +11635,13 @@ function SystematicPage({staff=[]}){
         </div>
         <div className="case-print-letterhead" style={{justifyContent:'space-between',alignItems:'flex-end',borderBottom:'2px solid '+BLU,paddingBottom:10,marginBottom:18,gap:16}}>
           <div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'3px',textTransform:'uppercase',color:BLU,marginBottom:1}}>Revibe Health</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'3px',textTransform:'uppercase',color:BLU,marginBottom:1}}>Revibe</div>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:25,fontWeight:800,color:'#fff',letterSpacing:'.5px',lineHeight:1.05}}>Clinical Care Map{regions.length?<span style={{color:BLU}}> · {regions.join(' + ')}</span>:''}</div>
             <div style={{fontSize:11.5,color:'#8aa39a',marginTop:2}}>Growth &amp; Development Portal · Suggestion only — the treating clinician decides</div>
           </div>
           <div style={{textAlign:'right',fontSize:11.5,color:'#8aa39a',whiteSpace:'nowrap'}}>{new Date().toLocaleDateString('en-CA',{weekday:'short',year:'numeric',month:'long',day:'numeric'})}</div>
         </div>
-        <div className="screen-only-title" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,letterSpacing:'1px',color:BLU,marginBottom:2}}>🧭 Care Mapper{regions.length>0?' — '+regions.join(' + '):''}</div>
+        <div className="screen-only-title" style={{background:'#00aa88',borderRadius:10,padding:'15px 20px',marginBottom:16,display:'flex',justifyContent:'space-between',alignItems:'flex-end',gap:16,flexWrap:'wrap'}}><div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'3px',color:'rgba(255,255,255,.85)',fontWeight:700}}>REVIBE</div><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:'#fff',lineHeight:1.05,letterSpacing:'.4px'}}>Clinical Care Map{regions.length>0?' \u00b7 '+regions.join(' + '):''}</div></div><div style={{fontSize:12,color:'rgba(255,255,255,.85)',whiteSpace:'nowrap',fontWeight:600}}>{mc.phase?mc.phase.split(' (')[0]+' phase':'Care Mapper'}</div></div>
         <div style={{background:'rgba(224,82,82,.07)',border:'1px solid rgba(224,82,82,.25)',borderRadius:7,padding:'9px 13px',fontSize:13,color:'#e0a0a0',lineHeight:1.55,marginBottom:16}}>
           <strong>Suggestion only — the treating clinician decides.</strong> This assembles a starting pathway from team standards; it does not diagnose. Specific timelines/referrals show only where a <em>verified</em> rule exists. Always re-assess and adjust.
         </div>
@@ -11689,6 +11689,123 @@ function SystematicPage({staff=[]}){
           </div>))}
         </div>
 
+        {ready&&(()=>{
+          const DISCL={pt:'Physio',chiro:'Chiro',rmt:'RMT',osteo:'Osteo',naturo:'Naturo'};
+          const LIME='#CAE8C1',PUR='#BB99FF',BLU='#7FC8E8';
+          const caseSport=mc.sport||[];
+          const acute=(mc.phase||'').startsWith('Acute');
+          const highIrr=mc.irritability==='High'||mc.pain==='7\u201310 (severe)';
+          // Region → clinically-relevant keywords (general MSK knowledge) to match against what each clinician treats
+          const REGION_KW={'Ankle / foot':['ankle','foot','feet','plantar','achilles','heel','sprain'],'Knee':['knee','acl','mcl','lcl','pcl','meniscus','patell','it band','itb'],'Hip / groin':['hip','groin','glute','hamstring','pelvis','pelvic','adductor','si joint','si pain'],'Low back':['low back','lower back','back','lumbar','lumbo','spine','disc','sciatic'],'Neck':['neck','cervical','cervicogenic','headache','migraine','tmj','jaw'],'Shoulder':['shoulder','rotator','impingement','labrum','overhead','scapula'],'Elbow / wrist':['elbow','wrist','forearm','tennis elbow','carpal','tendon'],'Other / multi-region':[]};
+          const regKW=Array.from(new Set(regions.flatMap(r=>REGION_KW[r]||[])));
+          // Discipline base weight for this case — Physio/Chiro lead; Osteo/RMT support (Osteo↑ when irritable); Naturo only for holistic
+          const dxDone=mc.diagnosed&&mc.diagnosed!=='No — not yet assessed';
+          const baseFor=(d)=>{const prem=dxDone?0:(d==='pt'?0.8:d==='chiro'?0.5:0);const core=d==='pt'?3.2:d==='chiro'?3.1:d==='osteo'?(acute||highIrr?3:1.8):d==='rmt'?(acute||highIrr?2.3:2.8):d==='naturo'?(/holistic|fatigue|hormon|wellness|stress/.test((lifestyles.join(' ')+(mc.mechanism||'')).toLowerCase())?1.8:0):0;return core+prem;};
+          const rows=(staff||[]).filter(s=>['pt','chiro','rmt','osteo','naturo'].includes(s.discipline)).map(s=>{
+            const mp=mpFor(s);const specs=s.specializations||[];
+            let score=baseFor(s.discipline);if(score<=0)return null;
+            const blob=((mp.expertise||'')+' '+(mp.conditions||'')+' '+(mp.treatments||'')+' '+(mp.bestClients||'')).toLowerCase();
+            const reasons=[];
+            const hits=regKW.filter(k=>blob.includes(k));
+            if(hits.length){score+=Math.min(hits.length,3)*0.9;reasons.push('profile: '+Array.from(new Set(hits)).slice(0,3).join(', '));}
+            if(lifestyles.includes('Post-partum')&&specs.includes('prenatalPostnatal')){score+=3;reasons.push('pre/postnatal');}
+            if(lifestyles.includes('Competitive athlete')&&(specs.includes('sportsMassage')||/sport|athlet/.test(blob))){score+=1.5;reasons.push('sports focus');}
+            if(lifestyles.includes('Older adult')&&/older|geriatr|gentle|relax/.test(blob)){score+=1;reasons.push('older-adult fit');}
+            if(lifestyles.includes('General / desk-based')&&/desk|postur|tension|ergonom/.test(blob)){score+=1;reasons.push('desk/posture');}
+            if(highIrr&&(specs.includes('acupuncture')||specs.includes('triggerPoint'))){score+=0.6;reasons.push('pain modalities');}
+            const sSports=asSports(mp.sports);const sLower=sSports.map(x=>x.toLowerCase());
+            const caseSports=caseSport.filter(c=>isSportName(c));const caseLife=caseSport.filter(c=>!isSportName(c));
+            let rapport=0;const hooks=[];
+            const sportHit=caseSports.filter(c=>sLower.includes(c.toLowerCase()));
+            if(sportHit.length){const b=3.5+Math.min(sportHit.length-1,2)*1.5;score+=b;rapport+=b;const t=sportHit.join(' / ');reasons.unshift('plays '+t);hooks.push({v:b,info:{kind:'sport',clin:t}});}
+            // Treats the patient's specific sport (in their clinical profile) without playing it — highlighted, ranks below a play-match
+            const treatHit=caseSports.filter(c=>!sLower.includes(c.toLowerCase())&&blob.includes(c.toLowerCase()));
+            if(treatHit.length){const b=1.6;score+=b;rapport+=b*0.7;const t=treatHit.slice(0,2).join(' / ');reasons.unshift('treats '+t);hooks.push({v:b*0.7,info:{kind:'athlete',clin:t}});}
+            const lifeHit=caseLife.filter(c=>sLower.includes(c.toLowerCase()));
+            if(lifeHit.length){const b=Math.min(lifeHit.length,2)*1.8;score+=b;rapport+=b;const t=lifeHit.join(' / ');reasons.unshift('shares: '+t);hooks.push({v:b,info:{kind:'life',clin:t}});}
+            // Generic athlete-treating fit (athletic patient, no specific-sport match) — highlighted, lowest priority
+            if(!sportHit.length&&!treatHit.length&&caseSports.length&&/sport|athlet|run|endurance|perform/.test(blob)){const b=0.9;score+=b;rapport+=0.5;reasons.unshift('treats athletes');hooks.push({v:0.5,info:{kind:'athlete',clin:'athletes'}});}
+            const cLang=(mp.languages||'').toLowerCase();
+            if(mc.language&&cLang.includes(mc.language.toLowerCase())){score+=2.5;rapport+=2;reasons.unshift('speaks '+mc.language);hooks.push({v:2,info:{kind:'lang',clin:mc.language}});}
+            const rapportInfo=hooks.length?hooks.sort((a,b)=>b.v-a.v)[0].info:null;
+            const excl=(mp.excludes||'').toLowerCase();
+            if(excl){
+              const exHit=regKW.filter(k=>k.length>=3&&excl.includes(k));
+              if(exHit.length){score-=5;reasons.push('⚠ won’t take: '+Array.from(new Set(exHit)).slice(0,2).join(', '));}
+              if(lifestyles.includes('Post-partum')&&/post.?natal|prenatal|pregnan|pelvic|pre.?post/.test(excl)){score-=6;if(!exHit.length)reasons.push('⚠ excl. pre/postnatal');}
+              if(/post|surg/.test((mc.mechanism||'').toLowerCase())&&/post.?op|surg/.test(excl)){score-=4;reasons.push('⚠ excl. post-op');}
+            }
+            const role=(s.discipline==='pt'||s.discipline==='chiro')?'lead':'support';
+            if(!reasons.length)reasons.push(role==='lead'?'assess & lead':s.discipline==='osteo'?'down-regulation':'soft-tissue support');
+            return{s,mp,score,reasons,role,rapport,rapportInfo};
+          }).filter(Boolean).sort((a,b)=>b.score-a.score||a.s.name.localeCompare(b.s.name));
+          const leads=rows.filter(r=>r.role==='lead').slice(0,3);
+          const supports=rows.filter(r=>r.role==='support').slice(0,3);
+          const bestFit=rows.filter(r=>r.rapport>0&&r.score>0).sort((a,b)=>b.score-a.score)[0];
+          const primary=bestFit||leads[0]||null;
+          const WEB=[{d:'pt',label:'PHYSIO',x:340,y:66},{d:'chiro',label:'CHIRO',x:474,y:142},{d:'naturo',label:'NATURO',x:420,y:292},{d:'rmt',label:'RMT',x:260,y:292},{d:'osteo',label:'OSTEO',x:206,y:142}];
+          const CX=340,CY=188,CR=58,NR=50;
+          const WEBFILL={best:'#00aa88',lead:'rgba(0,170,136,.6)',support:'rgba(0,170,136,.38)',off:'#16201c'};
+          const WEBTXT={best:'#fff',lead:'#fff',support:'#fff',off:'#5e7068'};
+          const discTier={pt:'off',chiro:'off',osteo:'off',rmt:'off',naturo:'off'};
+          supports.forEach(r=>{discTier[r.s.discipline]='support';});
+          leads.forEach(r=>{discTier[r.s.discipline]='lead';});
+          if(primary)discTier[primary.s.discipline]='best';
+          const Row=({s,mp,reasons,role})=>(
+            <div style={{background:'var(--surface3)',borderLeft:'3px solid '+(role==='lead'?LIME:PUR),borderRadius:6,padding:'11px 14px',marginBottom:8}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:6}}>
+                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#eee'}}>{s.name} <span style={{fontSize:13,color:BLU,fontWeight:600}}>· {DISCL[s.discipline]||s.discipline} · {(typeof siteList==='function'?siteList(s)[0]:s.site)||s.site||'\u2014'}</span></span>
+                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{reasons.map((r,i)=>{const isPlay=r.indexOf('plays ')===0;const isAth=r.indexOf('treats ')===0;const bg=isPlay?'#8FE0C0':isAth?'#E0A052':(role==='lead'?LIME:PUR);return <span key={i} style={{fontSize:11,color:'#1a1a1a',background:bg,borderRadius:4,padding:'2px 7px',fontWeight:700,boxShadow:(isPlay||isAth)?'0 0 0 1px rgba(255,255,255,.25)':'none'}}>{(isPlay?'🎯 ':isAth?'🏅 ':'')+r}</span>;})}</div>
+              </div>
+              {mp.matchNotes&&<div style={{fontSize:13,color:'#bbb',marginTop:5,lineHeight:1.5,fontStyle:'italic'}}>{mp.matchNotes}</div>}
+            </div>
+          );
+          return(
+            <div style={{marginTop:20}}>
+              <div className="no-print" style={{background:'#0e1512',border:'1px solid #1d2a25',borderRadius:10,padding:'10px 6px 2px',marginBottom:16}}>
+                <svg viewBox="0 0 680 360" style={{width:'100%',height:'auto',display:'block'}}>
+                  {WEB.map((n,i)=>{const m=WEB[(i+1)%WEB.length];return <line key={'p'+i} x1={n.x} y1={n.y} x2={m.x} y2={m.y} stroke="#22332d" strokeWidth="1.5"/>;})}
+                  {WEB.map((n,i)=>{const on=discTier[n.d]&&discTier[n.d]!=='off';return <line key={'s'+i} x1={CX} y1={CY} x2={n.x} y2={n.y} stroke={on?'#00aa88':'#22332d'} strokeWidth={on?3:1.5}/>;})}
+                  <circle cx={CX} cy={CY} r={CR} fill="#007f68"/>
+                  <text x={CX} y={CY-6} textAnchor="middle" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:800,letterSpacing:'.5px',fill:'#fff'}}>{regions.length>1?regions[0].toUpperCase()+' +'+(regions.length-1):(regions[0]||'CASE').toUpperCase()}</text>
+                  <text x={CX} y={CY+13} textAnchor="middle" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,fontWeight:600,fill:'rgba(255,255,255,.8)'}}>{(mc.phase||'').split(' (')[0].toUpperCase()}</text>
+                  {WEB.map((n,i)=>{const t=discTier[n.d]||'off';const isBest=t==='best';return(
+                    <g key={'n'+i}>
+                      <circle cx={n.x} cy={n.y} r={NR} fill={WEBFILL[t]}/>
+                      <text x={n.x} y={isBest?n.y-9:(t==='off'?n.y+4:n.y-2)} textAnchor="middle" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,fontWeight:800,letterSpacing:'.5px',fill:WEBTXT[t]}}>{n.label}</text>
+                      {isBest&&primary&&<text x={n.x} y={n.y+7} textAnchor="middle" style={{fontFamily:"'Barlow',sans-serif",fontSize:10.5,fontWeight:600,fill:'rgba(255,255,255,.92)'}}>{primary.s.name.split(' ')[0]}</text>}
+                      {isBest&&<text x={n.x} y={n.y+21} textAnchor="middle" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:9.5,fontWeight:700,letterSpacing:'1px',fill:'#d7f5ec'}}>{'\u2605 START HERE'}</text>}
+                      {t==='lead'&&<text x={n.x} y={n.y+15} textAnchor="middle" style={{fontFamily:"'Barlow',sans-serif",fontSize:10,fontWeight:600,fill:'rgba(255,255,255,.82)'}}>lead</text>}
+                      {t==='support'&&<text x={n.x} y={n.y+15} textAnchor="middle" style={{fontFamily:"'Barlow',sans-serif",fontSize:10,fontWeight:600,fill:'rgba(255,255,255,.82)'}}>support</text>}
+                    </g>);})}
+                </svg>
+                <div style={{textAlign:'center',fontSize:11.5,color:'#5fb89e',fontWeight:600,padding:'2px 0 8px'}}>Lit nodes are this case&rsquo;s pathway &middot; dim nodes aren&rsquo;t in play</div>
+              </div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginBottom:4}}>Suggested Clinicians</div>
+              <div style={{fontSize:12.5,color:'#666',marginBottom:10}}>Ranked by clinical fit (discipline, what they treat, specializations){caseSport.length?', plus shared sport / lifestyle for rapport':''} — availability and the lead's judgment decide. {hasFlags?<span style={{color:'#e0a0a0'}}>Medical screen flagged: leads below assess & clear first; support is comfort-only in the interim.</span>:''}</div>
+              {bestFit&&(()=>{const ri=bestFit.rapportInfo;const disc=DISCL[bestFit.s.discipline]||bestFit.s.discipline;const site=(typeof siteList==='function'?siteList(bestFit.s)[0]:bestFit.s.site)||bestFit.s.site||'';
+                let lead=null;
+                if(ri){
+                  if(ri.kind==='sport')lead=<>Both play <strong style={{color:LIME}}>{ri.clin}</strong> — </>;
+                  else if(ri.kind==='life')lead=<>Shares <strong style={{color:LIME}}>{ri.clin}</strong> with the patient — </>;
+                  else if(ri.kind==='lang')lead=<>Speaks <strong style={{color:LIME}}>{ri.clin}</strong> with the patient — </>;
+                  else if(ri.kind==='athlete')lead=<>Treats <strong style={{color:LIME}}>{ri.clin}</strong>{ri.clin==='athletes'?'':' athletes'} — </>;
+                }
+                return(
+                <div style={{background:'linear-gradient(180deg,rgba(202,232,193,.11),rgba(202,232,193,.02))',border:'1px solid rgba(202,232,193,.45)',borderRadius:9,padding:'13px 16px',marginBottom:14}}>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:800,letterSpacing:'1px',color:LIME,marginBottom:4}}>★ START HERE — STRONGEST CONNECTION</div>
+                  <div style={{fontSize:17,fontWeight:800,color:'#fff'}}>{bestFit.s.name} <span style={{fontSize:13,color:BLU,fontWeight:600}}>· {disc} · {site}</span></div>
+                  <div style={{fontSize:13,color:'#cde8c4',marginTop:5,lineHeight:1.55}}>{lead}{lead?'l':'L'}eading with that connection builds rapport, buy-in and trust, which drives retention and a faster recovery. They make the patient feel understood and are the best entry point. They set and own the appropriate co-treatment plan with the lead/support team below — not a lock to one clinician, but the strongest place to start.</div>
+                </div>);})()}
+              {leads.length>0&&<div style={{fontSize:12,color:LIME,fontWeight:700,letterSpacing:'.5px',margin:'4px 0 6px'}}>LEAD — diagnose & own the plan</div>}
+              {leads.map(r=><Row key={r.s.id} {...r}/>)}
+              {supports.length>0&&<div style={{fontSize:12,color:PUR,fontWeight:700,letterSpacing:'.5px',margin:'12px 0 6px'}}>SUPPORT — co-treat</div>}
+              {supports.map(r=><Row key={r.s.id} {...r}/>)}
+              {!leads.length&&!supports.length&&<div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:9,padding:'18px 16px',color:'#888',fontSize:13.5}}>No clinical staff found to suggest. Add clinicians with disciplines (Physio/Chiro/RMT/Osteo) to see matches.</div>}
+              <div style={{fontSize:11.5,color:'#5a5a5a',marginTop:8,fontStyle:'italic'}}>Suggestions are reasoning aids from team standards and each clinician's profile — not a directive. The treating lead decides.</div>
+            </div>
+          );
+        })()}
         {/* Output */}
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginBottom:10}}>Suggested Pathway</div>
         {hasFlags?(
@@ -11770,96 +11887,8 @@ function SystematicPage({staff=[]}){
           </div>
         )}
 
-        {ready&&(()=>{
-          const DISCL={pt:'Physio',chiro:'Chiro',rmt:'RMT',osteo:'Osteo',naturo:'Naturo'};
-          const LIME='#CAE8C1',PUR='#BB99FF',BLU='#7FC8E8';
-          const caseSport=mc.sport||[];
-          const acute=(mc.phase||'').startsWith('Acute');
-          const highIrr=mc.irritability==='High'||mc.pain==='7\u201310 (severe)';
-          // Region → clinically-relevant keywords (general MSK knowledge) to match against what each clinician treats
-          const REGION_KW={'Ankle / foot':['ankle','foot','feet','plantar','achilles','heel','sprain'],'Knee':['knee','acl','mcl','lcl','pcl','meniscus','patell','it band','itb'],'Hip / groin':['hip','groin','glute','hamstring','pelvis','pelvic','adductor','si joint','si pain'],'Low back':['low back','lower back','back','lumbar','lumbo','spine','disc','sciatic'],'Neck':['neck','cervical','cervicogenic','headache','migraine','tmj','jaw'],'Shoulder':['shoulder','rotator','impingement','labrum','overhead','scapula'],'Elbow / wrist':['elbow','wrist','forearm','tennis elbow','carpal','tendon'],'Other / multi-region':[]};
-          const regKW=Array.from(new Set(regions.flatMap(r=>REGION_KW[r]||[])));
-          // Discipline base weight for this case — Physio/Chiro lead; Osteo/RMT support (Osteo↑ when irritable); Naturo only for holistic
-          const dxDone=mc.diagnosed&&mc.diagnosed!=='No — not yet assessed';
-          const baseFor=(d)=>{const prem=dxDone?0:(d==='pt'?0.8:d==='chiro'?0.5:0);const core=d==='pt'?3.2:d==='chiro'?3.1:d==='osteo'?(acute||highIrr?3:1.8):d==='rmt'?(acute||highIrr?2.3:2.8):d==='naturo'?(/holistic|fatigue|hormon|wellness|stress/.test((lifestyles.join(' ')+(mc.mechanism||'')).toLowerCase())?1.8:0):0;return core+prem;};
-          const rows=(staff||[]).filter(s=>['pt','chiro','rmt','osteo','naturo'].includes(s.discipline)).map(s=>{
-            const mp=mpFor(s);const specs=s.specializations||[];
-            let score=baseFor(s.discipline);if(score<=0)return null;
-            const blob=((mp.expertise||'')+' '+(mp.conditions||'')+' '+(mp.treatments||'')+' '+(mp.bestClients||'')).toLowerCase();
-            const reasons=[];
-            const hits=regKW.filter(k=>blob.includes(k));
-            if(hits.length){score+=Math.min(hits.length,3)*0.9;reasons.push('profile: '+Array.from(new Set(hits)).slice(0,3).join(', '));}
-            if(lifestyles.includes('Post-partum')&&specs.includes('prenatalPostnatal')){score+=3;reasons.push('pre/postnatal');}
-            if(lifestyles.includes('Competitive athlete')&&(specs.includes('sportsMassage')||/sport|athlet/.test(blob))){score+=1.5;reasons.push('sports focus');}
-            if(lifestyles.includes('Older adult')&&/older|geriatr|gentle|relax/.test(blob)){score+=1;reasons.push('older-adult fit');}
-            if(lifestyles.includes('General / desk-based')&&/desk|postur|tension|ergonom/.test(blob)){score+=1;reasons.push('desk/posture');}
-            if(highIrr&&(specs.includes('acupuncture')||specs.includes('triggerPoint'))){score+=0.6;reasons.push('pain modalities');}
-            const sSports=asSports(mp.sports);const sLower=sSports.map(x=>x.toLowerCase());
-            const caseSports=caseSport.filter(c=>isSportName(c));const caseLife=caseSport.filter(c=>!isSportName(c));
-            let rapport=0;const hooks=[];
-            const sportHit=caseSports.filter(c=>sLower.includes(c.toLowerCase()));
-            if(sportHit.length){const b=3.5+Math.min(sportHit.length-1,2)*1.5;score+=b;rapport+=b;const t=sportHit.join(' / ');reasons.unshift('plays '+t);hooks.push({v:b,info:{kind:'sport',clin:t}});}
-            // Treats the patient's specific sport (in their clinical profile) without playing it — highlighted, ranks below a play-match
-            const treatHit=caseSports.filter(c=>!sLower.includes(c.toLowerCase())&&blob.includes(c.toLowerCase()));
-            if(treatHit.length){const b=1.6;score+=b;rapport+=b*0.7;const t=treatHit.slice(0,2).join(' / ');reasons.unshift('treats '+t);hooks.push({v:b*0.7,info:{kind:'athlete',clin:t}});}
-            const lifeHit=caseLife.filter(c=>sLower.includes(c.toLowerCase()));
-            if(lifeHit.length){const b=Math.min(lifeHit.length,2)*1.8;score+=b;rapport+=b;const t=lifeHit.join(' / ');reasons.unshift('shares: '+t);hooks.push({v:b,info:{kind:'life',clin:t}});}
-            // Generic athlete-treating fit (athletic patient, no specific-sport match) — highlighted, lowest priority
-            if(!sportHit.length&&!treatHit.length&&caseSports.length&&/sport|athlet|run|endurance|perform/.test(blob)){const b=0.9;score+=b;rapport+=0.5;reasons.unshift('treats athletes');hooks.push({v:0.5,info:{kind:'athlete',clin:'athletes'}});}
-            const cLang=(mp.languages||'').toLowerCase();
-            if(mc.language&&cLang.includes(mc.language.toLowerCase())){score+=2.5;rapport+=2;reasons.unshift('speaks '+mc.language);hooks.push({v:2,info:{kind:'lang',clin:mc.language}});}
-            const rapportInfo=hooks.length?hooks.sort((a,b)=>b.v-a.v)[0].info:null;
-            const excl=(mp.excludes||'').toLowerCase();
-            if(excl){
-              const exHit=regKW.filter(k=>k.length>=3&&excl.includes(k));
-              if(exHit.length){score-=5;reasons.push('⚠ won’t take: '+Array.from(new Set(exHit)).slice(0,2).join(', '));}
-              if(lifestyles.includes('Post-partum')&&/post.?natal|prenatal|pregnan|pelvic|pre.?post/.test(excl)){score-=6;if(!exHit.length)reasons.push('⚠ excl. pre/postnatal');}
-              if(/post|surg/.test((mc.mechanism||'').toLowerCase())&&/post.?op|surg/.test(excl)){score-=4;reasons.push('⚠ excl. post-op');}
-            }
-            const role=(s.discipline==='pt'||s.discipline==='chiro')?'lead':'support';
-            if(!reasons.length)reasons.push(role==='lead'?'assess & lead':s.discipline==='osteo'?'down-regulation':'soft-tissue support');
-            return{s,mp,score,reasons,role,rapport,rapportInfo};
-          }).filter(Boolean).sort((a,b)=>b.score-a.score||a.s.name.localeCompare(b.s.name));
-          const leads=rows.filter(r=>r.role==='lead').slice(0,3);
-          const supports=rows.filter(r=>r.role==='support').slice(0,3);
-          const bestFit=rows.filter(r=>r.rapport>0&&r.score>0).sort((a,b)=>b.score-a.score)[0];
-          const Row=({s,mp,reasons,role})=>(
-            <div style={{background:'var(--surface3)',borderLeft:'3px solid '+(role==='lead'?LIME:PUR),borderRadius:6,padding:'11px 14px',marginBottom:8}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:6}}>
-                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#eee'}}>{s.name} <span style={{fontSize:13,color:BLU,fontWeight:600}}>· {DISCL[s.discipline]||s.discipline} · {(typeof siteList==='function'?siteList(s)[0]:s.site)||s.site||'\u2014'}</span></span>
-                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{reasons.map((r,i)=>{const isPlay=r.indexOf('plays ')===0;const isAth=r.indexOf('treats ')===0;const bg=isPlay?'#8FE0C0':isAth?'#E0A052':(role==='lead'?LIME:PUR);return <span key={i} style={{fontSize:11,color:'#1a1a1a',background:bg,borderRadius:4,padding:'2px 7px',fontWeight:700,boxShadow:(isPlay||isAth)?'0 0 0 1px rgba(255,255,255,.25)':'none'}}>{(isPlay?'🎯 ':isAth?'🏅 ':'')+r}</span>;})}</div>
-              </div>
-              {mp.matchNotes&&<div style={{fontSize:13,color:'#bbb',marginTop:5,lineHeight:1.5,fontStyle:'italic'}}>{mp.matchNotes}</div>}
-            </div>
-          );
-          return(
-            <div style={{marginTop:20}}>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginBottom:4}}>Suggested Clinicians</div>
-              <div style={{fontSize:12.5,color:'#666',marginBottom:10}}>Ranked by clinical fit (discipline, what they treat, specializations){caseSport.length?', plus shared sport / lifestyle for rapport':''} — availability and the lead's judgment decide. {hasFlags?<span style={{color:'#e0a0a0'}}>Medical screen flagged: leads below assess & clear first; support is comfort-only in the interim.</span>:''}</div>
-              {bestFit&&(()=>{const ri=bestFit.rapportInfo;const disc=DISCL[bestFit.s.discipline]||bestFit.s.discipline;const site=(typeof siteList==='function'?siteList(bestFit.s)[0]:bestFit.s.site)||bestFit.s.site||'';
-                let lead=null;
-                if(ri){
-                  if(ri.kind==='sport')lead=<>Both play <strong style={{color:LIME}}>{ri.clin}</strong> — </>;
-                  else if(ri.kind==='life')lead=<>Shares <strong style={{color:LIME}}>{ri.clin}</strong> with the patient — </>;
-                  else if(ri.kind==='lang')lead=<>Speaks <strong style={{color:LIME}}>{ri.clin}</strong> with the patient — </>;
-                  else if(ri.kind==='athlete')lead=<>Treats <strong style={{color:LIME}}>{ri.clin}</strong>{ri.clin==='athletes'?'':' athletes'} — </>;
-                }
-                return(
-                <div style={{background:'linear-gradient(180deg,rgba(202,232,193,.11),rgba(202,232,193,.02))',border:'1px solid rgba(202,232,193,.45)',borderRadius:9,padding:'13px 16px',marginBottom:14}}>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:800,letterSpacing:'1px',color:LIME,marginBottom:4}}>★ START HERE — STRONGEST CONNECTION</div>
-                  <div style={{fontSize:17,fontWeight:800,color:'#fff'}}>{bestFit.s.name} <span style={{fontSize:13,color:BLU,fontWeight:600}}>· {disc} · {site}</span></div>
-                  <div style={{fontSize:13,color:'#cde8c4',marginTop:5,lineHeight:1.55}}>{lead}{lead?'l':'L'}eading with that connection builds rapport, buy-in and trust, which drives retention and a faster recovery. They make the patient feel understood and are the best entry point. They set and own the appropriate co-treatment plan with the lead/support team below — not a lock to one clinician, but the strongest place to start.</div>
-                </div>);})()}
-              {leads.length>0&&<div style={{fontSize:12,color:LIME,fontWeight:700,letterSpacing:'.5px',margin:'4px 0 6px'}}>LEAD — diagnose & own the plan</div>}
-              {leads.map(r=><Row key={r.s.id} {...r}/>)}
-              {supports.length>0&&<div style={{fontSize:12,color:PUR,fontWeight:700,letterSpacing:'.5px',margin:'12px 0 6px'}}>SUPPORT — co-treat</div>}
-              {supports.map(r=><Row key={r.s.id} {...r}/>)}
-              {!leads.length&&!supports.length&&<div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:9,padding:'18px 16px',color:'#888',fontSize:13.5}}>No clinical staff found to suggest. Add clinicians with disciplines (Physio/Chiro/RMT/Osteo) to see matches.</div>}
-              <div style={{fontSize:11.5,color:'#5a5a5a',marginTop:8,fontStyle:'italic'}}>Suggestions are reasoning aids from team standards and each clinician's profile — not a directive. The treating lead decides.</div>
-            </div>
-          );
-        })()}
-        <div className="case-print-foot" style={{marginTop:22,borderTop:'1px solid #25332d',paddingTop:9,fontSize:10,color:'#6f8379',textAlign:'center',letterSpacing:'.3px'}}>Revibe Health — Growth &amp; Development Portal · Clinical Care Map · Suggestion only; not a diagnosis — re-assess and adjust · Generated {new Date().toLocaleDateString('en-CA',{dateStyle:'medium'})}</div>
+
+        <div className="case-print-foot" style={{marginTop:22,borderTop:'1px solid #25332d',paddingTop:9,fontSize:10,color:'#6f8379',textAlign:'center',letterSpacing:'.3px'}}>Revibe — Growth &amp; Development Portal · Clinical Care Map · Suggestion only; not a diagnosis — re-assess and adjust · Generated {new Date().toLocaleDateString('en-CA',{dateStyle:'medium'})}</div>
       </div>
     );
   }
