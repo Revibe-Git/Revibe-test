@@ -1820,7 +1820,7 @@ const SPECIALIZATIONS=[
   {id:'stretchTherapy', label:'Stretch Therapy',              disc:['rmt','pt','sc','guest']},
 ];
 const SITES=['Markham','Mississauga','Toronto','Ajax','Oakville'];
-// Structured sport tags — the matchable lifestyle dimension the Case Mapper uses (alongside Specializations)
+// Structured sport tags — the matchable lifestyle dimension the Care Mapper uses (alongside Specializations)
 const LIFE_CONTEXT=[
   {g:'Sports & training',t:['Running','Hyrox','CrossFit','Weightlifting / Gym','General fitness','Soccer','Basketball','Volleyball','Hockey','Baseball','Football','Tennis / Racquet','Pickleball','Golf','Cycling','Swimming','Triathlon / Endurance','Combat / MMA','Climbing','Dance','Yoga / Pilates','Skiing / Snowboard']},
   {g:'Work & daily life',t:['Desk / office work','Long commute / driving','On feet all day','Manual labour / trades','Construction','Healthcare / nursing','Repetitive / assembly work','Heavy lifting at work','Student']},
@@ -11208,7 +11208,7 @@ function SystematicPage({staff=[]}){
   const[pbEdit,setPbEdit]=useState(false);
   const savePlaybook=(pb)=>{setPlaybook(pb);try{localStorage.setItem(PBK,JSON.stringify(pb));}catch(e){}const sb=window.__SB;if(sb)sb.from('systematic_playbook').upsert({id:'singleton',data:pb}).then(()=>{},()=>{});};
 
-  // ── Case Mapper: dropdowns in → suggested pathway out. SUGGESTION ONLY. ──
+  // ── Care Mapper: dropdowns in → suggested pathway out. SUGGESTION ONLY. ──
   // Specific clinical detail comes ONLY from verified rules below; everything else is generic
   // safe process. Add/verify rules over time so the tool maps from your standards, not guesses.
   const MC_REGIONS=['Ankle / foot','Knee','Hip / groin','Low back','Neck','Shoulder','Elbow / wrist','Other / multi-region'];
@@ -11437,15 +11437,15 @@ function SystematicPage({staff=[]}){
           </div>
         </div>
 
-        {/* Case Mapper — the focus / working tool of this section */}
+        {/* Care Mapper — the focus / working tool of this section */}
         <div onClick={()=>setView('mapper')} style={{cursor:'pointer',background:'linear-gradient(135deg,rgba(127,200,232,.18),rgba(127,200,232,.035) 70%)',border:'1.5px solid rgba(127,200,232,.55)',borderRadius:16,padding:'24px 28px',marginBottom:26,display:'flex',alignItems:'center',gap:22,flexWrap:'wrap',boxShadow:'0 10px 34px rgba(127,200,232,.10)'}}>
           <div style={{fontSize:52,lineHeight:1,filter:'drop-shadow(0 2px 8px rgba(127,200,232,.4))'}}>🧭</div>
           <div style={{flex:1,minWidth:210}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2.5px',textTransform:'uppercase',color:'#7FC8E8',opacity:.85,marginBottom:3}}>Start here</div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:34,fontWeight:800,letterSpacing:'.5px',color:'#7FC8E8',lineHeight:1.02}}>Case Mapper</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:34,fontWeight:800,letterSpacing:'.5px',color:'#7FC8E8',lineHeight:1.02}}>Care Mapper</div>
             <div style={{fontSize:14.5,color:'#cfdbe0',marginTop:6,lineHeight:1.55,maxWidth:580}}>Map a patient presentation to a clinical classification, the right lead and support clinicians, and a clear starting point — the working tool of this section.</div>
           </div>
-          <button className="btn btn-go" style={{fontSize:15,fontWeight:700,padding:'13px 24px',whiteSpace:'nowrap',flexShrink:0}} onClick={(e)=>{e.stopPropagation();setView('mapper');}}>Open Case Mapper →</button>
+          <button className="btn btn-go" style={{fontSize:15,fontWeight:700,padding:'13px 24px',whiteSpace:'nowrap',flexShrink:0}} onClick={(e)=>{e.stopPropagation();setView('mapper');}}>Open Care Mapper →</button>
         </div>
 
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12.5,letterSpacing:'2px',textTransform:'uppercase',color:'#5f7a6a',marginBottom:4}}>The thinking system behind it</div>
@@ -11571,7 +11571,7 @@ function SystematicPage({staff=[]}){
     );
   }
 
-  // Case Mapper view
+  // Care Mapper view
   if(view==='mapper'){
     const Sel=({label,val,opts,k})=>(<div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>{label}</div>
       <select value={val} onChange={e=>setMcv(k,e.target.value)} style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,color:val?'#eee':'#777',fontSize:14,padding:'8px 10px'}}>
@@ -11636,12 +11636,12 @@ function SystematicPage({staff=[]}){
         <div className="case-print-letterhead" style={{justifyContent:'space-between',alignItems:'flex-end',borderBottom:'2px solid '+BLU,paddingBottom:10,marginBottom:18,gap:16}}>
           <div>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'3px',textTransform:'uppercase',color:BLU,marginBottom:1}}>Revibe Health</div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:25,fontWeight:800,color:'#fff',letterSpacing:'.5px',lineHeight:1.05}}>Clinical Case Map{regions.length?<span style={{color:BLU}}> · {regions.join(' + ')}</span>:''}</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:25,fontWeight:800,color:'#fff',letterSpacing:'.5px',lineHeight:1.05}}>Clinical Care Map{regions.length?<span style={{color:BLU}}> · {regions.join(' + ')}</span>:''}</div>
             <div style={{fontSize:11.5,color:'#8aa39a',marginTop:2}}>Growth &amp; Development Portal · Suggestion only — the treating clinician decides</div>
           </div>
           <div style={{textAlign:'right',fontSize:11.5,color:'#8aa39a',whiteSpace:'nowrap'}}>{new Date().toLocaleDateString('en-CA',{weekday:'short',year:'numeric',month:'long',day:'numeric'})}</div>
         </div>
-        <div className="screen-only-title" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,letterSpacing:'1px',color:BLU,marginBottom:2}}>🧭 Case Mapper{regions.length>0?' — '+regions.join(' + '):''}</div>
+        <div className="screen-only-title" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,letterSpacing:'1px',color:BLU,marginBottom:2}}>🧭 Care Mapper{regions.length>0?' — '+regions.join(' + '):''}</div>
         <div style={{background:'rgba(224,82,82,.07)',border:'1px solid rgba(224,82,82,.25)',borderRadius:7,padding:'9px 13px',fontSize:13,color:'#e0a0a0',lineHeight:1.55,marginBottom:16}}>
           <strong>Suggestion only — the treating clinician decides.</strong> This assembles a starting pathway from team standards; it does not diagnose. Specific timelines/referrals show only where a <em>verified</em> rule exists. Always re-assess and adjust.
         </div>
@@ -11859,7 +11859,7 @@ function SystematicPage({staff=[]}){
             </div>
           );
         })()}
-        <div className="case-print-foot" style={{marginTop:22,borderTop:'1px solid #25332d',paddingTop:9,fontSize:10,color:'#6f8379',textAlign:'center',letterSpacing:'.3px'}}>Revibe Health — Growth &amp; Development Portal · Clinical Case Map · Suggestion only; not a diagnosis — re-assess and adjust · Generated {new Date().toLocaleDateString('en-CA',{dateStyle:'medium'})}</div>
+        <div className="case-print-foot" style={{marginTop:22,borderTop:'1px solid #25332d',paddingTop:9,fontSize:10,color:'#6f8379',textAlign:'center',letterSpacing:'.3px'}}>Revibe Health — Growth &amp; Development Portal · Clinical Care Map · Suggestion only; not a diagnosis — re-assess and adjust · Generated {new Date().toLocaleDateString('en-CA',{dateStyle:'medium'})}</div>
       </div>
     );
   }
