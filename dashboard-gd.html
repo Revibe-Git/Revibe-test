@@ -2250,7 +2250,7 @@ function CallHistoryPage(){
   const addSource=()=>{const name=prompt('New lead source / event name (e.g. "Jackalope 2026", "Sutherland Chan", "COMP Sessions")');if(!name||!name.trim())return;const id='src_'+Date.now().toString(36);persist({...data,sources:[...sources,{id,name:name.trim(),kind:'event'}]},true);setSelSource(id);};
   const renameSource=(sid)=>{const s=sources.find(x=>x.id===sid);const name=prompt('Rename source',s?s.name:'');if(!name||!name.trim())return;persist({...data,sources:sources.map(x=>x.id===sid?{...x,name:name.trim()}:x)},true);};
   const delSource=(sid)=>{if(!confirm('Delete this source and all its leads? This cannot be undone.'))return;const nl={...data.leads};delete nl[sid];const ns=sources.filter(x=>x.id!==sid);persist({...data,sources:ns,leads:nl},true);if(selSource===sid)setSelSource(ns[0]?ns[0].id:null);};
-  const addLead=(sid)=>{const lead={id:'ld_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:today,first:'',last:'',email:'',phone:'',location:'',interest:'',status:'New',practice:'',notes:'',nextDate:'',nextTime:'',nextMethod:'call',followups:[]};persist({...data,leads:{...data.leads,[sid]:[lead,...leadsOf(sid)]}},true);};
+  const addLead=(sid)=>{const lead={id:'ld_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:today,first:'',last:'',email:'',phone:'',location:'',interest:'',status:'New',practice:'',notes:'',nextDate:'',nextTime:'',nextMethod:'call',followups:[]};persist({...data,leads:{...data.leads,[sid]:[lead,...leadsOf(sid)]}},true);setExpandedLead(lead.id);};
   const patchLead=(sid,lid,patch,now)=>{persist({...data,leads:{...data.leads,[sid]:leadsOf(sid).map(l=>l.id===lid?{...l,...patch}:l)}},now);};
   const addAttempt=(sid,lid,method,outcome)=>{const l=leadsOf(sid).find(x=>x.id===lid)||{};const fu=[{at:today,method:method||'call',outcome:outcome||'',note:''},...(l.followups||[])];const patch={followups:fu};
     if(outcome==='Booked'){patch.status='Booked';patch.nextDate='';patch.nextTime='';}
@@ -2428,7 +2428,7 @@ function CallHistoryPage(){
         <button onClick={addSource} style={{cursor:'pointer',background:'transparent',border:'1px dashed var(--border2)',borderRadius:9,padding:'13px 15px',color:'#888',fontSize:14,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'.5px'}}>+ Add source / event</button>
       </div>
 
-      {selSource&&(()=>{const s=sources.find(x=>x.id===selSource);if(!s)return null;const r=rollup(s.id);const lsAll=leadsOf(s.id);const ls=sortLeads(leadFilter==='all'?lsAll:lsAll.filter(l=>(l.status||'New')===leadFilter));const lblS={fontSize:11,color:'#9a9a9a',marginBottom:3};const lblG={fontSize:10.5,color:'#7a857d',textTransform:'uppercase',letterSpacing:'1px',margin:'14px 0 7px'};return(<div>
+      {selSource&&(()=>{const s=sources.find(x=>x.id===selSource);if(!s)return null;const r=rollup(s.id);const lsAll=leadsOf(s.id);const ls=sortLeads(leadFilter==='all'?lsAll:lsAll.filter(l=>(l.status||'New')===leadFilter));const lblS={fontSize:11,color:'#9a9a9a',marginBottom:3};const lblG={fontSize:10.5,color:'#7a857d',textTransform:'uppercase',letterSpacing:'1px',margin:'14px 0 7px'};const COLS='16px minmax(110px,1.4fr) 92px minmax(140px,1.5fr) 118px 134px 84px 24px';return(<div>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:10}}>
           <div style={{display:'flex',alignItems:'baseline',gap:10}}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#eee'}}>{s.name}</span><span style={{fontSize:12,color:'#777'}}>{r.total} leads · {r.contacted} contacted · {r.responded} responded · {r.booked} booked · {r.conv.toFixed(0)}% conversion</span></div>
           <div style={{display:'flex',gap:6}}>
@@ -2445,66 +2445,58 @@ function CallHistoryPage(){
           <span style={{fontSize:11,color:'#666',marginLeft:'auto'}}>sorted by soonest follow-up</span>
         </div>
         {ls.length===0?<div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:8,padding:'18px',textAlign:'center',color:'#777',fontSize:13}}>No <b style={{color:'#aaa'}}>{leadFilter}</b> leads. <span style={{color:'#7FC8E8',cursor:'pointer'}} onClick={()=>setLeadFilter('all')}>Show all</span></div>:
-        <div style={{display:'flex',flexDirection:'column',gap:7}}>
-          {ls.map(l=>{const open=expandedLead===l.id;const nm=((l.first||'')+' '+(l.last||'')).trim();const st=l.status||'New';const dz=l.discs||[];const toggleDisc=(d)=>updLead(s.id,l.id,'discs',dz.includes(d)?dz.filter(x=>x!==d):[...dz,d]);const att=(l.followups||[]).length;return(
-            <div key={l.id} style={{background:'var(--surface2)',border:'1px solid '+(open?'var(--border2)':'var(--border)'),borderLeft:'3px solid '+(STATUS_C[st]||'#888'),borderRadius:9,overflow:'hidden'}}>
-              <div onClick={()=>{setExpandedLead(open?null:l.id);setLeadPane(null);}} style={{display:'flex',alignItems:'center',gap:9,flexWrap:'wrap',cursor:'pointer',padding:'9px 13px'}}>
-                <span style={{color:'#777',fontSize:11,width:9,flexShrink:0}}>{open?'▾':'▸'}</span>
-                <span style={{fontWeight:700,color:'#eee',fontSize:14,minWidth:115}}>{nm||<span style={{color:'#777',fontStyle:'italic',fontWeight:400}}>Unnamed lead</span>}</span>
-                <span style={{fontSize:10,fontWeight:800,letterSpacing:'.3px',color:STATUS_C[st]||'#aaa',background:'var(--surface3)',borderRadius:20,padding:'2px 9px',textTransform:'uppercase'}}>{st}</span>
-                <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{dz.map(d=>(<span key={d} style={{fontSize:10,fontWeight:700,color:'#10231a',background:DISC_COLOR[d]||'#999',borderRadius:4,padding:'1px 7px'}}>{(LEAD_DISCS.find(x=>x[0]===d)||[null,d])[1]}</span>))}</div>
-                <span style={{flex:1}}/>
-                {(l.phone||l.email)&&<span style={{fontSize:12,color:'#9aa6a0'}}>{l.phone||l.email}</span>}
-                {att>0&&<span style={{fontSize:11,color:'#777'}}>{att} attempt{att>1?'s':''}</span>}
-                <span style={{fontSize:11.5,fontWeight:700,color:l.nextDate?dueColor(l.nextDate):'#666',minWidth:70,textAlign:'right'}}>{l.nextDate?dueLabel(l.nextDate):'—'}</span>
+        <div style={{border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}}>
+          <div style={{display:'grid',gridTemplateColumns:COLS,gap:10,padding:'9px 13px',background:'var(--surface3)',borderBottom:'1px solid var(--border)',fontSize:10,color:'#7a857d',textTransform:'uppercase',letterSpacing:'1px',fontWeight:700,alignItems:'center'}}>
+            <span/><span>Name</span><span>Stage</span><span>Interested in</span><span>Phone</span><span>Next follow-up</span><span>Activity</span><span/>
+          </div>
+          {ls.map((l,ri)=>{const open=expandedLead===l.id;const nm=((l.first||'')+' '+(l.last||'')).trim();const st=l.status||'New';const dz=l.discs||[];const toggleDisc=(d)=>updLead(s.id,l.id,'discs',dz.includes(d)?dz.filter(x=>x!==d):[...dz,d]);const att=(l.followups||[]).length;return(
+            <div key={l.id} style={{borderBottom:(ri<ls.length-1||open)?'1px solid var(--border)':'none',borderLeft:'3px solid '+(STATUS_C[st]||'#888'),background:open?'var(--surface2)':(ri%2?'rgba(255,255,255,.012)':'transparent')}}>
+              <div onClick={()=>setExpandedLead(open?null:l.id)} style={{display:'grid',gridTemplateColumns:COLS,gap:10,padding:'10px 13px',alignItems:'center',cursor:'pointer'}}>
+                <span style={{color:'#777',fontSize:11}}>{open?'▾':'▸'}</span>
+                <span style={{fontWeight:700,color:'#eee',fontSize:13.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nm||<span style={{color:'#777',fontStyle:'italic',fontWeight:400}}>Unnamed lead</span>}</span>
+                <span><span style={{fontSize:10,fontWeight:800,letterSpacing:'.3px',color:STATUS_C[st]||'#aaa',background:'var(--surface3)',borderRadius:20,padding:'2px 9px',textTransform:'uppercase',whiteSpace:'nowrap'}}>{st}</span></span>
+                <span style={{display:'flex',gap:4,flexWrap:'wrap'}}>{dz.length?dz.map(d=>(<span key={d} style={{fontSize:10,fontWeight:700,color:'#10231a',background:DISC_COLOR[d]||'#999',borderRadius:4,padding:'1px 7px'}}>{(LEAD_DISCS.find(x=>x[0]===d)||[null,d])[1]}</span>)):<span style={{color:'#5f6660',fontSize:12}}>—</span>}</span>
+                <span style={{fontSize:12.5,color:l.phone?'#aebfb6':'#5f6660',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.phone||'—'}</span>
+                <span style={{fontSize:12.5,fontWeight:600,color:l.nextDate?dueColor(l.nextDate):'#5f6660',whiteSpace:'nowrap'}}>{l.nextDate?(l.nextDate.slice(5)+' · '+dueLabel(l.nextDate)):'—'}</span>
+                <span style={{fontSize:12,color:att?'#9aa6a0':'#5f6660',whiteSpace:'nowrap'}}>{att?att+' attempt'+(att>1?'s':''):'—'}</span>
+                <span onClick={e=>{e.stopPropagation();if(confirm('Delete this lead? This cannot be undone.'))delLead(s.id,l.id);}} style={{cursor:'pointer',color:'#84565a',fontSize:14,textAlign:'center'}} title="Delete lead">✕</span>
               </div>
-              {open&&(<div style={{padding:'2px 13px 13px',borderTop:'1px solid var(--border)'}}>
-                <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',margin:'11px 0 10px'}}>
+              {open&&(<div style={{padding:'4px 15px 16px'}}>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:11}}>
                   <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'No answer')}>No answer → +1d</button>
                   <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Left voicemail')}>Left msg → +2d</button>
                   <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Callback requested')}>Callback set</button>
                   <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Reached — no decision')}>Reached</button>
                   <button className="btn btn-ghost btn-xs" style={{color:'#44CCAA',borderColor:'rgba(68,204,170,.45)'}} onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Booked')}>✓ Booked</button>
                   <button className="btn btn-ghost btn-xs" style={{color:'#E05252',borderColor:'rgba(224,82,82,.45)'}} onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Not interested')}>✕ Not a fit</button>
+                  <span style={{width:1,height:18,background:'var(--border2)',margin:'0 3px'}}/>
+                  <select value={st} onChange={e=>updLead(s.id,l.id,'status',e.target.value)} style={{...inp,width:'auto',color:STATUS_C[st]||'#eee',fontWeight:700}}>{LEAD_STATUS.map(x=><option key={x} value={x}>{x}</option>)}</select>
                 </div>
-                <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginBottom:9}}>
-                  <span style={{fontSize:11,color:'#7a857d',textTransform:'uppercase',letterSpacing:'1px'}}>Next</span>
-                  <input type="date" value={l.nextDate||''} onChange={e=>updLead(s.id,l.id,'nextDate',e.target.value)} style={{...inp,width:148}}/>
-                  <input type="time" value={l.nextTime||''} onChange={e=>updLead(s.id,l.id,'nextTime',e.target.value)} style={{...inp,width:108}}/>
-                  <select value={l.nextMethod||'call'} onChange={e=>updLead(s.id,l.id,'nextMethod',e.target.value)} style={{...inp,width:104}}>{FU_METHODS.map(([v,lb])=><option key={v} value={v}>{lb}</option>)}</select>
-                  {l.nextDate&&<span style={{fontSize:12,fontWeight:700,color:dueColor(l.nextDate)}}>{dueLabel(l.nextDate)}</span>}
-                  <select value={st} onChange={e=>updLead(s.id,l.id,'status',e.target.value)} style={{...inp,width:'auto',marginLeft:'auto',color:STATUS_C[st]||'#eee',fontWeight:700}}>{LEAD_STATUS.map(x=><option key={x} value={x}>{x}</option>)}</select>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(148px,1fr))',gap:9,alignItems:'start'}}>
+                  <div><div style={lblS}>First name</div><input value={l.first||''} onChange={e=>updLead(s.id,l.id,'first',e.target.value)} style={inp}/></div>
+                  <div><div style={lblS}>Last name</div><input value={l.last||''} onChange={e=>updLead(s.id,l.id,'last',e.target.value)} style={inp}/></div>
+                  <div><div style={lblS}>Phone</div><input value={l.phone||''} onChange={e=>updLead(s.id,l.id,'phone',e.target.value)} style={inp}/></div>
+                  <div><div style={lblS}>Email</div><input value={l.email||''} onChange={e=>updLead(s.id,l.id,'email',e.target.value)} style={inp}/></div>
+                  <div><div style={lblS}>Location</div><select value={l.location||''} onChange={e=>updLead(s.id,l.id,'location',e.target.value)} style={inp}><option value="">—</option><option>Mississauga</option><option>Markham</option></select></div>
+                  <div><div style={lblS}>Next follow-up</div><input type="date" value={l.nextDate||''} onChange={e=>updLead(s.id,l.id,'nextDate',e.target.value)} style={inp}/></div>
+                  <div><div style={lblS}>Time</div><input type="time" value={l.nextTime||''} onChange={e=>updLead(s.id,l.id,'nextTime',e.target.value)} style={inp}/></div>
+                  <div><div style={lblS}>Via</div><select value={l.nextMethod||'call'} onChange={e=>updLead(s.id,l.id,'nextMethod',e.target.value)} style={inp}>{FU_METHODS.map(([v,lb])=><option key={v} value={v}>{lb}</option>)}</select></div>
                 </div>
-                {st==='Booked'&&<input value={l.practice||''} onChange={e=>updLead(s.id,l.id,'practice',e.target.value)} placeholder="Booked — which practice? e.g. Physio w/ Zee" style={{...inp,maxWidth:340,marginBottom:9}}/>}
-                <input value={l.notes||''} onChange={e=>updLead(s.id,l.id,'notes',e.target.value)} placeholder="Quick note…" style={{...inp,width:'100%',marginBottom:2}}/>
-                <div style={{display:'flex',gap:6,alignItems:'center',marginTop:11,paddingTop:10,borderTop:'1px solid var(--border)'}}>
-                  <button onClick={()=>setLeadPane(leadPane==='details'?null:'details')} style={{cursor:'pointer',background:leadPane==='details'?'var(--surface3)':'transparent',border:'1px solid var(--border)',borderRadius:6,padding:'4px 11px',fontSize:12,color:leadPane==='details'?'#ddd':'#9aa6a0'}}>{leadPane==='details'?'▾':'▸'} Details &amp; disciplines</button>
-                  <button onClick={()=>setLeadPane(leadPane==='history'?null:'history')} style={{cursor:'pointer',background:leadPane==='history'?'var(--surface3)':'transparent',border:'1px solid var(--border)',borderRadius:6,padding:'4px 11px',fontSize:12,color:leadPane==='history'?'#ddd':'#9aa6a0'}}>{leadPane==='history'?'▾':'▸'} History{att?' ('+att+')':''}</button>
-                  <span style={{flex:1}}/>
-                  <button className="btn btn-ghost btn-xs" onClick={()=>delLead(s.id,l.id)} style={{color:'#E05252'}}>Delete</button>
+                {st==='Booked'&&<div style={{marginTop:9}}><div style={lblS}>Booked — which practice?</div><input value={l.practice||''} onChange={e=>updLead(s.id,l.id,'practice',e.target.value)} placeholder="e.g. Physio w/ Zee" style={{...inp,maxWidth:320}}/></div>}
+                <div style={{...lblG,margin:'13px 0 7px'}}>Interested in</div>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                  {LEAD_DISCS.map(([d,lbl])=>{const onx=dz.includes(d);return(<button key={d} onClick={()=>toggleDisc(d)} style={{cursor:'pointer',fontSize:12,fontWeight:700,border:'1px solid '+(onx?(DISC_COLOR[d]||'#999'):'var(--border2)'),background:onx?(DISC_COLOR[d]||'#999'):'transparent',color:onx?'#10231a':'#9aa6a0',borderRadius:20,padding:'4px 12px'}}>{onx?'✓ ':''}{lbl}</button>);})}
                 </div>
-                {leadPane==='details'&&(<div style={{marginTop:11}}>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))',gap:8}}>
-                    <div><div style={lblS}>First name</div><input value={l.first||''} onChange={e=>updLead(s.id,l.id,'first',e.target.value)} style={inp}/></div>
-                    <div><div style={lblS}>Last name</div><input value={l.last||''} onChange={e=>updLead(s.id,l.id,'last',e.target.value)} style={inp}/></div>
-                    <div><div style={lblS}>Phone</div><input value={l.phone||''} onChange={e=>updLead(s.id,l.id,'phone',e.target.value)} style={inp}/></div>
-                    <div><div style={lblS}>Email</div><input value={l.email||''} onChange={e=>updLead(s.id,l.id,'email',e.target.value)} style={inp}/></div>
-                    <div><div style={lblS}>Location</div><select value={l.location||''} onChange={e=>updLead(s.id,l.id,'location',e.target.value)} style={inp}><option value="">—</option><option>Mississauga</option><option>Markham</option></select></div>
-                    <div><div style={lblS}>First contact</div><input type="date" value={l.date||''} onChange={e=>updLead(s.id,l.id,'date',e.target.value)} style={inp}/></div>
-                  </div>
-                  <div style={{...lblG,margin:'12px 0 7px'}}>Interested in</div>
-                  <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                    {LEAD_DISCS.map(([d,lbl])=>{const onx=dz.includes(d);return(<button key={d} onClick={()=>toggleDisc(d)} style={{cursor:'pointer',fontSize:12,fontWeight:700,border:'1px solid '+(onx?(DISC_COLOR[d]||'#999'):'var(--border2)'),background:onx?(DISC_COLOR[d]||'#999'):'transparent',color:onx?'#10231a':'#9aa6a0',borderRadius:20,padding:'4px 12px'}}>{onx?'✓ ':''}{lbl}</button>);})}
-                  </div>
-                </div>)}
-                {leadPane==='history'&&(<div style={{marginTop:11,display:'flex',flexDirection:'column',gap:4}}>
-                  {(l.followups||[]).length===0?<div style={{fontSize:12.5,color:'#777',fontStyle:'italic'}}>No attempts logged yet.</div>:
-                  (l.followups||[]).map((e,i)=>(<div key={i} style={{display:'flex',gap:8,alignItems:'center',fontSize:12,background:'var(--surface3)',borderRadius:6,padding:'5px 9px'}}>
+                <div style={{...lblG,margin:'13px 0 7px'}}>Notes</div>
+                <textarea value={l.notes||''} onChange={e=>updLead(s.id,l.id,'notes',e.target.value)} placeholder="Running notes — kept as they move through the stages…" style={{...inp,width:'100%',minHeight:44,resize:'vertical',fontFamily:'inherit'}}/>
+                {att>0&&<><div style={{...lblG,margin:'13px 0 7px'}}>History <span style={{color:'#5f6660',letterSpacing:0,textTransform:'none'}}>· oldest activity &amp; notes</span></div>
+                <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                  {(l.followups||[]).map((e,i)=>(<div key={i} style={{display:'flex',gap:8,alignItems:'center',fontSize:12,background:'var(--surface3)',borderRadius:6,padding:'5px 9px'}}>
                     <span style={{color:'#9a9a9a',minWidth:74}}>{e.at}</span><span title={e.method}>{methIcon(e.method)}</span><span style={{color:'#ccc',minWidth:130}}>{e.outcome||'—'}</span>
                     <input value={e.note||''} onChange={ev=>updAttempt(s.id,l.id,i,'note',ev.target.value)} placeholder="note…" style={{...inp,flex:1,padding:'3px 7px',fontSize:12}}/>
                     <button className="btn btn-ghost btn-xs" style={{color:'#777'}} onClick={()=>delAttempt(s.id,l.id,i)}>✕</button>
                   </div>))}
-                </div>)}
+                </div></>}
               </div>)}
             </div>);})}
         </div>}
