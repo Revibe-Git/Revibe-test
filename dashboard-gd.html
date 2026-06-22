@@ -2237,6 +2237,7 @@ function CallHistoryPage(){
   const[selSource,setSelSource]=useState(sources[0]?sources[0].id:'form');
   const[expandedLead,setExpandedLead]=useState(null);
   const[leadPane,setLeadPane]=useState(null);
+  useEffect(()=>{const h=(e)=>{if(e.key==='Escape')setExpandedLead(null);};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[]);
   const[leadFilter,setLeadFilter]=useState('all');
   const sortLeads=(arr)=>[...arr].sort((a,b)=>{
     const closed=l=>(l.status==='Booked'||l.status==='Not a fit')?1:0;
@@ -2449,20 +2450,32 @@ function CallHistoryPage(){
           <div style={{display:'grid',gridTemplateColumns:COLS,gap:10,padding:'9px 13px',background:'var(--surface3)',borderBottom:'1px solid var(--border)',fontSize:10,color:'#7a857d',textTransform:'uppercase',letterSpacing:'1px',fontWeight:700,alignItems:'center'}}>
             <span/><span>Name</span><span>Stage</span><span>Interested in</span><span>Phone</span><span>Next follow-up</span><span>Activity</span><span/>
           </div>
-          {ls.map((l,ri)=>{const open=expandedLead===l.id;const nm=((l.first||'')+' '+(l.last||'')).trim();const st=l.status||'New';const dz=l.discs||[];const toggleDisc=(d)=>updLead(s.id,l.id,'discs',dz.includes(d)?dz.filter(x=>x!==d):[...dz,d]);const att=(l.followups||[]).length;return(
-            <div key={l.id} style={{borderBottom:(ri<ls.length-1||open)?'1px solid var(--border)':'none',borderLeft:'3px solid '+(STATUS_C[st]||'#888'),background:open?'var(--surface2)':(ri%2?'rgba(255,255,255,.012)':'transparent')}}>
-              <div onClick={()=>setExpandedLead(open?null:l.id)} style={{display:'grid',gridTemplateColumns:COLS,gap:10,padding:'10px 13px',alignItems:'center',cursor:'pointer'}}>
-                <span style={{color:'#777',fontSize:11}}>{open?'▾':'▸'}</span>
-                <span style={{fontWeight:700,color:'#eee',fontSize:13.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nm||<span style={{color:'#777',fontStyle:'italic',fontWeight:400}}>Unnamed lead</span>}</span>
-                <span><span style={{fontSize:10,fontWeight:800,letterSpacing:'.3px',color:STATUS_C[st]||'#aaa',background:'var(--surface3)',borderRadius:20,padding:'2px 9px',textTransform:'uppercase',whiteSpace:'nowrap'}}>{st}</span></span>
-                <span style={{display:'flex',gap:4,flexWrap:'wrap'}}>{dz.length?dz.map(d=>(<span key={d} style={{fontSize:10,fontWeight:700,color:'#10231a',background:DISC_COLOR[d]||'#999',borderRadius:4,padding:'1px 7px'}}>{(LEAD_DISCS.find(x=>x[0]===d)||[null,d])[1]}</span>)):<span style={{color:'#5f6660',fontSize:12}}>—</span>}</span>
-                <span style={{fontSize:12.5,color:l.phone?'#aebfb6':'#5f6660',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.phone||'—'}</span>
-                <span style={{fontSize:12.5,fontWeight:600,color:l.nextDate?dueColor(l.nextDate):'#5f6660',whiteSpace:'nowrap'}}>{l.nextDate?(l.nextDate.slice(5)+' · '+dueLabel(l.nextDate)):'—'}</span>
-                <span style={{fontSize:12,color:att?'#9aa6a0':'#5f6660',whiteSpace:'nowrap'}}>{att?att+' attempt'+(att>1?'s':''):'—'}</span>
-                <span onClick={e=>{e.stopPropagation();if(confirm('Delete this lead? This cannot be undone.'))delLead(s.id,l.id);}} style={{cursor:'pointer',color:'#84565a',fontSize:14,textAlign:'center'}} title="Delete lead">✕</span>
+          {ls.map((l,ri)=>{const nm=((l.first||'')+' '+(l.last||'')).trim();const st=l.status||'New';const dz=l.discs||[];const att=(l.followups||[]).length;return(
+            <div key={l.id} onClick={()=>setExpandedLead(l.id)} style={{display:'grid',gridTemplateColumns:COLS,gap:10,padding:'10px 13px',alignItems:'center',cursor:'pointer',borderBottom:ri<ls.length-1?'1px solid var(--border)':'none',borderLeft:'3px solid '+(STATUS_C[st]||'#888'),background:ri%2?'rgba(255,255,255,.012)':'transparent'}}>
+              <span style={{color:'#777',fontSize:12}}>›</span>
+              <span style={{fontWeight:700,color:'#eee',fontSize:13.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{nm||<span style={{color:'#777',fontStyle:'italic',fontWeight:400}}>Unnamed lead</span>}</span>
+              <span><span style={{fontSize:10,fontWeight:800,letterSpacing:'.3px',color:STATUS_C[st]||'#aaa',background:'var(--surface3)',borderRadius:20,padding:'2px 9px',textTransform:'uppercase',whiteSpace:'nowrap'}}>{st}</span></span>
+              <span style={{display:'flex',gap:4,flexWrap:'wrap'}}>{dz.length?dz.map(d=>(<span key={d} style={{fontSize:10,fontWeight:700,color:'#10231a',background:DISC_COLOR[d]||'#999',borderRadius:4,padding:'1px 7px'}}>{(LEAD_DISCS.find(x=>x[0]===d)||[null,d])[1]}</span>)):<span style={{color:'#5f6660',fontSize:12}}>—</span>}</span>
+              <span style={{fontSize:12.5,color:l.phone?'#aebfb6':'#5f6660',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{l.phone||'—'}</span>
+              <span style={{fontSize:12.5,fontWeight:600,color:l.nextDate?dueColor(l.nextDate):'#5f6660',whiteSpace:'nowrap'}}>{l.nextDate?(l.nextDate.slice(5)+' · '+dueLabel(l.nextDate)):'—'}</span>
+              <span style={{fontSize:12,color:att?'#9aa6a0':'#5f6660',whiteSpace:'nowrap'}}>{att?att+' attempt'+(att>1?'s':''):'—'}</span>
+              <span onClick={e=>{e.stopPropagation();if(confirm('Delete this lead? This cannot be undone.'))delLead(s.id,l.id);}} style={{cursor:'pointer',color:'#84565a',fontSize:14,textAlign:'center'}} title="Delete lead">✕</span>
+            </div>);})}
+        </div>}
+        {(()=>{const l=leadsOf(s.id).find(x=>x.id===expandedLead);if(!l)return null;const nm=((l.first||'')+' '+(l.last||'')).trim();const st=l.status||'New';const dz=l.discs||[];const toggleDisc=(d)=>updLead(s.id,l.id,'discs',dz.includes(d)?dz.filter(x=>x!==d):[...dz,d]);const att=(l.followups||[]).length;const close=()=>setExpandedLead(null);return(
+          <div onClick={close} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.62)',zIndex:9000,display:'flex',alignItems:'flex-start',justifyContent:'center',padding:'40px 16px',overflowY:'auto'}}>
+            <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface)',border:'1px solid var(--border2)',borderTop:'3px solid '+(STATUS_C[st]||'#888'),borderRadius:14,width:'min(800px,100%)',boxShadow:'0 24px 70px rgba(0,0,0,.55)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:11,padding:'15px 20px',borderBottom:'1px solid var(--border)'}}>
+                <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:21,fontWeight:800,color:'#eee'}}>{nm||'Unnamed lead'}</span>
+                <span style={{fontSize:10.5,fontWeight:800,letterSpacing:'.3px',color:STATUS_C[st]||'#aaa',background:'var(--surface3)',borderRadius:20,padding:'2px 10px',textTransform:'uppercase'}}>{st}</span>
+                <span style={{fontSize:12,color:'#777'}}>· {s.name}</span>
+                <span style={{flex:1}}/>
+                <button className="btn btn-ghost btn-xs" style={{color:'#E05252'}} onClick={()=>{if(confirm('Delete this lead? This cannot be undone.')){delLead(s.id,l.id);close();}}}>Delete</button>
+                <button onClick={close} title="Close" style={{cursor:'pointer',background:'transparent',border:'none',color:'#9aa6a0',fontSize:24,lineHeight:1,padding:'0 2px'}}>×</button>
               </div>
-              {open&&(<div style={{padding:'4px 15px 16px'}}>
-                <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:11}}>
+              <div style={{padding:'15px 20px 22px'}}>
+                <div style={{fontSize:10.5,color:'#7a857d',textTransform:'uppercase',letterSpacing:'1px',marginBottom:8}}>Log activity</div>
+                <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
                   <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'No answer')}>No answer → +1d</button>
                   <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Left voicemail')}>Left msg → +2d</button>
                   <button className="btn btn-ghost btn-xs" onClick={()=>addAttempt(s.id,l.id,l.nextMethod,'Callback requested')}>Callback set</button>
@@ -2472,7 +2485,8 @@ function CallHistoryPage(){
                   <span style={{width:1,height:18,background:'var(--border2)',margin:'0 3px'}}/>
                   <select value={st} onChange={e=>updLead(s.id,l.id,'status',e.target.value)} style={{...inp,width:'auto',color:STATUS_C[st]||'#eee',fontWeight:700}}>{LEAD_STATUS.map(x=><option key={x} value={x}>{x}</option>)}</select>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(148px,1fr))',gap:9,alignItems:'start'}}>
+                <div style={{...lblG,margin:'15px 0 7px'}}>Contact &amp; schedule</div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:9,alignItems:'start'}}>
                   <div><div style={lblS}>First name</div><input value={l.first||''} onChange={e=>updLead(s.id,l.id,'first',e.target.value)} style={inp}/></div>
                   <div><div style={lblS}>Last name</div><input value={l.last||''} onChange={e=>updLead(s.id,l.id,'last',e.target.value)} style={inp}/></div>
                   <div><div style={lblS}>Phone</div><input value={l.phone||''} onChange={e=>updLead(s.id,l.id,'phone',e.target.value)} style={inp}/></div>
@@ -2483,13 +2497,13 @@ function CallHistoryPage(){
                   <div><div style={lblS}>Via</div><select value={l.nextMethod||'call'} onChange={e=>updLead(s.id,l.id,'nextMethod',e.target.value)} style={inp}>{FU_METHODS.map(([v,lb])=><option key={v} value={v}>{lb}</option>)}</select></div>
                 </div>
                 {st==='Booked'&&<div style={{marginTop:9}}><div style={lblS}>Booked — which practice?</div><input value={l.practice||''} onChange={e=>updLead(s.id,l.id,'practice',e.target.value)} placeholder="e.g. Physio w/ Zee" style={{...inp,maxWidth:320}}/></div>}
-                <div style={{...lblG,margin:'13px 0 7px'}}>Interested in</div>
+                <div style={{...lblG,margin:'15px 0 7px'}}>Interested in</div>
                 <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
                   {LEAD_DISCS.map(([d,lbl])=>{const onx=dz.includes(d);return(<button key={d} onClick={()=>toggleDisc(d)} style={{cursor:'pointer',fontSize:12,fontWeight:700,border:'1px solid '+(onx?(DISC_COLOR[d]||'#999'):'var(--border2)'),background:onx?(DISC_COLOR[d]||'#999'):'transparent',color:onx?'#10231a':'#9aa6a0',borderRadius:20,padding:'4px 12px'}}>{onx?'✓ ':''}{lbl}</button>);})}
                 </div>
-                <div style={{...lblG,margin:'13px 0 7px'}}>Notes</div>
-                <textarea value={l.notes||''} onChange={e=>updLead(s.id,l.id,'notes',e.target.value)} placeholder="Running notes — kept as they move through the stages…" style={{...inp,width:'100%',minHeight:44,resize:'vertical',fontFamily:'inherit'}}/>
-                {att>0&&<><div style={{...lblG,margin:'13px 0 7px'}}>History <span style={{color:'#5f6660',letterSpacing:0,textTransform:'none'}}>· oldest activity &amp; notes</span></div>
+                <div style={{...lblG,margin:'15px 0 7px'}}>Notes</div>
+                <textarea value={l.notes||''} onChange={e=>updLead(s.id,l.id,'notes',e.target.value)} placeholder="Running notes — kept as they move through the stages…" style={{...inp,width:'100%',minHeight:54,resize:'vertical',fontFamily:'inherit'}}/>
+                {att>0&&<><div style={{...lblG,margin:'15px 0 7px'}}>History <span style={{color:'#5f6660',letterSpacing:0,textTransform:'none'}}>· past activity &amp; notes</span></div>
                 <div style={{display:'flex',flexDirection:'column',gap:4}}>
                   {(l.followups||[]).map((e,i)=>(<div key={i} style={{display:'flex',gap:8,alignItems:'center',fontSize:12,background:'var(--surface3)',borderRadius:6,padding:'5px 9px'}}>
                     <span style={{color:'#9a9a9a',minWidth:74}}>{e.at}</span><span title={e.method}>{methIcon(e.method)}</span><span style={{color:'#ccc',minWidth:130}}>{e.outcome||'—'}</span>
@@ -2497,9 +2511,10 @@ function CallHistoryPage(){
                     <button className="btn btn-ghost btn-xs" style={{color:'#777'}} onClick={()=>delAttempt(s.id,l.id,i)}>✕</button>
                   </div>))}
                 </div></>}
-              </div>)}
-            </div>);})}
-        </div>}
+              </div>
+            </div>
+          </div>
+        );})()}
         </>}
       </div>);})()}
     </>)}
