@@ -2264,6 +2264,41 @@ function CallHistoryPage(){
   const updLead=(sid,lid,k,v)=>{persist({...data,leads:{...data.leads,[sid]:leadsOf(sid).map(l=>l.id===lid?{...l,[k]:v}:l)}});};
   const delLead=(sid,lid)=>{persist({...data,leads:{...data.leads,[sid]:leadsOf(sid).filter(l=>l.id!==lid)}},true);};
 
+  // ── Weekly Report (meeting-ready · mirrors the clinical Weekly Reports format) ──
+  const REP_LOCS=['Mississauga','Markham'];
+  const DISC_LABEL=Object.fromEntries([].concat(...Object.values(SITE_DISC)));
+  const _addDaysISO=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
+  const _wkLabelR=(ws)=>{const e=_addDaysISO(ws,6);const o={month:'short',day:'numeric'};return new Date(ws+'T12:00').toLocaleDateString('en-CA',o)+' – '+new Date(e+'T12:00').toLocaleDateString('en-CA',o)+', '+new Date(e+'T12:00').getFullYear();};
+  const[savedCallReports,setSavedCallReports]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_call_reports'))||[];}catch(e){return[];}});
+  const[repWeek,setRepWeek]=useState(()=>_wkStart(today));
+  const[repNotes,setRepNotes]=useState('');
+  const[viewingSavedRep,setViewingSavedRep]=useState(null);
+  const buildCallWeek=(ws)=>{
+    const days=[];for(let i=0;i<7;i++)days.push(_addDaysISO(ws,i));
+    const byLoc={},byDisc={},daily=[];let calls=0,booked=0;
+    REP_LOCS.forEach(L=>{byLoc[L]={calls:0,booked:0};});
+    days.forEach(d=>{let dc=0,db=0;REP_LOCS.forEach(L=>{const day=(data.calls[L]||{})[d]||{};Object.entries(day).forEach(([id,v])=>{const c=cOf(v),b=bOf(v);byLoc[L].calls+=c;byLoc[L].booked+=b;dc+=c;db+=b;if(!byDisc[id])byDisc[id]={calls:0,booked:0};byDisc[id].calls+=c;byDisc[id].booked+=b;});});calls+=dc;booked+=db;daily.push({d,calls:dc,booked:db});});
+    return{ws,calls,booked,rate:calls?booked/calls*100:0,byLoc,byDisc,daily};
+  };
+  const buildCallReport=(ws)=>({cur:buildCallWeek(ws),prev:buildCallWeek(_addDaysISO(ws,-7))});
+  const buildCallInsights=(cur,prev)=>{
+    const flags=[],gaps=[],wins=[];
+    const dCalls=cur.calls-prev.calls,dRate=cur.rate-prev.rate;
+    if(prev.calls>=10&&dCalls<=-0.25*prev.calls)flags.push({sev:'high',title:`Call volume down ${Math.round(-dCalls)} (${Math.abs(dCalls/prev.calls*100).toFixed(0)}%)`,detail:`${prev.calls} → ${cur.calls} calls vs the prior week.`,action:'Check phone coverage and missed-call follow-up — fewer calls reaching the desk means fewer chances to book.'});
+    if(prev.calls>=8&&cur.calls>=8&&dRate<=-10)flags.push({sev:cur.rate<30?'high':'med',title:`Booking rate down ${Math.abs(dRate).toFixed(0)} pts`,detail:`${prev.rate.toFixed(0)}% → ${cur.rate.toFixed(0)}% of calls converted.`,action:'Review call handling — ask for the booking on the first call and offer first-available plus an alternative.'});
+    REP_LOCS.forEach(L=>{const b=cur.byLoc[L];if(b.calls>=5&&b.booked===0)flags.push({sev:'med',title:`${L}: ${b.calls} calls, 0 booked`,detail:'No conversions logged at this site this week.',action:`Confirm bookings are being logged for ${L}, and review what those callers needed.`});});
+    if(cur.calls>=10&&cur.rate<35)gaps.push({title:`Overall booking rate ${cur.rate.toFixed(0)}%`,detail:`${cur.booked} booked of ${cur.calls} calls — under a healthy 40–50% line.`,action:'Tighten the close: confirm the slot before ending the call; capture a callback time if undecided.'});
+    Object.entries(cur.byDisc).forEach(([id,d])=>{const r=d.calls?d.booked/d.calls*100:0;if(d.calls>=4&&r<30)gaps.push({title:`${DISC_LABEL[id]||id}: ${r.toFixed(0)}% booked`,detail:`${d.booked} of ${d.calls} calls converted.`,action:`Check ${DISC_LABEL[id]||id} availability and intake — interest is there but not converting.`});});
+    if(dCalls>=5&&dCalls>=0.2*Math.max(1,prev.calls))wins.push({title:`Call volume up ${dCalls}`,detail:`${prev.calls} → ${cur.calls} calls.`});
+    if(dRate>=8&&cur.calls>=8)wins.push({title:`Booking rate up ${dRate.toFixed(0)} pts`,detail:`${prev.rate.toFixed(0)}% → ${cur.rate.toFixed(0)}%.`});
+    const top=Object.entries(cur.byDisc).map(([id,d])=>({id,...d,rate:d.calls?d.booked/d.calls*100:0})).filter(d=>d.calls>=3).sort((a,b)=>b.rate-a.rate)[0];
+    if(top&&top.rate>=60)wins.push({title:`${DISC_LABEL[top.id]||top.id}: ${top.rate.toFixed(0)}% booked`,detail:`${top.booked} of ${top.calls} calls — strongest conversion this week.`});
+    return{flags:flags.slice(0,6),gaps:gaps.slice(0,6),wins:wins.slice(0,5)};
+  };
+  const saveCallReport=()=>{const{cur,prev}=buildCallReport(repWeek);const rec={id:'crep_'+Date.now(),ws:repWeek,label:_wkLabelR(repWeek),prevLabel:_wkLabelR(_addDaysISO(repWeek,-7)),generatedAt:new Date().toISOString(),notes:repNotes,cur,prev};const next=[rec,...savedCallReports];setSavedCallReports(next);try{localStorage.setItem('rvgd3_call_reports',JSON.stringify(next));}catch(e){}setRepNotes('');setViewingSavedRep(rec.id);};
+  const delCallReport=(id)=>{const next=savedCallReports.filter(r=>r.id!==id);setSavedCallReports(next);try{localStorage.setItem('rvgd3_call_reports',JSON.stringify(next));}catch(e){}if(viewingSavedRep===id)setViewingSavedRep(null);};
+  const navRepWeek=(dir)=>{setRepWeek(w=>_addDaysISO(w,dir*7));setViewingSavedRep(null);};
+
   const card=(label,val,sub,color)=>(<div style={{flex:'1 1 150px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'14px 16px'}}>
     <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.5px',textTransform:'uppercase',color:'#777',marginBottom:6}}>{label}</div>
     <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color,lineHeight:1}}>{val}</div>
@@ -2277,7 +2312,7 @@ function CallHistoryPage(){
       <span style={{fontSize:13,color:'#777'}}>Guest Experience · call volume by location + lead sources</span>
     </div>
     <div style={{display:'flex',gap:4,marginBottom:16,alignItems:'center'}}>
-      {[['calls','📞 Call Volume'],['leads','🎯 Lead Sources'],['agenda','🗓 Follow-ups'+(dueN>0?' ('+dueN+')':'')]].map(([v,l])=>(<button key={v} className={`btn btn-sm ${view===v?'btn-go':'btn-ghost'}`} onClick={()=>setView(v)}>{l}</button>))}
+      {[['calls','📞 Call Volume'],['leads','🎯 Lead Sources'],['agenda','🗓 Follow-ups'+(dueN>0?' ('+dueN+')':'')],['report','📄 Weekly Report']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${view===v?'btn-go':'btn-ghost'}`} onClick={()=>setView(v)}>{l}</button>))}
       {(()=>{const t=sync.at?new Date(sync.at).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}):null;const map={idle:['#666','●','All changes save automatically'],saving:['#F4DB71','◌','Saving…'],synced:['#44CCAA','●','Synced to cloud'+(t?' · '+t:'')],local:['#E0A052','⚠','Saved on this device — cloud unavailable'],error:['#E05252','⚠','Saved locally — cloud sync failed']};const[c,icon,txt]=map[sync.s]||map.idle;return(<span style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:6,fontSize:12.5,color:c}}><span>{icon}</span>{txt}</span>);})()}
     </div>
 
@@ -2491,6 +2526,238 @@ function CallHistoryPage(){
             </div>);})}
           </div>
         </div>))}
+      </>);
+    })()}
+
+    {view==='report'&&(()=>{
+      const saved=viewingSavedRep?savedCallReports.find(r=>r.id===viewingSavedRep):null;
+      const built=saved?{cur:saved.cur,prev:saved.prev}:buildCallReport(repWeek);
+      const cur=built.cur,prev=built.prev;
+      const ins=buildCallInsights(cur,prev);
+      const label=saved?saved.label:_wkLabelR(repWeek);
+      const prevLabel=saved?saved.prevLabel:_wkLabelR(_addDaysISO(repWeek,-7));
+      const genAt=saved?saved.generatedAt:new Date().toISOString();
+      const notes=saved?saved.notes:'';
+      const noData=cur.calls===0&&prev.calls===0;
+      const delta=(c,p)=>{if(!p)return{pct:c>0?'100':'0',up:c>=0};const v=(c-p)/p*100;return{pct:Math.abs(v).toFixed(0),up:v>=0};};
+      const rd=(()=>{const v=cur.rate-prev.rate;return{pts:Math.abs(v).toFixed(0),up:v>=0};})();
+      const thisWk=_wkStart(today);
+      const showNudge=new Date().getDay()===1&&!savedCallReports.some(r=>r.ws===thisWk)&&!saved&&!noData;
+      const discIds=Array.from(new Set([...Object.keys(cur.byDisc),...Object.keys(prev.byDisc)]));
+      const discRows=discIds.map(id=>{const c=cur.byDisc[id]||{calls:0,booked:0};const p=prev.byDisc[id]||{calls:0,booked:0};return{id,label:DISC_LABEL[id]||id,color:DISC_COLOR[id]||'#56625a',c,p,rate:c.calls?c.booked/c.calls*100:0};}).filter(r=>r.c.calls>0||r.p.calls>0).sort((a,b)=>b.c.calls-a.c.calls);
+      const discMax=Math.max(1,...discRows.map(r=>r.c.calls));
+      const dailyMax=Math.max(1,...cur.daily.map(d=>d.calls));
+      const tileWrap={background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'15px 16px'};
+      const tLab={fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.3px',textTransform:'uppercase',color:'#5a655d',marginBottom:6};
+      const tVal=(c)=>({fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:c,lineHeight:1});
+      const dLine=(good)=>({marginTop:8,fontSize:12,fontWeight:700,color:good?'#0B6E54':'#C0392B'});
+      const secTitle={fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'1.5px',textTransform:'uppercase',marginBottom:12,fontWeight:700};
+      const thL={textAlign:'left',padding:'8px 10px',color:'#5a655d',fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.5px',textTransform:'uppercase'};
+      const thR={...thL,textAlign:'right'};
+      const tdL={textAlign:'left',padding:'9px 10px',color:'#243029',fontSize:13};
+      const tdR={textAlign:'right',padding:'9px 10px',color:'#34423a',fontSize:13};
+      const rateColor=(r)=>r>=45?'#0B6E54':r>=30?'#9A6B00':'#C0392B';
+      const dow=(ds)=>new Date(ds+'T12:00').toLocaleDateString('en-CA',{weekday:'short'});
+      const REP_LOC_C={Mississauga:'#0B6E54',Markham:'#1F6F9B'};
+      return(<>
+        <style>{`
+.creport-print-area{--surface:#ffffff;--surface2:#f5f9f6;--surface3:#eaf1ec;--border:#dde7e1;--border2:#cbd9d1;--go:#00aa88;background:#ffffff!important;color:#16231d;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+@media print{@page{margin:13mm;}html,body{background:#ffffff!important;}body *{visibility:hidden!important;}.creport-print-area,.creport-print-area *{visibility:visible!important;}.creport-print-area{position:absolute!important;left:0;top:0;width:100%!important;border:none!important;border-radius:0!important;padding:0!important;}.no-print{display:none!important;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}}
+`}</style>
+
+        {/* ── Controls (not printed) ── */}
+        <div className="no-print">
+          <div className="flex aic jsb" style={{marginBottom:14,flexWrap:'wrap',gap:10}}>
+            <div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#aaa',marginBottom:3}}>Weekly Call Report</div>
+              <div style={{fontSize:14,color:'#777'}}>Meeting-ready summary pulled live from the call log</div>
+            </div>
+            <div className="flex aic g5" style={{flexWrap:'wrap'}}>
+              <button className="btn btn-ghost btn-sm" onClick={()=>window.print()}>🖨 Print / PDF</button>
+              <button className="btn btn-lime btn-sm" onClick={saveCallReport}>💾 Save report</button>
+            </div>
+          </div>
+
+          {showNudge&&(
+            <div style={{background:'rgba(202,232,193,.08)',border:'1px solid #2f5a2a',borderRadius:8,padding:'12px 16px',marginBottom:14,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+              <span style={{color:'#CAE8C1',fontSize:14}}>📋 It's Monday — last week's call report isn't saved yet.</span>
+              <button className="btn btn-go btn-sm" onClick={()=>{setRepWeek(_addDaysISO(thisWk,-7));setViewingSavedRep(null);setTimeout(saveCallReport,0);}}>Generate &amp; save last week</button>
+            </div>
+          )}
+
+          <div className="flex aic g5" style={{marginBottom:14,flexWrap:'wrap'}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>navRepWeek(-1)} disabled={!!saved}>← Prev</button>
+            <span style={{minWidth:200,textAlign:'center',fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,color:'#ddd'}}>{label}</span>
+            <button className="btn btn-ghost btn-sm" onClick={()=>navRepWeek(1)} disabled={!!saved||repWeek>=thisWk}>Next →</button>
+            {!saved&&repWeek!==_addDaysISO(thisWk,-7)&&<button className="btn btn-ghost btn-sm" onClick={()=>{setRepWeek(_addDaysISO(thisWk,-7));setViewingSavedRep(null);}} style={{marginLeft:4}}>Last week</button>}
+            {saved&&<button className="btn btn-ghost btn-sm" onClick={()=>setViewingSavedRep(null)} style={{marginLeft:8}}>↩ Back to live</button>}
+          </div>
+
+          {!saved&&(
+            <textarea value={repNotes} onChange={e=>setRepNotes(e.target.value)} placeholder="Meeting notes / context for this report (optional) — saved with the report"
+              style={{width:'100%',minHeight:60,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,color:'#ddd',padding:'10px 12px',fontSize:13,marginBottom:16,fontFamily:'inherit',resize:'vertical'}}/>
+          )}
+        </div>
+
+        {/* ── The report (print area) ── */}
+        <div className="creport-print-area" style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:'24px 26px'}}>
+          {/* Header */}
+          <div style={{paddingBottom:16,marginBottom:20,borderBottom:'1px solid var(--border)'}}>
+            <div style={{height:5,width:78,borderRadius:3,marginBottom:12,background:'linear-gradient(90deg,#00aa88 0%,#f2db71 100%)'}}/>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'3px',textTransform:'uppercase',color:'#5a655d'}}>Revibe — Guest Experience</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#0E2A22',letterSpacing:'.5px',marginTop:2}}>Weekly Call Report</div>
+            <div style={{fontSize:15,color:'#0B6E54',fontWeight:600,marginTop:4}}>{label}</div>
+            <div style={{fontSize:12,color:'#6b766e',marginTop:4}}>Compared to {prevLabel} · Generated {new Date(genAt).toLocaleString('en-CA',{dateStyle:'medium',timeStyle:'short'})}{saved?' · SAVED':''}</div>
+          </div>
+
+          {noData&&<div style={{background:'rgba(224,82,82,.08)',border:'1px solid #e6b3ab',borderRadius:8,padding:'10px 14px',marginBottom:18,color:'#B5791F',fontSize:13}}>No calls logged for this week or the week before. Log calls under 📞 Call Volume, or use ← Prev to find a week with data.</div>}
+
+          {/* KPI tiles */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(165px,1fr))',gap:12,marginBottom:24}}>
+            {(()=>{const d=delta(cur.calls,prev.calls);return(<div style={tileWrap}><div style={tLab}>Total Calls</div><div style={tVal('#0B6E54')}>{fmt(cur.calls)}</div><div style={dLine(d.up)}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'#6b766e',fontWeight:400}}>vs prior week</span></div></div>);})()}
+            {(()=>{const d=delta(cur.booked,prev.booked);return(<div style={tileWrap}><div style={tLab}>Booked (Conversions)</div><div style={tVal('#0B6E54')}>{fmt(cur.booked)}</div><div style={dLine(d.up)}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'#6b766e',fontWeight:400}}>vs prior week</span></div></div>);})()}
+            <div style={tileWrap}><div style={tLab}>Booking Rate</div><div style={tVal(rateColor(cur.rate))}>{cur.calls?cur.rate.toFixed(0)+'%':'—'}</div><div style={dLine(rd.up)}>{rd.up?'▲':'▼'}{rd.pts} pts <span style={{color:'#6b766e',fontWeight:400}}>vs prior week ({prev.rate.toFixed(0)}%)</span></div></div>
+          </div>
+
+          {/* Red flags / gaps / wins */}
+          {!noData&&(
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:14,marginBottom:24}}>
+              <div style={{background:'rgba(224,82,82,.05)',border:'1px solid rgba(224,82,82,.25)',borderRadius:10,padding:'16px 18px'}}>
+                <div style={{...secTitle,color:'#C0392B'}}>⚑ Red Flags &amp; Watch List</div>
+                {ins.flags.length?ins.flags.map((f,i)=>(
+                  <div key={i} style={{marginBottom:i<ins.flags.length-1?12:0,paddingBottom:i<ins.flags.length-1?12:0,borderBottom:i<ins.flags.length-1?'1px solid rgba(0,0,0,.08)':'none'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap'}}>
+                      <span style={{fontSize:9,fontWeight:800,letterSpacing:'.5px',padding:'2px 6px',borderRadius:3,background:f.sev==='high'?'rgba(224,82,82,.18)':'rgba(224,160,82,.18)',color:f.sev==='high'?'#C0392B':'#B5791F'}}>{f.sev==='high'?'HIGH':'WATCH'}</span>
+                      <span style={{fontSize:14,fontWeight:700,color:'#16231d'}}>{f.title}</span>
+                    </div>
+                    <div style={{fontSize:13,color:'#4c584f',marginTop:4}}>{f.detail}</div>
+                    <div style={{fontSize:13,color:'#0B6E54',marginTop:3}}>→ {f.action}</div>
+                  </div>
+                )):<div style={{fontSize:13,color:'#5f6a62',fontStyle:'italic'}}>No red flags this week — nothing breached the thresholds.</div>}
+              </div>
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                <div style={{background:'rgba(244,219,113,.05)',border:'1px solid rgba(244,219,113,.22)',borderRadius:10,padding:'16px 18px',flex:1}}>
+                  <div style={{...secTitle,color:'#9A6B00'}}>◎ Gaps &amp; Opportunities</div>
+                  {ins.gaps.length?ins.gaps.map((g,i)=>(
+                    <div key={i} style={{marginBottom:i<ins.gaps.length-1?11:0}}>
+                      <div style={{fontSize:14,fontWeight:700,color:'#16231d'}}>{g.title}</div>
+                      <div style={{fontSize:13,color:'#4c584f'}}>{g.detail}</div>
+                      <div style={{fontSize:13,color:'#0B6E54',marginTop:2}}>→ {g.action}</div>
+                    </div>
+                  )):<div style={{fontSize:13,color:'#5f6a62',fontStyle:'italic'}}>No notable gaps flagged this week.</div>}
+                </div>
+                {ins.wins.length>0&&(
+                  <div style={{background:'rgba(68,204,170,.05)',border:'1px solid rgba(68,204,170,.22)',borderRadius:10,padding:'16px 18px'}}>
+                    <div style={{...secTitle,color:'#0B6E54',marginBottom:10}}>★ Wins to Recognize</div>
+                    {ins.wins.map((w,i)=>(<div key={i} style={{marginBottom:i<ins.wins.length-1?8:0}}><span style={{fontSize:14,fontWeight:700,color:'#16231d'}}>{w.title}</span><span style={{fontSize:13,color:'#4c584f'}}> — {w.detail}</span></div>))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* By location */}
+          {!noData&&(
+            <div style={{marginBottom:24}}>
+              <div style={{...secTitle,color:'#4c584f'}}>By Location</div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:12}}>
+                {REP_LOCS.map(L=>{const b=cur.byLoc[L];const pb=prev.byLoc[L];const r=b.calls?b.booked/b.calls*100:0;const d=delta(b.calls,pb.calls);return(
+                  <div key={L} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'14px 16px'}}>
+                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:REP_LOC_C[L],marginBottom:6}}>{L}</div>
+                    <div style={{display:'flex',alignItems:'baseline',gap:14,flexWrap:'wrap'}}>
+                      <span><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:'#16231d'}}>{fmt(b.calls)}</span><span style={{fontSize:12,color:'#5f6a62'}}> calls</span></span>
+                      <span><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#0B6E54'}}>{fmt(b.booked)}</span><span style={{fontSize:12,color:'#5f6a62'}}> booked</span></span>
+                      <span style={{fontSize:13,fontWeight:700,color:rateColor(r)}}>{b.calls?r.toFixed(0)+'%':'—'}</span>
+                    </div>
+                    <div style={{marginTop:6,fontSize:12,fontWeight:700,color:d.up?'#0B6E54':'#C0392B'}}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'#6b766e',fontWeight:400}}>calls vs prior week</span></div>
+                  </div>
+                );})}
+              </div>
+            </div>
+          )}
+
+          {/* Daily breakdown */}
+          {!noData&&cur.calls>0&&(
+            <div style={{marginBottom:24}}>
+              <div style={{...secTitle,color:'#4c584f'}}>Calls This Week</div>
+              <div style={{display:'flex',gap:6,alignItems:'flex-end',height:120,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'14px 16px'}}>
+                {cur.daily.map(day=>{const hc=Math.round(day.calls/dailyMax*78);const hb=Math.round(day.booked/dailyMax*78);return(
+                  <div key={day.d} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+                    <div style={{fontSize:10,color:'#56625a',fontWeight:700}}>{day.calls||''}</div>
+                    <div style={{width:'100%',maxWidth:34,height:78,display:'flex',alignItems:'flex-end',justifyContent:'center',position:'relative'}}>
+                      <div style={{width:'70%',height:hc,background:'#0B6E54',opacity:.4,borderRadius:'3px 3px 0 0',position:'absolute',bottom:0}}/>
+                      {day.booked>0&&<div style={{width:'70%',height:hb,background:'#0B6E54',borderRadius:'3px 3px 0 0',position:'absolute',bottom:0}}/>}
+                    </div>
+                    <div style={{fontSize:10,color:'#6b766e'}}>{dow(day.d)}</div>
+                  </div>
+                );})}
+              </div>
+              <div style={{display:'flex',gap:16,fontSize:11.5,color:'#5a655d',marginTop:6}}>
+                <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:10,height:10,borderRadius:2,background:'#0B6E54',opacity:.4,display:'inline-block'}}/>Calls</span>
+                <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:10,height:10,borderRadius:2,background:'#0B6E54',display:'inline-block'}}/>Booked</span>
+              </div>
+            </div>
+          )}
+
+          {/* By discipline table */}
+          {!noData&&discRows.length>0&&(
+            <div style={{marginBottom:8}}>
+              <div style={{...secTitle,color:'#4c584f'}}>By Discipline — This Week vs Last</div>
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <thead><tr style={{borderBottom:'1px solid var(--border)'}}>
+                    <th style={thL}>Discipline</th><th style={thR}>Calls</th><th style={thR}>Booked</th><th style={thR}>Rate</th><th style={thR}>Last wk calls</th><th style={{...thL,paddingLeft:18}}>Share</th>
+                  </tr></thead>
+                  <tbody>
+                    {discRows.map(r=>(
+                      <tr key={r.id} style={{borderBottom:'1px solid rgba(0,0,0,.08)'}}>
+                        <td style={tdL}><span style={{color:r.color}}>●</span> {r.label}</td>
+                        <td style={{...tdR,fontWeight:700,color:'#16231d'}}>{r.c.calls}</td>
+                        <td style={{...tdR,color:'#0B6E54'}}>{r.c.booked}</td>
+                        <td style={{...tdR,color:r.c.calls?rateColor(r.rate):'#79847c'}}>{r.c.calls?r.rate.toFixed(0)+'%':'—'}</td>
+                        <td style={{...tdR,color:'#5f6a62'}}>{r.p.calls}</td>
+                        <td style={{padding:'9px 10px',paddingLeft:18,minWidth:120}}><div style={{height:12,background:'var(--surface3)',borderRadius:3,overflow:'hidden'}}><div style={{height:'100%',width:(r.c.calls/discMax*100)+'%',background:r.color,borderRadius:3}}/></div></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot><tr style={{borderTop:'1px solid var(--border)'}}>
+                    <td style={{...tdL,fontFamily:"'Barlow Condensed',sans-serif",textTransform:'uppercase',letterSpacing:'1px',color:'#5a655d',fontSize:12}}>Total</td>
+                    <td style={{...tdR,fontWeight:800,color:'#0E2A22'}}>{cur.calls}</td>
+                    <td style={{...tdR,fontWeight:800,color:'#0B6E54'}}>{cur.booked}</td>
+                    <td style={{...tdR,fontWeight:800,color:rateColor(cur.rate)}}>{cur.calls?cur.rate.toFixed(0)+'%':'—'}</td>
+                    <td style={{...tdR,color:'#5f6a62'}}>{prev.calls}</td><td/>
+                  </tr></tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          {notes&&notes.trim()&&(
+            <div style={{marginTop:20,background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'14px 16px'}}>
+              <div style={{...secTitle,color:'#4c584f',marginBottom:8}}>Meeting Notes</div>
+              <div style={{fontSize:13.5,color:'#243029',lineHeight:1.6,whiteSpace:'pre-wrap'}}>{notes}</div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Saved report history ── */}
+        {savedCallReports.length>0&&(
+          <div className="no-print" style={{marginTop:20}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1.5px',textTransform:'uppercase',color:'#888',marginBottom:10}}>Saved Reports</div>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              {savedCallReports.map(r=>(
+                <div key={r.id} className="flex aic jsb" style={{background:viewingSavedRep===r.id?'rgba(202,232,193,.08)':'var(--surface2)',border:'1px solid '+(viewingSavedRep===r.id?'#2f5a2a':'var(--border)'),borderRadius:8,padding:'10px 14px',cursor:'pointer',gap:10}} onClick={()=>setViewingSavedRep(r.id)}>
+                  <div>
+                    <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,color:'#ddd'}}>{r.label}</span>
+                    <span style={{fontSize:12,color:'#666',marginLeft:10}}>{r.cur.calls} calls · {r.cur.booked} booked · {r.cur.calls?(r.cur.booked/r.cur.calls*100).toFixed(0):'0'}% · saved {new Date(r.generatedAt).toLocaleDateString('en-CA',{month:'short',day:'numeric'})}</span>
+                  </div>
+                  <button className="btn btn-ghost btn-xs" onClick={e=>{e.stopPropagation();if(confirm('Delete this saved report?'))delCallReport(r.id);}}>✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </>);
     })()}
   </div>);
@@ -4491,16 +4758,16 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const pTitleWord=ptype==='quarter'?'Quarterly':ptype==='month'?'Monthly':'Weekly';
     const delta=(c,p)=>{if(!p)return{pct:c>0?'100.0':'0.0',up:c>=0};const v=(c-p)/p*100;return{pct:Math.abs(v).toFixed(1),up:v>=0};};
     const KPIS=[
-      {k:'revenue',label:'Revenue',fmt:fmtMoney,color:'#CAE8C1'},
-      {k:'visits',label:'Completed Visits',fmt:v=>String(v),color:'#6B9FD4'},
-      {k:'ias',label:'Initial Assessments',fmt:v=>String(v),color:'#BB99FF'},
-      {k:'noShows',label:'No-Shows',fmt:v=>String(v),color:'#E0A052',inv:true},
-      {k:'cancels',label:'Cancellations',fmt:v=>String(v),color:'#E05252',inv:true},
+      {k:'revenue',label:'Revenue',fmt:fmtMoney,color:'#0B6E54'},
+      {k:'visits',label:'Completed Visits',fmt:v=>String(v),color:'#1F6F9B'},
+      {k:'ias',label:'Initial Assessments',fmt:v=>String(v),color:'#6A45C0'},
+      {k:'noShows',label:'No-Shows',fmt:v=>String(v),color:'#B5791F',inv:true},
+      {k:'cancels',label:'Cancellations',fmt:v=>String(v),color:'#C0392B',inv:true},
     ];
-    const thL={textAlign:'left',padding:'8px 10px',color:'#888',fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.5px',textTransform:'uppercase'};
+    const thL={textAlign:'left',padding:'8px 10px',color:'#5a655d',fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.5px',textTransform:'uppercase'};
     const thR={...thL,textAlign:'right'};
-    const tdL={textAlign:'left',padding:'9px 10px',color:'#ddd',fontSize:13};
-    const tdR={textAlign:'right',padding:'9px 10px',color:'#ccc',fontSize:13};
+    const tdL={textAlign:'left',padding:'9px 10px',color:'#243029',fontSize:13};
+    const tdR={textAlign:'right',padding:'9px 10px',color:'#34423a',fontSize:13};
     const today=new Date();
     const latestWk=_wkStart(dailyDateRange.max||today.toISOString().slice(0,10));
     const showNudge=today.getDay()===1&&hasDailyData&&!savedReports.some(r=>r.type==='week'&&r.from===latestWk)&&!saved;
@@ -4508,7 +4775,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
     return(
       <div>
-        <style>{`@media print{body *{visibility:hidden!important;}.report-print-area,.report-print-area *{visibility:visible!important;}.report-print-area{position:absolute!important;left:0;top:0;width:100%!important;}.no-print{display:none!important;}}`}</style>
+        <style>{`
+.report-print-area{--surface:#ffffff;--surface2:#f5f9f6;--surface3:#eaf1ec;--border:#dde7e1;--border2:#cbd9d1;--go:#00aa88;background:#ffffff!important;color:#16231d;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+@media print{@page{margin:13mm;}html,body{background:#ffffff!important;}body *{visibility:hidden!important;}.report-print-area,.report-print-area *{visibility:visible!important;}.report-print-area{position:absolute!important;left:0;top:0;width:100%!important;border:none!important;border-radius:0!important;padding:0!important;}.no-print{display:none!important;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}}
+`}</style>
 
         {/* ── Controls (not printed) ── */}
         <div className="no-print">
@@ -4558,16 +4828,17 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         {/* ── The report (print area) ── */}
         <div className="report-print-area" style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:12,padding:'24px 26px'}}>
           {/* Header */}
-          <div style={{borderBottom:'2px solid var(--go)',paddingBottom:16,marginBottom:20}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'3px',textTransform:'uppercase',color:'#888'}}>Revibe — Growth &amp; Development</div>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#fff',letterSpacing:'.5px',marginTop:2}}>{pTitleWord} Performance Report <span style={{color:repLoc==='all'?'#7FC8E8':'#E0A052',fontSize:22}}>· {repLoc==='all'?'All Revibe':repLoc}</span></div>
-            <div style={{fontSize:15,color:'#CAE8C1',fontWeight:600,marginTop:4}}>{pLabel}</div>
-            <div style={{fontSize:12,color:'#666',marginTop:4}}>Compared to {pPrev} · Generated {new Date(genAt).toLocaleString('en-CA',{dateStyle:'medium',timeStyle:'short'})}{saved?' · SAVED':''}</div>
+          <div style={{paddingBottom:16,marginBottom:20,borderBottom:'1px solid var(--border)'}}>
+            <div style={{height:5,width:78,borderRadius:3,marginBottom:12,background:'linear-gradient(90deg,#00aa88 0%,#f2db71 100%)'}}/>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'3px',textTransform:'uppercase',color:'#5a655d'}}>Revibe — Growth &amp; Development</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#0E2A22',letterSpacing:'.5px',marginTop:2}}>{pTitleWord} Performance Report <span style={{color:repLoc==='all'?'#1F6F9B':'#B5791F',fontSize:22}}>· {repLoc==='all'?'All Revibe':repLoc}</span></div>
+            <div style={{fontSize:15,color:'#0B6E54',fontWeight:600,marginTop:4}}>{pLabel}</div>
+            <div style={{fontSize:12,color:'#6b766e',marginTop:4}}>Compared to {pPrev} · Generated {new Date(genAt).toLocaleString('en-CA',{dateStyle:'medium',timeStyle:'short'})}{saved?' · SAVED':''}</div>
           </div>
 
-          {noData&&<div style={{background:'rgba(224,82,82,.08)',border:'1px solid #5a2a2a',borderRadius:8,padding:'10px 14px',marginBottom:18,color:'#E0A052',fontSize:13}}>No appointment or revenue data found for this period — make sure the Jane CSVs for these dates have been imported.</div>}
+          {noData&&<div style={{background:'rgba(224,82,82,.08)',border:'1px solid #e6b3ab',borderRadius:8,padding:'10px 14px',marginBottom:18,color:'#B5791F',fontSize:13}}>No appointment or revenue data found for this period — make sure the Jane CSVs for these dates have been imported.</div>}
 
-          {!noData&&!cur.hasRev&&cur.totals.visits>0&&<div style={{background:'rgba(244,219,113,.08)',border:'1px solid rgba(244,219,113,.3)',borderRadius:8,padding:'10px 14px',marginBottom:18,color:'#e8d48a',fontSize:13,lineHeight:1.5}}>⚠ Revenue isn't imported for this period yet. Visits and assessments come from your appointment data, but daily sales only run through your last Sales import. Import the Sales CSV covering these dates (Performance &rarr; Jane Import) to fill in revenue — the $0 below isn't a real drop.</div>}
+          {!noData&&!cur.hasRev&&cur.totals.visits>0&&<div style={{background:'rgba(244,219,113,.08)',border:'1px solid rgba(244,219,113,.3)',borderRadius:8,padding:'10px 14px',marginBottom:18,color:'#9A6B00',fontSize:13,lineHeight:1.5}}>⚠ Revenue isn't imported for this period yet. Visits and assessments come from your appointment data, but daily sales only run through your last Sales import. Import the Sales CSV covering these dates (Performance &rarr; Jane Import) to fill in revenue — the $0 below isn't a real drop.</div>}
 
           {/* KPI tiles */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(165px,1fr))',gap:12,marginBottom:24}}>
@@ -4576,9 +4847,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               const revMissing=kp.k==='revenue'&&!cur.hasRev;
               return(
                 <div key={kp.k} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'15px 16px'}}>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.3px',textTransform:'uppercase',color:'#888',marginBottom:6}}>{kp.label}</div>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:revMissing?'#555':kp.color,lineHeight:1}}>{revMissing?'—':kp.fmt(c)}</div>
-                  {revMissing?<div style={{marginTop:8,fontSize:11.5,fontWeight:600,color:'#E0A052'}}>not imported yet</div>:<div style={{marginTop:8,fontSize:12,fontWeight:700,color:good?'#44CCAA':'#E05252'}}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'#666',fontWeight:400}}>vs prior {pWord}</span></div>}
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.3px',textTransform:'uppercase',color:'#5a655d',marginBottom:6}}>{kp.label}</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:revMissing?'#79847c':kp.color,lineHeight:1}}>{revMissing?'—':kp.fmt(c)}</div>
+                  {revMissing?<div style={{marginTop:8,fontSize:11.5,fontWeight:600,color:'#B5791F'}}>not imported yet</div>:<div style={{marginTop:8,fontSize:12,fontWeight:700,color:good?'#0B6E54':'#C0392B'}}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'#6b766e',fontWeight:400}}>vs prior {pWord}</span></div>}
                 </div>
               );
             })}
@@ -4591,33 +4862,33 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             return(
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:14,marginBottom:24}}>
                 <div style={{background:'rgba(224,82,82,.05)',border:'1px solid rgba(224,82,82,.25)',borderRadius:10,padding:'16px 18px'}}>
-                  <div style={{...secTitle,color:'#E05252'}}>⚑ Red Flags &amp; Watch List</div>
+                  <div style={{...secTitle,color:'#C0392B'}}>⚑ Red Flags &amp; Watch List</div>
                   {ins.flags.length?ins.flags.map((f,i)=>(
-                    <div key={i} style={{marginBottom:i<ins.flags.length-1?12:0,paddingBottom:i<ins.flags.length-1?12:0,borderBottom:i<ins.flags.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
+                    <div key={i} style={{marginBottom:i<ins.flags.length-1?12:0,paddingBottom:i<ins.flags.length-1?12:0,borderBottom:i<ins.flags.length-1?'1px solid rgba(0,0,0,.08)':'none'}}>
                       <div style={{display:'flex',alignItems:'center',gap:7,flexWrap:'wrap'}}>
-                        <span style={{fontSize:9,fontWeight:800,letterSpacing:'.5px',padding:'2px 6px',borderRadius:3,background:f.sev==='high'?'rgba(224,82,82,.18)':'rgba(224,160,82,.18)',color:f.sev==='high'?'#E05252':'#E0A052'}}>{f.sev==='high'?'HIGH':'WATCH'}</span>
-                        <span style={{fontSize:14,fontWeight:700,color:'#eee'}}>{f.title}</span>
+                        <span style={{fontSize:9,fontWeight:800,letterSpacing:'.5px',padding:'2px 6px',borderRadius:3,background:f.sev==='high'?'rgba(224,82,82,.18)':'rgba(224,160,82,.18)',color:f.sev==='high'?'#C0392B':'#B5791F'}}>{f.sev==='high'?'HIGH':'WATCH'}</span>
+                        <span style={{fontSize:14,fontWeight:700,color:'#16231d'}}>{f.title}</span>
                       </div>
-                      <div style={{fontSize:13,color:'#aaa',marginTop:4}}>{f.detail}</div>
-                      <div style={{fontSize:13,color:'#CAE8C1',marginTop:3}}>→ {f.action}</div>
+                      <div style={{fontSize:13,color:'#4c584f',marginTop:4}}>{f.detail}</div>
+                      <div style={{fontSize:13,color:'#0B6E54',marginTop:3}}>→ {f.action}</div>
                     </div>
-                  )):<div style={{fontSize:13,color:'#777',fontStyle:'italic'}}>No red flags this period — nothing breached the thresholds.</div>}
+                  )):<div style={{fontSize:13,color:'#5f6a62',fontStyle:'italic'}}>No red flags this period — nothing breached the thresholds.</div>}
                 </div>
                 <div style={{display:'flex',flexDirection:'column',gap:14}}>
                   <div style={{background:'rgba(244,219,113,.05)',border:'1px solid rgba(244,219,113,.22)',borderRadius:10,padding:'16px 18px',flex:1}}>
-                    <div style={{...secTitle,color:'#F4DB71'}}>◎ Gaps &amp; Opportunities</div>
+                    <div style={{...secTitle,color:'#9A6B00'}}>◎ Gaps &amp; Opportunities</div>
                     {ins.gaps.length?ins.gaps.map((g,i)=>(
                       <div key={i} style={{marginBottom:i<ins.gaps.length-1?11:0}}>
-                        <div style={{fontSize:14,fontWeight:700,color:'#eee'}}>{g.title}</div>
-                        <div style={{fontSize:13,color:'#aaa'}}>{g.detail}</div>
-                        <div style={{fontSize:13,color:'#CAE8C1',marginTop:2}}>→ {g.action}</div>
+                        <div style={{fontSize:14,fontWeight:700,color:'#16231d'}}>{g.title}</div>
+                        <div style={{fontSize:13,color:'#4c584f'}}>{g.detail}</div>
+                        <div style={{fontSize:13,color:'#0B6E54',marginTop:2}}>→ {g.action}</div>
                       </div>
-                    )):<div style={{fontSize:13,color:'#777',fontStyle:'italic'}}>No notable gaps flagged this period.</div>}
+                    )):<div style={{fontSize:13,color:'#5f6a62',fontStyle:'italic'}}>No notable gaps flagged this period.</div>}
                   </div>
                   {ins.wins.length>0&&(
                     <div style={{background:'rgba(68,204,170,.05)',border:'1px solid rgba(68,204,170,.22)',borderRadius:10,padding:'16px 18px'}}>
-                      <div style={{...secTitle,color:'#44CCAA',marginBottom:10}}>★ Wins to Recognize</div>
-                      {ins.wins.map((w,i)=>(<div key={i} style={{marginBottom:i<ins.wins.length-1?8:0}}><span style={{fontSize:14,fontWeight:700,color:'#eee'}}>{w.title}</span><span style={{fontSize:13,color:'#aaa'}}> — {w.detail}</span></div>))}
+                      <div style={{...secTitle,color:'#0B6E54',marginBottom:10}}>★ Wins to Recognize</div>
+                      {ins.wins.map((w,i)=>(<div key={i} style={{marginBottom:i<ins.wins.length-1?8:0}}><span style={{fontSize:14,fontWeight:700,color:'#16231d'}}>{w.title}</span><span style={{fontSize:13,color:'#4c584f'}}> — {w.detail}</span></div>))}
                     </div>
                   )}
                 </div>
@@ -4628,22 +4899,22 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           {/* Breakdowns */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:20,marginBottom:24}}>
             <div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:8}}>BY DISCIPLINE</div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#243029',letterSpacing:'1px',marginBottom:8}}>BY DISCIPLINE</div>
               <table style={{width:'100%',borderCollapse:'collapse'}}>
                 <thead><tr style={{borderBottom:'1px solid var(--border)'}}><th style={thL}>Discipline</th><th style={thR}>Revenue</th><th style={thR}>Visits</th><th style={thR}>IAs</th></tr></thead>
                 <tbody>
-                  {Object.values(cur.byDisc).length===0?<tr><td style={tdL} colSpan="4"><span style={{color:'#666'}}>No data</span></td></tr>:
-                   Object.values(cur.byDisc).sort((a,b)=>b.revenue-a.revenue).map(d=>(<tr key={d.label} style={{borderBottom:'1px solid #1e1e1e'}}><td style={tdL}>{d.label}</td><td style={tdR}>{fmtMoney(d.revenue)}</td><td style={tdR}>{d.visits}</td><td style={tdR}>{d.ias}</td></tr>))}
+                  {Object.values(cur.byDisc).length===0?<tr><td style={tdL} colSpan="4"><span style={{color:'#6b766e'}}>No data</span></td></tr>:
+                   Object.values(cur.byDisc).sort((a,b)=>b.revenue-a.revenue).map(d=>(<tr key={d.label} style={{borderBottom:'1px solid #e7eee9'}}><td style={tdL}>{d.label}</td><td style={tdR}>{fmtMoney(d.revenue)}</td><td style={tdR}>{d.visits}</td><td style={tdR}>{d.ias}</td></tr>))}
                 </tbody>
               </table>
             </div>
             <div>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:8}}>BY LOCATION</div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#243029',letterSpacing:'1px',marginBottom:8}}>BY LOCATION</div>
               <table style={{width:'100%',borderCollapse:'collapse'}}>
                 <thead><tr style={{borderBottom:'1px solid var(--border)'}}><th style={thL}>Location</th><th style={thR}>Revenue</th><th style={thR}>Visits</th><th style={thR}>IAs</th></tr></thead>
                 <tbody>
-                  {Object.keys(cur.byLoc).length===0?<tr><td style={tdL} colSpan="4"><span style={{color:'#666'}}>No data</span></td></tr>:
-                   Object.entries(cur.byLoc).sort((a,b)=>b[1].revenue-a[1].revenue).map(([loc,v])=>(<tr key={loc} style={{borderBottom:'1px solid #1e1e1e'}}><td style={tdL}>{loc}</td><td style={tdR}>{fmtMoney(v.revenue)}</td><td style={tdR}>{v.visits}</td><td style={tdR}>{v.ias}</td></tr>))}
+                  {Object.keys(cur.byLoc).length===0?<tr><td style={tdL} colSpan="4"><span style={{color:'#6b766e'}}>No data</span></td></tr>:
+                   Object.entries(cur.byLoc).sort((a,b)=>b[1].revenue-a[1].revenue).map(([loc,v])=>(<tr key={loc} style={{borderBottom:'1px solid #e7eee9'}}><td style={tdL}>{loc}</td><td style={tdR}>{fmtMoney(v.revenue)}</td><td style={tdR}>{v.visits}</td><td style={tdR}>{v.ias}</td></tr>))}
                 </tbody>
               </table>
             </div>
@@ -4652,15 +4923,15 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           {(()=>{const rf=(saved?saved.from:reportPeriod.from||'').slice(0,7);const rt=(saved?saved.to:reportPeriod.to||'').slice(0,7);return<SessSummary log={sessionLog} fromM={rf} toM={rt} note={rf&&rt?(rf===rt?rf:rf+'→'+rt):''}/>;})()}
           {/* Practitioner movers */}
           <div style={{marginBottom:notes?24:4}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px',marginBottom:8}}>PRACTITIONER CHANGES <span style={{fontSize:12,color:'#666',fontWeight:400,letterSpacing:0}}>(moderate to significant vs prior {pWord})</span></div>
-            {movers.length===0?<div style={{color:'#777',fontSize:14,padding:'6px 0'}}>No moderate-to-significant practitioner changes this period.</div>:
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#243029',letterSpacing:'1px',marginBottom:8}}>PRACTITIONER CHANGES <span style={{fontSize:12,color:'#6b766e',fontWeight:400,letterSpacing:0}}>(moderate to significant vs prior {pWord})</span></div>
+            {movers.length===0?<div style={{color:'#5f6a62',fontSize:14,padding:'6px 0'}}>No moderate-to-significant practitioner changes this period.</div>:
              movers.map((m,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 0',borderBottom:'1px solid #1e1e1e',gap:12,flexWrap:'wrap'}}>
-                <div><span style={{color:'#eee',fontWeight:600,fontSize:14}}>{m.name}</span> <span style={{color:'#666',fontSize:12,marginLeft:4}}>{(DISC.find(x=>x.id===m.disc)||{}).abbr||''}</span></div>
+              <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 0',borderBottom:'1px solid #e7eee9',gap:12,flexWrap:'wrap'}}>
+                <div><span style={{color:'#16231d',fontWeight:600,fontSize:14}}>{m.name}</span> <span style={{color:'#6b766e',fontSize:12,marginLeft:4}}>{(DISC.find(x=>x.id===m.disc)||{}).abbr||''}</span></div>
                 <div style={{display:'flex',gap:16,fontSize:13,flexWrap:'wrap'}}>
-                  {m.sigV&&<span style={{color:m.dv>=0?'#44CCAA':'#E05252',fontWeight:600}}>{m.dv>=0?'▲':'▼'} {Math.abs(m.dv)} visits ({Math.abs(Math.round(m.vpct))}%)</span>}
-                  {m.sigI&&<span style={{color:m.di>=0?'#44CCAA':'#E05252',fontWeight:600}}>{m.di>=0?'▲':'▼'} {Math.abs(m.di)} initials ({Math.abs(Math.round(m.ipct))}%)</span>}
-                  {m.sigR&&<span style={{color:m.dr>=0?'#44CCAA':'#E05252',fontWeight:600}}>{m.dr>=0?'▲':'▼'} {fmtMoney(Math.abs(m.dr))} ({Math.abs(Math.round(m.rpct))}%)</span>}
+                  {m.sigV&&<span style={{color:m.dv>=0?'#0B6E54':'#C0392B',fontWeight:600}}>{m.dv>=0?'▲':'▼'} {Math.abs(m.dv)} visits ({Math.abs(Math.round(m.vpct))}%)</span>}
+                  {m.sigI&&<span style={{color:m.di>=0?'#0B6E54':'#C0392B',fontWeight:600}}>{m.di>=0?'▲':'▼'} {Math.abs(m.di)} initials ({Math.abs(Math.round(m.ipct))}%)</span>}
+                  {m.sigR&&<span style={{color:m.dr>=0?'#0B6E54':'#C0392B',fontWeight:600}}>{m.dr>=0?'▲':'▼'} {fmtMoney(Math.abs(m.dr))} ({Math.abs(Math.round(m.rpct))}%)</span>}
                 </div>
               </div>
             ))}
@@ -4669,7 +4940,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           {/* Each clinician vs their OWN prior period — self-relative, accounts for different schedules */}
           {selfRows.length>0&&(()=>{
             const dAbbr=(id)=>(DISC.find(x=>x.id===id)||{}).abbr||'';
-            const delta=(v,money,suffix)=>{if(v===0)return<span style={{color:'#666'}}>—</span>;const up=v>0;return<span style={{color:up?'#44CCAA':'#E05252',fontWeight:600}}>{up?'▲':'▼'}{money?fmtMoney(Math.abs(v)):Math.abs(v)}{suffix||''}</span>;};
+            const delta=(v,money,suffix)=>{if(v===0)return<span style={{color:'#6b766e'}}>—</span>;const up=v>0;return<span style={{color:up?'#0B6E54':'#C0392B',fontWeight:600}}>{up?'▲':'▼'}{money?fmtMoney(Math.abs(v)):Math.abs(v)}{suffix||''}</span>;};
             const pctTxt=(p)=>p==null?'':` (${p>=0?'+':''}${Math.round(p)}%)`;
             const attnRows=selfRows.filter(r=>r.attn);
             const med=(arr)=>{if(!arr.length)return 0;const s=[...arr].sort((a,b)=>a-b);const m=Math.floor(s.length/2);return s.length%2?s[m]:(s[m-1]+s[m])/2;};
@@ -4688,31 +4959,31 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             <div className="disc-print-area" style={{marginBottom:notes?24:4,marginTop:24}}>
               <style>{`@media print{body.disc-print *{visibility:hidden!important}body.disc-print .disc-print-area,body.disc-print .disc-print-area *{visibility:visible!important}body.disc-print .disc-print-area{position:absolute!important;left:0;top:0;width:100%!important}body.disc-print .no-print{display:none!important}}`}</style>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',flexWrap:'wrap',gap:8,marginBottom:3}}>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#ddd',letterSpacing:'1px'}}>EACH CLINICIAN vs THEIR OWN PRIOR {pWord.toUpperCase()}</div>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#243029',letterSpacing:'1px'}}>EACH CLINICIAN vs THEIR OWN PRIOR {pWord.toUpperCase()}</div>
                 <button className="btn btn-ghost btn-xs no-print" onClick={()=>{document.body.classList.add('disc-print');window.print();setTimeout(()=>document.body.classList.remove('disc-print'),500);}}>🖨 Print / save this discipline</button>
               </div>
-              <div style={{fontSize:12,color:'#777',marginBottom:10}}>Self-relative — each person measured against their own {lastP}, not the clinic average. {attnRows.length>0?<span style={{color:'#E0A052'}}>⚠ {attnRows.length} need{attnRows.length===1?'s':''} a look (own revenue or initials slipping).</span>:<span style={{color:'#44CCAA'}}>No one is slipping against their own prior {pWord}.</span>}</div>
+              <div style={{fontSize:12,color:'#5f6a62',marginBottom:10}}>Self-relative — each person measured against their own {lastP}, not the clinic average. {attnRows.length>0?<span style={{color:'#B5791F'}}>⚠ {attnRows.length} need{attnRows.length===1?'s':''} a look (own revenue or initials slipping).</span>:<span style={{color:'#0B6E54'}}>No one is slipping against their own prior {pWord}.</span>}</div>
               <div className="no-print" style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:10,alignItems:'center'}}>
-                <span style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginRight:2}}>Discipline</span>
+                <span style={{fontSize:11,color:'#5a655d',textTransform:'uppercase',letterSpacing:'1px',marginRight:2}}>Discipline</span>
                 <button className={`btn btn-xs ${repDisc==='all'?'btn-go':'btn-ghost'}`} onClick={()=>setRepDisc('all')}>All</button>
                 {discsPresent.map(d=><button key={d.id} className={`btn btn-xs ${repDisc===d.id?'btn-go':'btn-ghost'}`} onClick={()=>setRepDisc(d.id)}>{d.label}</button>)}
               </div>
               {/* Discipline total — for the lead presenting their discipline in the weekly meeting */}
               <div style={{background:'rgba(127,200,232,.05)',border:'1px solid rgba(127,200,232,.25)',borderRadius:9,padding:'12px 16px',marginBottom:12}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:6,marginBottom:8}}>
-                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1.5px',textTransform:'uppercase',color:'#7FC8E8'}}>{discName} — discipline total</span>
-                  <span style={{fontSize:12,color:'#888'}}>{pLabel} · {repRows.length} clinician{repRows.length!==1?'s':''}</span>
+                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1.5px',textTransform:'uppercase',color:'#1F6F9B'}}>{discName} — discipline total</span>
+                  <span style={{fontSize:12,color:'#5a655d'}}>{pLabel} · {repRows.length} clinician{repRows.length!==1?'s':''}</span>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:14}}>
-                  <div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Revenue ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'#eee',fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtMoney(tpRev)} → {fmtMoney(tRev)}</div><div style={{fontSize:13,marginTop:2}}>{delta(tRev-tpRev,true)}<span style={{color:'#666'}}>{pctTxt(pctOf(tRev,tpRev))}</span></div></div>
-                  <div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Initials ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'#eee',fontFamily:"'Barlow Condensed',sans-serif"}}>{tpIa} → {tIa}</div><div style={{fontSize:13,marginTop:2}}>{delta(tIa-tpIa)}<span style={{color:'#666'}}>{pctTxt(pctOf(tIa,tpIa))}</span></div></div>
-                  <div><div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Visits ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'#eee',fontFamily:"'Barlow Condensed',sans-serif"}}>{tpVis} → {tVis}</div><div style={{fontSize:13,marginTop:2}}>{delta(tVis-tpVis)}<span style={{color:'#666'}}>{pctTxt(pctOf(tVis,tpVis))}</span></div></div>
+                  <div><div style={{fontSize:11,color:'#5a655d',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Revenue ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'#16231d',fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtMoney(tpRev)} → {fmtMoney(tRev)}</div><div style={{fontSize:13,marginTop:2}}>{delta(tRev-tpRev,true)}<span style={{color:'#6b766e'}}>{pctTxt(pctOf(tRev,tpRev))}</span></div></div>
+                  <div><div style={{fontSize:11,color:'#5a655d',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Initials ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'#16231d',fontFamily:"'Barlow Condensed',sans-serif"}}>{tpIa} → {tIa}</div><div style={{fontSize:13,marginTop:2}}>{delta(tIa-tpIa)}<span style={{color:'#6b766e'}}>{pctTxt(pctOf(tIa,tpIa))}</span></div></div>
+                  <div><div style={{fontSize:11,color:'#5a655d',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Visits ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'#16231d',fontFamily:"'Barlow Condensed',sans-serif"}}>{tpVis} → {tVis}</div><div style={{fontSize:13,marginTop:2}}>{delta(tVis-tpVis)}<span style={{color:'#6b766e'}}>{pctTxt(pctOf(tVis,tpVis))}</span></div></div>
                 </div>
               </div>
-              <div style={{fontSize:11,color:'#666',marginBottom:10}}>🟢 up vs their own prior · 🟠/🔴 needs a look · ⚪ flat &nbsp;·&nbsp; <span style={{color:'#E0A052'}}>↳</span> up but still low volume for their discipline (where the growth is)</div>
+              <div style={{fontSize:11,color:'#6b766e',marginBottom:10}}>🟢 up vs their own prior · 🟠/🔴 needs a look · ⚪ flat &nbsp;·&nbsp; <span style={{color:'#B5791F'}}>↳</span> up but still low volume for their discipline (where the growth is)</div>
               <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,minWidth:560}}>
-                <thead><tr style={{textAlign:'right',color:'#888',fontSize:11,textTransform:'uppercase',letterSpacing:'.5px'}}>
+                <thead><tr style={{textAlign:'right',color:'#5a655d',fontSize:11,textTransform:'uppercase',letterSpacing:'.5px'}}>
                   <th style={{textAlign:'left',padding:'6px 8px'}}>Clinician</th>
                   <th style={{padding:'6px 8px'}}>Revenue ({lastP} → now)</th>
                   <th style={{padding:'6px 8px'}}>Initials</th>
@@ -4720,11 +4991,11 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 </tr></thead>
                 <tbody>
                 {repRows.map(r=>(
-                  <tr key={r.id} style={{borderTop:'1px solid #1c1c1c',background:r.sev==='high'?'rgba(224,82,82,.07)':(r.attn?'rgba(224,160,82,.06)':'transparent')}}>
-                    <td style={{textAlign:'left',padding:'8px',color:'#eee',verticalAlign:'top'}}><span style={{marginRight:5}}>{statusDot(r)}</span>{r.name} <span style={{color:'#666',fontSize:11,marginLeft:3}}>{dAbbr(r.disc)}</span>{ctxOf(r)&&<div style={{fontSize:11,color:'#E0A052',marginTop:3,maxWidth:360,lineHeight:1.4}}>↳ {ctxOf(r)}</div>}</td>
-                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'#bbb'}}>{fmtMoney(r.pRev)} → {fmtMoney(r.cRev)}</span><br/><span style={{fontSize:12}}>{delta(r.dr,true)}{r.dr!==0&&<span style={{color:'#666'}}>{pctTxt(r.rpct)}</span>}</span></td>
-                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'#bbb'}}>{r.pIa} → {r.cIa}</span><br/><span style={{fontSize:12}}>{delta(r.di)}{r.di!==0&&<span style={{color:'#666'}}>{pctTxt(r.ipct)}</span>}</span></td>
-                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'#bbb'}}>{r.pVis} → {r.cVis}</span><br/><span style={{fontSize:12}}>{delta(r.dv)}</span></td>
+                  <tr key={r.id} style={{borderTop:'1px solid #e7eee9',background:r.sev==='high'?'rgba(224,82,82,.07)':(r.attn?'rgba(224,160,82,.06)':'transparent')}}>
+                    <td style={{textAlign:'left',padding:'8px',color:'#16231d',verticalAlign:'top'}}><span style={{marginRight:5}}>{statusDot(r)}</span>{r.name} <span style={{color:'#6b766e',fontSize:11,marginLeft:3}}>{dAbbr(r.disc)}</span>{ctxOf(r)&&<div style={{fontSize:11,color:'#B5791F',marginTop:3,maxWidth:360,lineHeight:1.4}}>↳ {ctxOf(r)}</div>}</td>
+                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'#44524b'}}>{fmtMoney(r.pRev)} → {fmtMoney(r.cRev)}</span><br/><span style={{fontSize:12}}>{delta(r.dr,true)}{r.dr!==0&&<span style={{color:'#6b766e'}}>{pctTxt(r.rpct)}</span>}</span></td>
+                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'#44524b'}}>{r.pIa} → {r.cIa}</span><br/><span style={{fontSize:12}}>{delta(r.di)}{r.di!==0&&<span style={{color:'#6b766e'}}>{pctTxt(r.ipct)}</span>}</span></td>
+                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'#44524b'}}>{r.pVis} → {r.cVis}</span><br/><span style={{fontSize:12}}>{delta(r.dv)}</span></td>
                   </tr>
                 ))}
                 </tbody>
@@ -4735,8 +5006,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
           {notes&&(
             <div style={{marginTop:18,borderTop:'1px solid var(--border)',paddingTop:14}}>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:800,color:'#aaa',letterSpacing:'1px',marginBottom:6}}>NOTES</div>
-              <div style={{fontSize:13,color:'#ccc',whiteSpace:'pre-wrap',lineHeight:1.5}}>{notes}</div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:800,color:'#4c584f',letterSpacing:'1px',marginBottom:6}}>NOTES</div>
+              <div style={{fontSize:13,color:'#34423a',whiteSpace:'pre-wrap',lineHeight:1.5}}>{notes}</div>
             </div>
           )}
         </div>
@@ -11762,7 +12033,7 @@ function SystematicPage({staff=[]}){
           );
           return(
             <div style={{marginTop:20}}>
-              <div className="no-print" style={{background:'#0e1512',border:'1px solid #1d2a25',borderRadius:10,padding:'10px 6px 2px',maxWidth:430,margin:'0 auto 16px'}}>
+              <div className="no-print" style={{maxWidth:430,margin:'4px 0 16px'}}>
                 <svg viewBox="0 0 680 360" style={{width:'100%',height:'auto',display:'block'}}>
                   {WEB.map((n,i)=>{const m=WEB[(i+1)%WEB.length];return <line key={'p'+i} x1={n.x} y1={n.y} x2={m.x} y2={m.y} stroke="#22332d" strokeWidth="1.5"/>;})}
                   {WEB.map((n,i)=>{const on=discTier[n.d]&&discTier[n.d]!=='off';return <line key={'s'+i} x1={CX} y1={CY} x2={n.x} y2={n.y} stroke={on?'#00aa88':'#22332d'} strokeWidth={on?3:1.5}/>;})}
