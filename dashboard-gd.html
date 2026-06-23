@@ -9,6 +9,10 @@
   const SUPABASE_URL='https://ekjzbdvvxvylembmrphv.supabase.co';
   const SUPABASE_KEY='sb_publishable_2NpHtgiPTvrqi3bkQiejNw_Ob5dsATN';
   window.__SB=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+  // Shared cross-user sync helpers (per-row JSONB tables: columns id text PK, data jsonb)
+  window.sbRowUpsert=async(table,id,data)=>{const sb=window.__SB;if(!sb||!id)return;try{await sb.from(table).upsert({id,data});}catch(e){}};
+  window.sbRowDelete=async(table,id)=>{const sb=window.__SB;if(!sb||!id)return;try{await sb.from(table).delete().eq('id',id);}catch(e){}};
+  window.sbRowLoad=async(table)=>{const sb=window.__SB;if(!sb)return null;try{const{data,error}=await sb.from(table).select('*');if(error)return null;return data;}catch(e){return null;}};
 })();
 </script>
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
@@ -2273,6 +2277,7 @@ function CallHistoryPage(){
   const _addDaysISO=(ds,n)=>{const d=new Date(ds+'T12:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
   const _wkLabelR=(ws)=>{const e=_addDaysISO(ws,6);const o={month:'short',day:'numeric'};return new Date(ws+'T12:00').toLocaleDateString('en-CA',o)+' – '+new Date(e+'T12:00').toLocaleDateString('en-CA',o)+', '+new Date(e+'T12:00').getFullYear();};
   const[savedCallReports,setSavedCallReports]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_call_reports'))||[];}catch(e){return[];}});
+  useEffect(()=>{let c=false;(async()=>{const rows=await window.sbRowLoad('call_reports');if(c)return;if(rows&&rows.length){const d=rows.map(r=>r.data).filter(Boolean).sort((a,b)=>(b.generatedAt||'').localeCompare(a.generatedAt||''));setSavedCallReports(d);try{localStorage.setItem('rvgd3_call_reports',JSON.stringify(d));}catch(e){}}else if(rows){try{JSON.parse(localStorage.getItem('rvgd3_call_reports')||'[]').forEach(x=>{if(x.id)window.sbRowUpsert('call_reports',x.id,x);});}catch(e){}}})();return()=>{c=true;};},[]);
   const[repWeek,setRepWeek]=useState(()=>_wkStart(today));
   const[repNotes,setRepNotes]=useState('');
   const[viewingSavedRep,setViewingSavedRep]=useState(null);
@@ -2298,8 +2303,8 @@ function CallHistoryPage(){
     if(top&&top.rate>=60)wins.push({title:`${DISC_LABEL[top.id]||top.id}: ${top.rate.toFixed(0)}% booked`,detail:`${top.booked} of ${top.calls} calls — strongest conversion this week.`});
     return{flags:flags.slice(0,6),gaps:gaps.slice(0,6),wins:wins.slice(0,5)};
   };
-  const saveCallReport=()=>{const{cur,prev}=buildCallReport(repWeek);const rec={id:'crep_'+Date.now(),ws:repWeek,label:_wkLabelR(repWeek),prevLabel:_wkLabelR(_addDaysISO(repWeek,-7)),generatedAt:new Date().toISOString(),notes:repNotes,cur,prev};const next=[rec,...savedCallReports];setSavedCallReports(next);try{localStorage.setItem('rvgd3_call_reports',JSON.stringify(next));}catch(e){}setRepNotes('');setViewingSavedRep(rec.id);};
-  const delCallReport=(id)=>{const next=savedCallReports.filter(r=>r.id!==id);setSavedCallReports(next);try{localStorage.setItem('rvgd3_call_reports',JSON.stringify(next));}catch(e){}if(viewingSavedRep===id)setViewingSavedRep(null);};
+  const saveCallReport=()=>{const{cur,prev}=buildCallReport(repWeek);const rec={id:'crep_'+Date.now(),ws:repWeek,label:_wkLabelR(repWeek),prevLabel:_wkLabelR(_addDaysISO(repWeek,-7)),generatedAt:new Date().toISOString(),notes:repNotes,cur,prev};const next=[rec,...savedCallReports];setSavedCallReports(next);try{localStorage.setItem('rvgd3_call_reports',JSON.stringify(next));}catch(e){}window.sbRowUpsert('call_reports',rec.id,rec);setRepNotes('');setViewingSavedRep(rec.id);};
+  const delCallReport=(id)=>{const next=savedCallReports.filter(r=>r.id!==id);setSavedCallReports(next);try{localStorage.setItem('rvgd3_call_reports',JSON.stringify(next));}catch(e){}window.sbRowDelete('call_reports',id);if(viewingSavedRep===id)setViewingSavedRep(null);};
   const navRepWeek=(dir)=>{setRepWeek(w=>_addDaysISO(w,dir*7));setViewingSavedRep(null);};
 
   const card=(label,val,sub,color)=>(<div style={{flex:'1 1 150px',background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'14px 16px'}}>
@@ -2423,7 +2428,12 @@ function CallHistoryPage(){
     {view==='leads'&&(<>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10,marginBottom:18}}>
         {sources.map(s=>{const r=rollup(s.id);const on=selSource===s.id;return(<div key={s.id} onClick={()=>setSelSource(s.id)} style={{cursor:'pointer',background:on?'rgba(202,232,193,.07)':'var(--surface2)',border:'1px solid '+(on?'var(--go)':'var(--border)'),borderRadius:9,padding:'13px 15px'}}>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#eee',marginBottom:6}}>{s.name}</div>
+          <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:6}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#eee',flex:1,lineHeight:1.1}}>{s.name}</div>
+            {on&&<div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
+              <span onClick={e=>{e.stopPropagation();renameSource(s.id);}} title="Rename this category" style={{cursor:'pointer',color:'#8a948d',fontSize:13}}>✎</span>
+            </div>}
+          </div>
           <div style={{display:'flex',gap:12,fontSize:12,color:'#999'}}><span><b style={{color:'#ddd'}}>{r.total}</b> leads</span><span><b style={{color:'#44CCAA'}}>{r.booked}</b> booked</span><span><b style={{color:r.conv>=30?'#CAE8C1':'#F4DB71'}}>{r.conv.toFixed(0)}%</b></span></div>
         </div>);})}
         <button onClick={addSource} style={{cursor:'pointer',background:'transparent',border:'1px dashed var(--border2)',borderRadius:9,padding:'13px 15px',color:'#888',fontSize:14,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'.5px'}}>+ Add source / event</button>
@@ -2434,8 +2444,6 @@ function CallHistoryPage(){
           <div style={{display:'flex',alignItems:'baseline',gap:10}}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#eee'}}>{s.name}</span><span style={{fontSize:12,color:'#777'}}>{r.total} leads · {r.contacted} contacted · {r.responded} responded · {r.booked} booked · {r.conv.toFixed(0)}% conversion</span></div>
           <div style={{display:'flex',gap:6}}>
             <button className="btn btn-lime btn-sm" onClick={()=>addLead(s.id)}>+ Add lead to {s.name}</button>
-            <button className="btn btn-ghost btn-xs" onClick={()=>renameSource(s.id)} title="Rename this lead source / category (not the lead)">Rename source</button>
-            {s.kind==='event'&&<button className="btn btn-ghost btn-xs" onClick={()=>delSource(s.id)} style={{color:'#E05252'}}>Delete</button>}
           </div>
         </div>
         {lsAll.length===0?<div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:8,padding:'26px 18px',textAlign:'center',color:'#777'}}>No leads yet — click <b>+ Add lead</b> to start tracking {s.name}.</div>:
@@ -3570,6 +3578,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[repDisc,setRepDisc]=useState('all');
   const[repLoc,setRepLoc]=useState('all');
   const[savedReports,setSavedReports]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_reports'))||[];}catch(e){return[];}});
+  useEffect(()=>{let c=false;(async()=>{const rows=await window.sbRowLoad('weekly_reports');if(c)return;if(rows&&rows.length){const d=rows.map(r=>r.data).filter(Boolean).sort((a,b)=>(b.generatedAt||'').localeCompare(a.generatedAt||''));setSavedReports(d);try{localStorage.setItem('rvgd3_reports',JSON.stringify(d));}catch(e){}}else if(rows){try{JSON.parse(localStorage.getItem('rvgd3_reports')||'[]').forEach(x=>{if(x.id)window.sbRowUpsert('weekly_reports',x.id,x);});}catch(e){}}})();return()=>{c=true;};},[]);
   const[sessionLog,setSessionLog]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_sessions_log')||'{}');}catch(e){return{};}});
   useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data}=await SB.from('session_log').select('data').eq('id','singleton').maybeSingle();if(!c&&data&&data.data&&typeof data.data==='object')setSessionLog(data.data);}catch(e){}};ld();return()=>{c=true;};},[]);// eslint-disable-line
   // ── Clinic/location retention summary (from Jane Member Retention report upload) ──
@@ -4781,10 +4790,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const saveCurrentReport=()=>{
     const{cur,prev,movers}=buildReport();
     const rec={id:'rep_'+Date.now(),type:reportType,from:reportPeriod.from,to:reportPeriod.to,label:reportPeriod.label,prevLabel:reportPeriod.prevLabel,generatedAt:new Date().toISOString(),notes:reportNotes,cur,prev,movers};
-    const next=[rec,...savedReports];setSavedReports(next);try{localStorage.setItem('rvgd3_reports',JSON.stringify(next));}catch(e){}
+    const next=[rec,...savedReports];setSavedReports(next);try{localStorage.setItem('rvgd3_reports',JSON.stringify(next));}catch(e){}window.sbRowUpsert('weekly_reports',rec.id,rec);
     setReportNotes('');setViewingSaved(rec.id);
   };
-  const deleteSavedReport=(id)=>{const next=savedReports.filter(r=>r.id!==id);setSavedReports(next);try{localStorage.setItem('rvgd3_reports',JSON.stringify(next));}catch(e){}if(viewingSaved===id)setViewingSaved(null);};
+  const deleteSavedReport=(id)=>{const next=savedReports.filter(r=>r.id!==id);setSavedReports(next);try{localStorage.setItem('rvgd3_reports',JSON.stringify(next));}catch(e){}window.sbRowDelete('weekly_reports',id);if(viewingSaved===id)setViewingSaved(null);};
 
   if(page==='reports'){
     const saved=viewingSaved?savedReports.find(r=>r.id===viewingSaved):null;
@@ -7357,12 +7366,14 @@ function FormsPage({staff, evals}){
   const[submissions, setSubmissions] = useState(()=>{
     try{return JSON.parse(localStorage.getItem('rvgd3_formSubs')||'[]');}catch{return[];}
   });
+  React.useEffect(()=>{let c=false;(async()=>{const rows=await window.sbRowLoad('form_subs');if(c)return;if(rows&&rows.length){const d=rows.map(r=>r.data).filter(Boolean).sort((a,b)=>(b.submittedAt||'').localeCompare(a.submittedAt||''));setSubmissions(d);try{localStorage.setItem('rvgd3_formSubs',JSON.stringify(d));}catch(e){}}else if(rows){try{JSON.parse(localStorage.getItem('rvgd3_formSubs')||'[]').forEach(x=>{if(x.id)window.sbRowUpsert('form_subs',x.id,x);});}catch(e){}}})();return()=>{c=true;};},[]);
   const[filterType, setFilterType] = useState('all');
   const[expandedSub, setExpandedSub] = useState(null);
 
   const saveSubmissions = subs => {
     setSubmissions(subs);
     try{localStorage.setItem('rvgd3_formSubs', JSON.stringify(subs));}catch(e){}
+    try{submissions.forEach(o=>{if(o.id&&!subs.some(n=>n.id===o.id))window.sbRowDelete('form_subs',o.id);});subs.forEach(x=>{if(x.id)window.sbRowUpsert('form_subs',x.id,x);});}catch(e){}
   };
 
   const handleSubmit = data => {
