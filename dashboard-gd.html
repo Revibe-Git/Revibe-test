@@ -5593,43 +5593,48 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         const _to=(usingCustomRange?customTo:dateTo)||'';
         const fM=_from.slice(0,7),tM=_to.slice(0,7);
         const inM=(d)=>{const m=(d||'').slice(0,7);return (!fM||m>=fM)&&(!tM||m<=tM);};
-        const sess=perfTraining.sessions.filter(s=>inM(s.date));
-        const pays=perfTraining.payments.filter(p=>inM(p.date));
-        if(!sess.length&&!pays.length)return null;
-        const by={};
-        const bump=(k)=>{const key=(k||'').trim()||'Unattributed';return by[key]=by[key]||{sessions:0,revenue:0};};
-        sess.forEach(s=>{bump(s.staff).sessions++;});
-        pays.forEach(p=>{bump(p.staff).revenue+=p.amount;});
-        const totalSess=sess.length,totalRev=pays.reduce((a,p)=>a+p.amount,0);
-        const rows=Object.entries(by).sort((a,b)=>{const au=a[0]==='Unattributed',bu=b[0]==='Unattributed';if(au!==bu)return au?1:-1;return (b[1].revenue-a[1].revenue)||(b[1].sessions-a[1].sessions);});
-        return(
+        const aggBy=(S,P)=>{const by={};let ts=0,tr=0;S.filter(s=>inM(s.date)).forEach(s=>{const k=(s.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sessions:0,revenue:0}).sessions++;ts++;});P.filter(p=>inM(p.date)).forEach(p=>{const k=(p.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sessions:0,revenue:0}).revenue+=p.amount;tr+=p.amount;});const rows=Object.entries(by).sort((a,b)=>{const au=a[0]==='Unattributed',bu=b[0]==='Unattributed';if(au!==bu)return au?1:-1;return (b[1].revenue-a[1].revenue)||(b[1].sessions-a[1].sessions);});return{rows,ts,tr};};
+        const slot=(title,color,data,revWord,note)=>{
+          if(!data.ts&&!data.tr)return null;
+          return(
           <div className="perf-slot" style={{marginBottom:14}}>
-            <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#F4DB71'}}>Performance Training — sessions &amp; revenue</span></div>
+            <div className="perf-slot-head"><span className="perf-slot-title" style={{color}}>{title}</span></div>
             <div className="perf-slot-body">
               <div style={{display:'flex',flexWrap:'wrap',gap:14,marginBottom:14}}>
                 <div style={{flex:'1 1 160px',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'12px 14px'}}>
                   <div style={{fontSize:12,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>Sessions delivered</div>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#F4DB71'}}>{totalSess}</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color}}>{data.ts}</div>
                   <div style={{fontSize:12,color:'#777',marginTop:2}}>arrived appointments</div>
                 </div>
                 <div style={{flex:'1 1 160px',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'12px 14px'}}>
-                  <div style={{fontSize:12,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>Training revenue</div>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#44CCAA'}}>{fmtMoney(totalRev)}</div>
-                  <div style={{fontSize:12,color:'#777',marginTop:2}}>cash collected in range</div>
+                  <div style={{fontSize:12,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>{revWord}</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#44CCAA'}}>{fmtMoney(data.tr)}</div>
+                  <div style={{fontSize:12,color:'#777',marginTop:2}}>in date window</div>
                 </div>
               </div>
               <div style={{overflowX:'auto'}}>
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                  <thead><tr style={{color:'#888'}}><th style={{textAlign:'left',padding:'4px 8px'}}>Staff</th><th style={{textAlign:'right',padding:'4px 8px'}}>Sessions</th><th style={{textAlign:'right',padding:'4px 8px'}}>Revenue (collected)</th></tr></thead>
+                  <thead><tr style={{color:'#888'}}><th style={{textAlign:'left',padding:'4px 8px'}}>Staff</th><th style={{textAlign:'right',padding:'4px 8px'}}>Sessions</th><th style={{textAlign:'right',padding:'4px 8px'}}>Revenue</th></tr></thead>
                   <tbody>
-                    {rows.map(([k,v])=>(<tr key={k} style={{borderTop:'1px solid var(--border)',color:'#bbb',background:k==='Unattributed'?'rgba(244,219,113,.05)':'transparent'}}><td style={{textAlign:'left',padding:'4px 8px',color:k==='Unattributed'?'#F4DB71':'#ddd',fontStyle:k==='Unattributed'?'italic':'normal'}}>{k==='Unattributed'?'◆ Package / payment-plan revenue':k}</td><td style={{textAlign:'right',padding:'4px 8px'}}>{v.sessions||'—'}</td><td style={{textAlign:'right',padding:'4px 8px',color:'#44CCAA'}}>{v.revenue?fmtMoney(v.revenue):'—'}</td></tr>))}
-                    <tr style={{borderTop:'2px solid var(--border2)',color:'#fff',fontWeight:700}}><td style={{textAlign:'left',padding:'6px 8px'}}>Total</td><td style={{textAlign:'right',padding:'6px 8px'}}>{totalSess}</td><td style={{textAlign:'right',padding:'6px 8px',color:'#44CCAA'}}>{fmtMoney(totalRev)}</td></tr>
+                    {data.rows.map(([k,v])=>(<tr key={k} style={{borderTop:'1px solid var(--border)',color:'#bbb',background:k==='Unattributed'?'rgba(244,219,113,.05)':'transparent'}}><td style={{textAlign:'left',padding:'4px 8px',color:k==='Unattributed'?'#F4DB71':'#ddd',fontStyle:k==='Unattributed'?'italic':'normal'}}>{k==='Unattributed'?'◆ Package / payment-plan revenue':k}</td><td style={{textAlign:'right',padding:'4px 8px'}}>{v.sessions||'—'}</td><td style={{textAlign:'right',padding:'4px 8px',color:'#44CCAA'}}>{v.revenue?fmtMoney(v.revenue):'—'}</td></tr>))}
+                    <tr style={{borderTop:'2px solid var(--border2)',color:'#fff',fontWeight:700}}><td style={{textAlign:'left',padding:'6px 8px'}}>Total</td><td style={{textAlign:'right',padding:'6px 8px'}}>{data.ts}</td><td style={{textAlign:'right',padding:'6px 8px',color:'#44CCAA'}}>{fmtMoney(data.tr)}</td></tr>
                   </tbody>
                 </table>
               </div>
-              <div style={{fontSize:12,color:'#666',marginTop:8,lineHeight:1.6}}>Sessions are attributed to the practitioner from the appointment. Revenue is cash collected on Performance Training packages, payment-plan installments, drop-ins &amp; consults — package/plan payments often aren't tied to a person, so they sit in <b style={{color:'#999'}}>Unattributed</b> but still count in the total. Performance Rehab is excluded (separate service). Follows the date window above.</div>
+              <div style={{fontSize:12,color:'#666',marginTop:8,lineHeight:1.6}}>{note}</div>
             </div>
-          </div>
+          </div>);
+        };
+        const tr=aggBy(perfTraining.sessions,perfTraining.payments);
+        const rh=aggBy(perfTraining.rehabSessions,perfTraining.rehabPayments);
+        const po=aggBy(perfTraining.postOpSessions,perfTraining.postOpPayments);
+        if(!tr.ts&&!tr.tr&&!rh.ts&&!rh.tr&&!po.ts&&!po.tr)return null;
+        return(
+          <React.Fragment>
+            {slot('Performance Training — sessions & revenue','#F4DB71',tr,'Training revenue (collected)','Sessions are attributed to the trainer from the appointment. Revenue is cash collected on packages, payment-plan installments, drop-ins & consults — package/plan dollars carry the seller not the trainer, so they sit in Package / payment-plan revenue but still count in the total. Matches the Performance tab in Weekly Reports for the same dates.')}
+            {slot('Performance Rehab — sessions & revenue','#7FC8E8',rh,'Rehab revenue (collected)','Rehab clients are matched by their Performance Rehab package, so their visits (usually booked as Physiotherapy) count here and also in clinical Physio. Revenue is cash collected; package dollars sit in Package / payment-plan revenue. Matches the Performance tab in Weekly Reports.')}
+            {slot('Post-Op Rehab — sessions & revenue','#E0A0C0',po,'Post-op revenue (billed)','Post-Op visits are billed $125 each and paid later by the provider’s e-transfer (they read Unpaid in Jane), so revenue here is the billed value, not cash collected. Also counted within clinical discipline revenue. Matches the Post-Op Rehab tab in Weekly Reports.')}
+          </React.Fragment>
         );
       })()}
       {tab==='revenue'&&<SessionsLog defaultMonth={dataMaxMonth} readOnly/>}
