@@ -3867,6 +3867,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const rehPay=(it)=>isReh(it)&&noJunk(it);
     const poSess=(t)=>isPostOp(t);
     const poPay=(it)=>isPostOp(it)&&noJunk(it);
+    const isPkg=(it)=>{const x=lc(it);return x.indexOf('session')>=0||x.indexOf('membership')>=0||x.indexOf('package')>=0||x.indexOf('[')>=0||x.indexOf('plan')>=0;}; // packages/plans carry the SELLER, not the trainer → leave unattributed
     const files=[...(sourceFiles||[])].sort((a,b)=>(a.at||'').localeCompare(b.at||''));
     files.forEach(f=>{
       if(!f.content)return;
@@ -3887,8 +3888,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           const date=(r['purchase date']||r['invoice date']||'').slice(0,10);if(date.length!==10)return;
           const inv=r['invoice #']||(date+'|'+(r['item']||'')+'|'+(r['patient guid']||''));
           const it=r['item'], staff=(r['staff member']||'').trim(), amount=money(r['collected']);
-          if(isPay(it))payMap.set(inv,{date,staff,amount});
-          else if(rehPay(it))rPayMap.set(inv,{date,staff,amount});
+          if(isPay(it))payMap.set(inv,{date,staff:isPkg(it)?'':staff,amount});
+          else if(rehPay(it))rPayMap.set(inv,{date,staff:isPkg(it)?'':staff,amount});
           else if(poPay(it))poPayMap.set(inv,{date,staff,amount});
         });
       }
@@ -5105,8 +5106,10 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             const sum=(k)=>repRows.reduce((a,r)=>a+(r[k]||0),0);
             const tRev=sum('cRev'),tpRev=sum('pRev'),tIa=sum('cIa'),tpIa=sum('pIa'),tVis=sum('cVis'),tpVis=sum('pVis');
             const pctOf=(c,p)=>p>0?((c-p)/p*100):(c>0?null:0);
-            // Performance Training / Rehab / Post-Op as selectable "disciplines" (computed from source CSVs)
-            const PERF_DS={pt_train:{label:'Performance Training',color:'var(--c-gold)',S:perfTraining.sessions,P:perfTraining.payments},pt_rehab:{label:'Performance Rehab',color:'var(--c-blue)',S:perfTraining.rehabSessions,P:perfTraining.rehabPayments},pt_postop:{label:'Post-Op Rehab',color:'var(--c-pink)',S:perfTraining.postOpSessions,P:perfTraining.postOpPayments}};
+            // Performance (Training + Rehab) and Post-Op as selectable tabs (computed from source CSVs)
+            const DS_TRAIN={label:'Performance Training',color:'var(--c-gold)',S:perfTraining.sessions,P:perfTraining.payments};
+            const DS_REHAB={label:'Performance Rehab',color:'var(--c-blue)',S:perfTraining.rehabSessions,P:perfTraining.rehabPayments};
+            const PERF_DS={pt_perf:{label:'Performance'},pt_postop:{label:'Post-Op Rehab',color:'var(--c-pink)',S:perfTraining.postOpSessions,P:perfTraining.postOpPayments}};
             const perfTab=PERF_DS[repDisc]||null;
             const _pf=(saved?saved.from:reportPeriod.from)||'',_pt=(saved?saved.to:reportPeriod.to)||'';
             const _D=(a,n)=>{const d=new Date(a+'T12:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
@@ -5114,6 +5117,23 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             const _ppt=_pf?_D(_pf,-1):'',_ppf=_pf?_D(_pf,-_dlen):'';
             const inWin=(d,a,b)=>(!a||d>=a)&&(!b||d<=b);
             const perfAgg=(ds,a,b)=>{const by={};let sess=0,rev=0;(ds.S||[]).forEach(s=>{if(inWin(s.date,a,b)){const k=(s.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sess:0,rev:0}).sess++;sess++;}});(ds.P||[]).forEach(p=>{if(inWin(p.date,a,b)){const k=(p.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sess:0,rev:0}).rev+=p.amount;rev+=p.amount;}});return{by,sess,rev};};
+            const perfStaffTable=(ds,heading,accent)=>{
+              const c=perfAgg(ds,_pf,_pt), p=perfAgg(ds,_ppf,_ppt);
+              const keys=Array.from(new Set([...Object.keys(c.by),...Object.keys(p.by)]));
+              keys.sort((a,b)=>{const au=a==='Unattributed',bu=b==='Unattributed';if(au!==bu)return au?1:-1;const av=(c.by[a]||{}).rev||0,bv=(c.by[b]||{}).rev||0;if(bv!==av)return bv-av;return ((c.by[b]||{}).sess||0)-((c.by[a]||{}).sess||0);});
+              return(<div style={{marginBottom:14}}>
+                {heading&&<div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:accent,marginBottom:4}}>{heading}</div>}
+                <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,minWidth:480}}>
+                  <thead><tr style={{textAlign:'right',color:'var(--c-mut8)',fontSize:11,textTransform:'uppercase',letterSpacing:'.5px'}}><th style={{textAlign:'left',padding:'6px 8px'}}>Staff</th><th style={{padding:'6px 8px'}}>Sessions ({lastP} → now)</th><th style={{padding:'6px 8px'}}>Revenue ({lastP} → now)</th></tr></thead>
+                  <tbody>
+                  {keys.length===0?<tr><td colSpan="3" style={{padding:'10px 8px',color:'var(--c-faint)'}}>No activity in this period.</td></tr>:keys.map(k=>{const cc=c.by[k]||{sess:0,rev:0},pp=p.by[k]||{sess:0,rev:0};return(<tr key={k} style={{borderTop:'1px solid var(--c-bdk)'}}><td style={{textAlign:'left',padding:'8px',color:k==='Unattributed'?'var(--c-mut8)':'var(--c-strong)',fontStyle:k==='Unattributed'?'italic':'normal'}}>{k==='Unattributed'?'Unattributed (packages / plans)':k}</td><td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{pp.sess} → {cc.sess}</span><br/><span style={{fontSize:12}}>{delta(cc.sess-pp.sess)}</span></td><td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{fmtMoney(pp.rev)} → {fmtMoney(cc.rev)}</span><br/><span style={{fontSize:12}}>{delta(cc.rev-pp.rev,true)}</span></td></tr>);})}
+                  <tr style={{borderTop:'2px solid var(--c-grid)',fontWeight:700,color:'var(--c-strong)'}}><td style={{textAlign:'left',padding:'8px'}}>{heading?heading+' total':'Total'}</td><td style={{textAlign:'right',padding:'8px'}}>{p.sess} → {c.sess}</td><td style={{textAlign:'right',padding:'8px'}}>{fmtMoney(p.rev)} → {fmtMoney(c.rev)}</td></tr>
+                  </tbody>
+                </table>
+                </div>
+              </div>);
+            };
             return(
             <div className="disc-print-area" style={{marginBottom:notes?24:4,marginTop:24}}>
               <style>{`@media print{body.disc-print *{visibility:hidden!important}body.disc-print .disc-print-area,body.disc-print .disc-print-area *{visibility:visible!important}body.disc-print .disc-print-area{position:absolute!important;left:0;top:0;width:100%!important}body.disc-print .no-print{display:none!important}}`}</style>
@@ -5127,7 +5147,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 <button className={`btn btn-xs ${repDisc==='all'?'btn-go':'btn-ghost'}`} onClick={()=>setRepDisc('all')}>All</button>
                 {discsPresent.map(d=><button key={d.id} className={`btn btn-xs ${repDisc===d.id?'btn-go':'btn-ghost'}`} onClick={()=>setRepDisc(d.id)}>{d.label}</button>)}
                 <span style={{width:1,alignSelf:'stretch',background:'var(--border2)',margin:'0 3px'}}/>
-                {['pt_train','pt_rehab','pt_postop'].map(id=><button key={id} className={`btn btn-xs ${repDisc===id?'btn-go':'btn-ghost'}`} onClick={()=>setRepDisc(id)}>{PERF_DS[id].label}</button>)}
+                {['pt_perf','pt_postop'].map(id=><button key={id} className={`btn btn-xs ${repDisc===id?'btn-go':'btn-ghost'}`} onClick={()=>setRepDisc(id)}>{PERF_DS[id].label}</button>)}
               </div>
               {/* Discipline total — for the lead presenting their discipline in the weekly meeting */}
               {!perfTab&&(<div style={{background:'rgba(127,200,232,.05)',border:'1px solid rgba(127,200,232,.25)',borderRadius:9,padding:'12px 16px',marginBottom:12}}>
@@ -5164,36 +5184,45 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 </div>
                 );
               })()}
-              {perfTab&&(()=>{
-                const cur2=perfAgg(perfTab,_pf,_pt), prev2=perfAgg(perfTab,_ppf,_ppt);
-                const keys=Array.from(new Set([...Object.keys(cur2.by),...Object.keys(prev2.by)]));
-                keys.sort((a,b)=>{const au=a==='Unattributed',bu=b==='Unattributed';if(au!==bu)return au?1:-1;const av=(cur2.by[a]||{}).rev||0,bv=(cur2.by[b]||{}).rev||0;if(bv!==av)return bv-av;return ((cur2.by[b]||{}).sess||0)-((cur2.by[a]||{}).sess||0);});
+              {perfTab&&repDisc==='pt_postop'&&(()=>{
+                const c=perfAgg(PERF_DS.pt_postop,_pf,_pt),p=perfAgg(PERF_DS.pt_postop,_ppf,_ppt);
                 return(
                 <React.Fragment>
                   <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'12px 16px',marginBottom:12}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:6,marginBottom:8}}>
-                      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1.5px',textTransform:'uppercase',color:perfTab.color}}>{perfTab.label} — total</span>
+                      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1.5px',textTransform:'uppercase',color:'var(--c-pink)'}}>Post-Op Rehab — total</span>
                       <span style={{fontSize:12,color:'var(--c-mut8)'}}>{pLabel} · cash collected</span>
                     </div>
                     <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:14}}>
-                      <div><div style={{fontSize:11,color:'var(--c-mut8)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Revenue ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'var(--c-strong)',fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtMoney(prev2.rev)} → {fmtMoney(cur2.rev)}</div><div style={{fontSize:13,marginTop:2}}>{delta(cur2.rev-prev2.rev,true)}<span style={{color:'var(--c-faint)'}}>{pctTxt(pctOf(cur2.rev,prev2.rev))}</span></div></div>
-                      <div><div style={{fontSize:11,color:'var(--c-mut8)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Sessions ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'var(--c-strong)',fontFamily:"'Barlow Condensed',sans-serif"}}>{prev2.sess} → {cur2.sess}</div><div style={{fontSize:13,marginTop:2}}>{delta(cur2.sess-prev2.sess)}<span style={{color:'var(--c-faint)'}}>{pctTxt(pctOf(cur2.sess,prev2.sess))}</span></div></div>
+                      <div><div style={{fontSize:11,color:'var(--c-mut8)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Revenue ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'var(--c-strong)',fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtMoney(p.rev)} → {fmtMoney(c.rev)}</div><div style={{fontSize:13,marginTop:2}}>{delta(c.rev-p.rev,true)}<span style={{color:'var(--c-faint)'}}>{pctTxt(pctOf(c.rev,p.rev))}</span></div></div>
+                      <div><div style={{fontSize:11,color:'var(--c-mut8)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Sessions ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'var(--c-strong)',fontFamily:"'Barlow Condensed',sans-serif"}}>{p.sess} → {c.sess}</div><div style={{fontSize:13,marginTop:2}}>{delta(c.sess-p.sess)}<span style={{color:'var(--c-faint)'}}>{pctTxt(pctOf(c.sess,p.sess))}</span></div></div>
                     </div>
                   </div>
-                  <div style={{overflowX:'auto'}}>
-                  <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,minWidth:480}}>
-                    <thead><tr style={{textAlign:'right',color:'var(--c-mut8)',fontSize:11,textTransform:'uppercase',letterSpacing:'.5px'}}>
-                      <th style={{textAlign:'left',padding:'6px 8px'}}>Staff</th>
-                      <th style={{padding:'6px 8px'}}>Sessions ({lastP} → now)</th>
-                      <th style={{padding:'6px 8px'}}>Revenue ({lastP} → now)</th>
-                    </tr></thead>
-                    <tbody>
-                    {keys.length===0?<tr><td colSpan="3" style={{padding:'10px 8px',color:'var(--c-faint)'}}>No {perfTab.label} activity in this period.</td></tr>:keys.map(k=>{const c=cur2.by[k]||{sess:0,rev:0},p=prev2.by[k]||{sess:0,rev:0};return(<tr key={k} style={{borderTop:'1px solid var(--c-bdk)'}}><td style={{textAlign:'left',padding:'8px',color:k==='Unattributed'?'var(--c-mut8)':'var(--c-strong)',fontStyle:k==='Unattributed'?'italic':'normal'}}>{k==='Unattributed'?'Unattributed (packages / plans)':k}</td><td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{p.sess} → {c.sess}</span><br/><span style={{fontSize:12}}>{delta(c.sess-p.sess)}</span></td><td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{fmtMoney(p.rev)} → {fmtMoney(c.rev)}</span><br/><span style={{fontSize:12}}>{delta(c.rev-p.rev,true)}</span></td></tr>);})}
-                    <tr style={{borderTop:'2px solid var(--c-grid)',fontWeight:700,color:'var(--c-strong)'}}><td style={{textAlign:'left',padding:'8px'}}>Total</td><td style={{textAlign:'right',padding:'8px'}}>{prev2.sess} → {cur2.sess}</td><td style={{textAlign:'right',padding:'8px'}}>{fmtMoney(prev2.rev)} → {fmtMoney(cur2.rev)}</td></tr>
-                    </tbody>
-                  </table>
+                  {perfStaffTable(PERF_DS.pt_postop,'',null)}
+                  <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:4,marginBottom:6,lineHeight:1.5}}>Post-Operative Rehabilitation is a clinical service shown here separately — sessions are arrived appointments attributed to the provider, revenue is cash collected. These figures also remain within the clinical discipline revenue above.</div>
+                </React.Fragment>
+                );
+              })()}
+              {perfTab&&repDisc==='pt_perf'&&(()=>{
+                const tc=perfAgg(DS_TRAIN,_pf,_pt),tp2=perfAgg(DS_TRAIN,_ppf,_ppt);
+                const rc=perfAgg(DS_REHAB,_pf,_pt),rp2=perfAgg(DS_REHAB,_ppf,_ppt);
+                const col=(lbl,pv,cv,sub,accent)=>(<div><div style={{fontSize:11,color:'var(--c-mut8)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>{lbl}</div><div style={{fontSize:18,fontWeight:800,color:accent||'var(--c-strong)',fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtMoney(pv)} → {fmtMoney(cv)}</div><div style={{fontSize:12,color:'var(--c-faint)',marginTop:2}}>{sub}</div></div>);
+                return(
+                <React.Fragment>
+                  <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'12px 16px',marginBottom:12}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:6,marginBottom:8}}>
+                      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1.5px',textTransform:'uppercase',color:'var(--c-gold)'}}>Performance — total <span style={{color:'var(--c-faint)',fontSize:12,letterSpacing:0}}>(training + rehab)</span></span>
+                      <span style={{fontSize:12,color:'var(--c-mut8)'}}>{pLabel} · cash collected</span>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:14}}>
+                      {col('Training revenue',tp2.rev,tc.rev,(tc.sess+' session'+(tc.sess===1?'':'s')+' delivered'),'var(--c-gold)')}
+                      {col('Rehab revenue',rp2.rev,rc.rev,(rc.sess?rc.sess+' sessions':'package-based'),'var(--c-blue)')}
+                      {col('Performance total',tp2.rev+rp2.rev,tc.rev+rc.rev,((tc.sess+rc.sess)+' sessions'),'var(--c-strong)')}
+                    </div>
                   </div>
-                  <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:8,marginBottom:6,lineHeight:1.5}}>Sessions are arrived appointments attributed to staff; revenue is cash collected — package/plan dollars often aren't tied to a person (→ Unattributed) but are all counted. {repDisc==='pt_postop'?'Post-Op Rehabilitation is a clinical service; these figures also remain within the discipline revenue above.':'Separate from clinical Post-Op Rehabilitation.'}</div>
+                  {perfStaffTable(DS_TRAIN,'Performance Training','var(--c-gold)')}
+                  {perfStaffTable(DS_REHAB,'Performance Rehab','var(--c-blue)')}
+                  <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:4,marginBottom:6,lineHeight:1.5}}>Sessions are arrived appointments attributed to the trainer; revenue is cash collected. Package / plan / membership dollars carry whoever processed the sale (not the trainer), so they sit in <b style={{color:'var(--c-mut8)'}}>Unattributed</b> — still counted. Only single drop-ins &amp; consults are credited to a trainer. Separate from clinical Post-Op Rehabilitation.</div>
                 </React.Fragment>
                 );
               })()}
