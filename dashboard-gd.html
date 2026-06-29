@@ -3856,7 +3856,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const perfTraining=React.useMemo(()=>{
     const sessMap=new Map(), payMap=new Map(), rSessMap=new Map(), rPayMap=new Map();
     const money=(s)=>{const n=parseFloat((s||'0').toString().replace(/[$,\s]/g,''));return isNaN(n)?0:n;};
-    const isReh=(s)=>{s=(s||'').toLowerCase();return s.indexOf('rehab')>=0;}; // catches "Performance Training: Rehab" + "Post-Operative Rehabilitation"
+    const isReh=(s)=>{s=(s||'').toLowerCase();return s.indexOf('rehab')>=0&&s.indexOf('performance')>=0;}; // ONLY "Performance Training: Rehab" — NOT clinical Post-Operative Rehabilitation
     const hasTrain=(s)=>{s=(s||'').toLowerCase();return s.indexOf('performance training')>=0||s.indexOf('performance consultation')>=0;};
     const noJunk=(s)=>{s=(s||'').toLowerCase();return s.indexOf('tempo')<0&&s.indexOf('no show')<0&&s.indexOf('no_show')<0;};
     const isSess=(t)=>{const x=(t||'').toLowerCase();return hasTrain(t)&&x.indexOf('private group')<0&&!isReh(t)&&x.indexOf('mobility')<0;};
@@ -5124,6 +5124,29 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <div><div style={{fontSize:11,color:'var(--c-mut8)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Visits ({lastP} → now)</div><div style={{fontSize:18,fontWeight:800,color:'var(--c-strong)',fontFamily:"'Barlow Condensed',sans-serif"}}>{tpVis} → {tVis}</div><div style={{fontSize:13,marginTop:2}}>{delta(tVis-tpVis)}<span style={{color:'var(--c-faint)'}}>{pctTxt(pctOf(tVis,tpVis))}</span></div></div>
                 </div>
               </div>
+              {(()=>{
+                const rpF=(saved?saved.from:reportPeriod.from)||'',rpT=(saved?saved.to:reportPeriod.to)||'';
+                const inR=(d)=>(!rpF||d>=rpF)&&(!rpT||d<=rpT);
+                const tS=perfTraining.sessions.filter(s=>inR(s.date)).length;
+                const tR=perfTraining.payments.filter(p=>inR(p.date)).reduce((a,p)=>a+p.amount,0);
+                const hS=perfTraining.rehabSessions.filter(s=>inR(s.date)).length;
+                const hR=perfTraining.rehabPayments.filter(p=>inR(p.date)).reduce((a,p)=>a+p.amount,0);
+                if(!tS&&!tR&&!hS&&!hR)return null;
+                return(
+                <div style={{background:'rgba(244,219,113,.05)',border:'1px solid rgba(244,219,113,.28)',borderRadius:9,padding:'12px 16px',marginBottom:12}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:6,marginBottom:8}}>
+                    <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1.5px',textTransform:'uppercase',color:'var(--c-gold)'}}>Performance Training &amp; Rehab — total</span>
+                    <span style={{fontSize:12,color:'var(--c-mut8)'}}>{pLabel} · cash collected</span>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:14}}>
+                    <div><div style={{fontSize:11,color:'var(--c-mut8)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Training</div><div style={{fontSize:18,fontWeight:800,color:'var(--c-strong)',fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtMoney(tR)}</div><div style={{fontSize:12,color:'var(--c-faint)',marginTop:2}}>{tS} session{tS===1?'':'s'} delivered</div></div>
+                    <div><div style={{fontSize:11,color:'var(--c-mut8)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Rehab</div><div style={{fontSize:18,fontWeight:800,color:'var(--c-strong)',fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtMoney(hR)}</div><div style={{fontSize:12,color:'var(--c-faint)',marginTop:2}}>{hS?hS+' session'+(hS===1?'':'s'):'package-based'}</div></div>
+                    <div><div style={{fontSize:11,color:'var(--c-mut8)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Performance total</div><div style={{fontSize:18,fontWeight:800,color:'var(--c-gold)',fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtMoney(tR+hR)}</div><div style={{fontSize:12,color:'var(--c-faint)',marginTop:2}}>{tS+hS} session{(tS+hS)===1?'':'s'}</div></div>
+                  </div>
+                  <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:8,lineHeight:1.5}}>Cash collected on Performance Training/Rehab packages, plans, drop-ins &amp; consults — package/plan dollars often aren't tied to one person but are all counted here. Sessions are arrived appointments. Separate from clinical Post-Op Rehabilitation, which stays in the discipline figures above.</div>
+                </div>
+                );
+              })()}
               <div style={{fontSize:11,color:'var(--c-faint)',marginBottom:10}}>🟢 up vs their own prior · 🟠/🔴 needs a look · ⚪ flat &nbsp;·&nbsp; <span style={{color:'var(--c-org)'}}>↳</span> up but still low volume for their discipline (where the growth is)</div>
               <div style={{overflowX:'auto'}}>
               <table style={{width:'100%',borderCollapse:'collapse',fontSize:13,minWidth:560}}>
