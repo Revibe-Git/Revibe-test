@@ -3869,31 +3869,30 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const poPay=(it)=>isPostOp(it)&&noJunk(it);
     const isPkg=(it)=>{const x=lc(it);return x.indexOf('session')>=0||x.indexOf('membership')>=0||x.indexOf('package')>=0||x.indexOf('[')>=0||x.indexOf('plan')>=0;}; // packages/plans carry the SELLER, not the trainer → leave unattributed
     const files=[...(sourceFiles||[])].sort((a,b)=>(a.at||'').localeCompare(b.at||''));
-    files.forEach(f=>{
-      if(!f.content)return;
-      let rows;try{rows=parseCSV(f.content);}catch(e){return;}
-      if(!rows.length)return;const h=rows[0];
-      if(('treatment_name' in h)&&('arrived_at' in h)){
-        rows.forEach(r=>{
-          if(!(r['arrived_at']||'').trim())return; // delivered only
-          const date=(r['start_at']||'').slice(0,10);if(date.length!==10)return;
-          const id=r['id']||(date+'|'+(r['start_at']||'')+'|'+(r['patient_guid']||''));
-          const tn=r['treatment_name'], staff=(r['staff_member_name']||'').trim();
-          if(isSess(tn))sessMap.set(id,{date,staff});
-          else if(rehSess(tn))rSessMap.set(id,{date,staff});
-          else if(poSess(tn))poSessMap.set(id,{date,staff});
-        });
-      }else if(('item' in h)&&('collected' in h)){
-        rows.forEach(r=>{
-          const date=(r['purchase date']||r['invoice date']||'').slice(0,10);if(date.length!==10)return;
-          const inv=r['invoice #']||(date+'|'+(r['item']||'')+'|'+(r['patient guid']||''));
-          const it=r['item'], staff=(r['staff member']||'').trim(), amount=money(r['collected']);
-          if(isPay(it))payMap.set(inv,{date,staff:isPkg(it)?'':staff,amount});
-          else if(rehPay(it))rPayMap.set(inv,{date,staff:isPkg(it)?'':staff,amount});
-          else if(poPay(it))poPayMap.set(inv,{date,staff,amount});
-        });
-      }
-    });
+    const parsed=[];
+    files.forEach(f=>{if(!f.content)return;let rows;try{rows=parseCSV(f.content);}catch(e){return;}if(!rows.length)return;const h=rows[0];parsed.push({rows,appt:('treatment_name' in h)&&('arrived_at' in h),sale:('item' in h)&&('collected' in h)});});
+    // Pass 1 — sales: payments + flag which patients are Performance-Rehab clients (so their physio visits can be tagged as rehab)
+    const rehabGuids=new Set();
+    parsed.forEach(f=>{if(!f.sale)return;f.rows.forEach(r=>{
+      const date=(r['purchase date']||r['invoice date']||'').slice(0,10);if(date.length!==10)return;
+      const inv=r['invoice #']||(date+'|'+(r['item']||'')+'|'+(r['patient guid']||''));
+      const it=r['item'], staff=(r['staff member']||'').trim(), amount=money(r['collected']);
+      if(isReh(it)){const g=(r['patient guid']||'').trim();if(g)rehabGuids.add(g);}
+      if(isPay(it))payMap.set(inv,{date,staff:isPkg(it)?'':staff,amount});
+      else if(rehPay(it))rPayMap.set(inv,{date,staff:isPkg(it)?'':staff,amount});
+      else if(poPay(it))poPayMap.set(inv,{date,staff,amount});
+    });});
+    // Pass 2 — appointments: sessions. Rehab visits caught by treatment name OR by patient (rehab-package clients usually book as "Physiotherapy").
+    const rehByPatient=(tn,g)=>!!g&&rehabGuids.has(g)&&(lc(tn).indexOf('physio')>=0||lc(tn).indexOf('rehab')>=0);
+    parsed.forEach(f=>{if(!f.appt)return;f.rows.forEach(r=>{
+      if(!(r['arrived_at']||'').trim())return; // delivered only
+      const date=(r['start_at']||'').slice(0,10);if(date.length!==10)return;
+      const id=r['id']||(date+'|'+(r['start_at']||'')+'|'+(r['patient_guid']||''));
+      const tn=r['treatment_name'], staff=(r['staff_member_name']||'').trim(), g=(r['patient_guid']||'').trim();
+      if(isSess(tn))sessMap.set(id,{date,staff});
+      else if(rehSess(tn)||rehByPatient(tn,g))rSessMap.set(id,{date,staff});
+      else if(poSess(tn))poSessMap.set(id,{date,staff});
+    });});
     return {sessions:[...sessMap.values()],payments:[...payMap.values()],rehabSessions:[...rSessMap.values()],rehabPayments:[...rPayMap.values()],postOpSessions:[...poSessMap.values()],postOpPayments:[...poPayMap.values()]};
   },[sourceFiles]);
 
@@ -5222,7 +5221,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   </div>
                   {perfStaffTable(DS_TRAIN,'Performance Training','var(--c-gold)')}
                   {perfStaffTable(DS_REHAB,'Performance Rehab','var(--c-blue)')}
-                  <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:4,marginBottom:6,lineHeight:1.5}}>Sessions are arrived appointments attributed to the trainer; revenue is cash collected. Package / plan / membership dollars carry whoever processed the sale (not the trainer), so they sit in <b style={{color:'var(--c-mut8)'}}>Unattributed</b> — still counted. Only single drop-ins &amp; consults are credited to a trainer. Separate from clinical Post-Op Rehabilitation.</div>
+                  <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:4,marginBottom:6,lineHeight:1.5}}>Sessions are arrived appointments attributed to the trainer; revenue is cash collected. Package / plan / membership dollars carry whoever processed the sale (not the trainer), so they sit in <b style={{color:'var(--c-mut8)'}}>Unattributed</b> — still counted. Only single drop-ins &amp; consults are credited to a trainer. Rehab visits are matched to clients on a Performance Rehab package (usually booked as Physiotherapy), so they also appear within clinical Physio above. Separate from clinical Post-Op Rehabilitation.</div>
                 </React.Fragment>
                 );
               })()}
