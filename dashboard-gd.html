@@ -5641,6 +5641,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         );
       })()}
       {tab==='revenue'&&(()=>{
+        const _from=(usingCustomRange?customFrom:dateFrom)||'';
+        const _to=(usingCustomRange?customTo:dateTo)||'';
         const fM=_from.slice(0,7),tM=_to.slice(0,7);
         const inM=(d)=>{const m=(d||'').slice(0,7);return (!fM||m>=fM)&&(!tM||m<=tM);};
         const aggBy=(S,P)=>{const by={};let ts=0,tr=0;S.filter(s=>inM(s.date)).forEach(s=>{const k=(s.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sessions:0,revenue:0}).sessions++;ts++;});P.filter(p=>inM(p.date)).forEach(p=>{const k=(p.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sessions:0,revenue:0}).revenue+=p.amount;tr+=p.amount;});const rows=Object.entries(by).sort((a,b)=>{const au=a[0]==='Unattributed',bu=b[0]==='Unattributed';if(au!==bu)return au?1:-1;return (b[1].revenue-a[1].revenue)||(b[1].sessions-a[1].sessions);});return{rows,ts,tr};};
