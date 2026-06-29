@@ -3775,6 +3775,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const[pendingShift,setPendingShift]=useState(null); // parsed rows of a dropped undated shift report, awaiting month confirmation
   const[pendingShiftMonth,setPendingShiftMonth]=useState('');
   const[revBasis,setRevBasis]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_rev_basis')||'{}');}catch(e){return{};}}); // {month:{billed,collected}} for the billed-vs-collected view
+  const[pkgAssign,setPkgAssign]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_pkg_assign')||'{}');}catch(e){return{};}}); // {invoiceNo: staffName} — manual package→staff assignments (mirrors the payroll dashboard)
+  const savePkgAssign=(next)=>{setPkgAssign(next);try{localStorage.setItem('rvgd3_pkg_assign',JSON.stringify(next));}catch(e){}try{window.sbRowUpsert&&window.sbRowUpsert('pkg_assign','map',next);}catch(e){}};
+  React.useEffect(()=>{let c=false;(async()=>{try{const rows=await window.sbRowLoad('pkg_assign');if(c||!rows)return;const row=rows.find(r=>r.id==='map');if(row&&row.data){setPkgAssign(row.data);try{localStorage.setItem('rvgd3_pkg_assign',JSON.stringify(row.data));}catch(e){}}else{const loc=JSON.parse(localStorage.getItem('rvgd3_pkg_assign')||'{}');if(Object.keys(loc).length&&window.sbRowUpsert)window.sbRowUpsert('pkg_assign','map',loc);}}catch(e){}})();return()=>{c=true;};},[]);
   // Reconcile the month billed total from the (correctly-merged, all-weeks) daily store. This
   // self-heals months whose total was overwritten by an older weekly import that replaced
   // instead of accumulating. Only touches months that actually have daily rows; collected kept.
@@ -3853,7 +3856,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   // Sessions come from Appointments (arrived only, attributed to staff); revenue is cash
   // Collected on Performance Training packages/plans/drop-ins/consults from Sales. Rehab,
   // Tempo, group/no-show all excluded. De-duped by appt id / invoice # (newest file wins).
-  const perfTraining=React.useMemo(()=>{
+  const perfRaw=React.useMemo(()=>{
     const sessMap=new Map(), payMap=new Map(), rSessMap=new Map(), rPayMap=new Map(), poSessMap=new Map(), poPayMap=new Map();
     const money=(s)=>{const n=parseFloat((s||'0').toString().replace(/[$,\s]/g,''));return isNaN(n)?0:n;};
     const lc=(s)=>(s||'').toLowerCase();
@@ -3871,15 +3874,19 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const files=[...(sourceFiles||[])].sort((a,b)=>(a.at||'').localeCompare(b.at||''));
     const parsed=[];
     files.forEach(f=>{if(!f.content)return;let rows;try{rows=parseCSV(f.content);}catch(e){return;}if(!rows.length)return;const h=rows[0];parsed.push({rows,appt:('treatment_name' in h)&&('arrived_at' in h),sale:('item' in h)&&('collected' in h)});});
+    // Who is an actual trainer? = anyone who delivers Performance Training sessions. Used to decide whether a package's "Staff Member" is a real trainer (credit them) or just the seller/front-desk (leave unattributed).
+    const trainers=new Set();
+    parsed.forEach(f=>{if(!f.appt)return;f.rows.forEach(r=>{if(isSess(r['treatment_name'])){const s=(r['staff_member_name']||'').trim();if(s)trainers.add(s);}});});
+    const pkgStaff=(it,staff)=>isPkg(it)?(trainers.has(staff)?staff:''):staff; // package → keep only if tagged to a real trainer; drop-ins keep their staff
     // Pass 1 — sales: payments + flag which patients are Performance-Rehab clients (so their physio visits can be tagged as rehab)
     const rehabGuids=new Set();
     parsed.forEach(f=>{if(!f.sale)return;f.rows.forEach(r=>{
       const date=(r['purchase date']||r['invoice date']||'').slice(0,10);if(date.length!==10)return;
       const inv=r['invoice #']||(date+'|'+(r['item']||'')+'|'+(r['patient guid']||''));
-      const it=r['item'], staff=(r['staff member']||'').trim(), amount=money(r['collected']), billed=money(r['total']);
+      const it=r['item'], staff=(r['staff member']||'').trim(), amount=money(r['collected']), billed=money(r['total']), patient=(r['patient']||'').trim();
       if(isReh(it)){const g=(r['patient guid']||'').trim();if(g)rehabGuids.add(g);}
-      if(isPay(it))payMap.set(inv,{date,staff:isPkg(it)?'':staff,amount});
-      else if(rehPay(it))rPayMap.set(inv,{date,staff:isPkg(it)?'':staff,amount});
+      if(isPay(it))payMap.set(inv,{date,amount,inv,item:it,patient,pkg:isPkg(it),autoStaff:pkgStaff(it,staff)});
+      else if(rehPay(it))rPayMap.set(inv,{date,amount,inv,item:it,patient,pkg:isPkg(it),autoStaff:pkgStaff(it,staff)});
       else if(poPay(it))poPayMap.set(inv,{date,staff,amount:billed}); // post-op is paid via external e-transfer (left Unpaid in Jane) → use billed value so each $125 visit counts
     });});
     // Pass 2 — appointments: sessions. Rehab visits caught by treatment name OR by patient (rehab-package clients usually book as "Physiotherapy").
@@ -3895,6 +3902,16 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     });});
     return {sessions:[...sessMap.values()],payments:[...payMap.values()],rehabSessions:[...rSessMap.values()],rehabPayments:[...rPayMap.values()],postOpSessions:[...poSessMap.values()],postOpPayments:[...poPayMap.values()]};
   },[sourceFiles]);
+
+  // Apply manual package→staff assignments (pkgAssign, keyed by invoice #). Auto-attribution (tagged trainer) is the default; an explicit assignment overrides it. Also exposes the package list for the assignment UI.
+  const perfTraining=React.useMemo(()=>{
+    const eff=(p)=>(p.pkg&&pkgAssign[p.inv]!==undefined&&pkgAssign[p.inv]!=='')?pkgAssign[p.inv]:(p.autoStaff||'');
+    const ov=(p)=>({date:p.date,amount:p.amount,inv:p.inv,item:p.item,patient:p.patient,pkg:p.pkg,staff:eff(p)});
+    const packages=[];
+    (perfRaw.payments||[]).forEach(p=>{if(p.pkg)packages.push({inv:p.inv,item:p.item,patient:p.patient,amount:p.amount,date:p.date,autoStaff:p.autoStaff,assigned:eff(p),kind:'Training'});});
+    (perfRaw.rehabPayments||[]).forEach(p=>{if(p.pkg)packages.push({inv:p.inv,item:p.item,patient:p.patient,amount:p.amount,date:p.date,autoStaff:p.autoStaff,assigned:eff(p),kind:'Rehab'});});
+    return {sessions:perfRaw.sessions,payments:(perfRaw.payments||[]).map(ov),rehabSessions:perfRaw.rehabSessions,rehabPayments:(perfRaw.rehabPayments||[]).map(ov),postOpSessions:perfRaw.postOpSessions,postOpPayments:perfRaw.postOpPayments,packages};
+  },[perfRaw,pkgAssign]);
 
   /* ── Async chunked CSV parser (for large files — yields to UI, reports progress) ── */
   const parseCSVChunked=async(text,onProgress)=>{
@@ -5591,9 +5608,39 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           </div>
         );
       })()}
+      {tab==='revenue'&&perfTraining.packages.length>0&&(()=>{
+        const _from=(usingCustomRange?customFrom:dateFrom)||'',_to=(usingCustomRange?customTo:dateTo)||'';
+        const fM=_from.slice(0,7),tM=_to.slice(0,7);
+        const inM=(d)=>{const m=(d||'').slice(0,7);return (!fM||m>=fM)&&(!tM||m<=tM);};
+        const pkgs=perfTraining.packages.filter(p=>inM(p.date)).sort((a,b)=>((a.assigned?1:0)-(b.assigned?1:0))||((a.patient||'').localeCompare(b.patient||'')));
+        if(!pkgs.length)return null;
+        const names=Array.from(new Set((staff||[]).map(s=>s.name).filter(Boolean))).sort();
+        const unassigned=pkgs.filter(p=>!p.assigned).length;
+        const selSt={background:'var(--surface2)',color:'#ddd',border:'1px solid var(--border2)',borderRadius:6,padding:'6px 8px',maxWidth:230,fontSize:13};
+        return(
+          <div className="perf-slot" style={{marginBottom:14}}>
+            <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#F4DB71'}}>Assign packages to staff</span>{unassigned>0?<span style={{fontSize:12,color:'#E0A052'}}>{unassigned} unassigned</span>:<span style={{fontSize:12,color:'#44CCAA'}}>all assigned</span>}</div>
+            <div className="perf-slot-body">
+              <div style={{fontSize:12,color:'#888',marginBottom:10,lineHeight:1.55}}>Packages &amp; payment plans can't be auto-tied to a provider from Jane. Assign each to the staff who delivers it — that revenue then moves onto them here <b>and</b> in Weekly Reports, instead of sitting in <span style={{color:'#F4DB71'}}>◆ Package / payment-plan revenue</span>. Assignments are saved by invoice, so they stick across re-imports. Mirrors your payroll dashboard.</div>
+              <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                {pkgs.map(p=>(
+                  <div key={p.inv} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap',background:'var(--surface3)',border:'1px solid '+(p.assigned?'var(--border2)':'#E0A05255'),borderRadius:6,padding:'8px 12px'}}>
+                    <div style={{minWidth:0,flex:'1 1 280px'}}>
+                      <div style={{color:'#ddd',fontSize:13,fontWeight:600}}>{p.item}</div>
+                      <div style={{color:'#888',fontSize:12}}>{p.patient||'—'} · {fmtMoney(p.amount)} collected · <span style={{color:p.kind==='Rehab'?'#7FC8E8':'#F4DB71'}}>{p.kind}</span></div>
+                    </div>
+                    <select value={p.assigned||''} onChange={e=>savePkgAssign({...pkgAssign,[p.inv]:e.target.value})} style={selSt}>
+                      <option value="">Unattributed (package)</option>
+                      {names.map(n=><option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {tab==='revenue'&&(()=>{
-        const _from=(usingCustomRange?customFrom:dateFrom)||'';
-        const _to=(usingCustomRange?customTo:dateTo)||'';
         const fM=_from.slice(0,7),tM=_to.slice(0,7);
         const inM=(d)=>{const m=(d||'').slice(0,7);return (!fM||m>=fM)&&(!tM||m<=tM);};
         const aggBy=(S,P)=>{const by={};let ts=0,tr=0;S.filter(s=>inM(s.date)).forEach(s=>{const k=(s.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sessions:0,revenue:0}).sessions++;ts++;});P.filter(p=>inM(p.date)).forEach(p=>{const k=(p.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sessions:0,revenue:0}).revenue+=p.amount;tr+=p.amount;});const rows=Object.entries(by).sort((a,b)=>{const au=a[0]==='Unattributed',bu=b[0]==='Unattributed';if(au!==bu)return au?1:-1;return (b[1].revenue-a[1].revenue)||(b[1].sessions-a[1].sessions);});return{rows,ts,tr};};
