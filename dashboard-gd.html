@@ -5047,16 +5047,19 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                     const tR=perfTraining.payments.filter(p=>inR(p.date)).reduce((a,p)=>a+p.amount,0);
                     const hS=perfTraining.rehabSessions.filter(s=>inR(s.date)).length;
                     const hR=perfTraining.rehabPayments.filter(p=>inR(p.date)).reduce((a,p)=>a+p.amount,0);
-                    if(!tS&&!tR&&!hS&&!hR)return null;
+                    const pS=perfTraining.postOpSessions.filter(s=>inR(s.date)).length;
+                    const pR=perfTraining.postOpPayments.filter(p=>inR(p.date)).reduce((a,p)=>a+p.amount,0);
+                    if(!tS&&!tR&&!hS&&!hR&&!pS&&!pR)return null;
                     return(<React.Fragment>
                       <tr style={{borderTop:'2px solid var(--c-grid)'}}><td style={{...tdL,color:'var(--c-gold)',fontWeight:700}}>Performance Training</td><td style={tdR}>{fmtMoney(tR)}</td><td style={tdR}>{tS||'—'}</td><td style={tdR}>—</td></tr>
                       <tr style={{borderBottom:'1px solid var(--c-bdk)'}}><td style={{...tdL,color:'var(--c-blue)',fontWeight:700}}>Performance Rehab</td><td style={tdR}>{fmtMoney(hR)}</td><td style={tdR}>{hS||'—'}</td><td style={tdR}>—</td></tr>
                       <tr><td style={{...tdL,color:'var(--c-mut8)',fontStyle:'italic'}}>Performance total</td><td style={{...tdR,color:'var(--c-mut8)',fontStyle:'italic'}}>{fmtMoney(tR+hR)}</td><td style={{...tdR,color:'var(--c-mut8)',fontStyle:'italic'}}>{(tS+hS)||'—'}</td><td style={tdR}>—</td></tr>
+                      <tr style={{borderTop:'1px solid var(--c-bdk)'}}><td style={{...tdL,color:'var(--c-pink)',fontWeight:700}}>Post-Op Rehab <span style={{fontWeight:400,fontStyle:'italic',color:'var(--c-faint)'}}>(billed)</span></td><td style={tdR}>{fmtMoney(pR)}</td><td style={tdR}>{pS||'—'}</td><td style={tdR}>—</td></tr>
                     </React.Fragment>);
                   })()}
                 </tbody>
               </table>
-              <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:6,lineHeight:1.5}}>Performance Training/Rehab revenue is cash collected (package-based); Visits = arrived sessions attributed to staff. Same period as the report.</div>
+              <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:6,lineHeight:1.5}}>Performance Training/Rehab revenue is cash collected (package-based); Post-Op Rehab is billed $125/visit (paid later by the provider’s e-transfer). Visits = arrived sessions attributed to staff. Same period as the report.</div>
             </div>
             <div>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'var(--c-body)',letterSpacing:'1px',marginBottom:8}}>BY LOCATION</div>
