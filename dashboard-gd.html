@@ -3885,8 +3885,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const inv=r['invoice #']||(date+'|'+(r['item']||'')+'|'+(r['patient guid']||''));
       const it=r['item'], staff=(r['staff member']||'').trim(), amount=money(r['collected']), billed=money(r['total']), patient=(r['patient']||'').trim();
       if(isReh(it)){const g=(r['patient guid']||'').trim();if(g)rehabGuids.add(g);}
-      if(isPay(it))payMap.set(inv,{date,amount,inv,item:it,patient,pkg:isPkg(it),autoStaff:pkgStaff(it,staff)});
-      else if(rehPay(it))rPayMap.set(inv,{date,amount,inv,item:it,patient,pkg:isPkg(it),autoStaff:pkgStaff(it,staff)});
+      if(isPay(it)){const pk=isPkg(it);payMap.set(inv,{date,amount:pk?billed:amount,inv,item:it,patient,pkg:pk,autoStaff:pkgStaff(it,staff)});}
+      else if(rehPay(it)){const pk=isPkg(it);rPayMap.set(inv,{date,amount:pk?billed:amount,inv,item:it,patient,pkg:pk,autoStaff:pkgStaff(it,staff)});}
       else if(poPay(it))poPayMap.set(inv,{date,staff,amount:billed}); // post-op is paid via external e-transfer (left Unpaid in Jane) → use billed value so each $125 visit counts
     });});
     // Pass 2 — appointments: sessions. Rehab visits caught by treatment name OR by patient (rehab-package clients usually book as "Physiotherapy").
@@ -5076,7 +5076,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   })()}
                 </tbody>
               </table>
-              <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:6,lineHeight:1.5}}>Performance Training/Rehab revenue is cash collected (package-based); Post-Op Rehab is billed $125/visit (paid later by the provider’s e-transfer). Visits = arrived sessions attributed to staff. Same period as the report.</div>
+              <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:6,lineHeight:1.5}}>Performance Training/Rehab packages valued at billed (contract) value, drop-ins at cash collected; Post-Op Rehab is billed $125/visit (paid later by the provider’s e-transfer). Visits = arrived sessions attributed to staff. Same period as the report.</div>
             </div>
             <div>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'var(--c-body)',letterSpacing:'1px',marginBottom:8}}>BY LOCATION</div>
@@ -5199,7 +5199,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                     <div><div style={{fontSize:11,color:'var(--c-mut8)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Rehab</div><div style={{fontSize:18,fontWeight:800,color:'var(--c-strong)',fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtMoney(hR)}</div><div style={{fontSize:12,color:'var(--c-faint)',marginTop:2}}>{hS?hS+' session'+(hS===1?'':'s'):'package-based'}</div></div>
                     <div><div style={{fontSize:11,color:'var(--c-mut8)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:3}}>Performance total</div><div style={{fontSize:18,fontWeight:800,color:'var(--c-gold)',fontFamily:"'Barlow Condensed',sans-serif"}}>{fmtMoney(tR+hR)}</div><div style={{fontSize:12,color:'var(--c-faint)',marginTop:2}}>{tS+hS} session{(tS+hS)===1?'':'s'}</div></div>
                   </div>
-                  <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:8,lineHeight:1.5}}>Cash collected on Performance Training/Rehab packages, plans, drop-ins &amp; consults — package/plan dollars often aren't tied to one person but are all counted here. Sessions are arrived appointments. Separate from clinical Post-Op Rehabilitation, which stays in the discipline figures above.</div>
+                  <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:8,lineHeight:1.5}}>Packages &amp; plans valued at billed (contract) value, drop-ins &amp; consults at cash collected — package dollars go to the staff you assign in the Revenue tab (or the tagged trainer); unassigned ones sit in Package / payment-plan revenue but are all counted here. Sessions are arrived appointments. Separate from clinical Post-Op Rehabilitation, which stays in the discipline figures above.</div>
                 </div>
                 );
               })()}
@@ -5241,7 +5241,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   </div>
                   {perfStaffTable(DS_TRAIN,'Performance Training','var(--c-gold)')}
                   {perfStaffTable(DS_REHAB,'Performance Rehab','var(--c-blue)')}
-                  <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:4,marginBottom:6,lineHeight:1.5}}>Sessions are arrived appointments attributed to the trainer; revenue is cash collected. Package / plan / membership dollars carry whoever processed the sale (not the trainer), so they sit in <b style={{color:'var(--c-mut8)'}}>Unattributed</b> — still counted. Only single drop-ins &amp; consults are credited to a trainer. Rehab visits are matched to clients on a Performance Rehab package (usually booked as Physiotherapy), so they also appear within clinical Physio above. Separate from clinical Post-Op Rehabilitation.</div>
+                  <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:4,marginBottom:6,lineHeight:1.5}}>Sessions are arrived appointments attributed to the trainer. Revenue = packages/plans at billed (contract) value + drop-ins & consults at cash collected. Package dollars go to the staff assigned in the Revenue tab (or the tagged trainer); unassigned ones sit in <b style={{color:'var(--c-mut8)'}}>Package / payment-plan revenue</b> — still counted. Rehab visits are matched to clients on a Performance Rehab package (usually booked as Physiotherapy), so they also appear within clinical Physio above. Separate from clinical Post-Op Rehabilitation.</div>
                 </React.Fragment>
                 );
               })()}
@@ -5627,7 +5627,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <div key={p.inv} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap',background:'var(--surface3)',border:'1px solid '+(p.assigned?'var(--border2)':'#E0A05255'),borderRadius:6,padding:'8px 12px'}}>
                     <div style={{minWidth:0,flex:'1 1 280px'}}>
                       <div style={{color:'#ddd',fontSize:13,fontWeight:600}}>{p.item}</div>
-                      <div style={{color:'#888',fontSize:12}}>{p.patient||'—'} · {fmtMoney(p.amount)} collected · <span style={{color:p.kind==='Rehab'?'#7FC8E8':'#F4DB71'}}>{p.kind}</span></div>
+                      <div style={{color:'#888',fontSize:12}}>{p.patient||'—'} · {fmtMoney(p.amount)} billed · <span style={{color:p.kind==='Rehab'?'#7FC8E8':'#F4DB71'}}>{p.kind}</span></div>
                     </div>
                     <select value={p.assigned||''} onChange={e=>savePkgAssign({...pkgAssign,[p.inv]:e.target.value})} style={selSt}>
                       <option value="">Unattributed (package)</option>
@@ -5683,8 +5683,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         if(!tr.ts&&!tr.tr&&!rh.ts&&!rh.tr&&!po.ts&&!po.tr)return null;
         return(
           <React.Fragment>
-            {slot('Performance Training — sessions & revenue','#F4DB71',tr,'Training revenue (collected)','Sessions are attributed to the trainer from the appointment. Revenue is cash collected on packages, payment-plan installments, drop-ins & consults — package/plan dollars carry the seller not the trainer, so they sit in Package / payment-plan revenue but still count in the total. Matches the Performance tab in Weekly Reports for the same dates.')}
-            {slot('Performance Rehab — sessions & revenue','#7FC8E8',rh,'Rehab revenue (collected)','Rehab clients are matched by their Performance Rehab package, so their visits (usually booked as Physiotherapy) count here and also in clinical Physio. Revenue is cash collected; package dollars sit in Package / payment-plan revenue. Matches the Performance tab in Weekly Reports.')}
+            {slot('Performance Training — sessions & revenue','#F4DB71',tr,'Training revenue','Sessions are attributed to the trainer from the appointment. Revenue = packages/plans at their billed (contract) value + drop-ins & consults at cash collected. Package dollars go to whoever you assign above (or the tagged trainer); unassigned ones sit in Package / payment-plan revenue but still count. Matches the Performance tab in Weekly Reports for the same dates.')}
+            {slot('Performance Rehab — sessions & revenue','#7FC8E8',rh,'Rehab revenue','Rehab clients are matched by their Performance Rehab package, so their visits (usually booked as Physiotherapy) count here and also in clinical Physio. Revenue = rehab packages at billed (contract) value; assign each above so it lands on the provider. Matches the Performance tab in Weekly Reports.')}
             {slot('Post-Op Rehab — sessions & revenue','#E0A0C0',po,'Post-op revenue (billed)','Post-Op visits are billed $125 each and paid later by the provider’s e-transfer (they read Unpaid in Jane), so revenue here is the billed value, not cash collected. Also counted within clinical discipline revenue. Matches the Post-Op Rehab tab in Weekly Reports.')}
           </React.Fragment>
         );
