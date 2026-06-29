@@ -3849,6 +3849,47 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     }).filter(r=>Object.values(r).some(v=>v));
   };
 
+  // Performance Training (sessions + revenue) computed live from the stored source CSVs.
+  // Sessions come from Appointments (arrived only, attributed to staff); revenue is cash
+  // Collected on Performance Training packages/plans/drop-ins/consults from Sales. Rehab,
+  // Tempo, group/no-show all excluded. De-duped by appt id / invoice # (newest file wins).
+  const perfTraining=React.useMemo(()=>{
+    const sessMap=new Map(), payMap=new Map(), rSessMap=new Map(), rPayMap=new Map();
+    const money=(s)=>{const n=parseFloat((s||'0').toString().replace(/[$,\s]/g,''));return isNaN(n)?0:n;};
+    const isReh=(s)=>{s=(s||'').toLowerCase();return s.indexOf('rehab')>=0;}; // catches "Performance Training: Rehab" + "Post-Operative Rehabilitation"
+    const hasTrain=(s)=>{s=(s||'').toLowerCase();return s.indexOf('performance training')>=0||s.indexOf('performance consultation')>=0;};
+    const noJunk=(s)=>{s=(s||'').toLowerCase();return s.indexOf('tempo')<0&&s.indexOf('no show')<0&&s.indexOf('no_show')<0;};
+    const isSess=(t)=>{const x=(t||'').toLowerCase();return hasTrain(t)&&x.indexOf('private group')<0&&!isReh(t)&&x.indexOf('mobility')<0;};
+    const isPay=(it)=>hasTrain(it)&&!isReh(it)&&noJunk(it);
+    const rehSess=(t)=>{const x=(t||'').toLowerCase();return isReh(t)&&x.indexOf('private group')<0;};
+    const rehPay=(it)=>isReh(it)&&noJunk(it);
+    const files=[...(sourceFiles||[])].sort((a,b)=>(a.at||'').localeCompare(b.at||''));
+    files.forEach(f=>{
+      if(!f.content)return;
+      let rows;try{rows=parseCSV(f.content);}catch(e){return;}
+      if(!rows.length)return;const h=rows[0];
+      if(('treatment_name' in h)&&('arrived_at' in h)){
+        rows.forEach(r=>{
+          if(!(r['arrived_at']||'').trim())return; // delivered only
+          const date=(r['start_at']||'').slice(0,10);if(date.length!==10)return;
+          const id=r['id']||(date+'|'+(r['start_at']||'')+'|'+(r['patient_guid']||''));
+          const tn=r['treatment_name'], staff=(r['staff_member_name']||'').trim();
+          if(isSess(tn))sessMap.set(id,{date,staff});
+          else if(rehSess(tn))rSessMap.set(id,{date,staff});
+        });
+      }else if(('item' in h)&&('collected' in h)){
+        rows.forEach(r=>{
+          const date=(r['purchase date']||r['invoice date']||'').slice(0,10);if(date.length!==10)return;
+          const inv=r['invoice #']||(date+'|'+(r['item']||'')+'|'+(r['patient guid']||''));
+          const it=r['item'], staff=(r['staff member']||'').trim(), amount=money(r['collected']);
+          if(isPay(it))payMap.set(inv,{date,staff,amount});
+          else if(rehPay(it))rPayMap.set(inv,{date,staff,amount});
+        });
+      }
+    });
+    return {sessions:[...sessMap.values()],payments:[...payMap.values()],rehabSessions:[...rSessMap.values()],rehabPayments:[...rPayMap.values()]};
+  },[sourceFiles]);
+
   /* ── Async chunked CSV parser (for large files — yields to UI, reports progress) ── */
   const parseCSVChunked=async(text,onProgress)=>{
     const rows=[];
@@ -4993,8 +5034,23 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 <tbody>
                   {Object.values(cur.byDisc).length===0?<tr><td style={tdL} colSpan="4"><span style={{color:'var(--c-faint)'}}>No data</span></td></tr>:
                    Object.values(cur.byDisc).sort((a,b)=>b.revenue-a.revenue).map(d=>(<tr key={d.label} style={{borderBottom:'1px solid var(--c-bdk)'}}><td style={tdL}>{d.label}</td><td style={tdR}>{fmtMoney(d.revenue)}</td><td style={tdR}>{d.visits}</td><td style={tdR}>{d.ias}</td></tr>))}
+                  {(()=>{
+                    const rpF=(saved?saved.from:reportPeriod.from)||'',rpT=(saved?saved.to:reportPeriod.to)||'';
+                    const inR=(d)=>(!rpF||d>=rpF)&&(!rpT||d<=rpT);
+                    const tS=perfTraining.sessions.filter(s=>inR(s.date)).length;
+                    const tR=perfTraining.payments.filter(p=>inR(p.date)).reduce((a,p)=>a+p.amount,0);
+                    const hS=perfTraining.rehabSessions.filter(s=>inR(s.date)).length;
+                    const hR=perfTraining.rehabPayments.filter(p=>inR(p.date)).reduce((a,p)=>a+p.amount,0);
+                    if(!tS&&!tR&&!hS&&!hR)return null;
+                    return(<React.Fragment>
+                      <tr style={{borderTop:'2px solid var(--c-grid)'}}><td style={{...tdL,color:'var(--c-gold)',fontWeight:700}}>Performance Training</td><td style={tdR}>{fmtMoney(tR)}</td><td style={tdR}>{tS||'—'}</td><td style={tdR}>—</td></tr>
+                      <tr style={{borderBottom:'1px solid var(--c-bdk)'}}><td style={{...tdL,color:'var(--c-blue)',fontWeight:700}}>Performance Rehab</td><td style={tdR}>{fmtMoney(hR)}</td><td style={tdR}>{hS||'—'}</td><td style={tdR}>—</td></tr>
+                      <tr><td style={{...tdL,color:'var(--c-mut8)',fontStyle:'italic'}}>Performance total</td><td style={{...tdR,color:'var(--c-mut8)',fontStyle:'italic'}}>{fmtMoney(tR+hR)}</td><td style={{...tdR,color:'var(--c-mut8)',fontStyle:'italic'}}>{(tS+hS)||'—'}</td><td style={tdR}>—</td></tr>
+                    </React.Fragment>);
+                  })()}
                 </tbody>
               </table>
+              <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:6,lineHeight:1.5}}>Performance Training/Rehab revenue is cash collected (package-based); Visits = arrived sessions attributed to staff. Same period as the report.</div>
             </div>
             <div>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'var(--c-body)',letterSpacing:'1px',marginBottom:8}}>BY LOCATION</div>
@@ -5425,6 +5481,50 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 </table>
               </div>
               <div style={{fontSize:12,color:'#666',marginTop:8,lineHeight:1.6}}>Billed = Total (all income, all statuses) — the figure tracked across the dashboard. Collected = cash actually received.{usingCustomRange?' Revenue is tracked per month, so a partial-week range still shows the full month(s) it overlaps — use the Trends tab for weekly revenue.':' Follows the date window above.'}</div>
+            </div>
+          </div>
+        );
+      })()}
+      {tab==='revenue'&&(()=>{
+        const _from=(usingCustomRange?customFrom:dateFrom)||'';
+        const _to=(usingCustomRange?customTo:dateTo)||'';
+        const fM=_from.slice(0,7),tM=_to.slice(0,7);
+        const inM=(d)=>{const m=(d||'').slice(0,7);return (!fM||m>=fM)&&(!tM||m<=tM);};
+        const sess=perfTraining.sessions.filter(s=>inM(s.date));
+        const pays=perfTraining.payments.filter(p=>inM(p.date));
+        if(!sess.length&&!pays.length)return null;
+        const by={};
+        const bump=(k)=>{const key=(k||'').trim()||'Unattributed';return by[key]=by[key]||{sessions:0,revenue:0};};
+        sess.forEach(s=>{bump(s.staff).sessions++;});
+        pays.forEach(p=>{bump(p.staff).revenue+=p.amount;});
+        const totalSess=sess.length,totalRev=pays.reduce((a,p)=>a+p.amount,0);
+        const rows=Object.entries(by).sort((a,b)=>{const au=a[0]==='Unattributed',bu=b[0]==='Unattributed';if(au!==bu)return au?1:-1;return (b[1].revenue-a[1].revenue)||(b[1].sessions-a[1].sessions);});
+        return(
+          <div className="perf-slot" style={{marginBottom:14}}>
+            <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#F4DB71'}}>Performance Training — sessions &amp; revenue</span></div>
+            <div className="perf-slot-body">
+              <div style={{display:'flex',flexWrap:'wrap',gap:14,marginBottom:14}}>
+                <div style={{flex:'1 1 160px',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'12px 14px'}}>
+                  <div style={{fontSize:12,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>Sessions delivered</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#F4DB71'}}>{totalSess}</div>
+                  <div style={{fontSize:12,color:'#777',marginTop:2}}>arrived appointments</div>
+                </div>
+                <div style={{flex:'1 1 160px',background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'12px 14px'}}>
+                  <div style={{fontSize:12,color:'#888',textTransform:'uppercase',letterSpacing:'1px',marginBottom:4}}>Training revenue</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'#44CCAA'}}>{fmtMoney(totalRev)}</div>
+                  <div style={{fontSize:12,color:'#777',marginTop:2}}>cash collected in range</div>
+                </div>
+              </div>
+              <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                  <thead><tr style={{color:'#888'}}><th style={{textAlign:'left',padding:'4px 8px'}}>Staff</th><th style={{textAlign:'right',padding:'4px 8px'}}>Sessions</th><th style={{textAlign:'right',padding:'4px 8px'}}>Revenue (collected)</th></tr></thead>
+                  <tbody>
+                    {rows.map(([k,v])=>(<tr key={k} style={{borderTop:'1px solid var(--border)',color:'#bbb'}}><td style={{textAlign:'left',padding:'4px 8px',color:k==='Unattributed'?'#999':'#ddd',fontStyle:k==='Unattributed'?'italic':'normal'}}>{k==='Unattributed'?'Unattributed (packages / plans)':k}</td><td style={{textAlign:'right',padding:'4px 8px'}}>{v.sessions||'—'}</td><td style={{textAlign:'right',padding:'4px 8px',color:'#44CCAA'}}>{v.revenue?fmtMoney(v.revenue):'—'}</td></tr>))}
+                    <tr style={{borderTop:'2px solid var(--border2)',color:'#fff',fontWeight:700}}><td style={{textAlign:'left',padding:'6px 8px'}}>Total</td><td style={{textAlign:'right',padding:'6px 8px'}}>{totalSess}</td><td style={{textAlign:'right',padding:'6px 8px',color:'#44CCAA'}}>{fmtMoney(totalRev)}</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div style={{fontSize:12,color:'#666',marginTop:8,lineHeight:1.6}}>Sessions are attributed to the practitioner from the appointment. Revenue is cash collected on Performance Training packages, payment-plan installments, drop-ins &amp; consults — package/plan payments often aren't tied to a person, so they sit in <b style={{color:'#999'}}>Unattributed</b> but still count in the total. Performance Rehab is excluded (separate service). Follows the date window above.</div>
             </div>
           </div>
         );
