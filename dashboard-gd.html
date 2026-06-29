@@ -3885,8 +3885,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const inv=r['invoice #']||(date+'|'+(r['item']||'')+'|'+(r['patient guid']||''));
       const it=r['item'], staff=(r['staff member']||'').trim(), amount=money(r['collected']), billed=money(r['total']), patient=(r['patient']||'').trim();
       if(isReh(it)){const g=(r['patient guid']||'').trim();if(g)rehabGuids.add(g);}
-      if(isPay(it))payMap.set(inv,{date,amount,inv,item:it,patient,pkg:isPkg(it),autoStaff:pkgStaff(it,staff)});
-      else if(rehPay(it))rPayMap.set(inv,{date,amount,inv,item:it,patient,pkg:isPkg(it),autoStaff:pkgStaff(it,staff)});
+      if(isPay(it))payMap.set(inv,{date,amount,inv,item:it,patient,pkg:isPkg(it),autoStaff:pkgStaff(it,staff),seller:staff,billed,loc:r['location']});
+      else if(rehPay(it))rPayMap.set(inv,{date,amount,inv,item:it,patient,pkg:isPkg(it),autoStaff:pkgStaff(it,staff),seller:staff,billed,loc:r['location']});
       else if(poPay(it))poPayMap.set(inv,{date,staff,amount:billed}); // post-op = work delivered this period, billed $125/visit, paid later by e-transfer (so use billed, not Jane "collected")
     });});
     // Pass 2 — appointments: sessions. Rehab visits caught by treatment name OR by patient (rehab-package clients usually book as "Physiotherapy").
@@ -3908,8 +3908,8 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const eff=(p)=>(p.pkg&&pkgAssign[p.inv]!==undefined&&pkgAssign[p.inv]!=='')?pkgAssign[p.inv]:(p.autoStaff||'');
     const ov=(p)=>({date:p.date,amount:p.amount,inv:p.inv,item:p.item,patient:p.patient,pkg:p.pkg,staff:eff(p)});
     const packages=[];
-    (perfRaw.payments||[]).forEach(p=>{if(p.pkg)packages.push({inv:p.inv,item:p.item,patient:p.patient,amount:p.amount,date:p.date,autoStaff:p.autoStaff,assigned:eff(p),kind:'Training'});});
-    (perfRaw.rehabPayments||[]).forEach(p=>{if(p.pkg)packages.push({inv:p.inv,item:p.item,patient:p.patient,amount:p.amount,date:p.date,autoStaff:p.autoStaff,assigned:eff(p),kind:'Rehab'});});
+    (perfRaw.payments||[]).forEach(p=>{if(p.pkg)packages.push({inv:p.inv,item:p.item,patient:p.patient,amount:p.amount,collected:p.amount,billed:p.billed,seller:p.seller,loc:p.loc,date:p.date,autoStaff:p.autoStaff,assigned:eff(p),kind:'Training'});});
+    (perfRaw.rehabPayments||[]).forEach(p=>{if(p.pkg)packages.push({inv:p.inv,item:p.item,patient:p.patient,amount:p.amount,collected:p.amount,billed:p.billed,seller:p.seller,loc:p.loc,date:p.date,autoStaff:p.autoStaff,assigned:eff(p),kind:'Rehab'});});
     return {sessions:perfRaw.sessions,payments:(perfRaw.payments||[]).map(ov),rehabSessions:perfRaw.rehabSessions,rehabPayments:(perfRaw.rehabPayments||[]).map(ov),postOpSessions:perfRaw.postOpSessions,postOpPayments:perfRaw.postOpPayments,packages};
   },[perfRaw,pkgAssign]);
 
@@ -4621,9 +4621,48 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     return aggregateRows(filteredSnaps);
   },[filteredSnaps,usingCustomRange,hasDailyData,customFrom,customTo,dailyAppts,dailyRevenue]);
 
+  /* ── Package reattribution ──────────────────────────────
+     When a Performance package is assigned to someone (manually, or auto via tagged trainer),
+     its COLLECTED-this-period value moves onto that person and its BILLED credit comes off the
+     front-desk seller who rang up the sale. Non-package revenue is untouched (stays billed).
+     inWin(date)->bool clips to the view's window. Returns per-staff totals AND a per-location
+     slice, so the all-sites bar, a site-filtered view, the weekly report's location split, and
+     Compare mode all stay consistent. */
+  const pkgReattribDelta=(inWin)=>{
+    const byId={},byIdLoc={},otherLoc={};let other=0;
+    const add=(id,loc,v)=>{if(!id||!v)return;byId[id]=(byId[id]||0)+v;if(loc){(byIdLoc[id]=byIdLoc[id]||{});byIdLoc[id][loc]=(byIdLoc[id][loc]||0)+v;}};
+    const addOther=(loc,v)=>{if(!v)return;other+=v;if(loc)otherLoc[loc]=(otherLoc[loc]||0)+v;};
+    (perfTraining.packages||[]).forEach(p=>{
+      const who=(p.assigned||'').trim();if(!who)return;            // unassigned → leave billed on seller
+      if(!inWin(p.date||''))return;
+      const sm=p.seller?matchStaff(p.seller):null;                 // current holder of the billed credit
+      const am=matchStaff(who);                                    // the assignee
+      const loc=normLoc(p.loc||'');
+      const billed=p.billed||0,collected=p.collected||0;
+      if(sm)add(sm.id,loc,-billed);else addOther(loc,-billed);     // take the package off the seller
+      if(am)add(am.id,loc,collected);else addOther(loc,collected); // give the assignee the collected $
+    });
+    return{byId,byIdLoc,other,otherLoc};
+  };
+  // Apply a reattribution delta to an aggregateRows()-style array (used by Compare mode).
+  const applyReToRows=(rows,month)=>{
+    if(!month)return rows;
+    const d=pkgReattribDelta((dt)=>(dt||'').slice(0,7)===month);
+    const out=rows.map(r=>({...r,revByLoc:{...(r.revByLoc||{})}}));
+    const find=(id)=>out.find(r=>r.staffId===id);
+    Object.entries(d.byId).forEach(([id,v])=>{const st=staff.find(x=>x.id===id);if(!st)return;let r=find(id);if(!r){r={staffId:id,name:st.name,revenue:0,revByLoc:{}};out.push(r);}r.revenue=Math.round(((r.revenue||0)+v)*100)/100;});
+    Object.entries(d.byIdLoc).forEach(([id,lm])=>{const r=find(id);if(!r)return;Object.entries(lm).forEach(([loc,v])=>{if(loc)r.revByLoc[loc]=Math.round(((r.revByLoc[loc]||0)+v)*100)/100;});});
+    return out;
+  };
+
   // Compare mode rows
-  const compareARows=useMemo(()=>aggregateRows(filterSnaps(compareA)),[data.snapshots,compareA]);
-  const compareBRows=useMemo(()=>aggregateRows(filterSnaps(compareB)),[data.snapshots,compareB]);
+  const compareARows=useMemo(()=>applyReToRows(aggregateRows(filterSnaps(compareA)),compareA),[data.snapshots,compareA,perfTraining,staff]);
+  const compareBRows=useMemo(()=>applyReToRows(aggregateRows(filterSnaps(compareB)),compareB),[data.snapshots,compareB,perfTraining,staff]);
+
+  // Window for the Revenue tab (month-granular for presets, exact for custom range) → matches the practitioner bar's clipping.
+  const _rvF=(usingCustomRange?customFrom:dateFrom)||'',_rvT=(usingCustomRange?customTo:dateTo)||'';
+  const revInWin=(d)=>{if(usingCustomRange)return(!_rvF||d>=_rvF)&&(!_rvT||d<=_rvT);const m=(d||'').slice(0,7);return(!_rvF||m>=_rvF)&&(!_rvT||m<=_rvT);};
+  const revRe=pkgReattribDelta(revInWin);
 
   /* ── Merged staff with period-filtered data ── */
   const mergedStaff=useMemo(()=>
@@ -4634,14 +4673,18 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const jr=filteredRows.find(r=>r.staffId===s.id);
       const gvaVal=parseFloat(gvaEdits[s.id]!==undefined?gvaEdits[s.id]:data.gva[s.id])||null;
       const retVal=data.retention?.[s.id]||null;
+      // Reattribution: all-sites uses the total delta; a specific site uses that site's slice.
+      const reDlt=(filterSite&&filterSite!=='all')?((revRe.byIdLoc[s.id]||{})[filterSite]||0):(revRe.byId[s.id]||0);
+      const baseRev=jr?(filterSite&&filterSite!=='all'?revForSite(jr,filterSite):(jr.revenue||0)):0;
+      const revVal=(jr||reDlt)?Math.round((baseRev+reDlt)*100)/100:null;
       return{...s,
         completed:jr?.completed||null,utilization:jr?.utilization||null,
         appointments:jr?.appointments||null,noShows:jr?.noShows||null,
         cancellations:jr?.cancellations||null,rescheduled:jr?.rescheduled||null,
-        revenue:jr?(filterSite&&filterSite!=='all'?revForSite(jr,filterSite):(jr.revenue||null)):null,initialAssessments:jr?.initialAssessments||null,
+        revenue:revVal,initialAssessments:jr?.initialAssessments||null,
         gva:gvaVal,retention:retVal};
     })
-  ,[staff,filteredRows,data.gva,data.retention,gvaEdits,filterDisc,filterSite]);
+  ,[staff,filteredRows,data.gva,data.retention,gvaEdits,filterDisc,filterSite,revRe]);
 
   const withUtil  =mergedStaff.filter(s=>s.utilization!=null).sort((a,b)=>b.utilization-a.utilization);
   const withAppts =mergedStaff.filter(s=>s.completed!=null).sort((a,b)=>b.completed-a.completed);
@@ -4758,6 +4801,11 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     dailyAppts.forEach(r=>{if(r.date<from||r.date>to)return;const b=touch(r.staff_id);if(!b)return;b.visits+=(r.completed||0);b.ias+=(r.initial_assessments||0);b.noShows+=(r.no_shows||0);b.cancels+=(r.cancellations||0);});
     let otherRev=0,revRows=0;
     dailyRevenue.forEach(r=>{if(r.date<from||r.date>to)return;revRows++;const b=touch(r.staff_id);if(!b){otherRev+=(r.revenue||0);return;}b.revenue+=(r.revenue||0);if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{b.revByLoc[loc]=(b.revByLoc[loc]||0)+(v||0);});});
+    // Reattribute assigned Performance packages for this window (collected onto assignee, billed off seller) — totals and location split.
+    {const _rd=pkgReattribDelta((d)=>d>=from&&d<=to);
+     Object.entries(_rd.byId).forEach(([id,v])=>{const b=touch(id);if(b)b.revenue=Math.round((b.revenue+v)*100)/100;});
+     Object.entries(_rd.byIdLoc).forEach(([id,lm])=>{const b=touch(id);if(b)Object.entries(lm).forEach(([loc,v])=>{if(loc)b.revByLoc[loc]=Math.round(((b.revByLoc[loc]||0)+v)*100)/100;});});
+     otherRev+=_rd.other;}
     const list=Object.values(byStaff);
     const totals=list.reduce((a,b)=>({revenue:a.revenue+b.revenue,visits:a.visits+b.visits,ias:a.ias+b.ias,noShows:a.noShows+b.noShows,cancels:a.cancels+b.cancels}),{revenue:0,visits:0,ias:0,noShows:0,cancels:0});
     totals.revenue=Math.round((totals.revenue+otherRev)*100)/100; // include front-desk / retail / unmatched so the total matches the books
@@ -5689,7 +5737,6 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           </React.Fragment>
         );
       })()}
-      {tab==='revenue'&&<SessionsLog defaultMonth={dataMaxMonth} readOnly/>}
       {tab==='revenue'&&(
         <div className="perf-slot">
           <div className="perf-slot-head">
@@ -5700,6 +5747,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 onClick={()=>setSectionCompare(p=>({...p,revenue:!p.revenue}))}>⇄ Compare</button>
             </div>
           </div>
+          {Object.keys(revRe.byId).length>0&&<div style={{fontSize:11.5,color:'#7FC8E8',padding:'0 0 8px',lineHeight:1.5}}>↻ Reflects your Performance package assignments: each assigned package's <b>collected</b> dollars are credited to the assignee and the billed credit is taken off the front-desk seller. Drop-ins and all non-package revenue stay billed, as booked.</div>}
           {sectionCompare.revenue&&(
             <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0 14px',flexWrap:'wrap'}}>
               <select value={sectionA.revenue||''} onChange={e=>setSectionA(p=>({...p,revenue:e.target.value}))}
@@ -6202,7 +6250,6 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       {/* ── IMPORT ── */}
       {tab==='import'&&(
         <div>
-          <SessionsLog defaultMonth={dataMaxMonth}/>
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'16px 18px',marginBottom:14}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',fontWeight:700,marginBottom:10}}>How to Export from Jane</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:12}}>
