@@ -4009,7 +4009,38 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     return null;
   };
 
-  /* ── Aggregate appointments CSV ─────────────── */
+  /* ── Per-staff location SHARE, reconstructed from the raw Sales files ──────────
+     The daily_revenue table may not persist the per-location split (revByLoc), in
+     which case rollups would otherwise dump a multi-site person's whole total onto
+     their first home site. We rebuild each person's Mississauga/Markham share from
+     the Sales CSV's Location column and use it to split revenue when the stored
+     revByLoc is missing — so e.g. Michael Leung's revenue follows where it was
+     actually earned, not just his home clinic. */
+  const srcLocShare=useMemo(()=>{
+    const by={};
+    (sourceFiles||[]).forEach(f=>{
+      if(!/sale/i.test(f.name||''))return;
+      let rows;try{rows=parseCSV(f.content||'');}catch(e){return;}
+      (rows||[]).forEach(r=>{
+        const nm=(r['staff member']||r['staff_member']||'').trim();if(!nm)return;
+        const loc=normLoc(r['location']||'');if(!loc)return;
+        const tot=parseFloat(String(r['total']||'0').replace(/[$,\s]/g,''))||0;if(!tot)return;
+        const m=matchStaff(nm);if(!m)return;
+        (by[m.id]=by[m.id]||{});by[m.id][loc]=(by[m.id][loc]||0)+tot;
+      });
+    });
+    const share={};
+    Object.entries(by).forEach(([id,lm])=>{const tot=Object.values(lm).reduce((a,b)=>a+b,0);if(tot>0){share[id]={};Object.entries(lm).forEach(([loc,v])=>{share[id][loc]=v/tot;});}});
+    return share;
+  },[sourceFiles,staff]);// eslint-disable-line
+  // Returns a {loc:amount} split for a staff member: their stored revByLoc if present,
+  // else their Sales-derived share applied to `revenue`, else everything on `home`.
+  const splitRevByLoc=(staffId,revenue,revByLoc,home)=>{
+    if(revByLoc&&Object.keys(revByLoc).length)return revByLoc;
+    const sh=srcLocShare[staffId];
+    if(sh){const o={};Object.entries(sh).forEach(([loc,f])=>{o[loc]=Math.round(revenue*f*100)/100;});return o;}
+    return home?{[home]:revenue}:{};
+  };
   /* ── Get month from a date string ───────────── */
   const getMonth=(dateStr)=>{
     if(!dateStr)return null;
@@ -4114,7 +4145,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       byStaff[r.staff_id].revenue+=(r.revenue||0);
       if(r.revByLoc){if(!byStaff[r.staff_id].revByLoc)byStaff[r.staff_id].revByLoc={};Object.entries(r.revByLoc).forEach(([loc,v])=>{byStaff[r.staff_id].revByLoc[loc]=(byStaff[r.staff_id].revByLoc[loc]||0)+(v||0);});}
     });
-    return Object.values(byStaff).map(r=>({...r,revByLoc:Object.fromEntries(Object.entries(r.revByLoc||{}).map(([k,v])=>[k,Math.round(v*100)/100]))}));
+    return Object.values(byStaff).map(r=>{const rbl=splitRevByLoc(r.staffId,r.revenue,r.revByLoc,siteList(staff.find(x=>x.id===r.staffId)||{})[0]||r.site);return{...r,revByLoc:Object.fromEntries(Object.entries(rbl||{}).map(([k,v])=>[k,Math.round(v*100)/100]))};});
   };
 
   /* ── Get date range of daily data ─────────── */
@@ -4605,7 +4636,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     return Object.values(byStaff).map(r=>({
       ...r,
       revenue:Math.round(r.revenue*100)/100,
-      revByLoc:Object.fromEntries(Object.entries(r.revByLoc||{}).map(([k,v])=>[k,Math.round(v*100)/100])),
+      revByLoc:Object.fromEntries(Object.entries(splitRevByLoc(r.staffId,Math.round(r.revenue*100)/100,r.revByLoc,siteList(staff.find(x=>x.id===r.staffId)||{})[0])||{}).map(([k,v])=>[k,Math.round(v*100)/100])),
       // Average the utilization across however many shift snapshots exist
       utilization:r.utilizationCount>0?Math.round(r.utilization/r.utilizationCount):null,
     }));
@@ -4801,6 +4832,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     dailyAppts.forEach(r=>{if(r.date<from||r.date>to)return;const b=touch(r.staff_id);if(!b)return;b.visits+=(r.completed||0);b.ias+=(r.initial_assessments||0);b.noShows+=(r.no_shows||0);b.cancels+=(r.cancellations||0);});
     let otherRev=0,revRows=0;
     dailyRevenue.forEach(r=>{if(r.date<from||r.date>to)return;revRows++;const b=touch(r.staff_id);if(!b){otherRev+=(r.revenue||0);return;}b.revenue+=(r.revenue||0);if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{b.revByLoc[loc]=(b.revByLoc[loc]||0)+(v||0);});});
+    // If the stored daily rows had no per-location split, rebuild it from the Sales files so a
+    // multi-site person's base revenue is distributed correctly (and isn't dumped on one site).
+    Object.values(byStaff).forEach(b=>{if(!Object.keys(b.revByLoc||{}).length&&b.revenue){b.revByLoc=splitRevByLoc(b.id,b.revenue,null,siteList(staff.find(x=>x.id===b.id)||{})[0]||b.site);}});
     // Reattribute assigned Performance packages for this window (collected onto assignee, billed off seller) — totals and location split.
     {const _rd=pkgReattribDelta((d)=>d>=from&&d<=to);
      Object.entries(_rd.byId).forEach(([id,v])=>{const b=touch(id);if(b)b.revenue=Math.round((b.revenue+v)*100)/100;});
@@ -4816,7 +4850,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     list.forEach(x=>{
       const rbl=x.revByLoc||{};
       if(Object.keys(rbl).length)Object.entries(rbl).forEach(([loc,v])=>bump(loc,'revenue',v));
-      else bump(siteList(x)[0]||x.site,'revenue',x.revenue);
+      else {const sp=splitRevByLoc(x.id,x.revenue,null,siteList(x)[0]||x.site);Object.entries(sp).forEach(([loc,v])=>bump(loc,'revenue',v));}
       const hs=siteList(x)[0]||x.site;bump(hs,'visits',x.visits);bump(hs,'ias',x.ias);
     });
     Object.values(byLoc).forEach(o=>{o.revenue=Math.round(o.revenue*100)/100;});
