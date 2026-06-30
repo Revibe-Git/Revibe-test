@@ -4625,6 +4625,17 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   // For appointments: sum across snapshots. For utilization/revenue: use latest in period.
   const aggregateRows=(snaps)=>{
     if(!snaps.length)return[];
+    // De-dupe stacked snapshots: if more than one snapshot exists for the same month+type
+    // (e.g. a stale partial import sitting behind a fresh full one), keep only the most complete
+    // so revenue/visits aren't double-counted. Different types (sales/shift/appointments) for the
+    // same month are all kept — they carry different fields.
+    const _best={};
+    snaps.forEach(s=>{
+      const key=(s.date||'').slice(0,7)+'|'+(s.type||'sales');
+      const w=(s.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0)+(parseFloat(r.completed)||0)+(parseFloat(r.appointments)||0)+(parseFloat(r.appointmentHours)||0),0)+(s.rows||[]).length*0.001;
+      if(!_best[key]||w>_best[key]._w)_best[key]={snap:s,_w:w};
+    });
+    snaps=Object.values(_best).map(x=>x.snap);
     const byStaff={};
     snaps.forEach(snap=>{
       const isShift=snap.type==='shift';
@@ -4665,20 +4676,23 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   }),[data.snapshots,dateFrom,dateTo]);
   const filteredRows=useMemo(()=>{
     if(usingCustomRange&&hasDailyData)return aggregateDaily(customFrom,customTo);
-    const snapRows=aggregateRows(filteredSnaps);
-    // Snapshots can lag (a re-upload refreshes daily data but the stored monthly snapshot may be
-    // stale/partial). When fresh daily data fully covers this preset window, trust it for REVENUE
-    // and revByLoc, but keep visits/utilization (which live in the snapshots) intact.
+    const snapRows=aggregateRows(filteredSnaps);              // visits + utilization (and stale revenue) across the window
+    if(!hasDailyData)return snapRows;
     const dMinM=(dailyDateRange.min||'').slice(0,7),dMaxM=(dailyDateRange.max||'').slice(0,7);
-    if(hasDailyData&&dateFrom&&dateTo&&dMinM&&dMaxM&&dateFrom>=dMinM&&dateTo<=dMaxM){
-      const dRows=aggregateDaily(dateFrom+'-01',dateTo+'-31');
-      const dMap={};dRows.forEach(r=>{dMap[r.staffId]=r;});
-      const seen={};
-      const merged=snapRows.map(r=>{seen[r.staffId]=1;const d=dMap[r.staffId];return{...r,revenue:d?d.revenue:0,revByLoc:d?d.revByLoc:{}};});
-      dRows.forEach(d=>{if(!seen[d.staffId])merged.push({...d});});
-      return merged;
-    }
-    return snapRows;
+    const months=[...new Set(filteredSnaps.map(s=>(s.date||'').slice(0,7)).filter(Boolean))];
+    const dMonths=months.filter(m=>dMinM&&dMaxM&&m>=dMinM&&m<=dMaxM); // months where fresh daily data exists
+    if(!dMonths.length)return snapRows;
+    // Fresh daily revenue for the covered months; stale-snapshot revenue only for the older months.
+    const f=dMonths.reduce((a,m)=>a<m?a:m)+'-01',t=dMonths.reduce((a,m)=>a>m?a:m)+'-31';
+    const dMap={};aggregateDaily(f,t).forEach(r=>{dMap[r.staffId]=r;});
+    const ndMap={};aggregateRows(filteredSnaps.filter(s=>!dMonths.includes((s.date||'').slice(0,7)))).forEach(r=>{ndMap[r.staffId]=r;});
+    const seen={};
+    const out=snapRows.map(r=>{seen[r.staffId]=1;
+      const d=dMap[r.staffId],nd=ndMap[r.staffId];
+      const revByLoc={};Object.entries(d?.revByLoc||{}).forEach(([l,v])=>revByLoc[l]=(revByLoc[l]||0)+v);Object.entries(nd?.revByLoc||{}).forEach(([l,v])=>revByLoc[l]=(revByLoc[l]||0)+v);
+      return{...r,revenue:Math.round(((d?.revenue||0)+(nd?.revenue||0))*100)/100,revByLoc};});
+    Object.values(dMap).forEach(d=>{if(!seen[d.staffId])out.push({...d});});
+    return out;
   },[filteredSnaps,usingCustomRange,hasDailyData,customFrom,customTo,dailyAppts,dailyRevenue,dateFrom,dateTo,dailyDateRange]);
 
   /* ── Package reattribution ──────────────────────────────
@@ -5550,13 +5564,23 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             const wMonths=[];{let a=(f||'').slice(0,7),b=(t||'').slice(0,7);if(a&&b){let y=+a.slice(0,4),m=+a.slice(5,7);const ey=+b.slice(0,4),em=+b.slice(5,7);let guard=0;while((y<ey||(y===ey&&m<=em))&&guard++<60){wMonths.push(y+'-'+String(m).padStart(2,'0'));m++;if(m>12){m=1;y++;}}}}
             const srcMonths=new Set((srcSalesRows||[]).map(r=>r.date.slice(0,7)));
             const srcCovers=(srcSalesRows||[]).length>0&&wMonths.length>0&&wMonths.every(m=>srcMonths.has(m));
+            const _dMinM=(dailyDateRange.min||'').slice(0,7),_dMaxM=(dailyDateRange.max||'').slice(0,7);
+            const dailyCovers=hasDailyData&&wMonths.length>0&&_dMinM&&_dMaxM&&wMonths.every(m=>m>=_dMinM&&m<=_dMaxM);
             const locRev={};
             if(srcCovers){
-              // Exact: sum billed by actual billing location straight from the Sales files for the window.
+              // Best: exact billed by actual billing location straight from the Sales files.
               (srcSalesRows||[]).forEach(r=>{if(f&&r.date<f)return;if(t&&r.date>t)return;locRev[r.loc]=(locRev[r.loc]||0)+r.billed;});
+            }else if(dailyCovers){
+              // Robust: correct TOTAL from fresh daily revenue (incl front-desk), split by the
+              // location PROPORTIONS from snapshots (those shares hold even if a snapshot's absolute lags).
+              let tot=0;dailyRevenue.forEach(r=>{if(f&&r.date<f)return;if(t&&r.date>t)return;tot+=(parseFloat(r.revenue)||0);});
+              const snapLoc={};filteredSnaps.forEach(s=>(s.rows||[]).forEach(r=>{if(r.revByLoc)Object.entries(r.revByLoc).forEach(([l,v])=>{snapLoc[l]=(snapLoc[l]||0)+(parseFloat(v)||0);});}));
+              const snapTot=Object.values(snapLoc).reduce((a,b)=>a+b,0);
+              if(snapTot>0)Object.entries(snapLoc).forEach(([l,v])=>{locRev[l]=Math.round(tot*(v/snapTot)*100)/100;});
+              else filteredRows.forEach(r=>Object.entries(r.revByLoc||{}).forEach(([loc,v])=>{locRev[loc]=(locRev[loc]||0)+(parseFloat(v)||0);}));
             }else{
-              // Fallback (months not uploaded): use the period-filtered rows (daily-corrected where possible).
-              filteredRows.forEach(r=>{const rbl=r.revByLoc||{};Object.entries(rbl).forEach(([loc,v])=>{locRev[loc]=(locRev[loc]||0)+(parseFloat(v)||0);});});
+              // Last resort (older months, no daily/source): raw snapshot split.
+              filteredSnaps.forEach(s=>(s.rows||[]).forEach(r=>{if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{locRev[loc]=(locRev[loc]||0)+(parseFloat(v)||0);});}));
             }
             const locAct={};
             filteredRows.forEach(r=>{const st=staff.find(x=>x.id===r.staffId);const hs=st?siteList(st)[0]:null;if(!hs)return;if(!locAct[hs])locAct[hs]={visits:0,ias:0,heads:0,util:0,utilN:0};locAct[hs].visits+=(r.completed||0);locAct[hs].ias+=(r.initialAssessments||0);if(r.completed||r.revenue)locAct[hs].heads++;if(r.utilization!=null){locAct[hs].util+=r.utilization;locAct[hs].utilN++;}});
@@ -5567,7 +5591,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             return(
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
-                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const fm=f?new Date(f+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const tm=t?new Date(t+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';return fm&&tm?(fm===tm?fm:fm+' – '+tm):(fm||tm||'selected range');})()}</span>}</span>
+                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const lbl=(x)=>x?new Date(x+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const fm=lbl(f),tm=lbl(t);if(fm&&tm)return fm===tm?fm:fm+' – '+tm;if(tm&&!fm)return 'through '+tm;if(fm&&!tm)return fm+' onward';return 'all dates';})()}</span>}</span>
                   <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site</span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
