@@ -5518,7 +5518,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             return(
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
-                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location</span>
+                  <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const fm=f?new Date(f+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const tm=t?new Date(t+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';return fm&&tm?(fm===tm?fm:fm+' – '+tm):(fm||tm||'selected range');})()}</span>}</span>
                   <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site</span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
