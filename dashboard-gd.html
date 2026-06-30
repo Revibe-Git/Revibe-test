@@ -4033,6 +4033,22 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     Object.entries(by).forEach(([id,lm])=>{const tot=Object.values(lm).reduce((a,b)=>a+b,0);if(tot>0){share[id]={};Object.entries(lm).forEach(([loc,v])=>{share[id][loc]=v/tot;});}});
     return share;
   },[sourceFiles,staff]);// eslint-disable-line
+  // Flat list of Sales rows from the uploaded files: {date, loc, billed} — used for an exact
+  // by-location revenue total on the Overview (independent of the monthly snapshots).
+  const srcSalesRows=useMemo(()=>{
+    const out=[];
+    (sourceFiles||[]).forEach(f=>{
+      if(!/sale/i.test(f.name||''))return;
+      let rows;try{rows=parseCSV(f.content||'');}catch(e){return;}
+      (rows||[]).forEach(r=>{
+        const d=String(r['purchase date']||r['invoice date']||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(d))return;
+        const loc=normLoc(r['location']||'');
+        const billed=parseFloat(String(r['total']||'0').replace(/[$,\s]/g,''))||0;
+        if(loc&&billed)out.push({date:d,loc,billed});
+      });
+    });
+    return out;
+  },[sourceFiles]);// eslint-disable-line
   // Returns a {loc:amount} split for a staff member: their stored revByLoc if present,
   // else their Sales-derived share applied to `revenue`, else everything on `home`.
   const splitRevByLoc=(staffId,revenue,revByLoc,home)=>{
@@ -4649,8 +4665,21 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   }),[data.snapshots,dateFrom,dateTo]);
   const filteredRows=useMemo(()=>{
     if(usingCustomRange&&hasDailyData)return aggregateDaily(customFrom,customTo);
-    return aggregateRows(filteredSnaps);
-  },[filteredSnaps,usingCustomRange,hasDailyData,customFrom,customTo,dailyAppts,dailyRevenue]);
+    const snapRows=aggregateRows(filteredSnaps);
+    // Snapshots can lag (a re-upload refreshes daily data but the stored monthly snapshot may be
+    // stale/partial). When fresh daily data fully covers this preset window, trust it for REVENUE
+    // and revByLoc, but keep visits/utilization (which live in the snapshots) intact.
+    const dMinM=(dailyDateRange.min||'').slice(0,7),dMaxM=(dailyDateRange.max||'').slice(0,7);
+    if(hasDailyData&&dateFrom&&dateTo&&dMinM&&dMaxM&&dateFrom>=dMinM&&dateTo<=dMaxM){
+      const dRows=aggregateDaily(dateFrom+'-01',dateTo+'-31');
+      const dMap={};dRows.forEach(r=>{dMap[r.staffId]=r;});
+      const seen={};
+      const merged=snapRows.map(r=>{seen[r.staffId]=1;const d=dMap[r.staffId];return{...r,revenue:d?d.revenue:0,revByLoc:d?d.revByLoc:{}};});
+      dRows.forEach(d=>{if(!seen[d.staffId])merged.push({...d});});
+      return merged;
+    }
+    return snapRows;
+  },[filteredSnaps,usingCustomRange,hasDailyData,customFrom,customTo,dailyAppts,dailyRevenue,dateFrom,dateTo,dailyDateRange]);
 
   /* ── Package reattribution ──────────────────────────────
      When a Performance package is assigned to someone (manually, or auto via tagged trainer),
@@ -4686,9 +4715,16 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     return out;
   };
 
+  // For Compare: use fresh daily data when the month is within daily coverage; else fall back to snapshots (history).
+  const aggMonth=(month)=>{
+    if(!month)return [];
+    const dMinM=(dailyDateRange.min||'').slice(0,7),dMaxM=(dailyDateRange.max||'').slice(0,7);
+    if(hasDailyData&&dMinM&&dMaxM&&month>=dMinM&&month<=dMaxM)return aggregateDaily(month+'-01',month+'-31');
+    return aggregateRows(filterSnaps(month));
+  };
   // Compare mode rows
-  const compareARows=useMemo(()=>applyReToRows(aggregateRows(filterSnaps(compareA)),compareA),[data.snapshots,compareA,perfTraining,staff]);
-  const compareBRows=useMemo(()=>applyReToRows(aggregateRows(filterSnaps(compareB)),compareB),[data.snapshots,compareB,perfTraining,staff]);
+  const compareARows=useMemo(()=>applyReToRows(aggMonth(compareA),compareA),[data.snapshots,compareA,perfTraining,staff,dailyAppts,dailyRevenue,dailyDateRange]);
+  const compareBRows=useMemo(()=>applyReToRows(aggMonth(compareB),compareB),[data.snapshots,compareB,perfTraining,staff,dailyAppts,dailyRevenue,dailyDateRange]);
 
   // Window for the Revenue tab (month-granular for presets, exact for custom range) → matches the practitioner bar's clipping.
   const _rvF=(usingCustomRange?customFrom:dateFrom)||'',_rvT=(usingCustomRange?customTo:dateTo)||'';
@@ -5507,8 +5543,21 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         <>
           {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7);const t=(usingCustomRange?customTo:dateTo||'').slice(0,7);return<SessSummary log={sessionLog} fromM={f} toM={t}/>;})()}
           {(()=>{
+            // Window for this card.
+            const f=(usingCustomRange?customFrom:(dateFrom?dateFrom+'-01':''))||'';
+            const t=(usingCustomRange?customTo:(dateTo?dateTo+'-31':''))||'';
+            // Months the window spans.
+            const wMonths=[];{let a=(f||'').slice(0,7),b=(t||'').slice(0,7);if(a&&b){let y=+a.slice(0,4),m=+a.slice(5,7);const ey=+b.slice(0,4),em=+b.slice(5,7);let guard=0;while((y<ey||(y===ey&&m<=em))&&guard++<60){wMonths.push(y+'-'+String(m).padStart(2,'0'));m++;if(m>12){m=1;y++;}}}}
+            const srcMonths=new Set((srcSalesRows||[]).map(r=>r.date.slice(0,7)));
+            const srcCovers=(srcSalesRows||[]).length>0&&wMonths.length>0&&wMonths.every(m=>srcMonths.has(m));
             const locRev={};
-            filteredSnaps.forEach(s=>(s.rows||[]).forEach(r=>{if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{locRev[loc]=(locRev[loc]||0)+(parseFloat(v)||0);});}));
+            if(srcCovers){
+              // Exact: sum billed by actual billing location straight from the Sales files for the window.
+              (srcSalesRows||[]).forEach(r=>{if(f&&r.date<f)return;if(t&&r.date>t)return;locRev[r.loc]=(locRev[r.loc]||0)+r.billed;});
+            }else{
+              // Fallback (months not uploaded): use the period-filtered rows (daily-corrected where possible).
+              filteredRows.forEach(r=>{const rbl=r.revByLoc||{};Object.entries(rbl).forEach(([loc,v])=>{locRev[loc]=(locRev[loc]||0)+(parseFloat(v)||0);});});
+            }
             const locAct={};
             filteredRows.forEach(r=>{const st=staff.find(x=>x.id===r.staffId);const hs=st?siteList(st)[0]:null;if(!hs)return;if(!locAct[hs])locAct[hs]={visits:0,ias:0,heads:0,util:0,utilN:0};locAct[hs].visits+=(r.completed||0);locAct[hs].ias+=(r.initialAssessments||0);if(r.completed||r.revenue)locAct[hs].heads++;if(r.utilization!=null){locAct[hs].util+=r.utilization;locAct[hs].utilN++;}});
             const sites=[...new Set([...Object.keys(locRev),...Object.keys(locAct)])].filter(x=>x&&x!=='—').sort((a,b)=>(locRev[b]||0)-(locRev[a]||0));
