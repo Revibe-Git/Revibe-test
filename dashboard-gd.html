@@ -5582,6 +5582,14 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               // Last resort (older months, no daily/source): raw snapshot split.
               filteredSnaps.forEach(s=>(s.rows||[]).forEach(r=>{if(r.revByLoc)Object.entries(r.revByLoc).forEach(([loc,v])=>{locRev[loc]=(locRev[loc]||0)+(parseFloat(v)||0);});}));
             }
+            // Anchor the TOTAL to revBasis (the exact billed figure the month-end projection uses), keeping
+            // whatever location split we computed above. This makes the card immune to stale/stacked snapshots:
+            // the magnitude always matches the books, only the Sauga/Markham proportion comes from the split.
+            if(!usingCustomRange){
+              let authTotal=0;wMonths.forEach(m=>{const rb=revBasis&&revBasis[m];if(rb)authTotal+=(parseFloat(rb.billed)||0);});
+              const lrTot=Object.values(locRev).reduce((a,b)=>a+b,0);
+              if(authTotal>0&&lrTot>0){const k=authTotal/lrTot;Object.keys(locRev).forEach(l=>{locRev[l]=Math.round(locRev[l]*k*100)/100;});}
+            }
             const locAct={};
             filteredRows.forEach(r=>{const st=staff.find(x=>x.id===r.staffId);const hs=st?siteList(st)[0]:null;if(!hs)return;if(!locAct[hs])locAct[hs]={visits:0,ias:0,heads:0,util:0,utilN:0};locAct[hs].visits+=(r.completed||0);locAct[hs].ias+=(r.initialAssessments||0);if(r.completed||r.revenue)locAct[hs].heads++;if(r.utilization!=null){locAct[hs].util+=r.utilization;locAct[hs].utilN++;}});
             const sites=[...new Set([...Object.keys(locRev),...Object.keys(locAct)])].filter(x=>x&&x!=='—').sort((a,b)=>(locRev[b]||0)-(locRev[a]||0));
@@ -5592,7 +5600,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const lbl=(x)=>x?new Date(x+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const fm=lbl(f),tm=lbl(t);if(fm&&tm)return fm===tm?fm:fm+' – '+tm;if(tm&&!fm)return 'through '+tm;if(fm&&!tm)return fm+' onward';return 'all dates';})()}</span>}</span>
-                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L4</span></span>
+                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L5</span></span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
                 <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
