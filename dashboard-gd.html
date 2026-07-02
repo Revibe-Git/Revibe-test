@@ -5223,21 +5223,6 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           </div>
 
           {(()=>{const rf=(saved?saved.from:reportPeriod.from||'').slice(0,7);const rt=(saved?saved.to:reportPeriod.to||'').slice(0,7);return<SessSummary log={sessionLog} fromM={rf} toM={rt} note={rf&&rt?(rf===rt?rf:rf+'→'+rt):''}/>;})()}
-          {/* Practitioner movers */}
-          <div style={{marginBottom:notes?24:4}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'var(--c-body)',letterSpacing:'1px',marginBottom:8}}>PRACTITIONER CHANGES <span style={{fontSize:12,color:'var(--c-faint)',fontWeight:400,letterSpacing:0}}>(moderate to significant vs prior {pWord})</span></div>
-            {movers.length===0?<div style={{color:'var(--c-mut7)',fontSize:14,padding:'6px 0'}}>No moderate-to-significant practitioner changes this period.</div>:
-             movers.map((m,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'9px 0',borderBottom:'1px solid var(--c-bdk)',gap:12,flexWrap:'wrap'}}>
-                <div><span style={{color:'var(--c-strong)',fontWeight:600,fontSize:14}}>{m.name}</span> <span style={{color:'var(--c-faint)',fontSize:12,marginLeft:4}}>{(DISC.find(x=>x.id===m.disc)||{}).abbr||''}</span></div>
-                <div style={{display:'flex',gap:16,fontSize:13,flexWrap:'wrap'}}>
-                  {m.sigV&&<span style={{color:m.dv>=0?'var(--c-grn)':'var(--c-red)',fontWeight:600}}>{m.dv>=0?'▲':'▼'} {Math.abs(m.dv)} visits ({Math.abs(Math.round(m.vpct))}%)</span>}
-                  {m.sigI&&<span style={{color:m.di>=0?'var(--c-grn)':'var(--c-red)',fontWeight:600}}>{m.di>=0?'▲':'▼'} {Math.abs(m.di)} initials ({Math.abs(Math.round(m.ipct))}%)</span>}
-                  {m.sigR&&<span style={{color:m.dr>=0?'var(--c-grn)':'var(--c-red)',fontWeight:600}}>{m.dr>=0?'▲':'▼'} {fmtMoney(Math.abs(m.dr))} ({Math.abs(Math.round(m.rpct))}%)</span>}
-                </div>
-              </div>
-            ))}
-          </div>
 
           {/* Each clinician vs their OWN prior period — self-relative, accounts for different schedules */}
           {selfRows.length>0&&(()=>{
