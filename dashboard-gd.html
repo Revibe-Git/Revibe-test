@@ -4625,13 +4625,13 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   // For appointments: sum across snapshots. For utilization/revenue: use latest in period.
   const aggregateRows=(snaps)=>{
     if(!snaps.length)return[];
-    // De-dupe stacked snapshots: if more than one snapshot exists for the same month+type
-    // (e.g. a stale partial import sitting behind a fresh full one), keep only the most complete
-    // so revenue/visits aren't double-counted. Different types (sales/shift/appointments) for the
-    // same month are all kept — they carry different fields.
+    // De-dupe stacked snapshots: sales & appointments imports merge into ONE monthly snapshot by
+    // design (matched by date), so for de-dupe they share a bucket — if a stale duplicate exists
+    // (e.g. legacy timestamp-id imports), keep only the most complete. Shift snapshots are a
+    // separate bucket (they carry utilization, not revenue).
     const _best={};
     snaps.forEach(s=>{
-      const key=(s.date||'').slice(0,7)+'|'+(s.type||'sales');
+      const key=(s.date||'').slice(0,7)+'|'+((s.type||'sales')==='shift'?'shift':'monthly');
       const w=(s.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0)+(parseFloat(r.completed)||0)+(parseFloat(r.appointments)||0)+(parseFloat(r.appointmentHours)||0),0)+(s.rows||[]).length*0.001;
       if(!_best[key]||w>_best[key]._w)_best[key]={snap:s,_w:w};
     });
@@ -4949,7 +4949,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const medIA=med(active.map(x=>x.ias));
     // ── Clinic-level flags ──
     if(pT.revenue>0&&cur.hasRev){const dr=(cT.revenue-pT.revenue)/pT.revenue*100;
-      if(dr<=-15)flags.push({sev:'high',title:`Clinic revenue down ${Math.abs(dr).toFixed(0)}% ${per}`,detail:`${fmtMoney(cT.revenue)} this period vs ${fmtMoney(pT.revenue)} prior.`,action:'Pinpoint which disciplines/practitioners drove it (see movers) and rule out a holiday or missing-import artifact.',score:8000});
+      if(dr<=-15)flags.push({sev:'high',title:`Clinic revenue down ${Math.abs(dr).toFixed(0)}% ${per}`,detail:`${fmtMoney(cT.revenue)} this period vs ${fmtMoney(pT.revenue)} prior.`,action:'Pinpoint which disciplines/practitioners drove it (see Each clinician vs their own prior period below) and rule out a holiday or missing-import artifact.',score:8000});
       else if(dr<=-10)flags.push({sev:'med',title:`Clinic revenue down ${Math.abs(dr).toFixed(0)}% ${per}`,detail:`${fmtMoney(cT.revenue)} vs ${fmtMoney(pT.revenue)}.`,action:'Watch into next period; check schedule fill across the team.',score:4000});}
     if(clinicNoShow>=12){const lost=Math.round(cT.noShows*clinAvgRpv);flags.push({sev:clinicNoShow>=18?'high':'med',title:`Clinic no-show rate ${clinicNoShow.toFixed(0)}%`,detail:`${cT.noShows} no-shows of ~${cSched} booked${pSched?` (was ${prevNoShow.toFixed(0)}%)`:''}${lost>0?` · ~${fmtMoney(lost)} of lost capacity`:''}.`,action:'Tighten confirmations (48h + day-of) and revisit deposit / late-cancel policy.',score:5000});}
     if(pT.ias>0){const di=(cT.ias-pT.ias)/pT.ias*100;if(di<=-30)flags.push({sev:'med',title:`New-patient (IA) volume down ${Math.abs(di).toFixed(0)}% ${per}`,detail:`${cT.ias} initial assessments vs ${pT.ias} prior.`,action:'Pipeline gap — review lead follow-up, online-booking availability, and marketing spend.',score:4500});}
@@ -5009,7 +5009,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       const byLoc={[loc]:{revenue:totals.revenue,visits:totals.visits,ias:totals.ias}};
       return {...agg,perStaff:ps,totals,byDisc,byLoc,otherRev:0,scopedLoc:loc};
     };
-    const cur=scopeLoc(built.cur,repLoc),prev=scopeLoc(built.prev,repLoc),movers=computeMovers(cur,prev);
+    const cur=scopeLoc(built.cur,repLoc),prev=scopeLoc(built.prev,repLoc);
     const selfRows=(()=>{
       const pm={};prev.perStaff.forEach(p=>pm[p.id]=p);const cm={};cur.perStaff.forEach(c=>cm[c.id]=c);
       const ids=Array.from(new Set([...cur.perStaff.map(s=>s.id),...prev.perStaff.map(s=>s.id)]));
@@ -5222,7 +5222,6 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             </div>
           </div>
 
-          {(()=>{const rf=(saved?saved.from:reportPeriod.from||'').slice(0,7);const rt=(saved?saved.to:reportPeriod.to||'').slice(0,7);return<SessSummary log={sessionLog} fromM={rf} toM={rt} note={rf&&rt?(rf===rt?rf:rf+'→'+rt):''}/>;})()}
 
           {/* Each clinician vs their OWN prior period — self-relative, accounts for different schedules */}
           {selfRows.length>0&&(()=>{
@@ -5540,7 +5539,6 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       )}
       {tab==='overview'&&(
         <>
-          {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7);const t=(usingCustomRange?customTo:dateTo||'').slice(0,7);return<SessSummary log={sessionLog} fromM={f} toM={t}/>;})()}
           {(()=>{
             // Window for this card.
             const f=(usingCustomRange?customFrom:(dateFrom?dateFrom+'-01':''))||'';
@@ -5585,7 +5583,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const lbl=(x)=>x?new Date(x+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const fm=lbl(f),tm=lbl(t);if(fm&&tm)return fm===tm?fm:fm+' – '+tm;if(tm&&!fm)return 'through '+tm;if(fm&&!tm)return fm+' onward';return 'all dates';})()}</span>}</span>
-                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L5</span></span>
+                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L6-audit</span></span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
                 <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
@@ -6258,7 +6256,6 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             </div>
           </div>
 
-          {(()=>{const maxM=dataMaxMonth||new Date().toISOString().slice(0,7);let fromM='',toM='';if(trendFrom||trendTo){fromM=(trendFrom||'').slice(0,7);toM=(trendTo||'').slice(0,7);}else if(trendTimeframe==='ytd'){fromM=maxM.slice(0,4)+'-01';toM=maxM;}else if(trendTimeframe&&trendTimeframe!=='all'){const n=trendTimeframe==='3m'?3:trendTimeframe==='6m'?6:12;const d=new Date(maxM+'-01T12:00');d.setMonth(d.getMonth()-(n-1));fromM=d.toISOString().slice(0,7);toM=maxM;}return<SessSummary log={sessionLog} fromM={fromM} toM={toM}/>;})()}
 
           {data.snapshots.length<2&&trendGranularity==='monthly'&&<div style={{fontSize:14,color:'#777',padding:'12px 0',fontStyle:'italic'}}>Import at least 2 monthly snapshots to see trend lines.</div>}
 
