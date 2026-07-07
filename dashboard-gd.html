@@ -3297,6 +3297,9 @@ function WeekCompareChart({dailyAppts,dailyRevenue,staff,staffId,filterDisc,filt
 
   const filterRow=(r)=>{
     if(staffId)return r.staff_id===staffId;
+    // Front-desk/retail bucket: counted in the unfiltered clinic view so weekly totals
+    // reconcile with the monthly books; excluded from any staff/discipline/site filter.
+    if(r.staff_id==='_clinic')return(!filterDisc||filterDisc==='all')&&(!filterSite||filterSite==='all');
     const s=(staff||[]).find(x=>x.id===r.staff_id);
     if(!s||['mgmt','ops','edu'].includes(s.discipline))return false;
     if(filterDisc&&filterDisc!=='all'&&s.discipline!==filterDisc)return false;
@@ -4608,17 +4611,17 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     return p;
   };
   const filterSnaps=(filter)=>{
-    if(!filter||filter==='all')return data.snapshots;
+    if(!filter||filter==='all')return canonSnapshots;
     if(filter.includes('-Q')){
       const[y,q]=filter.split('-Q');
-      return data.snapshots.filter(s=>{
+      return canonSnapshots.filter(s=>{
         const[sy,sm]=s.date.split('-');
         return sy===y&&Math.ceil(parseInt(sm)/3)===parseInt(q);
       });
     }
-    if(filter.length===7)return data.snapshots.filter(s=>s.date.startsWith(filter)); // YYYY-MM
-    if(filter.length===4)return data.snapshots.filter(s=>s.date.startsWith(filter)); // YYYY
-    return data.snapshots;
+    if(filter.length===7)return canonSnapshots.filter(s=>s.date.startsWith(filter)); // YYYY-MM
+    if(filter.length===4)return canonSnapshots.filter(s=>s.date.startsWith(filter)); // YYYY
+    return canonSnapshots;
   };
 
   // Aggregate rows across multiple snapshots for a period
@@ -4670,10 +4673,46 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   };
 
   // Active filtered rows
-  const filteredSnaps=useMemo(()=>data.snapshots.filter(s=>{
+  /* ── CANONICAL SNAPSHOTS ────────────────────────────────
+     One display dataset every chart/table reads, so per-person revenue can never differ
+     between pages. Built by (1) de-duping stacked snapshots (monthly vs shift buckets,
+     most-complete wins) and (2) for months covered by fresh daily data, replacing each
+     person's revenue/revByLoc with the daily-derived figure (incl. the '_clinic' bucket).
+     Visits/utilization fields are left untouched. */
+  const canonSnapshots=useMemo(()=>{
+    const best={};
+    (data.snapshots||[]).forEach(s=>{
+      const key=(s.date||'').slice(0,7)+'|'+((s.type||'sales')==='shift'?'shift':'monthly');
+      const w=(s.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0)+(parseFloat(r.completed)||0)+(parseFloat(r.appointments)||0)+(parseFloat(r.appointmentHours)||0),0)+(s.rows||[]).length*0.001;
+      if(!best[key]||w>best[key]._w)best[key]={snap:s,_w:w};
+    });
+    let snaps=Object.values(best).map(x=>x.snap);
+    const dMinM=(dailyDateRange.min||'').slice(0,7),dMaxM=(dailyDateRange.max||'').slice(0,7);
+    if(hasDailyData&&dMinM&&dMaxM){
+      snaps=snaps.map(s=>{
+        const m=(s.date||'').slice(0,7);
+        if((s.type||'sales')==='shift'||!(m>=dMinM&&m<=dMaxM))return s;
+        const dRows=aggregateDaily(m+'-01',m+'-31');const dMap={};dRows.forEach(r=>{dMap[r.staffId]=r;});
+        let clinicRev=0;const clinicLoc={};
+        dailyRevenue.forEach(r=>{if(r.staff_id==='_clinic'&&(r.date||'').slice(0,7)===m){clinicRev+=(r.revenue||0);Object.entries(r.revByLoc||{}).forEach(([l,v])=>{clinicLoc[l]=(clinicLoc[l]||0)+(v||0);});}});
+        const seen={};
+        const rows=(s.rows||[]).map(r=>{
+          if(r.name==='_clinic')return{...r,revenue:Math.round(clinicRev*100)/100,revByLoc:clinicLoc};
+          if(!r.staffId)return r;
+          seen[r.staffId]=1;const d=dMap[r.staffId];
+          return d?{...r,revenue:d.revenue,revByLoc:d.revByLoc||{}}:{...r,revenue:0,revByLoc:{}};
+        });
+        dRows.forEach(d=>{if(!seen[d.staffId]&&(d.revenue||0)>0){const st=staff.find(x=>x.id===d.staffId);rows.push({staffId:d.staffId,name:st?st.name:String(d.staffId),revenue:d.revenue,revByLoc:d.revByLoc||{}});}});
+        return{...s,rows};
+      });
+    }
+    return snaps.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  },[data.snapshots,hasDailyData,dailyAppts,dailyRevenue,dailyDateRange,staff]);
+
+  const filteredSnaps=useMemo(()=>canonSnapshots.filter(s=>{
     const m=s.date.slice(0,7);
     return(!dateFrom||m>=dateFrom)&&(!dateTo||m<=dateTo);
-  }),[data.snapshots,dateFrom,dateTo]);
+  }),[canonSnapshots,dateFrom,dateTo]);
   const filteredRows=useMemo(()=>{
     if(usingCustomRange&&hasDailyData)return aggregateDaily(customFrom,customTo);
     const snapRows=aggregateRows(filteredSnaps);              // visits + utilization (and stale revenue) across the window
@@ -4790,7 +4829,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   const fmtRev=(v)=>v>=1000?'$'+(v/1000).toFixed(1)+'k':'$'+Math.round(v);
   const pctDiff=(a,b)=>b&&a?Math.round(((a-b)/b)*100):null;
 
-  const getTrend=(sId,metric)=>data.snapshots.map(snap=>{
+  const getTrend=(sId,metric)=>canonSnapshots.map(snap=>{
     const r=snap.rows?.find(r=>r.staffId===sId);
     return{date:snap.date,val:r?parseFloat(r[metric])||null:null};
   }).filter(d=>d.val!=null);
@@ -5252,6 +5291,27 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             const _ppt=_pf?_D(_pf,-1):'',_ppf=_pf?_D(_pf,-_dlen):'';
             const inWin=(d,a,b)=>(!a||d>=a)&&(!b||d<=b);
             const perfAgg=(ds,a,b)=>{const by={};let sess=0,rev=0;(ds.S||[]).forEach(s=>{if(inWin(s.date,a,b)){const k=(s.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sess:0,rev:0}).sess++;sess++;}});(ds.P||[]).forEach(p=>{if(inWin(p.date,a,b)){const k=(p.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sess:0,rev:0}).rev+=p.amount;rev+=p.amount;}});return{by,sess,rev};};
+            // Per-day totals for one or more perf datasets within the report window.
+            const perfDailyTable=(dsList,accent)=>{
+              const byDay={};const day=(d)=>(byDay[d]=byDay[d]||{date:d,sess:0,rev:0});
+              dsList.forEach(ds=>{(ds.S||[]).forEach(s=>{if(inWin(s.date,_pf,_pt)&&s.date)day(s.date.slice(0,10)).sess++;});(ds.P||[]).forEach(p=>{if(inWin(p.date,_pf,_pt)&&p.date&&p.amount)day(p.date.slice(0,10)).rev+=p.amount;});});
+              const days=Object.values(byDay).filter(d=>d.sess||d.rev).sort((a,b)=>a.date.localeCompare(b.date));
+              if(!days.length)return null;
+              const tS=days.reduce((a,d)=>a+d.sess,0),tR=days.reduce((a,d)=>a+d.rev,0);
+              return(<div style={{marginBottom:14}}>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:accent||'var(--c-mut8)',marginBottom:4}}>Daily totals</div>
+                <div style={{overflowX:'auto'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5,minWidth:380}}>
+                  <thead><tr style={{textAlign:'right',color:'var(--c-mut8)',fontSize:11,textTransform:'uppercase',letterSpacing:'.5px'}}><th style={{textAlign:'left',padding:'5px 8px'}}>Date</th><th style={{padding:'5px 8px'}}>Sessions</th><th style={{padding:'5px 8px'}}>Revenue</th></tr></thead>
+                  <tbody>
+                  {days.map(d=>{const dt=new Date(d.date+'T12:00');const wknd=[0,6].includes(dt.getDay());return(<tr key={d.date} style={{borderTop:'1px solid var(--c-bdk)'}}><td style={{textAlign:'left',padding:'5px 8px',color:wknd?'var(--c-blue)':'var(--c-sec)'}}>{dt.toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric'})}</td><td style={{textAlign:'right',padding:'5px 8px',color:'var(--c-sec)'}}>{d.sess||'—'}</td><td style={{textAlign:'right',padding:'5px 8px',color:d.rev?'var(--c-grn)':'var(--c-faint)'}}>{d.rev?fmtMoney(d.rev):'—'}</td></tr>);})}
+                  <tr style={{borderTop:'2px solid var(--c-grid)',fontWeight:700,color:'var(--c-strong)'}}><td style={{textAlign:'left',padding:'6px 8px'}}>Total</td><td style={{textAlign:'right',padding:'6px 8px'}}>{tS}</td><td style={{textAlign:'right',padding:'6px 8px'}}>{fmtMoney(tR)}</td></tr>
+                  </tbody>
+                </table>
+                </div>
+                <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:4}}>Sessions land on the appointment date; revenue on the purchase/payment date — a day can show revenue with no sessions (package payment) or sessions with no revenue (package-covered visits).</div>
+              </div>);
+            };
             const perfStaffTable=(ds,heading,accent)=>{
               const c=perfAgg(ds,_pf,_pt), p=perfAgg(ds,_ppf,_ppt);
               const keys=Array.from(new Set([...Object.keys(c.by),...Object.keys(p.by)]));
@@ -5334,6 +5394,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                     </div>
                   </div>
                   {perfStaffTable(PERF_DS.pt_postop,'',null)}
+                  {perfDailyTable([PERF_DS.pt_postop],'var(--c-pink)')}
                   <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:4,marginBottom:6,lineHeight:1.5}}>Post-Operative Rehabilitation is a clinical service shown here separately. Sessions are arrived appointments attributed to the provider. Revenue is the <b style={{color:'var(--c-mut8)'}}>billed</b> $125/visit — these stay Unpaid in Jane until the provider's e-transfer arrives, so this reflects value delivered, not cash received. These figures also remain within the clinical discipline revenue above.</div>
                 </React.Fragment>
                 );
@@ -5357,6 +5418,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   </div>
                   {perfStaffTable(DS_TRAIN,'Performance Training','var(--c-gold)')}
                   {perfStaffTable(DS_REHAB,'Performance Rehab','var(--c-blue)')}
+                  {perfDailyTable([DS_TRAIN,DS_REHAB],'var(--c-gold)')}
                   <div style={{fontSize:10.5,color:'var(--c-faint)',marginTop:4,marginBottom:6,lineHeight:1.5}}>Sessions are arrived appointments attributed to the trainer. Revenue = cash collected this period — a package/plan counts only what was paid that period, with the rest showing in the months it was paid. Package dollars go to the staff assigned in the Revenue tab (or the tagged trainer); unassigned ones sit in <b style={{color:'var(--c-mut8)'}}>Package / payment-plan revenue</b> — still counted. Rehab visits are matched to clients on a Performance Rehab package (usually booked as Physiotherapy), so they also appear within clinical Physio above. Separate from clinical Post-Op Rehabilitation.</div>
                 </React.Fragment>
                 );
@@ -5583,7 +5645,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const lbl=(x)=>x?new Date(x+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const fm=lbl(f),tm=lbl(t);if(fm&&tm)return fm===tm?fm:fm+' – '+tm;if(tm&&!fm)return 'through '+tm;if(fm&&!tm)return fm+' onward';return 'all dates';})()}</span>}</span>
-                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L6-audit</span></span>
+                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L9</span></span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
                 <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
@@ -5605,7 +5667,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               </div>
             );
           })()}
-          <ProjectionCard snapshots={data.snapshots} filterDisc={filterDisc} filterSite={filterSite} staff={staff} revBasis={revBasis} dataMaxMonth={dataMaxMonth} dailyMaxDate={dailyDateRange.max}/>
+          <ProjectionCard snapshots={canonSnapshots} filterDisc={filterDisc} filterSite={filterSite} staff={staff} revBasis={revBasis} dataMaxMonth={dataMaxMonth} dailyMaxDate={dailyDateRange.max}/>
           <div className="grid2">
           <div className="perf-slot">
             <div className="perf-slot-head"><span className="perf-slot-title" style={{color:'#CAE8C1'}}>Revenue</span>{!withRev.length&&<button className="btn btn-ghost btn-xs" onClick={()=>setTab('import')}>Import →</button>}</div>
@@ -5629,7 +5691,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             const maxIA=iaStaff[0]?.initialAssessments||1;
             const totalIA=iaStaff.reduce((a,s)=>a+(s.initialAssessments||0),0);
             // Clinic-wide monthly trend from all snapshots
-            const clinicMonthlyIA=data.snapshots.map(s=>({
+            const clinicMonthlyIA=canonSnapshots.map(s=>({
               date:s.date,
               total:(s.rows||[]).reduce((a,r)=>a+(parseFloat(r.initialAssessments)||0),0)
             })).filter(p=>p.total>0).sort((a,b)=>a.date.localeCompare(b.date));
@@ -5791,7 +5853,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
         const _to=(usingCustomRange?customTo:dateTo)||'';
         const fM=_from.slice(0,7),tM=_to.slice(0,7);
         const inM=(d)=>{const m=(d||'').slice(0,7);return (!fM||m>=fM)&&(!tM||m<=tM);};
-        const aggBy=(S,P)=>{const by={};let ts=0,tr=0;S.filter(s=>inM(s.date)).forEach(s=>{const k=(s.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sessions:0,revenue:0}).sessions++;ts++;});P.filter(p=>inM(p.date)).forEach(p=>{const k=(p.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sessions:0,revenue:0}).revenue+=p.amount;tr+=p.amount;});const rows=Object.entries(by).sort((a,b)=>{const au=a[0]==='Unattributed',bu=b[0]==='Unattributed';if(au!==bu)return au?1:-1;return (b[1].revenue-a[1].revenue)||(b[1].sessions-a[1].sessions);});return{rows,ts,tr};};
+        const aggBy=(S,P)=>{const by={};let ts=0,tr=0;const byDay={};const day=(d)=>(byDay[d]=byDay[d]||{date:d,sess:0,rev:0});S.filter(s=>inM(s.date)).forEach(s=>{const k=(s.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sessions:0,revenue:0}).sessions++;ts++;if(s.date)day(s.date.slice(0,10)).sess++;});P.filter(p=>inM(p.date)).forEach(p=>{const k=(p.staff||'').trim()||'Unattributed';(by[k]=by[k]||{sessions:0,revenue:0}).revenue+=p.amount;tr+=p.amount;if(p.date&&p.amount)day(p.date.slice(0,10)).rev+=p.amount;});const rows=Object.entries(by).sort((a,b)=>{const au=a[0]==='Unattributed',bu=b[0]==='Unattributed';if(au!==bu)return au?1:-1;return (b[1].revenue-a[1].revenue)||(b[1].sessions-a[1].sessions);});const days=Object.values(byDay).filter(d=>d.sess||d.rev).sort((a,b)=>a.date.localeCompare(b.date));return{rows,ts,tr,days};};
         const slot=(title,color,data,revWord,note)=>{
           if(!data.ts&&!data.tr)return null;
           return(
@@ -5819,6 +5881,26 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   </tbody>
                 </table>
               </div>
+              {(data.days||[]).length>0&&(
+                <details style={{marginTop:10}}>
+                  <summary style={{cursor:'pointer',fontSize:12.5,color,fontWeight:600,letterSpacing:'.3px',userSelect:'none'}}>Daily totals — {data.days.length} day{data.days.length===1?'':'s'} with activity</summary>
+                  <div style={{overflowX:'auto',marginTop:8}}>
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
+                      <thead><tr style={{color:'#888'}}><th style={{textAlign:'left',padding:'3px 8px'}}>Date</th><th style={{textAlign:'right',padding:'3px 8px'}}>Sessions</th><th style={{textAlign:'right',padding:'3px 8px'}}>Revenue</th></tr></thead>
+                      <tbody>
+                        {data.days.map(d=>{const wd=new Date(d.date+'T12:00').toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric'});const wknd=[0,6].includes(new Date(d.date+'T12:00').getDay());return(
+                          <tr key={d.date} style={{borderTop:'1px solid var(--border)',color:'#bbb'}}>
+                            <td style={{textAlign:'left',padding:'3px 8px',color:wknd?'#9BB8D0':'#ccc'}}>{wd}</td>
+                            <td style={{textAlign:'right',padding:'3px 8px'}}>{d.sess||'—'}</td>
+                            <td style={{textAlign:'right',padding:'3px 8px',color:d.rev?'#44CCAA':'#666'}}>{d.rev?fmtMoney(d.rev):'—'}</td>
+                          </tr>);})}
+                        <tr style={{borderTop:'2px solid var(--border2)',color:'#fff',fontWeight:700}}><td style={{textAlign:'left',padding:'5px 8px'}}>Total</td><td style={{textAlign:'right',padding:'5px 8px'}}>{data.ts}</td><td style={{textAlign:'right',padding:'5px 8px',color:'#44CCAA'}}>{fmtMoney(data.tr)}</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{fontSize:11,color:'#666',marginTop:6}}>Sessions land on the appointment date · revenue on the purchase/payment date, so a day can show revenue with no sessions (package payment) or sessions with no revenue (package-covered visits).</div>
+                </details>
+              )}
               <div style={{fontSize:12,color:'#666',marginTop:8,lineHeight:1.6}}>{note}</div>
             </div>
           </div>);
@@ -5966,7 +6048,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             })}</div>);
           })():(()=>{
             // Always show utilization — fall back to all snapshots if filtered period has none
-            const allUtilRows=data.snapshots
+            const allUtilRows=canonSnapshots
               .flatMap(sn=>(sn.rows||[]).filter(r=>r.utilization!=null))
               .reduce((acc,r)=>{
                 if(!acc[r.staffId]||r.utilization>0)acc[r.staffId]=r;
@@ -6261,9 +6343,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
           {trendSite!=='all'&&!hasLocRevenue&&locRevNote}
 
-          {trendView==='practitioner'&&trendStaff&&<ProjectionCard snapshots={data.snapshots} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} staff={staff} revBasis={revBasis} dataMaxMonth={dataMaxMonth} dailyMaxDate={dailyDateRange.max} title={trendStaff.name}/>}
+          {trendView==='practitioner'&&trendStaff&&<ProjectionCard snapshots={canonSnapshots} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} staff={staff} revBasis={revBasis} dataMaxMonth={dataMaxMonth} dailyMaxDate={dailyDateRange.max} title={trendStaff.name}/>}
 
-          {trendGranularity==='weekly'&&trendView==='clinic'&&(<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe} snapshots={data.snapshots}/>)}
+          {trendGranularity==='weekly'&&trendView==='clinic'&&(<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe} snapshots={canonSnapshots}/>)}
           {trendGranularity==='weekly'&&trendView==='practitioner'&&(trendStaff?<WeekCompareChart dailyAppts={dailyAppts} dailyRevenue={dailyRevenue} staff={staff} staffId={trendStaff.id} filterDisc={trendDisc} filterSite={trendSite} dateFrom={trendFrom} dateTo={trendTo} timeframe={trendTimeframe}/>:<div style={{textAlign:'center',padding:'40px 0',color:'#555',fontSize:15}}>Select a practitioner above to compare their weeks.</div>)}
 
           {trendGranularity==='monthly'&&trendView==='clinic'&&(
@@ -6282,7 +6364,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <div key={key} className="perf-slot">
                     <div className="perf-slot-head"><span className="perf-slot-title" style={{color}}>{label}</span></div>
                     <div style={{padding:'4px 16px 16px'}}>
-                      <ClinicLineChart snapshots={data.snapshots} staff={staff} metric={key} agg={agg} color={color} label={label} fmt={fmt} timeframe={trendTimeframe} filterDisc={trendDisc} filterSite={trendSite} revBasis={revBasis}/>
+                      <ClinicLineChart snapshots={canonSnapshots} staff={staff} metric={key} agg={agg} color={color} label={label} fmt={fmt} timeframe={trendTimeframe} filterDisc={trendDisc} filterSite={trendSite} revBasis={revBasis}/>
                     </div>
                   </div>
                 ))}
@@ -6308,7 +6390,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   if(trendTimeframe==='ytd')return d.getFullYear()===now.getFullYear();
                   return true;
                 };
-                const filteredSnaps=data.snapshots.filter(s=>inTimeframe(s.date));
+                const filteredSnaps=canonSnapshots.filter(s=>inTimeframe(s.date));
                 const clinicAvg={};
                 ['revenue','utilization','completed','initialAssessments','noShows','cancellations'].forEach(metric=>{
                   const monthlyTotals=filteredSnaps.map(s=>{
@@ -6332,7 +6414,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                       <div key={key} className="perf-slot">
                         <div className="perf-slot-head"><span className="perf-slot-title" style={{color}}>{label}</span></div>
                         <div style={{padding:'4px 16px 16px'}}>
-                          <LineChart snapshots={data.snapshots} staffId={trendStaff.id} metric={key} color={color} label={label} fmt={fmt} timeframe={trendTimeframe} clinicAvg={clinicAvg[key]}/>
+                          <LineChart snapshots={canonSnapshots} staffId={trendStaff.id} metric={key} color={color} label={label} fmt={fmt} timeframe={trendTimeframe} clinicAvg={clinicAvg[key]}/>
                         </div>
                       </div>
                     ))}
@@ -6576,6 +6658,7 @@ function Overview({staff,evals,sessions,setPage,openProfile}){
                   <div style={{flex:1,minWidth:0}}><div className="sm fw5">{s.name}</div><div className="flex aic g4" style={{marginTop:2}}><DBadge d={s.discipline}/>{site&&<span style={{fontSize:10,color:'#777'}}>{site}</span>}</div></div>
                 </div>
                 {niche?<div style={{fontSize:11.5,color:'#bbb',lineHeight:1.45}}><span style={{color:'#777'}}>Focus:</span> {niche.length>120?niche.slice(0,120)+'…':niche}</div>:<div style={{fontSize:11.5,color:'#666',fontStyle:'italic'}}>Profile not set yet</div>}
+                {(s.specializations||[]).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:4}}>{(s.specializations||[]).map(sid=>{const sp=SPECIALIZATIONS.find(x=>x.id===sid);return sp?<span key={sid} style={{fontSize:10,background:'rgba(187,153,255,.08)',color:'#BB99FF',border:'1px solid rgba(187,153,255,.2)',borderRadius:3,padding:'1px 6px'}}>{sp.label}</span>:null;})}</div>}
                 {tx&&<div style={{fontSize:11,color:'#8a8a8a',lineHeight:1.45,marginTop:3}}><span style={{color:'#666'}}>Treats with:</span> {tx.length>95?tx.slice(0,95)+'…':tx}</div>}
                 {exc&&<div style={{fontSize:10.5,color:'#c08a8a',lineHeight:1.4,marginTop:3}}><span style={{color:'#8a6a6a'}}>Does not do:</span> {exc.length>70?exc.slice(0,70)+'…':exc}</div>}
               </div>
@@ -7223,12 +7306,39 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff,p
 function StaffNumbersTab({staff,perfData}){
   perfData=perfData||{snapshots:[],gva:{},retention:{}};
 
-  // Get latest snapshot row for this staff member
-  const latestSnap=perfData.snapshots.length?perfData.snapshots[perfData.snapshots.length-1]:null;
+  // Canonical view of the snapshots for display: de-dupe stacked imports (monthly vs shift
+  // buckets, most-complete wins) and, for months covered by fresh daily revenue (synced to
+  // localStorage by the Performance page), override this person's revenue with the daily-derived
+  // figure — so the profile always matches the Performance & Revenue and Reports pages.
+  const snapshots=React.useMemo(()=>{
+    const best={};
+    (perfData.snapshots||[]).forEach(s=>{
+      const k=(s.date||'').slice(0,7)+'|'+((s.type||'sales')==='shift'?'shift':'monthly');
+      const w=(s.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0)+(parseFloat(r.completed)||0)+(parseFloat(r.appointments)||0)+(parseFloat(r.appointmentHours)||0),0)+(s.rows||[]).length*0.001;
+      if(!best[k]||w>best[k]._w)best[k]={snap:s,_w:w};
+    });
+    let snaps=Object.values(best).map(x=>x.snap).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    let daily=[];try{daily=JSON.parse(localStorage.getItem('rvgd3_daily_rev')||'[]');}catch(e){}
+    if(daily.length){
+      const byM={};let mMin=null,mMax=null;
+      daily.forEach(r=>{const m=(r.date||'').slice(0,7);if(!m)return;if(!mMin||m<mMin)mMin=m;if(!mMax||m>mMax)mMax=m;if(r.staff_id===staff.id)byM[m]=(byM[m]||0)+(r.revenue||0);});
+      snaps=snaps.map(s=>{
+        const m=(s.date||'').slice(0,7);
+        if((s.type||'sales')==='shift'||!(mMin&&m>=mMin&&m<=mMax))return s;
+        const rows=(s.rows||[]).map(r=>r.staffId===staff.id?{...r,revenue:Math.round((byM[m]||0)*100)/100}:r);
+        return{...s,rows};
+      });
+    }
+    return snaps;
+  },[perfData.snapshots,staff.id]);
+
+  // Latest MONTHLY snapshot (shift snapshots carry utilization, not revenue/visits)
+  const monthly=snapshots.filter(s=>(s.type||'sales')!=='shift');
+  const latestSnap=monthly.length?monthly[monthly.length-1]:(snapshots.length?snapshots[snapshots.length-1]:null);
   const latestRow=latestSnap?.rows?.find(r=>r.staffId===staff.id);
 
   // Get all historical values for trend
-  const getTrend=(metric)=>perfData.snapshots
+  const getTrend=(metric)=>snapshots
     .map(s=>({date:s.date,val:s.rows?.find(r=>r.staffId===staff.id)?.[metric]||null}))
     .filter(d=>d.val!=null);
 
@@ -12469,15 +12579,17 @@ function SystematicPage({staff=[]}){
           const rows=(staff||[]).filter(s=>['pt','chiro','rmt','osteo','naturo'].includes(s.discipline)).map(s=>{
             const mp=mpFor(s);const specs=s.specializations||[];
             let score=baseFor(s.discipline);if(score<=0)return null;
-            const blob=((mp.expertise||'')+' '+(mp.conditions||'')+' '+(mp.treatments||'')+' '+(mp.bestClients||'')).toLowerCase();
+            const specLabels=specs.map(id=>(SPECIALIZATIONS.find(x=>x.id===id)||{}).label||'').filter(Boolean);
+            const blob=((mp.expertise||'')+' '+(mp.conditions||'')+' '+(mp.treatments||'')+' '+(mp.bestClients||'')+' '+specLabels.join(' ')).toLowerCase();
             const reasons=[];
             const hits=regKW.filter(k=>blob.includes(k));
             if(hits.length){score+=Math.min(hits.length,3)*0.9;reasons.push('profile: '+Array.from(new Set(hits)).slice(0,3).join(', '));}
             if(lifestyles.includes('Post-partum')&&specs.includes('prenatalPostnatal')){score+=3;reasons.push('pre/postnatal');}
+            if(specs.includes('pelvicFloor')&&(lifestyles.includes('Post-partum')||regions.includes('Hip / groin'))){score+=2.5;reasons.push('pelvic floor');}
             if(lifestyles.includes('Competitive athlete')&&(specs.includes('sportsMassage')||/sport|athlet/.test(blob))){score+=1.5;reasons.push('sports focus');}
             if(lifestyles.includes('Older adult')&&/older|geriatr|gentle|relax/.test(blob)){score+=1;reasons.push('older-adult fit');}
             if(lifestyles.includes('General / desk-based')&&/desk|postur|tension|ergonom/.test(blob)){score+=1;reasons.push('desk/posture');}
-            if(highIrr&&(specs.includes('acupuncture')||specs.includes('triggerPoint'))){score+=0.6;reasons.push('pain modalities');}
+            if(highIrr&&(specs.includes('acupuncture')||specs.includes('electroAcu')||specs.includes('triggerPoint')||specs.includes('cupping'))){score+=0.6;reasons.push('pain modalities');}
             const sSports=asSports(mp.sports);const sLower=sSports.map(x=>x.toLowerCase());
             const caseSports=caseSport.filter(c=>isSportName(c));const caseLife=caseSport.filter(c=>!isSportName(c));
             let rapport=0;const hooks=[];
@@ -12522,6 +12634,7 @@ function SystematicPage({staff=[]}){
                 <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'#eee'}}>{s.name} <span style={{fontSize:13,color:BLU,fontWeight:600}}>· {DISCL[s.discipline]||s.discipline} · {(typeof siteList==='function'?siteList(s)[0]:s.site)||s.site||'\u2014'}</span></span>
                 <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{reasons.map((r,i)=>{const isPlay=r.indexOf('plays ')===0;const isAth=r.indexOf('treats ')===0;const bg=isPlay?'#8FE0C0':isAth?'#E0A052':(role==='lead'?LIME:PUR);return <span key={i} style={{fontSize:11,color:'#1a1a1a',background:bg,borderRadius:4,padding:'2px 7px',fontWeight:700,boxShadow:(isPlay||isAth)?'0 0 0 1px rgba(255,255,255,.25)':'none'}}>{(isPlay?'🎯 ':isAth?'🏅 ':'')+r}</span>;})}</div>
               </div>
+              {(s.specializations||[]).length>0&&<div style={{display:'flex',flexWrap:'wrap',gap:4,marginTop:6}}>{(s.specializations||[]).map(sid=>{const sp=SPECIALIZATIONS.find(x=>x.id===sid);return sp?<span key={sid} style={{fontSize:10.5,background:'rgba(187,153,255,.08)',color:'#BB99FF',border:'1px solid rgba(187,153,255,.22)',borderRadius:3,padding:'1px 6px'}}>{sp.label}</span>:null;})}</div>}
               {mp.matchNotes&&<div style={{fontSize:13,color:'#bbb',marginTop:5,lineHeight:1.5,fontStyle:'italic'}}>{mp.matchNotes}</div>}
             </div>
           );
