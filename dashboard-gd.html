@@ -4157,7 +4157,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       });
     });
     const isPO=(t)=>t.includes('post-op')||t.includes('post op')||t.includes('post-operative')||t.includes('post operative')||t.includes('postoperative');
-    const out={};const counted=new Set();
+    const events=[];const counted=new Set();
     arr.forEach(([g,d,st,tn])=>{
       if(!isPO(tn))return;
       if(first[g]!==d)return;                 // must be the patient's first arrived visit
@@ -4165,10 +4165,14 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       if(counted.has(g))return;               // one first-touch per patient
       const m=matchStaff(st);if(!m)return;
       counted.add(g);
-      const mo=d.slice(0,7);(out[mo]=out[mo]||{});out[mo][m.id]=(out[mo][m.id]||0)+1;
+      events.push({date:d,staffId:m.id});
     });
+    const out={};events.forEach(e=>{const mo=e.date.slice(0,7);(out[mo]=out[mo]||{});out[mo][e.staffId]=(out[mo][e.staffId]||0)+1;});
+    out._events=events;
     return out;
   },[sourceFiles,staff]);// eslint-disable-line
+  // Per-staff first-visit post-op counts within an arbitrary date window (for weekly reports).
+  const poFirstInWin=(a,b)=>{const m={};(poFirstByMonth._events||[]).forEach(e=>{if((!a||e.date>=a)&&(!b||e.date<=b))m[e.staffId]=(m[e.staffId]||0)+1;});return m;};
   // Returns a {loc:amount} split for a staff member: their stored revByLoc if present,
   // else their Sales-derived share applied to `revenue`, else everything on `home`.
   const splitRevByLoc=(staffId,revenue,revByLoc,home)=>{
@@ -5221,10 +5225,19 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       if(hasDailyData&&m&&dMin&&m>=dMin&&m<=dMax){dailyAppts.forEach(r=>{if((r.date||'').slice(0,7)===m)ia[r.staff_id]=(ia[r.staff_id]||0)+(r.initial_assessments||0);});src='daily';}
       else{const sn=canonSnapshots.find(s=>(s.date||'').slice(0,7)===m&&(s.type||'sales')!=='shift');if(sn){(sn.rows||[]).forEach(rr=>{if(rr.staffId)ia[rr.staffId]=(ia[rr.staffId]||0)+(parseFloat(rr.initialAssessments)||0);});src='snap';}}
       if(!src)return null;
-      const per={};let tN=0,tI=0,tP=0;
+      /* Same staff scope as every other report number: mgmt/ops/edu excluded (e.g. Dr. J's IAs,
+         post-ops and new patients live on the Retention tab's full-clinic view, not here) —
+         and de-duped per staffId in case the retention report lists someone twice. */
       const _po=poFirstByMonth[m]||{};
-      rs.practitioners.forEach(p=>{if(!p.staffId)return;const n=(p.newPatients!=null)?p.newPatients:null;const i=ia[p.staffId]||0;const po=_po[p.staffId]||0;const first=i+po;per[p.staffId]={n,i,po,first,int:n!=null?first-n:null};if(n!=null)tN+=n;tI+=i;tP+=po;});
-      return{m,label:rs.periodLabel||m,per,tN,tI,tP,tFirst:tI+tP,tInt:(tI+tP)-tN};
+      const _agg={};
+      rs.practitioners.forEach(p=>{if(!p.staffId)return;const st=staff.find(x=>x.id===p.staffId);if(!st||['mgmt','ops','edu'].includes(st.discipline))return;const a=(_agg[p.staffId]=_agg[p.staffId]||{n:null});if(p.newPatients!=null)a.n=(a.n||0)+p.newPatients;});
+      const per={};let tN=0,tI=0,tP=0;
+      Object.entries(_agg).forEach(([id,a])=>{const i=ia[id]||0;const po=_po[id]||0;const first=i+po;per[id]={n:a.n,i,po,first,int:a.n!=null?first-a.n:null};if(a.n!=null)tN+=a.n;tI+=i;tP+=po;});
+      // Report-WINDOW first-visit post-ops (same staff scope) — lets weekly reports show the
+      // week's own post-op first-touches instead of the month total.
+      const _wAll=poFirstInWin(saved?saved.from:reportPeriod.from,saved?saved.to:reportPeriod.to);
+      const winPo={};let wP=0;Object.keys(_agg).forEach(id=>{const v=_wAll[id]||0;if(v){winPo[id]=v;wP+=v;}});
+      return{m,label:rs.periodLabel||m,per,tN,tI,tP,tFirst:tI+tP,tInt:(tI+tP)-tN,winPo,wP};
     })();
 
     return(
@@ -5306,23 +5319,25 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.3px',textTransform:'uppercase',color:'var(--c-mut8)',marginBottom:6}}>{kp.label}</div>
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:revMissing?'var(--c-d55)':kp.color,lineHeight:1}}>{revMissing?'—':kp.fmt(c)}</div>
                   {revMissing?<div style={{marginTop:8,fontSize:11.5,fontWeight:600,color:'var(--c-org)'}}>not imported yet</div>:<div style={{marginTop:8,fontSize:12,fontWeight:700,color:good?'var(--c-grn)':'var(--c-red)'}}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'var(--c-faint)',fontWeight:400}}>vs prior {pWord}</span></div>}
+                  {kp.k==='ias'&&retBk&&repLoc==='all'&&(pWord==='month'?(
+                    <div style={{marginTop:7,paddingTop:7,borderTop:'1px solid var(--c-sep)',fontSize:11.5,lineHeight:1.7}}
+                      title={retBk.label+': '+retBk.tN+' new to clinic (first-ever visits) · '+retBk.tFirst+' first visits ('+retBk.tI+' arrived IAs'+(retBk.tP?' + '+retBk.tP+' first-visit post-op — started as a post-op session, no in-clinic initial':'')+') → '+retBk.tInt+' internal/organic (existing clinic clients referred or cross-booked in). No-shows & cancellations excluded.'}>
+                      {retBk.tP>0&&<div style={{whiteSpace:'nowrap'}}><b style={{color:'var(--c-pink)'}}>{retBk.tP}</b><span style={{color:'var(--c-faint)'}}> of </span><b style={{color:'var(--c-body2)'}}>{retBk.tFirst}</b><span style={{color:'var(--c-faint)'}}> first visits via post-op — no initial</span></div>}
+                      <div style={{whiteSpace:'nowrap'}}>
+                        <b style={{color:'var(--c-pur)'}}>{retBk.tN}</b><span style={{color:'var(--c-faint)'}}> new · </span>
+                        <b style={{color:retBk.tInt>=0?'var(--c-grn)':'var(--c-org)'}}>{retBk.tInt}</b><span style={{color:'var(--c-faint)'}}> internal</span>
+                        <span style={{color:'var(--c-d55)'}}> · {retBk.label.split(' ')[0]}</span>
+                      </div>
+                    </div>
+                  ):(retBk.wP>0?(
+                    <div style={{marginTop:7,paddingTop:7,borderTop:'1px solid var(--c-sep)',fontSize:11.5,whiteSpace:'nowrap'}}
+                      title={'This '+pWord+': '+retBk.wP+' first visit(s) started as a post-op session with no in-clinic initial, so they arrive without an IA. They are counted here on top of the '+String(cur.totals.ias)+' arrived IAs. New-to-clinic and internal/organic are monthly figures — see the monthly report.'}>
+                      <b style={{color:'var(--c-pink)'}}>+{retBk.wP}</b><span style={{color:'var(--c-faint)'}}> first visit{retBk.wP===1?'':'s'} via post-op — no initial</span>
+                    </div>
+                  ):null))}
                 </div>
               );
             })}
-            {retBk&&(
-              <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'15px 16px'}} title={retBk.tFirst+' first visits = '+retBk.tI+' arrived IAs'+(retBk.tP?' + '+retBk.tP+' first-visit post-op (no in-clinic IA needed)':'')+' · no-shows & cancellations excluded'}>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.3px',textTransform:'uppercase',color:'var(--c-mut8)',marginBottom:6}}>New to Clinic</div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:'var(--c-pur)',lineHeight:1}}>{retBk.tN}</div>
-                <div style={{marginTop:8,fontSize:12,color:'var(--c-faint)'}}>first-ever visits · <span style={{fontWeight:700,color:'var(--c-mut8)'}}>{retBk.label}</span>{pWord!=='month'?' (mo)':''}</div>
-              </div>
-            )}
-            {retBk&&(
-              <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'15px 16px'}} title={'Internal / organic = first visits − new to clinic: existing clinic clients referred or cross-booked into a clinician. '+retBk.tFirst+' first visits ('+retBk.tI+' IA'+(retBk.tP?' + '+retBk.tP+' post-op':'')+') − '+retBk.tN+' new = '+retBk.tInt}>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.3px',textTransform:'uppercase',color:'var(--c-mut8)',marginBottom:6}}>Internal / Organic</div>
-                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:retBk.tInt>=0?'var(--c-grn)':'var(--c-org)',lineHeight:1}}>{retBk.tInt}</div>
-                <div style={{marginTop:8,fontSize:12,color:'var(--c-faint)'}}>{retBk.tFirst} first visits − {retBk.tN} new · <span style={{fontWeight:700,color:'var(--c-mut8)'}}>{retBk.label}</span>{pWord!=='month'?' (mo)':''}</div>
-              </div>
-            )}
           </div>
 
           {/* Red flags / gaps / wins — action-planning section */}
@@ -5585,7 +5600,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <tr key={r.id} style={{borderTop:'1px solid var(--c-bdk)',background:r.sev==='high'?'rgba(224,82,82,.07)':(r.attn?'rgba(224,160,82,.06)':'transparent')}}>
                     <td style={{textAlign:'left',padding:'8px',color:'var(--c-strong)',verticalAlign:'top'}}><span style={{marginRight:5}}>{statusDot(r)}</span>{r.name} <span style={{color:'var(--c-faint)',fontSize:11,marginLeft:3}}>{dAbbr(r.disc)}</span>{ctxOf(r)&&<div style={{fontSize:11,color:'var(--c-org)',marginTop:3,maxWidth:360,lineHeight:1.4}}>↳ {ctxOf(r)}</div>}</td>
                     <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{fmtMoney(r.pRev)} → {fmtMoney(r.cRev)}</span><br/><span style={{fontSize:12}}>{delta(r.dr,true)}{r.dr!==0&&<span style={{color:'var(--c-faint)'}}>{pctTxt(r.rpct)}</span>}</span></td>
-                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{r.pIa} → {r.cIa}</span><br/><span style={{fontSize:12}}>{delta(r.di)}{r.di!==0&&<span style={{color:'var(--c-faint)'}}>{pctTxt(r.ipct)}</span>}</span>{retBk&&retBk.per[r.id]&&retBk.per[r.id].n!=null&&(()=>{const b=retBk.per[r.id];return(<><br/><span style={{fontSize:10.5,whiteSpace:'nowrap'}} title={'Month of '+retBk.label+': '+b.n+' new to clinic, '+b.first+' first visits ('+b.i+' IA'+(b.po?' + '+b.po+' first-visit post-op':'')+') → '+b.int+' internal/organic (existing clinic clients referred in)'}><b style={{color:'var(--c-pur)'}}>{b.n}</b><span style={{color:'var(--c-faint)'}}> new · </span>{b.int>=0?<b style={{color:'var(--c-grn)'}}>{b.int}</b>:<b style={{color:'var(--c-org)'}}>{b.int}⚠</b>}<span style={{color:'var(--c-faint)'}}> int{pWord!=='month'?' (mo)':''}</span></span></>);})()}</td>
+                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{r.pIa} → {r.cIa}</span><br/><span style={{fontSize:12}}>{delta(r.di)}{r.di!==0&&<span style={{color:'var(--c-faint)'}}>{pctTxt(r.ipct)}</span>}</span>{retBk&&pWord==='month'&&retBk.per[r.id]&&retBk.per[r.id].n!=null&&(()=>{const b=retBk.per[r.id];return(<><br/><span style={{fontSize:10.5,whiteSpace:'nowrap'}} title={'Month of '+retBk.label+': '+b.n+' new to clinic, '+b.first+' first visits ('+b.i+' IA'+(b.po?' + '+b.po+' started as post-op sessions — no in-clinic initial':'')+') → '+b.int+' internal/organic (existing clinic clients referred in)'}><b style={{color:'var(--c-pur)'}}>{b.n}</b><span style={{color:'var(--c-faint)'}}> new · </span>{b.int>=0?<b style={{color:'var(--c-grn)'}}>{b.int}</b>:<b style={{color:'var(--c-org)'}}>{b.int}⚠</b>}<span style={{color:'var(--c-faint)'}}> int</span>{b.po>0&&<span style={{color:'var(--c-pink)'}}> · {b.po} po</span>}</span></>);})()}{retBk&&pWord!=='month'&&retBk.winPo[r.id]>0&&(<><br/><span style={{fontSize:10.5,whiteSpace:'nowrap',color:'var(--c-pink)'}} title={'This '+pWord+': '+retBk.winPo[r.id]+' first visit(s) that started as a post-op session — no in-clinic initial, so no IA is counted for them.'}>+{retBk.winPo[r.id]} po-first <span style={{color:'var(--c-faint)'}}>(no initial)</span></span></>)}</td>
                     <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{r.pVis} → {r.cVis}</span><br/><span style={{fontSize:12}}>{delta(r.dv)}</span></td>
                   </tr>
                 ))}
@@ -5792,7 +5807,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const lbl=(x)=>x?new Date(x+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const fm=lbl(f),tm=lbl(t);if(fm&&tm)return fm===tm?fm:fm+' – '+tm;if(tm&&!fm)return 'through '+tm;if(fm&&!tm)return fm+' onward';return 'all dates';})()}</span>}</span>
-                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L14</span></span>
+                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L17</span></span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
                 <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
@@ -6479,7 +6494,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                           <div style={{flex:'0 0 235px',display:'flex',gap:6,alignItems:'center',fontSize:12}}>
                             <span title="New to clinic — first-ever visits (retention report)" style={{color:'#BB99FF',fontWeight:700}}>{w._new!=null?w._new:'—'}<span style={{color:'#666',fontWeight:400}}> new</span></span>
                             <span style={{color:'#555'}}>·</span>
-                            <span title={w._first!=null?('First visits: '+w._ia+' arrived IAs'+(w._po?' + '+w._po+' first-visit post-op (no in-clinic IA needed)':'')) : 'First visits'} style={{color:'#7FC8E8',fontWeight:700}}>{w._first!=null?w._first:'—'}<span style={{color:'#666',fontWeight:400}}> first{w._po?<span style={{color:'#E0A0C0'}}>*</span>:null}</span></span>
+                            <span title={w._first!=null?('First visits: '+w._ia+' arrived IAs'+(w._po?' + '+w._po+' that started as post-op sessions — no in-clinic initial':'')) : 'First visits'} style={{color:'#7FC8E8',fontWeight:700}}>{w._first!=null?w._first:'—'}<span style={{color:'#666',fontWeight:400}}> first</span>{w._po>0&&<span style={{color:'#E0A0C0',fontWeight:600}}> ({w._po} po)</span>}</span>
                             <span style={{color:'#555'}}>→</span>
                             {w._int==null?<span style={{color:'#555'}}>—</span>:
                              w._int>=0?<span title="Internal referrals / organic — existing clinic clients booked into this clinician" style={{color:'#44CCAA',fontWeight:700}}>{w._int}<span style={{color:'#666',fontWeight:400}}> internal</span></span>:
@@ -6494,7 +6509,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   })}
                   <div style={{fontSize:13,color:'#666',marginTop:10,lineHeight:1.6}}>
                     Bars show each practitioner's repeat-visit %; returning % is under the name.
-                    {iaSrc?<> <b style={{color:'#BB99FF'}}>New</b> = first-ever clinic visits from the retention report. <b style={{color:'#7FC8E8'}}>First</b> = first visits for {retentionSummary.periodLabel||_m}: arrived initial assessments (from the {iaSrc}) plus first-visit post-op arrivals<span style={{color:'#E0A0C0'}}>*</span> — surgical clients whose first visit doesn't need an in-clinic IA. No-shows and cancellations are never counted. <b style={{color:'#44CCAA'}}>Internal</b> = First − New: clients who already existed at the clinic and were referred or organically cross-booked into this clinician.</>:
+                    {iaSrc?<> <b style={{color:'#BB99FF'}}>New</b> = first-ever clinic visits from the retention report. <b style={{color:'#7FC8E8'}}>First</b> = first visits for {retentionSummary.periodLabel||_m}: arrived initial assessments (from the {iaSrc}) plus first-visit post-op arrivals — shown as <span style={{color:'#E0A0C0',fontWeight:600}}>(n po)</span>: surgical clients whose first visit started as a post-op session, so there's no in-clinic initial. No-shows and cancellations are never counted. <b style={{color:'#44CCAA'}}>Internal</b> = First − New: clients who already existed at the clinic and were referred or organically cross-booked into this clinician.</>:
                     <> Upload the Appointments file covering {retentionSummary.periodLabel||_m} on the Jane Import tab to also see arrived initial assessments and the internal-referral split (IA − new-to-clinic).</>}
                   </div>
                 </div>
