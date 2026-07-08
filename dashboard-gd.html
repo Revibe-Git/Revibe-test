@@ -2199,6 +2199,65 @@ function CallHistoryPage(){
   const backupRef=React.useRef(null);
   const exportBackup=()=>{try{const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='revibe-callhistory-backup-'+today+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}catch(e){window.alert('Export failed: '+((e&&e.message)||e));}};
   const importBackup=(file)=>{if(!file)return;const r=new FileReader();r.onload=()=>{try{const obj=JSON.parse(r.result);if(!obj||typeof obj!=='object'||!obj.calls)throw new Error('That file does not look like a Call History backup.');if(window.confirm('Restore this backup? It will REPLACE all current calls, leads, and sources — for everyone — with the contents of this file.')){persist(obj,true);window.alert('Backup restored.');}}catch(e){window.alert('Restore failed: '+((e&&e.message)||e));}};r.readAsText(file);};
+
+  /* ── Backdate import: Google Sheets → CSV → call log ─────────────
+     Accepts either shape:
+       A) long — Date, [Location], Discipline/Service, Calls, [Booked] (one row per date+discipline)
+       B) wide — Date, [Location], one column per discipline (Physio, RMT, Chiro…) with optional
+          "<Disc> Booked" columns.
+     Imported dates REPLACE that date+location's existing day (the sheet is the truth for the
+     dates it covers); all other days are untouched. */
+  const csvRef=React.useRef(null);
+  const[csvPrev,setCsvPrev]=useState(null);
+  const[csvDone,setCsvDone]=useState('');
+  const _csvParse=(text)=>{const rows=[];let row=[],cur='',q=false;const s=String(text||'').replace(/\r\n?/g,'\n');for(let i=0;i<s.length;i++){const ch=s[i];if(q){if(ch==='"'){if(s[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=ch;}else if(ch==='"')q=true;else if(ch===','){row.push(cur);cur='';}else if(ch==='\n'){row.push(cur);rows.push(row);row=[];cur='';}else cur+=ch;}if(cur!==''||row.length){row.push(cur);rows.push(row);}return rows.filter(r=>r.some(c=>String(c).trim()!==''));};
+  const _discFromHeader=(h)=>{h=String(h||'').toLowerCase();if(/pelvic/.test(h))return'pelvic';if(/perf|training/.test(h))return'perf';if(/fam|doctor|\bmd\b/.test(h))return'famdoc';if(/sauna|plunge|recovery/.test(h))return'sauna';if(/naturo|\bnd\b/.test(h))return'naturo';if(/osteo/.test(h))return'osteo';if(/chiro/.test(h))return'chiro';if(/rmt|massage/.test(h))return'rmt';if(/physio|\bpt\b/.test(h))return'pt';if(/other/.test(h))return'other';return null;};
+  const _normLocCSV=(v)=>{const l=String(v||'').toLowerCase();if(/markham/.test(l))return'Markham';if(/mississauga|sauga|sherway/.test(l))return'Mississauga';return null;};
+  const _normDate=(v)=>{const s=String(v||'').trim();if(!s)return null;let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return m[1]+'-'+String(+m[2]).padStart(2,'0')+'-'+String(+m[3]).padStart(2,'0');m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);if(m){let a=+m[1],b=+m[2],y=+m[3];if(y<100)y+=2000;let mo=a,d=b;if(a>12&&b<=12){mo=b;d=a;}return y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');}const t=Date.parse(s+(/\d{4}/.test(s)?'':' '+new Date().getFullYear())+' 12:00');if(!isNaN(t))return new Date(t).toISOString().slice(0,10);return null;};
+  const parseCallCSV=(text,fileName)=>{
+    const rows=_csvParse(text);if(rows.length<2)return{error:'File has no data rows.'};
+    const hdr=rows[0].map(h=>String(h||'').trim());const lh=hdr.map(h=>h.toLowerCase());
+    let dateI=lh.findIndex(h=>/date|day\b/.test(h));if(dateI<0)dateI=0;
+    const locI=lh.findIndex(h=>/location|site|clinic/.test(h));
+    const discColI=lh.findIndex((h,i)=>i!==dateI&&i!==locI&&/^(disc|discipline|service|type|category|offering)/.test(h));
+    const entries=[];const warn=[];let badDates=0;
+    if(discColI>=0){ // shape A — long
+      const callI=lh.findIndex((h,i)=>i!==dateI&&i!==locI&&i!==discColI&&/call|count|qty|total|#/.test(h));
+      const bookI=lh.findIndex(h=>/book/.test(h));
+      if(callI<0)return{error:'Found a Discipline column but no Calls/Count column.'};
+      rows.slice(1).forEach(r=>{const date=_normDate(r[dateI]);if(!date){badDates++;return;}const disc=_discFromHeader(r[discColI]);if(!disc)return;const c=parseInt(String(r[callI]).replace(/[^0-9]/g,''))||0;const b=bookI>=0?(parseInt(String(r[bookI]).replace(/[^0-9]/g,''))||0):0;if(c||b)entries.push({date,loc:locI>=0?_normLocCSV(r[locI]):null,disc,c,b});});
+    }else{ // shape B — wide
+      const cols=[];const unmapped=[];
+      hdr.forEach((h,i)=>{if(i===dateI||i===locI)return;const isB=/book/.test(lh[i]);const disc=_discFromHeader(h);if(disc)cols.push({i,disc,b:isB});else if(String(h).trim())unmapped.push(h);});
+      if(!cols.length)return{error:'No discipline columns recognized. Headers should include e.g. Physio, Chiro, RMT, Osteo, Naturo, Sauna…'};
+      if(unmapped.length)warn.push('Ignored columns: '+unmapped.slice(0,6).join(', ')+(unmapped.length>6?'…':''));
+      rows.slice(1).forEach(r=>{const date=_normDate(r[dateI]);if(!date){badDates++;return;}const locV=locI>=0?_normLocCSV(r[locI]):null;cols.forEach(cl=>{const n=parseInt(String(r[cl.i]).replace(/[^0-9]/g,''))||0;if(!n)return;entries.push({date,loc:locV,disc:cl.disc,c:cl.b?0:n,b:cl.b?n:0});});});
+    }
+    if(badDates)warn.push(badDates+' row(s) skipped — date not recognized.');
+    if(!entries.length)return{error:'No usable rows found.'+(warn.length?' '+warn.join(' '):'')};
+    const noLoc=entries.some(e=>!e.loc);
+    if(locI<0)warn.push('No Location column — all rows will file under '+loc+' (the location selected above).');
+    else if(noLoc)warn.push('Some rows have an unrecognized location — those file under '+loc+'.');
+    const dates=entries.map(e=>e.date).sort();
+    return{entries,warn,fileName,from:dates[0],to:dates[dates.length-1],
+      totC:entries.reduce((a,e)=>a+e.c,0),totB:entries.reduce((a,e)=>a+e.b,0),
+      days:new Set(entries.map(e=>(e.loc||loc)+'|'+e.date)).size};
+  };
+  const handleCallCSV=(file)=>{if(!file)return;setCsvDone('');const r=new FileReader();r.onload=()=>{const res=parseCallCSV(r.result,file.name);if(res.error){window.alert('Import failed: '+res.error);setCsvPrev(null);}else setCsvPrev(res);};r.readAsText(file);};
+  const applyCallCSV=()=>{
+    if(!csvPrev)return;
+    const byDay={};
+    csvPrev.entries.forEach(e=>{const L=e.loc||loc;const k=L+'|'+e.date;(byDay[k]=byDay[k]||{L,date:e.date,day:{}});const d=byDay[k].day;const p=d[e.disc]||{c:0,b:0};d[e.disc]={c:p.c+e.c,b:p.b+e.b};});
+    const calls={...data.calls};
+    Object.values(byDay).forEach(({L,date,day})=>{
+      if(!calls[L])calls[L]={};else calls[L]={...calls[L]};
+      const out={};Object.entries(day).forEach(([id,v])=>{if(v.c||v.b)out[id]=v.b?{c:v.c,b:v.b}:v.c;});
+      calls[L][date]=out;
+    });
+    persist({...data,calls},true);
+    setCsvDone('Imported '+csvPrev.days+' day(s) · '+csvPrev.totC+' calls'+(csvPrev.totB?' · '+csvPrev.totB+' booked':'')+' ('+csvPrev.from+' → '+csvPrev.to+').');
+    setCsvPrev(null);
+  };
   useEffect(()=>{try{localStorage.setItem('rvgd3_call_log',JSON.stringify(data));}catch(e){}},[]);// eslint-disable-line
   useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data:row}=await SB.from('call_log').select('data').eq('id','singleton').maybeSingle();if(!c&&row&&row.data&&typeof row.data==='object'){const merged=seedMerge(migrate(row.data));setData(merged);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(merged));}catch(e){}SB.from('call_log').upsert({id:'singleton',data:merged});}}catch(e){}};ld();return()=>{c=true;};},[]);// eslint-disable-line
 
@@ -2355,6 +2414,33 @@ function CallHistoryPage(){
           {savedFlag&&<span style={{color:'#44CCAA',fontSize:13}}>Saved ✓</span>}
         </div>
       </div>
+
+      <details style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'12px 16px',marginBottom:16}}>
+        <summary style={{cursor:'pointer',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:'#aaa',userSelect:'none'}}>⬆ Backdate from Google Sheets (CSV import)</summary>
+        <div style={{marginTop:10}}>
+          <div style={{fontSize:12.5,color:'#999',lineHeight:1.6,marginBottom:10}}>
+            In Google Sheets: <b style={{color:'#ccc'}}>File → Download → Comma Separated Values (.csv)</b>, then drop it here. Two layouts work:
+            a <b style={{color:'#ccc'}}>Date</b> column plus one column per discipline (Physio, Chiro, RMT, Osteo, Naturo, Sauna… optionally "Physio Booked" etc.), or one row per entry with <b style={{color:'#ccc'}}>Date · Discipline · Calls · Booked</b>.
+            An optional <b style={{color:'#ccc'}}>Location</b> column splits Mississauga/Markham — without one, everything files under <b style={{color:LOC_C[loc]}}>{loc}</b> (the toggle above). Imported dates <b style={{color:'#F4DB71'}}>replace</b> those days; everything else is untouched.
+          </div>
+          <input type="file" accept=".csv,.tsv,text/csv" ref={csvRef} style={{display:'none'}} onChange={e=>{handleCallCSV(e.target.files[0]);e.target.value='';}}/>
+          <button className="btn btn-ghost btn-sm" onClick={()=>csvRef.current&&csvRef.current.click()}>Choose CSV file…</button>
+          {csvDone&&<span style={{marginLeft:10,color:'#44CCAA',fontSize:13}}>✓ {csvDone}</span>}
+          {csvPrev&&(
+            <div style={{marginTop:12,background:'var(--surface3)',border:'1px solid var(--border2)',borderRadius:6,padding:'12px 14px'}}>
+              <div style={{fontSize:13,color:'#ddd',fontWeight:600,marginBottom:6}}>Preview — {csvPrev.fileName}</div>
+              <div style={{fontSize:12.5,color:'#bbb',lineHeight:1.7}}>
+                <b style={{color:'#fff'}}>{csvPrev.days}</b> day(s) across <b style={{color:'#fff'}}>{csvPrev.from}</b> → <b style={{color:'#fff'}}>{csvPrev.to}</b> · <b style={{color:'#fff'}}>{csvPrev.totC}</b> calls{csvPrev.totB?<> · <b style={{color:'#44CCAA'}}>{csvPrev.totB}</b> booked</>:null}
+              </div>
+              {csvPrev.warn.map((w,i)=><div key={i} style={{fontSize:12,color:'#F4DB71',marginTop:4}}>⚠ {w}</div>)}
+              <div style={{marginTop:10,display:'flex',gap:8}}>
+                <button className="btn btn-lime btn-sm" onClick={applyCallCSV}>Import {csvPrev.days} day(s)</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>setCsvPrev(null)}>Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </details>
 
       <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
         <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginRight:2}}>View</span>
@@ -5645,7 +5731,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const lbl=(x)=>x?new Date(x+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const fm=lbl(f),tm=lbl(t);if(fm&&tm)return fm===tm?fm:fm+' – '+tm;if(tm&&!fm)return 'through '+tm;if(fm&&!tm)return fm+' onward';return 'all dates';})()}</span>}</span>
-                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L9</span></span>
+                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L11</span></span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
                 <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
@@ -6279,6 +6365,25 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             const repLabel=(n)=>n==null?'':n>=55?'Healthy':n>=45?'Watch':'Low';
             const retC=(n)=>n==null?'#888':n>=85?'#CAE8C1':n>=75?'#44ccaa':n>=65?'#F4DB71':'#E05252';
             const list=retentionSummary.practitioners.filter(p=>p.staffId).slice().sort((a,b)=>(b.pctRepeatVisits||0)-(a.pctRepeatVisits||0));
+            /* Arrived-only Initial Assessments for the retention month, per staff.
+               New-to-clinic (retention CSV) = truly first-ever visits. IA − New = clients who
+               already existed at the clinic and were referred/booked into this clinician —
+               internal referrals / organic cross-bookings. No-shows & cancellations never count:
+               both the daily and monthly appointment parsers only tally IAs on state='arrived'. */
+            const _m=retActiveMonth;
+            const _dMin=(dailyDateRange.min||'').slice(0,7),_dMax=(dailyDateRange.max||'').slice(0,7);
+            const iaByStaff={};let iaSrc=null;
+            if(hasDailyData&&_m&&_dMin&&_m>=_dMin&&_m<=_dMax){
+              dailyAppts.forEach(r=>{if((r.date||'').slice(0,7)===_m)iaByStaff[r.staff_id]=(iaByStaff[r.staff_id]||0)+(r.initial_assessments||0);});
+              iaSrc='daily appointments';
+            }else{
+              const snap=canonSnapshots.find(s=>(s.date||'').slice(0,7)===_m&&(s.type||'sales')!=='shift');
+              if(snap){(snap.rows||[]).forEach(r=>{if(r.staffId&&r.initialAssessments!=null)iaByStaff[r.staffId]=(iaByStaff[r.staffId]||0)+(parseFloat(r.initialAssessments)||0);});iaSrc='monthly snapshot';}
+            }
+            const withNums=list.map(p=>{const ia=iaSrc?(iaByStaff[p.staffId]||0):null;const newP=(p.newPatients!=null)?p.newPatients:null;const internal=(ia!=null&&newP!=null)?ia-newP:null;return{...p,_ia:ia,_new:newP,_int:internal};});
+            const totNew=withNums.reduce((a,p)=>a+(p._new||0),0);
+            const totIA=withNums.reduce((a,p)=>a+(p._ia||0),0);
+            const totInt=totIA-totNew;
             return(
               <div className="perf-slot" style={{marginBottom:14}}>
                 <div className="perf-slot-head">
@@ -6286,21 +6391,48 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <span style={{fontSize:13,color:'#777'}}>repeat-visit % · auto-filled from the Member Retention report</span>
                 </div>
                 <div className="perf-slot-body">
+                  {iaSrc&&(
+                    <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
+                      {[['New to clinic',totNew,'#BB99FF','first-ever visits (retention report)'],['Initial assessments',totIA,'#7FC8E8','arrived IAs — no-shows & cancellations excluded'],['Internal / organic',totInt,totInt>=0?'#44CCAA':'#E05252','existing clinic clients referred or cross-booked in']].map(([l,v,c,sub])=>(
+                        <div key={l} style={{flex:'1 1 170px',background:'var(--surface3)',borderRadius:6,padding:'9px 12px',borderLeft:'3px solid '+c}}>
+                          <div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'.5px'}}>{l}</div>
+                          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:c,lineHeight:1.1}}>{v}</div>
+                          <div style={{fontSize:10.5,color:'#666',lineHeight:1.4}}>{sub}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {list.map((p,i)=>{
                     const rep=p.pctRepeatVisits,pr=p.pctReturning;const nm=p.matchedName||p.name;
+                    const w=withNums[i];
                     return(
-                      <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 0',borderBottom:i<list.length-1?'1px solid var(--border)':'none'}}>
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'9px 0',borderBottom:i<list.length-1?'1px solid var(--border)':'none',flexWrap:'wrap'}}>
                         <div style={{flex:'0 0 180px',minWidth:0}}>
                           <div style={{fontSize:15,fontWeight:600,color:'#ddd',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{nm}</div>
                           {pr!=null&&<div style={{fontSize:13,color:retC(pr)}}>{pr}% returning</div>}
                         </div>
-                        <div style={{flex:1,height:8,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',borderRadius:4,background:repC(rep),width:Math.min(100,rep||0)+'%'}}/></div>
+                        {iaSrc&&(
+                          <div style={{flex:'0 0 235px',display:'flex',gap:6,alignItems:'center',fontSize:12}}>
+                            <span title="New to clinic — first-ever visits (retention report)" style={{color:'#BB99FF',fontWeight:700}}>{w._new!=null?w._new:'—'}<span style={{color:'#666',fontWeight:400}}> new</span></span>
+                            <span style={{color:'#555'}}>·</span>
+                            <span title="Initial assessments — arrived only" style={{color:'#7FC8E8',fontWeight:700}}>{w._ia!=null?w._ia:'—'}<span style={{color:'#666',fontWeight:400}}> IA</span></span>
+                            <span style={{color:'#555'}}>→</span>
+                            {w._int==null?<span style={{color:'#555'}}>—</span>:
+                             w._int>=0?<span title="Internal referrals / organic — existing clinic clients booked into this clinician" style={{color:'#44CCAA',fontWeight:700}}>{w._int}<span style={{color:'#666',fontWeight:400}}> internal</span></span>:
+                             <span title="Retention report shows more new patients than arrived IAs — check the report period matches, or the IA was booked under a non-'Initial' treatment name" style={{color:'#E0A052',fontWeight:700}}>{w._int} ⚠</span>}
+                          </div>
+                        )}
+                        <div style={{flex:1,minWidth:120,height:8,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',borderRadius:4,background:repC(rep),width:Math.min(100,rep||0)+'%'}}/></div>
                         <div style={{flex:'0 0 56px',textAlign:'right',fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:repC(rep)}}>{rep!=null?rep+'%':'—'}</div>
                         <span style={{flex:'0 0 64px',fontSize:13,textAlign:'center',background:repC(rep)+'18',color:repC(rep),border:'1px solid '+repC(rep)+'33',borderRadius:3,padding:'2px 0',fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700}}>{repLabel(rep)}</span>
                       </div>
                     );
                   })}
-                  <div style={{fontSize:13,color:'#666',marginTop:10,lineHeight:1.6}}>Bars show each practitioner's repeat-visit %. Returning % is under the name. These come straight from the imported report; the manual entry below is for overrides or months without an import.</div>
+                  <div style={{fontSize:13,color:'#666',marginTop:10,lineHeight:1.6}}>
+                    Bars show each practitioner's repeat-visit %; returning % is under the name.
+                    {iaSrc?<> <b style={{color:'#BB99FF'}}>New</b> = first-ever clinic visits from the retention report. <b style={{color:'#7FC8E8'}}>IA</b> = arrived initial assessments for {retentionSummary.periodLabel||_m} (from the {iaSrc} — no-shows and cancellations are never counted). <b style={{color:'#44CCAA'}}>Internal</b> = IA − New: clients who already existed at the clinic and were referred or organically cross-booked into this clinician.</>:
+                    <> Upload the Appointments file covering {retentionSummary.periodLabel||_m} on the Jane Import tab to also see arrived initial assessments and the internal-referral split (IA − new-to-clinic).</>}
+                  </div>
                 </div>
               </div>
             );
