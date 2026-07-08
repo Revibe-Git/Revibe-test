@@ -5179,6 +5179,21 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const latestWk=_wkStart(dailyDateRange.max||today.toISOString().slice(0,10));
     const showNudge=today.getDay()===1&&hasDailyData&&!savedReports.some(r=>r.type==='week'&&r.from===latestWk)&&!saved;
     const noData=cur.totals.visits===0&&cur.totals.revenue===0;
+    /* New-to-clinic vs arrived-IA vs internal/organic for the month this report sits in.
+       Retention reports are monthly, so the breakdown is month-scoped even on weekly reports. */
+    const retBk=(()=>{
+      const m=(saved?saved.from:reportPeriod.from||'').slice(0,7);
+      const rs=retentionSummaries&&retentionSummaries[m];
+      if(!rs||!rs.practitioners||!rs.practitioners.some(p=>p.staffId))return null;
+      const dMin=(dailyDateRange.min||'').slice(0,7),dMax=(dailyDateRange.max||'').slice(0,7);
+      const ia={};let src=null;
+      if(hasDailyData&&m&&dMin&&m>=dMin&&m<=dMax){dailyAppts.forEach(r=>{if((r.date||'').slice(0,7)===m)ia[r.staff_id]=(ia[r.staff_id]||0)+(r.initial_assessments||0);});src='daily';}
+      else{const sn=canonSnapshots.find(s=>(s.date||'').slice(0,7)===m&&(s.type||'sales')!=='shift');if(sn){(sn.rows||[]).forEach(rr=>{if(rr.staffId)ia[rr.staffId]=(ia[rr.staffId]||0)+(parseFloat(rr.initialAssessments)||0);});src='snap';}}
+      if(!src)return null;
+      const per={};let tN=0,tI=0;
+      rs.practitioners.forEach(p=>{if(!p.staffId)return;const n=(p.newPatients!=null)?p.newPatients:null;const i=ia[p.staffId]||0;per[p.staffId]={n,i,int:n!=null?i-n:null};if(n!=null)tN+=n;tI+=i;});
+      return{m,label:rs.periodLabel||m,per,tN,tI,tInt:tI-tN};
+    })();
 
     return(
       <div>
@@ -5348,6 +5363,15 @@ function PerformancePage({staff,perfData,setPerfData,page}){
           </div>
 
 
+          {retBk&&(
+            <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'baseline',margin:'0 0 20px',padding:'9px 13px',background:'var(--c-sep)',border:'1px solid var(--c-bdk)',borderRadius:6,fontSize:13.5}}>
+              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:'var(--c-label)',fontWeight:800}}>New guests — {retBk.label}</span>
+              <span><b style={{color:'var(--c-pur)',fontSize:16}}>{retBk.tN}</b> <span style={{color:'var(--c-mut7)'}}>new to clinic</span></span>
+              <span><b style={{color:'var(--c-blue)',fontSize:16}}>{retBk.tI}</b> <span style={{color:'var(--c-mut7)'}}>arrived IAs</span></span>
+              <span><b style={{color:retBk.tInt>=0?'var(--c-grn)':'var(--c-org)',fontSize:16}}>{retBk.tInt}</b> <span style={{color:'var(--c-mut7)'}}>internal / organic</span></span>
+              <span style={{color:'var(--c-faint)',fontSize:11}}>internal = IAs − new to clinic · no-shows &amp; cancellations excluded{pWord!=='month'?' · month-scoped (retention reports are monthly)':''}</span>
+            </div>
+          )}
           {/* Each clinician vs their OWN prior period — self-relative, accounts for different schedules */}
           {selfRows.length>0&&(()=>{
             const dAbbr=(id)=>(DISC.find(x=>x.id===id)||{}).abbr||'';
@@ -5524,7 +5548,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <tr key={r.id} style={{borderTop:'1px solid var(--c-bdk)',background:r.sev==='high'?'rgba(224,82,82,.07)':(r.attn?'rgba(224,160,82,.06)':'transparent')}}>
                     <td style={{textAlign:'left',padding:'8px',color:'var(--c-strong)',verticalAlign:'top'}}><span style={{marginRight:5}}>{statusDot(r)}</span>{r.name} <span style={{color:'var(--c-faint)',fontSize:11,marginLeft:3}}>{dAbbr(r.disc)}</span>{ctxOf(r)&&<div style={{fontSize:11,color:'var(--c-org)',marginTop:3,maxWidth:360,lineHeight:1.4}}>↳ {ctxOf(r)}</div>}</td>
                     <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{fmtMoney(r.pRev)} → {fmtMoney(r.cRev)}</span><br/><span style={{fontSize:12}}>{delta(r.dr,true)}{r.dr!==0&&<span style={{color:'var(--c-faint)'}}>{pctTxt(r.rpct)}</span>}</span></td>
-                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{r.pIa} → {r.cIa}</span><br/><span style={{fontSize:12}}>{delta(r.di)}{r.di!==0&&<span style={{color:'var(--c-faint)'}}>{pctTxt(r.ipct)}</span>}</span></td>
+                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{r.pIa} → {r.cIa}</span><br/><span style={{fontSize:12}}>{delta(r.di)}{r.di!==0&&<span style={{color:'var(--c-faint)'}}>{pctTxt(r.ipct)}</span>}</span>{retBk&&retBk.per[r.id]&&retBk.per[r.id].n!=null&&(()=>{const b=retBk.per[r.id];return(<><br/><span style={{fontSize:10.5,whiteSpace:'nowrap'}} title={'Month of '+retBk.label+': '+b.n+' new to clinic, '+b.i+' arrived IAs → '+b.int+' internal/organic (existing clinic clients referred in)'}><b style={{color:'var(--c-pur)'}}>{b.n}</b><span style={{color:'var(--c-faint)'}}> new · </span>{b.int>=0?<b style={{color:'var(--c-grn)'}}>{b.int}</b>:<b style={{color:'var(--c-org)'}}>{b.int}⚠</b>}<span style={{color:'var(--c-faint)'}}> int{pWord!=='month'?' (mo)':''}</span></span></>);})()}</td>
                     <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{r.pVis} → {r.cVis}</span><br/><span style={{fontSize:12}}>{delta(r.dv)}</span></td>
                   </tr>
                 ))}
@@ -5731,7 +5755,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const lbl=(x)=>x?new Date(x+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const fm=lbl(f),tm=lbl(t);if(fm&&tm)return fm===tm?fm:fm+' – '+tm;if(tm&&!fm)return 'through '+tm;if(fm&&!tm)return fm+' onward';return 'all dates';})()}</span>}</span>
-                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L11</span></span>
+                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L12</span></span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
                 <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
