@@ -2227,11 +2227,11 @@ function CallHistoryPage(){
       if(callI<0)return{error:'Found a Discipline column but no Calls/Count column.'};
       rows.slice(1).forEach(r=>{const date=_normDate(r[dateI]);if(!date){badDates++;return;}const disc=_discFromHeader(r[discColI]);if(!disc)return;const c=parseInt(String(r[callI]).replace(/[^0-9]/g,''))||0;const b=bookI>=0?(parseInt(String(r[bookI]).replace(/[^0-9]/g,''))||0):0;if(c||b)entries.push({date,loc:locI>=0?_normLocCSV(r[locI]):null,disc,c,b});});
     }else{ // shape B — wide
-      const cols=[];const unmapped=[];
-      hdr.forEach((h,i)=>{if(i===dateI||i===locI)return;const isB=/book/.test(lh[i]);const disc=_discFromHeader(h);if(disc)cols.push({i,disc,b:isB});else if(String(h).trim())unmapped.push(h);});
+      const cols=[];const metaCols=[];const unmapped=[];
+      hdr.forEach((h,i)=>{if(i===dateI||i===locI)return;const hl=lh[i];if(/cancel/.test(hl)){metaCols.push({i,k:'cx'});return;}if(/re-?sched/.test(hl)){metaCols.push({i,k:'rs'});return;}if(/wrong/.test(hl)){metaCols.push({i,k:'wn'});return;}const isB=/book/.test(hl);const disc=_discFromHeader(h);if(disc)cols.push({i,disc,b:isB});else if(String(h).trim())unmapped.push(h);});
       if(!cols.length)return{error:'No discipline columns recognized. Headers should include e.g. Physio, Chiro, RMT, Osteo, Naturo, Sauna…'};
       if(unmapped.length)warn.push('Ignored columns: '+unmapped.slice(0,6).join(', ')+(unmapped.length>6?'…':''));
-      rows.slice(1).forEach(r=>{const date=_normDate(r[dateI]);if(!date){badDates++;return;}const locV=locI>=0?_normLocCSV(r[locI]):null;cols.forEach(cl=>{const n=parseInt(String(r[cl.i]).replace(/[^0-9]/g,''))||0;if(!n)return;entries.push({date,loc:locV,disc:cl.disc,c:cl.b?0:n,b:cl.b?n:0});});});
+      rows.slice(1).forEach(r=>{const date=_normDate(r[dateI]);if(!date){badDates++;return;}const locV=locI>=0?_normLocCSV(r[locI]):null;cols.forEach(cl=>{const n=parseInt(String(r[cl.i]).replace(/[^0-9]/g,''))||0;if(!n)return;entries.push({date,loc:locV,disc:cl.disc,c:cl.b?0:n,b:cl.b?n:0});});metaCols.forEach(mc=>{const n=parseInt(String(r[mc.i]).replace(/[^0-9]/g,''))||0;if(!n)return;entries.push({date,loc:locV,meta:mc.k,c:n,b:0});});});
     }
     if(badDates)warn.push(badDates+' row(s) skipped — date not recognized.');
     if(!entries.length)return{error:'No usable rows found.'+(warn.length?' '+warn.join(' '):'')};
@@ -2247,11 +2247,12 @@ function CallHistoryPage(){
   const applyCallCSV=()=>{
     if(!csvPrev)return;
     const byDay={};
-    csvPrev.entries.forEach(e=>{const L=e.loc||loc;const k=L+'|'+e.date;(byDay[k]=byDay[k]||{L,date:e.date,day:{}});const d=byDay[k].day;const p=d[e.disc]||{c:0,b:0};d[e.disc]={c:p.c+e.c,b:p.b+e.b};});
+    csvPrev.entries.forEach(e=>{const L=e.loc||loc;const k=L+'|'+e.date;(byDay[k]=byDay[k]||{L,date:e.date,day:{},x:{}});const B=byDay[k];if(e.meta){B.x[e.meta]=(B.x[e.meta]||0)+e.c;return;}const d=B.day;const p=d[e.disc]||{c:0,b:0};d[e.disc]={c:p.c+e.c,b:p.b+e.b};});
     const calls={...data.calls};
-    Object.values(byDay).forEach(({L,date,day})=>{
+    Object.values(byDay).forEach(({L,date,day,x})=>{
       if(!calls[L])calls[L]={};else calls[L]={...calls[L]};
       const out={};Object.entries(day).forEach(([id,v])=>{if(v.c||v.b)out[id]=v.b?{c:v.c,b:v.b}:v.c;});
+      if(x&&(x.cx||x.rs||x.wn))out._x={...(x.cx?{cx:x.cx}:{}),...(x.rs?{rs:x.rs}:{}),...(x.wn?{wn:x.wn}:{})};
       calls[L][date]=out;
     });
     persist({...data,calls},true);
@@ -2273,8 +2274,8 @@ function CallHistoryPage(){
   const[entryDate,setEntryDate]=useState(today);
   const[entry,setEntry]=useState({});
   const[savedFlag,setSavedFlag]=useState(false);
-  useEffect(()=>{const e=(data.calls[loc]||{})[entryDate]||{};setEntry(Object.fromEntries(discList.map(([id])=>[id,{c:cOf(e[id])?String(cOf(e[id])):'',b:bOf(e[id])?String(bOf(e[id])):''}])));setSavedFlag(false);},[entryDate,loc,data]);// eslint-disable-line
-  const saveEntry=()=>{const day={};discList.forEach(([id])=>{const c=parseInt(entry[id]&&entry[id].c)||0;const b=parseInt(entry[id]&&entry[id].b)||0;if(c||b)day[id]=b?{c,b}:c;});const calls={...data.calls,[loc]:{...(data.calls[loc]||{})}};if(Object.keys(day).length)calls[loc][entryDate]=day;else delete calls[loc][entryDate];persist({...data,calls},true);setSavedFlag(true);setTimeout(()=>setSavedFlag(false),1600);};
+  useEffect(()=>{const e=(data.calls[loc]||{})[entryDate]||{};const base=Object.fromEntries(discList.map(([id])=>[id,{c:cOf(e[id])?String(cOf(e[id])):'',b:bOf(e[id])?String(bOf(e[id])):''}]));const x=e._x||{};base._x={cx:x.cx?String(x.cx):'',rs:x.rs?String(x.rs):'',wn:x.wn?String(x.wn):''};setEntry(base);setSavedFlag(false);},[entryDate,loc,data]);// eslint-disable-line
+  const saveEntry=()=>{const day={};discList.forEach(([id])=>{const c=parseInt(entry[id]&&entry[id].c)||0;const b=parseInt(entry[id]&&entry[id].b)||0;if(c||b)day[id]=b?{c,b}:c;});const _x=entry._x||{};const cx=parseInt(_x.cx)||0,rs=parseInt(_x.rs)||0,wn=parseInt(_x.wn)||0;if(cx||rs||wn)day._x={...(cx?{cx}:{}),...(rs?{rs}:{}),...(wn?{wn}:{})};const calls={...data.calls,[loc]:{...(data.calls[loc]||{})}};if(Object.keys(day).length)calls[loc][entryDate]=day;else delete calls[loc][entryDate];persist({...data,calls},true);setSavedFlag(true);setTimeout(()=>setSavedFlag(false),1600);};
   const inTf=(d)=>{if(tf==='all')return true;if(tf==='month')return d.slice(0,7)===today.slice(0,7);const cut=new Date(Date.now()-parseInt(tf)*86400000).toISOString().slice(0,10);return d>=cut;};
   const locDays=Object.keys(data.calls[loc]||{}).filter(inTf).sort();
   const discTotals=discList.map(([id,label])=>{const calls=locDays.reduce((a,d)=>a+cOf((data.calls[loc][d]||{})[id]),0);const booked=locDays.reduce((a,d)=>a+bOf((data.calls[loc][d]||{})[id]),0);return{id,label,color:DISC_COLOR[id]||'#999',calls,booked,n:metric==='booked'?booked:calls};});
@@ -2347,8 +2348,9 @@ function CallHistoryPage(){
     const days=[];for(let i=0;i<7;i++)days.push(_addDaysISO(ws,i));
     const byLoc={},byDisc={},daily=[];let calls=0,booked=0;
     REP_LOCS.forEach(L=>{byLoc[L]={calls:0,booked:0};});
-    days.forEach(d=>{let dc=0,db=0;REP_LOCS.forEach(L=>{const day=(data.calls[L]||{})[d]||{};Object.entries(day).forEach(([id,v])=>{const c=cOf(v),b=bOf(v);byLoc[L].calls+=c;byLoc[L].booked+=b;dc+=c;db+=b;if(!byDisc[id])byDisc[id]={calls:0,booked:0};byDisc[id].calls+=c;byDisc[id].booked+=b;});});calls+=dc;booked+=db;daily.push({d,calls:dc,booked:db});});
-    return{ws,calls,booked,rate:calls?booked/calls*100:0,byLoc,byDisc,daily};
+    const meta={cx:0,rs:0,wn:0};
+    days.forEach(d=>{let dc=0,db=0;REP_LOCS.forEach(L=>{const day=(data.calls[L]||{})[d]||{};Object.entries(day).forEach(([id,v])=>{if(id==='_x'){meta.cx+=(+v.cx||0);meta.rs+=(+v.rs||0);meta.wn+=(+v.wn||0);return;}const c=cOf(v),b=bOf(v);byLoc[L].calls+=c;byLoc[L].booked+=b;dc+=c;db+=b;if(!byDisc[id])byDisc[id]={calls:0,booked:0};byDisc[id].calls+=c;byDisc[id].booked+=b;});});calls+=dc;booked+=db;daily.push({d,calls:dc,booked:db});});
+    return{ws,calls,booked,rate:calls?booked/calls*100:0,byLoc,byDisc,daily,meta};
   };
   const buildCallReport=(ws)=>({cur:buildCallWeek(ws),prev:buildCallWeek(_addDaysISO(ws,-7))});
   const buildCallInsights=(cur,prev)=>{
@@ -2409,6 +2411,17 @@ function CallHistoryPage(){
             </div>
           </div>))}
         </div>
+        <div style={{marginTop:12,display:'flex',gap:14,flexWrap:'wrap'}}>
+          {[['cx','Cancellations','#E05252'],['rs','Reschedules','#F4DB71'],['wn','Wrong number','#9BA8B5']].map(([k,label,col])=>(
+            <div key={k} style={{flex:'0 0 150px'}}>
+              <div style={{fontSize:11,color:col,textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4,fontWeight:700}}>{label}</div>
+              <input type="number" min="0" placeholder="0" value={(entry._x&&entry._x[k])||''}
+                onChange={e=>setEntry(p=>({...p,_x:{...(p._x||{}),[k]:e.target.value}}))}
+                style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,color:'#eee',padding:'7px 9px',fontSize:14}}/>
+            </div>
+          ))}
+        </div>
+        <div style={{fontSize:11.5,color:'#666',marginTop:6}}>Day-level tallies for {loc} — cancellation &amp; reschedule calls, and wrong-number calls (not tied to a discipline).</div>
         <div style={{marginTop:12,display:'flex',alignItems:'center',gap:10}}>
           <button className="btn btn-lime btn-sm" onClick={saveEntry}>Save {entryDate}</button>
           {savedFlag&&<span style={{color:'#44CCAA',fontSize:13}}>Saved ✓</span>}
@@ -2420,7 +2433,7 @@ function CallHistoryPage(){
         <div style={{marginTop:10}}>
           <div style={{fontSize:12.5,color:'#999',lineHeight:1.6,marginBottom:10}}>
             In Google Sheets: <b style={{color:'#ccc'}}>File → Download → Comma Separated Values (.csv)</b>, then drop it here. Two layouts work:
-            a <b style={{color:'#ccc'}}>Date</b> column plus one column per discipline (Physio, Chiro, RMT, Osteo, Naturo, Sauna… optionally "Physio Booked" etc.), or one row per entry with <b style={{color:'#ccc'}}>Date · Discipline · Calls · Booked</b>.
+            a <b style={{color:'#ccc'}}>Date</b> column plus one column per discipline (Physio, Chiro, RMT, Osteo, Naturo, Sauna… optionally "Physio Booked" etc.), or one row per entry with <b style={{color:'#ccc'}}>Date · Discipline · Calls · Booked</b>. Columns named <b style={{color:'#ccc'}}>Cancellations, Reschedules, Wrong Number</b> import as day-level tallies.
             An optional <b style={{color:'#ccc'}}>Location</b> column splits Mississauga/Markham — without one, everything files under <b style={{color:LOC_C[loc]}}>{loc}</b> (the toggle above). Imported dates <b style={{color:'#F4DB71'}}>replace</b> those days; everything else is untouched.
           </div>
           <input type="file" accept=".csv,.tsv,text/csv" ref={csvRef} style={{display:'none'}} onChange={e=>{handleCallCSV(e.target.files[0]);e.target.value='';}}/>
@@ -2505,12 +2518,12 @@ function CallHistoryPage(){
       <div className="perf-slot">
         <div className="perf-slot-head"><span className="perf-slot-title">Recent Entries — {loc}</span></div>
         <div className="perf-slot-body">
-          {locDays.slice(-14).reverse().map(d=>{const day=data.calls[loc][d]||{};const tot=Object.values(day).reduce((s,v)=>s+cOf(v),0);const tb=Object.values(day).reduce((s,v)=>s+bOf(v),0);return(<div key={d} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+          {locDays.slice(-14).reverse().map(d=>{const day=data.calls[loc][d]||{};const tot=Object.values(day).reduce((s,v)=>s+cOf(v),0);const tb=Object.values(day).reduce((s,v)=>s+bOf(v),0);const xx=day._x||{};return(<div key={d} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
               <span style={{fontSize:13,color:'#ccc',width:90}}>{d}</span>
               <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{discList.filter(([id])=>day[id]).map(([id,label])=>(<span key={id} style={{fontSize:11,color:'#1a1a1a',background:DISC_COLOR[id],borderRadius:4,padding:'1px 6px',fontWeight:700}}>{label.split(' ')[0]} {cOf(day[id])}{bOf(day[id])?'→'+bOf(day[id]):''}</span>))}</div>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:13,fontWeight:700,color:'#ddd'}}>{tot}{tb?' / '+tb+' booked':''}</span><button className="btn btn-ghost btn-xs" onClick={()=>{const calls={...data.calls,[loc]:{...data.calls[loc]}};delete calls[loc][d];persist({...data,calls},true);}}>✕</button></div>
+            <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:13,fontWeight:700,color:'#ddd'}}>{tot}{tb?' / '+tb+' booked':''}</span>{(xx.cx||xx.rs||xx.wn)&&<span style={{fontSize:11.5}}>{xx.cx?<span style={{color:'#E05252'}}>{xx.cx} cx</span>:null}{xx.cx&&(xx.rs||xx.wn)?<span style={{color:'#555'}}> · </span>:null}{xx.rs?<span style={{color:'#F4DB71'}}>{xx.rs} rs</span>:null}{xx.rs&&xx.wn?<span style={{color:'#555'}}> · </span>:null}{xx.wn?<span style={{color:'#9BA8B5'}}>{xx.wn} wn</span>:null}</span>}<button className="btn btn-ghost btn-xs" onClick={()=>{const calls={...data.calls,[loc]:{...data.calls[loc]}};delete calls[loc][d];persist({...data,calls},true);}}>✕</button></div>
           </div>);})}
           {locDays.length===0&&<div style={{color:'#666',padding:'14px 0',textAlign:'center'}}>Nothing logged in this window.</div>}
         </div>
@@ -2738,6 +2751,7 @@ function CallHistoryPage(){
             {(()=>{const d=delta(cur.calls,prev.calls);return(<div style={tileWrap}><div style={tLab}>Total Calls</div><div style={tVal('var(--c-grn)')}>{fmt(cur.calls)}</div><div style={dLine(d.up)}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'var(--c-faint)',fontWeight:400}}>vs prior week</span></div></div>);})()}
             {(()=>{const d=delta(cur.booked,prev.booked);return(<div style={tileWrap}><div style={tLab}>Booked (Conversions)</div><div style={tVal('var(--c-grn)')}>{fmt(cur.booked)}</div><div style={dLine(d.up)}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'var(--c-faint)',fontWeight:400}}>vs prior week</span></div></div>);})()}
             <div style={tileWrap}><div style={tLab}>Booking Rate</div><div style={tVal(rateColor(cur.rate))}>{cur.calls?cur.rate.toFixed(0)+'%':'—'}</div><div style={dLine(rd.up)}>{rd.up?'▲':'▼'}{rd.pts} pts <span style={{color:'var(--c-faint)',fontWeight:400}}>vs prior week ({prev.rate.toFixed(0)}%)</span></div></div>
+            {(cur.meta&&(cur.meta.cx||cur.meta.rs||cur.meta.wn)||prev.meta&&(prev.meta.cx||prev.meta.rs||prev.meta.wn))?[['cx','Cancellation Calls','var(--c-red)'],['rs','Reschedule Calls','var(--c-gold)'],['wn','Wrong Numbers','#9BA8B5']].map(([k,label,col])=>{const c=(cur.meta&&cur.meta[k])||0,p=(prev.meta&&prev.meta[k])||0;const d=delta(c,p);return(<div key={k} style={tileWrap}><div style={tLab}>{label}</div><div style={tVal(col)}>{fmt(c)}</div><div style={dLine(k==='cx'||k==='wn'?!d.up:d.up)}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'var(--c-faint)',fontWeight:400}}>vs prior week ({p})</span></div></div>);}):null}
           </div>
 
           {/* Red flags / gaps / wins */}
@@ -5321,10 +5335,12 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   {revMissing?<div style={{marginTop:8,fontSize:11.5,fontWeight:600,color:'var(--c-org)'}}>not imported yet</div>:<div style={{marginTop:8,fontSize:12,fontWeight:700,color:good?'var(--c-grn)':'var(--c-red)'}}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'var(--c-faint)',fontWeight:400}}>vs prior {pWord}</span></div>}
                   {kp.k==='ias'&&retBk&&repLoc==='all'&&(pWord==='month'?(
                     <div style={{marginTop:7,paddingTop:7,borderTop:'1px solid var(--c-sep)',fontSize:11.5,lineHeight:1.7}}
-                      title={retBk.label+': '+retBk.tN+' new to clinic (first-ever visits) · '+retBk.tFirst+' first visits ('+retBk.tI+' arrived IAs'+(retBk.tP?' + '+retBk.tP+' first-visit post-op — started as a post-op session, no in-clinic initial':'')+') → '+retBk.tInt+' internal/organic (existing clinic clients referred or cross-booked in). No-shows & cancellations excluded.'}>
-                      {retBk.tP>0&&<div style={{whiteSpace:'nowrap'}}><b style={{color:'var(--c-pink)'}}>{retBk.tP}</b><span style={{color:'var(--c-faint)'}}> of </span><b style={{color:'var(--c-body2)'}}>{retBk.tFirst}</b><span style={{color:'var(--c-faint)'}}> first visits via post-op — no initial</span></div>}
+                      title={retBk.label+': '+retBk.tN+' new to clinic'+(retBk.tP&&retBk.tN-retBk.tP>=0?' — '+(retBk.tN-retBk.tP)+' arrived via an initial assessment, '+retBk.tP+' via a post-op session (no in-clinic initial)':'')+' · '+retBk.tFirst+' first visits ('+retBk.tI+' arrived IAs + '+retBk.tP+' first-visit post-op) → '+retBk.tInt+' internal/organic (existing clinic clients referred or cross-booked in). No-shows & cancellations excluded.'}>
+                      {retBk.tP>0&&<div style={{whiteSpace:'nowrap'}}><b style={{color:'var(--c-body2)'}}>{retBk.tFirst}</b><span style={{color:'var(--c-faint)'}}> first visits = </span><b style={{color:'var(--c-pur)'}}>{retBk.tI}</b><span style={{color:'var(--c-faint)'}}> initials + </span><b style={{color:'var(--c-pink)'}}>{retBk.tP}</b><span style={{color:'var(--c-faint)'}}> post-op (no initial)</span></div>}
                       <div style={{whiteSpace:'nowrap'}}>
-                        <b style={{color:'var(--c-pur)'}}>{retBk.tN}</b><span style={{color:'var(--c-faint)'}}> new · </span>
+                        <b style={{color:'var(--c-pur)'}}>{retBk.tN}</b><span style={{color:'var(--c-faint)'}}> new</span>
+                        {retBk.tP>0&&retBk.tN-retBk.tP>=0&&<span style={{color:'var(--c-faint)'}}> ({retBk.tN-retBk.tP} via initial · <span style={{color:'var(--c-pink)'}}>{retBk.tP} via post-op</span>)</span>}
+                        <span style={{color:'var(--c-faint)'}}> · </span>
                         <b style={{color:retBk.tInt>=0?'var(--c-grn)':'var(--c-org)'}}>{retBk.tInt}</b><span style={{color:'var(--c-faint)'}}> internal</span>
                         <span style={{color:'var(--c-d55)'}}> · {retBk.label.split(' ')[0]}</span>
                       </div>
@@ -5600,7 +5616,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <tr key={r.id} style={{borderTop:'1px solid var(--c-bdk)',background:r.sev==='high'?'rgba(224,82,82,.07)':(r.attn?'rgba(224,160,82,.06)':'transparent')}}>
                     <td style={{textAlign:'left',padding:'8px',color:'var(--c-strong)',verticalAlign:'top'}}><span style={{marginRight:5}}>{statusDot(r)}</span>{r.name} <span style={{color:'var(--c-faint)',fontSize:11,marginLeft:3}}>{dAbbr(r.disc)}</span>{ctxOf(r)&&<div style={{fontSize:11,color:'var(--c-org)',marginTop:3,maxWidth:360,lineHeight:1.4}}>↳ {ctxOf(r)}</div>}</td>
                     <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{fmtMoney(r.pRev)} → {fmtMoney(r.cRev)}</span><br/><span style={{fontSize:12}}>{delta(r.dr,true)}{r.dr!==0&&<span style={{color:'var(--c-faint)'}}>{pctTxt(r.rpct)}</span>}</span></td>
-                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{r.pIa} → {r.cIa}</span><br/><span style={{fontSize:12}}>{delta(r.di)}{r.di!==0&&<span style={{color:'var(--c-faint)'}}>{pctTxt(r.ipct)}</span>}</span>{retBk&&pWord==='month'&&retBk.per[r.id]&&retBk.per[r.id].n!=null&&(()=>{const b=retBk.per[r.id];return(<><br/><span style={{fontSize:10.5,whiteSpace:'nowrap'}} title={'Month of '+retBk.label+': '+b.n+' new to clinic, '+b.first+' first visits ('+b.i+' IA'+(b.po?' + '+b.po+' started as post-op sessions — no in-clinic initial':'')+') → '+b.int+' internal/organic (existing clinic clients referred in)'}><b style={{color:'var(--c-pur)'}}>{b.n}</b><span style={{color:'var(--c-faint)'}}> new · </span>{b.int>=0?<b style={{color:'var(--c-grn)'}}>{b.int}</b>:<b style={{color:'var(--c-org)'}}>{b.int}⚠</b>}<span style={{color:'var(--c-faint)'}}> int</span>{b.po>0&&<span style={{color:'var(--c-pink)'}}> · {b.po} po</span>}</span></>);})()}{retBk&&pWord!=='month'&&retBk.winPo[r.id]>0&&(<><br/><span style={{fontSize:10.5,whiteSpace:'nowrap',color:'var(--c-pink)'}} title={'This '+pWord+': '+retBk.winPo[r.id]+' first visit(s) that started as a post-op session — no in-clinic initial, so no IA is counted for them.'}>+{retBk.winPo[r.id]} po-first <span style={{color:'var(--c-faint)'}}>(no initial)</span></span></>)}</td>
+                    <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{r.pIa} → {r.cIa}</span><br/><span style={{fontSize:12}}>{delta(r.di)}{r.di!==0&&<span style={{color:'var(--c-faint)'}}>{pctTxt(r.ipct)}</span>}</span>{retBk&&pWord==='month'&&retBk.per[r.id]&&retBk.per[r.id].n!=null&&(()=>{const b=retBk.per[r.id];return(<><br/><span style={{fontSize:10.5,whiteSpace:'nowrap'}} title={'Month of '+retBk.label+': '+b.n+' new to clinic, '+b.first+' first visits ('+b.i+' IA'+(b.po?' + '+b.po+' started as post-op sessions — no in-clinic initial':'')+') → '+b.int+' internal/organic (existing clinic clients referred in)'}><b style={{color:'var(--c-pur)'}}>{b.n}</b><span style={{color:'var(--c-faint)'}}> new</span>{b.po>0&&b.n-b.po>=0&&<span style={{color:'var(--c-faint)'}}> ({b.n-b.po} ia · <span style={{color:'var(--c-pink)'}}>{b.po} po</span>)</span>}{b.po>0&&b.n-b.po<0&&<span style={{color:'var(--c-pink)'}}> (incl. {b.po} po)</span>}<span style={{color:'var(--c-faint)'}}> · </span>{b.int>=0?<b style={{color:'var(--c-grn)'}}>{b.int}</b>:<b style={{color:'var(--c-org)'}}>{b.int}⚠</b>}<span style={{color:'var(--c-faint)'}}> int</span></span></>);})()}{retBk&&pWord!=='month'&&retBk.winPo[r.id]>0&&(<><br/><span style={{fontSize:10.5,whiteSpace:'nowrap',color:'var(--c-pink)'}} title={'This '+pWord+': '+retBk.winPo[r.id]+' first visit(s) that started as a post-op session — no in-clinic initial, so no IA is counted for them.'}>+{retBk.winPo[r.id]} po-first <span style={{color:'var(--c-faint)'}}>(no initial)</span></span></>)}</td>
                     <td style={{textAlign:'right',padding:'8px'}}><span style={{color:'var(--c-sec)'}}>{r.pVis} → {r.cVis}</span><br/><span style={{fontSize:12}}>{delta(r.dv)}</span></td>
                   </tr>
                 ))}
@@ -5807,7 +5823,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const lbl=(x)=>x?new Date(x+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const fm=lbl(f),tm=lbl(t);if(fm&&tm)return fm===tm?fm:fm+' – '+tm;if(tm&&!fm)return 'through '+tm;if(fm&&!tm)return fm+' onward';return 'all dates';})()}</span>}</span>
-                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L17</span></span>
+                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L19</span></span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
                 <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
@@ -6472,7 +6488,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 <div className="perf-slot-body">
                   {iaSrc&&(
                     <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
-                      {[['New to clinic',totNew,'#BB99FF','first-ever visits (retention report)'],['First visits',totFirst,'#7FC8E8',totIA+' arrived IAs + '+totPO+' first-visit post-op (no in-clinic IA needed) — no-shows & cancellations excluded'],['Internal / organic',totInt,totInt>=0?'#44CCAA':'#E05252','existing clinic clients referred or cross-booked in']].map(([l,v,c,sub])=>(
+                      {[['New to clinic',totNew,'#BB99FF',(totPO>0&&totNew-totPO>=0?((totNew-totPO)+' via an initial + '+totPO+' via post-op (no initial) — '):'')+'first-ever visits (retention report)'],['First visits',totFirst,'#7FC8E8',totIA+' arrived IAs + '+totPO+' first-visit post-op (no in-clinic IA needed) — no-shows & cancellations excluded'],['Internal / organic',totInt,totInt>=0?'#44CCAA':'#E05252','existing clinic clients referred or cross-booked in']].map(([l,v,c,sub])=>(
                         <div key={l} style={{flex:'1 1 170px',background:'var(--surface3)',borderRadius:6,padding:'9px 12px',borderLeft:'3px solid '+c}}>
                           <div style={{fontSize:11,color:'#888',textTransform:'uppercase',letterSpacing:'.5px'}}>{l}</div>
                           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:c,lineHeight:1.1}}>{v}</div>
