@@ -5231,27 +5231,34 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     /* New-to-clinic vs arrived-IA vs internal/organic for the month this report sits in.
        Retention reports are monthly, so the breakdown is month-scoped even on weekly reports. */
     const retBk=(()=>{
-      const m=(saved?saved.from:reportPeriod.from||'').slice(0,7);
-      const rs=retentionSummaries&&retentionSummaries[m];
-      if(!rs||!rs.practitioners||!rs.practitioners.some(p=>p.staffId))return null;
+      /* Anchor the month context to the month containing the MAJORITY of the report window
+         (a Jun 29 – Jul 5 week is a July week, not a June one). If that month has no retention
+         import yet, we still show the week's own post-op first-visits — appointment-derived —
+         and simply omit the month rows instead of showing a stale prior month. */
+      const _f=(saved?saved.from:reportPeriod.from)||'',_t=(saved?saved.to:reportPeriod.to)||_f;
+      let m='';{const cnt={};let d=new Date(_f+'T12:00');const end=new Date((_t||_f)+'T12:00');let g=0;while(d<=end&&g++<400){const mo=d.toISOString().slice(0,7);cnt[mo]=(cnt[mo]||0)+1;d.setDate(d.getDate()+1);}const top=Object.entries(cnt).sort((a,b)=>(b[1]-a[1])||(a[0]<b[0]?1:-1))[0];m=top?top[0]:'';}
+      const rs0=retentionSummaries&&retentionSummaries[m];
+      const rs=(rs0&&rs0.practitioners&&rs0.practitioners.some(p=>p.staffId))?rs0:null;
       const dMin=(dailyDateRange.min||'').slice(0,7),dMax=(dailyDateRange.max||'').slice(0,7);
       const ia={};let src=null;
       if(hasDailyData&&m&&dMin&&m>=dMin&&m<=dMax){dailyAppts.forEach(r=>{if((r.date||'').slice(0,7)===m)ia[r.staff_id]=(ia[r.staff_id]||0)+(r.initial_assessments||0);});src='daily';}
       else{const sn=canonSnapshots.find(s=>(s.date||'').slice(0,7)===m&&(s.type||'sales')!=='shift');if(sn){(sn.rows||[]).forEach(rr=>{if(rr.staffId)ia[rr.staffId]=(ia[rr.staffId]||0)+(parseFloat(rr.initialAssessments)||0);});src='snap';}}
-      if(!src)return null;
+      if(!src&&rs)return null; // retention exists but no IA source for its month — can't build month rows
       /* Same staff scope as every other report number: mgmt/ops/edu excluded (e.g. Dr. J's IAs,
          post-ops and new patients live on the Retention tab's full-clinic view, not here) —
          and de-duped per staffId in case the retention report lists someone twice. */
       const _po=poFirstByMonth[m]||{};
       const _agg={};
-      rs.practitioners.forEach(p=>{if(!p.staffId)return;const st=staff.find(x=>x.id===p.staffId);if(!st||['mgmt','ops','edu'].includes(st.discipline))return;const a=(_agg[p.staffId]=_agg[p.staffId]||{n:null});if(p.newPatients!=null)a.n=(a.n||0)+p.newPatients;});
+      if(rs)rs.practitioners.forEach(p=>{if(!p.staffId)return;const st=staff.find(x=>x.id===p.staffId);if(!st||['mgmt','ops','edu'].includes(st.discipline))return;const a=(_agg[p.staffId]=_agg[p.staffId]||{n:null});if(p.newPatients!=null)a.n=(a.n||0)+p.newPatients;});
+      else staff.forEach(st=>{if(['mgmt','ops','edu'].includes(st.discipline))return;_agg[st.id]={n:null};}); // no retention yet — window po still uses report staff scope
       const per={};let tN=0,tI=0,tP=0;
       Object.entries(_agg).forEach(([id,a])=>{const i=ia[id]||0;const po=_po[id]||0;const first=i+po;per[id]={n:a.n,i,po,first,int:a.n!=null?first-a.n:null};if(a.n!=null)tN+=a.n;tI+=i;tP+=po;});
       // Report-WINDOW first-visit post-ops (same staff scope) — lets weekly reports show the
       // week's own post-op first-touches instead of the month total.
       const _wAll=poFirstInWin(saved?saved.from:reportPeriod.from,saved?saved.to:reportPeriod.to);
       const winPo={};let wP=0;Object.keys(_agg).forEach(id=>{const v=_wAll[id]||0;if(v){winPo[id]=v;wP+=v;}});
-      return{m,label:rs.periodLabel||m,per,tN,tI,tP,tFirst:tI+tP,tInt:(tI+tP)-tN,winPo,wP};
+      if(!rs&&!wP)return null; // nothing to show at all
+      return{m,label:rs?(rs.periodLabel||m):m,hasMonth:!!rs,per,tN,tI,tP,tFirst:tI+tP,tInt:(tI+tP)-tN,winPo,wP};
     })();
 
     return(
@@ -5333,31 +5340,37 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:11,letterSpacing:'1.3px',textTransform:'uppercase',color:'var(--c-mut8)',marginBottom:6}}>{kp.label}</div>
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:32,fontWeight:800,color:revMissing?'var(--c-d55)':kp.color,lineHeight:1}}>{revMissing?'—':kp.fmt(c)}</div>
                   {revMissing?<div style={{marginTop:8,fontSize:11.5,fontWeight:600,color:'var(--c-org)'}}>not imported yet</div>:<div style={{marginTop:8,fontSize:12,fontWeight:700,color:good?'var(--c-grn)':'var(--c-red)'}}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'var(--c-faint)',fontWeight:400}}>vs prior {pWord}</span></div>}
-                  {kp.k==='ias'&&retBk&&repLoc==='all'&&(pWord==='month'?(
+                  {kp.k==='ias'&&retBk&&repLoc==='all'&&(pWord==='month'?(retBk.hasMonth&&(
                     <div style={{marginTop:7,paddingTop:7,borderTop:'1px solid var(--c-sep)',fontSize:11.5,lineHeight:1.7}}
                       title={retBk.label+': '+retBk.tN+' new to clinic'+(retBk.tP&&retBk.tN-retBk.tP>=0?' — '+(retBk.tN-retBk.tP)+' arrived via an initial assessment, '+retBk.tP+' via a post-op session (no in-clinic initial)':'')+' · '+retBk.tFirst+' first visits ('+retBk.tI+' arrived IAs + '+retBk.tP+' first-visit post-op) → '+retBk.tInt+' internal/organic (existing clinic clients referred or cross-booked in). No-shows & cancellations excluded.'}>
-                      {retBk.tP>0&&<div style={{whiteSpace:'nowrap'}}><b style={{color:'var(--c-body2)'}}>{retBk.tFirst}</b><span style={{color:'var(--c-faint)'}}> first visits = </span><b style={{color:'var(--c-pur)'}}>{retBk.tI}</b><span style={{color:'var(--c-faint)'}}> initials + </span><b style={{color:'var(--c-pink)'}}>{retBk.tP}</b><span style={{color:'var(--c-faint)'}}> post-op (no initial)</span></div>}
-                      <div style={{whiteSpace:'nowrap'}}>
-                        <b style={{color:'var(--c-pur)'}}>{retBk.tN}</b><span style={{color:'var(--c-faint)'}}> new</span>
-                        {retBk.tP>0&&retBk.tN-retBk.tP>=0&&<span style={{color:'var(--c-faint)'}}> ({retBk.tN-retBk.tP} via initial · <span style={{color:'var(--c-pink)'}}>{retBk.tP} via post-op</span>)</span>}
-                        <span style={{color:'var(--c-faint)'}}> · </span>
-                        <b style={{color:retBk.tInt>=0?'var(--c-grn)':'var(--c-org)'}}>{retBk.tInt}</b><span style={{color:'var(--c-faint)'}}> internal</span>
-                        <span style={{color:'var(--c-d55)'}}> · {retBk.label.split(' ')[0]}</span>
-                      </div>
+                      {[
+                        ['First visits',<b style={{color:'var(--c-body2)'}}>{retBk.tFirst}</b>,retBk.tP>0?<span style={{color:'var(--c-faint)'}}>{retBk.tI} initial · <span style={{color:'var(--c-pink)'}}>{retBk.tP} post-op</span></span>:null],
+                        ['New to clinic',<b style={{color:'var(--c-pur)'}}>{retBk.tN}</b>,retBk.tP>0&&retBk.tN-retBk.tP>=0?<span style={{color:'var(--c-faint)'}}>{retBk.tN-retBk.tP} initial · <span style={{color:'var(--c-pink)'}}>{retBk.tP} post-op</span></span>:null],
+                        ['Internal / organic',<b style={{color:retBk.tInt>=0?'var(--c-grn)':'var(--c-org)'}}>{retBk.tInt}</b>,null]
+                      ].map(([lab,val,sub],i)=>(
+                        <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,padding:'1px 0'}}>
+                          <span style={{color:'var(--c-mut7)',flex:'0 0 auto'}}>{lab}</span>
+                          <span style={{textAlign:'right'}}>{val}{sub&&<span style={{fontSize:10.5}}>&nbsp;&nbsp;{sub}</span>}</span>
+                        </div>
+                      ))}
+                      <div style={{fontSize:10,color:'var(--c-d55)',marginTop:3}}>post-op = first visit with no in-clinic initial · {retBk.label}</div>
                     </div>
-                  ):(()=>{
+                  )):(()=>{
                     const newViaIA=(retBk.tN||0)-(retBk.tP||0);
                     return(
                     <div style={{marginTop:7,paddingTop:7,borderTop:'1px solid var(--c-sep)',fontSize:11.5,lineHeight:1.7}}
-                      title={(retBk.wP?('This '+pWord+': '+retBk.wP+' first visit(s) started as a post-op session with no in-clinic initial, so they arrive without an IA — counted on top of the '+String(cur.totals.ias)+' arrived IAs. '):'')+'Month of '+retBk.label+': '+retBk.tI+' IAs = '+newViaIA+' brand-new + '+retBk.tInt+' internal/organic'+(retBk.tP?'; plus '+retBk.tP+' new via post-op (no initial) → '+retBk.tN+' new total.':'; '+retBk.tN+' new total.')+' Retention reports are monthly, so new/internal are month figures.'}>
-                      {retBk.wP>0&&<div style={{whiteSpace:'nowrap'}}><b style={{color:'var(--c-pink)'}}>+{retBk.wP}</b><span style={{color:'var(--c-faint)'}}> first visit{retBk.wP===1?'':'s'} via post-op — no initial</span></div>}
-                      <div style={{whiteSpace:'nowrap'}}>
-                        <span style={{color:'var(--c-d55)'}}>{retBk.label.split(' ')[0]}: </span>
-                        <b style={{color:'var(--c-pur)'}}>{retBk.tN}</b><span style={{color:'var(--c-faint)'}}> new</span>
-                        {retBk.tP>0&&newViaIA>=0&&<span style={{color:'var(--c-faint)'}}> ({newViaIA} ia · <span style={{color:'var(--c-pink)'}}>{retBk.tP} po</span>)</span>}
-                        <span style={{color:'var(--c-faint)'}}> · </span>
-                        <b style={{color:retBk.tInt>=0?'var(--c-grn)':'var(--c-org)'}}>{retBk.tInt}</b><span style={{color:'var(--c-faint)'}}> int (mo)</span>
-                      </div>
+                      title={(retBk.wP?('This '+pWord+': '+retBk.wP+' first visit(s) started as a post-op session with no in-clinic initial, so they arrive without an IA — counted on top of the '+String(cur.totals.ias)+' arrived IAs. '):'')+(retBk.hasMonth?('Month of '+retBk.label+': '+retBk.tI+' IAs = '+newViaIA+' brand-new + '+retBk.tInt+' internal/organic'+(retBk.tP?'; plus '+retBk.tP+' new via post-op (no initial) → '+retBk.tN+' new total.':'; '+retBk.tN+' new total.')+' Retention reports are monthly, so new/internal are month figures.'):('No retention report imported for '+retBk.m+' yet — import it on the Retention tab to see new-to-clinic and internal/organic here.'))}>
+                      {retBk.wP>0&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,padding:'1px 0'}}><span style={{color:'var(--c-mut7)'}}>Post-op first visits</span><span><b style={{color:'var(--c-pink)'}}>+{retBk.wP}</b><span style={{color:'var(--c-faint)',fontSize:10.5}}>&nbsp;this {pWord}</span></span></div>}
+                      {retBk.hasMonth&&[
+                        ['New to clinic',<b style={{color:'var(--c-pur)'}}>{retBk.tN}</b>,retBk.tP>0&&newViaIA>=0?<span style={{color:'var(--c-faint)'}}>{newViaIA} initial · <span style={{color:'var(--c-pink)'}}>{retBk.tP} post-op</span></span>:null],
+                        ['Internal / organic',<b style={{color:retBk.tInt>=0?'var(--c-grn)':'var(--c-org)'}}>{retBk.tInt}</b>,null]
+                      ].map(([lab,val,sub],i)=>(
+                        <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,padding:'1px 0'}}>
+                          <span style={{color:'var(--c-mut7)'}}>{lab}</span>
+                          <span style={{textAlign:'right'}}>{val}{sub&&<span style={{fontSize:10.5}}>&nbsp;&nbsp;{sub}</span>}</span>
+                        </div>
+                      ))}
+                      <div style={{fontSize:10,color:'var(--c-d55)',marginTop:3}}>post-op = first visit with no in-clinic initial{retBk.hasMonth?' · month of '+retBk.label:''}</div>
                     </div>);})())}
                 </div>
               );
@@ -5831,7 +5844,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const lbl=(x)=>x?new Date(x+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const fm=lbl(f),tm=lbl(t);if(fm&&tm)return fm===tm?fm:fm+' – '+tm;if(tm&&!fm)return 'through '+tm;if(fm&&!tm)return fm+' onward';return 'all dates';})()}</span>}</span>
-                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L21</span></span>
+                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L23</span></span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
                 <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
