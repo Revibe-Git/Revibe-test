@@ -1838,7 +1838,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L29'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L30'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2336,6 +2336,8 @@ function CallHistoryPage(){
   useEffect(()=>{const h=(e)=>{if(e.key==='Escape')setExpandedLead(null);};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[]);
   const[leadFilter,setLeadFilter]=useState('all');
   const[leadSort,setLeadSort]=useState('date');
+  const[lFrom,setLFrom]=useState('');   // lead-tracker custom range — from
+  const[lTo,setLTo]=useState('');       // lead-tracker custom range — to
   const sortLeads=(arr)=>[...arr].sort((a,b)=>{
     if(leadSort==='date'){ // newest first — recent conversion performance up top
       const da=(a.date||'')+'|'+(a.createdAt||''),db=(b.date||'')+'|'+(b.createdAt||'');
