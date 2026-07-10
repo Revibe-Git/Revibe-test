@@ -1968,8 +1968,10 @@ function App(){
   const[activeId,setActiveId]=useState(null);
   const{notifs,addNotif,markRead,markAllRead}=useNotifications();
   const[meetings,setMeetings]=useState(()=>{try{const s=localStorage.getItem('rvgd3_meetings');if(s)return JSON.parse(s);}catch(e){}return [];});
+  const _mtLoaded=React.useRef(false);
+  useEffect(()=>{let c=false,tries=0;const ld=()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}SB.from('meetings').select('data').eq('id','singleton').maybeSingle().then(({data,error})=>{if(c)return;_mtLoaded.current=true;if(!error&&data&&Array.isArray(data.data)){if(data.data.length)setMeetings(data.data);else if(meetings.length)SB.from('meetings').upsert({id:'singleton',data:meetings}).then(()=>{},()=>{});}else if(!error&&meetings.length)SB.from('meetings').upsert({id:'singleton',data:meetings}).then(()=>{},()=>{});},()=>{_mtLoaded.current=true;});};ld();return()=>{c=true;};},[]);// eslint-disable-line
   const[perfData,setPerfData]=useState(()=>{try{const s=localStorage.getItem('rvgd3_perf3');return s?JSON.parse(s):{snapshots:[],gva:{},retention:{},lastImport:null};}catch{return{snapshots:[],gva:{},retention:{},lastImport:null};}});
-  useEffect(()=>{try{localStorage.setItem('rvgd3_meetings',JSON.stringify(meetings));}catch(e){}},[meetings]);
+  useEffect(()=>{try{localStorage.setItem('rvgd3_meetings',JSON.stringify(meetings));}catch(e){}const SB=window.__SB;if(SB&&_mtLoaded.current)SB.from('meetings').upsert({id:'singleton',data:meetings}).then(()=>{},()=>{});},[meetings]);
 
   useEffect(()=>sv('staff',staff),[staff]);
   useEffect(()=>sv('evals',evals),[evals]);
@@ -5877,7 +5879,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const lbl=(x)=>x?new Date(x+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const fm=lbl(f),tm=lbl(t);if(fm&&tm)return fm===tm?fm:fm+' – '+tm;if(tm&&!fm)return 'through '+tm;if(fm&&!tm)return fm+' onward';return 'all dates';})()}</span>}</span>
-                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L26</span></span>
+                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L28</span></span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
                 <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
@@ -6710,6 +6712,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       {/* ── IMPORT ── */}
       {tab==='import'&&(
         <div>
+          <DBHealthCard/>
           <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'16px 18px',marginBottom:14}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#CAE8C1',fontWeight:700,marginBottom:10}}>How to Export from Jane</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:12}}>
@@ -7579,6 +7582,103 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff,p
           {tab==='numbers'&&(<StaffNumbersTab staff={staff} perfData={perfData}/>)}
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ══ MD-LITE — renders meeting-notes markdown (headings/bold/links/bullets) as clean UI ══ */
+function MdLite({text}){
+  const inline=(t,key)=>{
+    const out=[];let rest=String(t||'');let i=0;
+    const rx=/\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|\*([^*\n]+)\*/;
+    while(rest){
+      const m=rest.match(rx);
+      if(!m){out.push(rest);break;}
+      if(m.index>0)out.push(rest.slice(0,m.index));
+      if(m[1]!==undefined){
+        const label=m[1],url=m[2]||'';
+        if(/^\d{2}:\d{2}(:\d{2})?$/.test(label))out.push(<span key={key+'-'+i} style={{color:'#556059',fontSize:'0.82em'}}>{label}</span>);
+        else if(/^https?:/.test(url))out.push(<a key={key+'-'+i} href={url} target="_blank" rel="noreferrer" style={{color:'#7FC8E8',textDecoration:'underline',textDecorationColor:'rgba(127,200,232,.4)'}}>{label}</a>);
+        else out.push(<span key={key+'-'+i} style={{color:'#cdd5d0'}}>{label}</span>);
+      }
+      else if(m[3]!==undefined)out.push(<b key={key+'-'+i} style={{color:'#e8ece9'}}>{m[3]}</b>);
+      else out.push(<i key={key+'-'+i} style={{color:'#8f9a94'}}>{m[4]}</i>);
+      rest=rest.slice(m.index+m[0].length);i++;
+    }
+    return out;
+  };
+  const blocks=String(text||'').split(/\n{2,}/);
+  return(<div>{blocks.map((raw,bi)=>{
+    const b=raw.trim();if(!b)return null;
+    if(b.startsWith('### '))return <div key={bi} style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:19,fontWeight:800,letterSpacing:'1px',textTransform:'uppercase',color:'#BB99FF',margin:'22px 0 8px',paddingBottom:5,borderBottom:'1px solid rgba(187,153,255,.25)'}}>{inline(b.slice(4),bi)}</div>;
+    if(b.startsWith('## '))return <div key={bi} style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,letterSpacing:'.5px',color:'#eee',margin:'8px 0 4px'}}>{inline(b.slice(3),bi)}</div>;
+    const lines=b.split('\n').filter(l=>l.trim());
+    if(lines.length&&lines.every(l=>/^\s*-\s/.test(l)))
+      return <div key={bi} style={{margin:'6px 0 12px'}}>{lines.map((l,li)=>(<div key={li} style={{display:'flex',gap:10,margin:'0 0 10px'}}><span style={{color:'#BB99FF',flex:'0 0 auto',lineHeight:1.7}}>▸</span><span style={{lineHeight:1.7,color:'#b9c2bd',fontSize:14.5}}>{inline(l.replace(/^\s*-\s/,''),bi+'-'+li)}</span></div>))}</div>;
+    return <p key={bi} style={{margin:'6px 0 12px',lineHeight:1.75,color:'#b9c2bd',fontSize:14.5}}>{inline(b,bi)}</p>;
+  })}</div>);
+}
+
+/* ══ DB HEALTH — pings every Supabase table this dashboard writes to ══ */
+function DBHealthCard(){
+  const TABLES=[
+    ['staff','Staff roster'],['performance_snapshots','Monthly snapshots'],['daily_appointments','Daily appointments'],['daily_revenue','Daily revenue'],
+    ['shift_daily','Shift / utilization'],['source_files','Uploaded report files'],['revenue_basis','Revenue basis (books)'],
+    ['retention_summaries','Retention imports'],['retention_entries','Retention entries'],['gva_entries','GVA entries'],
+    ['call_log','Call log · leads · sources'],['call_reports','Saved call reports'],['weekly_reports','Saved weekly reports'],['form_subs','Check-in forms'],
+    ['pkg_assign','Package assignments'],['match_profiles','Care-mapper profiles'],['session_log','Manual session log (legacy)'],
+    ['systematic_sessions','Systematic sessions'],['systematic_concepts','Systematic concepts'],['systematic_playbook','Clinical playbook'],
+    ['gd_tracker','G&D tracker'],['leadership_entries','Leadership tracker'],['resources','Clinician resources'],['staff_comments','Staff comments'],['meetings','Schedule & meetings'],
+  ];
+  const[res,setRes]=React.useState(null);
+  const[busy,setBusy]=React.useState(false);
+  const run=async()=>{
+    const SB=window.__SB;
+    if(!SB){setRes({noSb:true,rows:[]});return;}
+    setBusy(true);
+    const rows=[];
+    for(const[t,label] of TABLES){
+      try{
+        const{error}=await SB.from(t).select('id',{head:true,count:'exact'}).limit(1);
+        if(!error)rows.push({t,label,st:'ok'});
+        else rows.push({t,label,st:(/does not exist|relation|42P01|schema cache/i.test(error.message||'')?'missing':'error'),msg:error.message});
+      }catch(e){rows.push({t,label,st:'error',msg:(e&&e.message)||String(e)});}
+    }
+    let lsBytes=0;try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);lsBytes+=(k.length+(localStorage.getItem(k)||'').length)*2;}}catch(e){}
+    setRes({rows,lsBytes,revLoc:!!window.__revLocUnsynced});
+    setBusy(false);
+  };
+  const C={ok:'#44CCAA',missing:'#E05252',error:'#E0A052'};
+  const miss=res&&res.rows.filter(r=>r.st!=='ok');
+  return(
+    <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6,padding:'14px 18px',marginBottom:14}}>
+      <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,letterSpacing:'1px',color:'#ddd'}}>DATA SYNC HEALTH</span>
+        <span style={{fontSize:12,color:'#777'}}>pings every database table this dashboard saves to</span>
+        <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}} disabled={busy} onClick={run}>{busy?'Checking…':(res?'Re-check':'Run check')}</button>
+      </div>
+      {res&&res.noSb&&<div style={{fontSize:13,color:'#E0A052',marginTop:8}}>Supabase client not loaded — everything is currently device-local only.</div>}
+      {res&&!res.noSb&&(
+        <div style={{marginTop:10}}>
+          <div style={{fontSize:13,marginBottom:8}}>
+            <b style={{color:miss.length?'#E0A052':'#44CCAA'}}>{res.rows.length-miss.length}/{res.rows.length} tables reachable</b>
+            <span style={{color:'#777'}}> · browser storage in use ≈ {(res.lsBytes/1024).toFixed(0)} KB{res.lsBytes>4200000?' ⚠ approaching the ~5 MB browser limit':''}</span>
+            {res.revLoc&&<span style={{color:'#E0A052'}}> · ⚠ daily_revenue is missing the "revByLoc"/collected columns (location splits fall back to estimates) — run the setup SQL</span>}
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))',gap:'4px 14px'}}>
+            {res.rows.map(r=>(
+              <div key={r.t} style={{fontSize:12.5,display:'flex',gap:7,alignItems:'baseline'}} title={r.msg||''}>
+                <span style={{color:C[r.st],fontWeight:800}}>{r.st==='ok'?'●':'●'}</span>
+                <span style={{color:'#bbb'}}>{r.label}</span>
+                <span style={{color:'#5a5f5c',fontSize:11}}>{r.t}</span>
+                {r.st!=='ok'&&<span style={{color:C[r.st],fontSize:11,fontWeight:700}}>{r.st==='missing'?'TABLE MISSING':'ERROR'}</span>}
+              </div>
+            ))}
+          </div>
+          {miss.length>0&&<div style={{fontSize:12.5,color:'#E0A052',marginTop:10,lineHeight:1.6}}>Anything red is <b>not being backed up</b> — those saves fall back to this device only. Run the <b>revibe-gd-setup.sql</b> script in Supabase (SQL editor → paste → run) to create missing tables/columns, then re-check.</div>}
+        </div>
+      )}
+      {!res&&<div style={{fontSize:12.5,color:'#666',marginTop:8}}>Run this after deploys or if a save ever seems to vanish — it verifies each table exists and is reachable with the current key.</div>}
     </div>
   );
 }
@@ -12572,14 +12672,16 @@ function SystematicPage({staff=[]}){
           <div style={{fontSize:15,color:'#aaa',lineHeight:1.8,whiteSpace:'pre-wrap',background:'var(--surface2)',borderRadius:5,padding:'12px 14px'}}>{active.notes}</div>
         </div>)}
         {active.sourceDocText&&(<div>
-          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,flexWrap:'wrap'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10,flexWrap:'wrap'}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'#BB99FF'}}>Source Document</div>
             <span style={{fontSize:12.5,color:'#777'}}>{active.sourceDocName||'attached document'}</span>
-            {active.sourceDocB64&&<button className="btn btn-ghost btn-xs" onClick={()=>{try{const bin=atob(active.sourceDocB64);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});const url=URL.createObjectURL(blob);const el=document.createElement('a');el.href=url;el.download=active.sourceDocName||'session-notes.docx';document.body.appendChild(el);el.click();el.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}catch(e){window.alert('Download failed: '+((e&&e.message)||e));}}}>⬇ Download original (.docx)</button>}
+            {active.sourceDocB64&&<button className="btn btn-go btn-sm" style={{fontWeight:800}} onClick={()=>{try{const bin=atob(active.sourceDocB64);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);const blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});const url=URL.createObjectURL(blob);const el=document.createElement('a');el.href=url;el.download=active.sourceDocName||'session-notes.docx';document.body.appendChild(el);el.click();el.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}catch(e){window.alert('Download failed: '+((e&&e.message)||e));}}}>⬇ Download original (.docx)</button>}
           </div>
-          <details style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:6}}>
-            <summary style={{cursor:'pointer',padding:'10px 14px',fontSize:13.5,color:'#bbb',userSelect:'none'}}>View full document — the complete meeting notes, word for word (use ⌘F to find specifics)</summary>
-            <div style={{maxHeight:520,overflowY:'auto',padding:'4px 16px 16px',fontSize:14,color:'#bfc7c2',lineHeight:1.75,whiteSpace:'pre-wrap',borderTop:'1px solid var(--border)'}}>{active.sourceDocText}</div>
+          <details open style={{background:'var(--surface2)',border:'1px solid rgba(187,153,255,.35)',borderRadius:8,overflow:'hidden'}}>
+            <summary style={{cursor:'pointer',padding:'13px 16px',fontSize:14.5,fontWeight:800,color:'#BB99FF',userSelect:'none',background:'rgba(187,153,255,.08)',letterSpacing:'.3px'}}>📄 Full document — complete meeting notes, word for word <span style={{fontWeight:400,color:'#8f8aa5',fontSize:12.5}}>(⌘F to find specifics · click to collapse)</span></summary>
+            <div style={{maxHeight:560,overflowY:'auto',padding:'6px 22px 20px',borderTop:'1px solid rgba(187,153,255,.2)'}}>
+              <MdLite text={active.sourceDocText}/>
+            </div>
           </details>
         </div>)}
         {active.concepts&&(<div>
