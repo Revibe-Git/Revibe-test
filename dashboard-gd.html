@@ -1838,6 +1838,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
+window.__BUILD='build L29'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2111,6 +2112,7 @@ function App(){
           <div className="nav-item" onClick={()=>{setModal('addStaff');setNavOpen(false);}}><span className="nav-icon">+</span>Add Staff</div>
           <div className="nav-item" onClick={()=>{setModal('addEval');setNavOpen(false);}}><span className="nav-icon">+</span>Log Evaluation</div>
           <div className="nav-item" onClick={()=>{setModal('addSess');setNavOpen(false);}}><span className="nav-icon">+</span>Log Edu Session</div>
+          <div style={{padding:'14px 18px 10px',fontSize:10.5,color:'#4a524d',letterSpacing:'.5px'}} title="The version of this dashboard that is actually running. If a change seems missing, check this first — if it doesn't match the latest build, the deploy didn't take.">{window.__BUILD||'build ?'}</div>
         </div>
         <div className="sidebar-foot">
           <div className="foot-card">
@@ -2171,6 +2173,13 @@ function CallHistoryPage(){
   const STATUS_C={New:'#888','No Response':'#F4DB71',Booked:'#44CCAA','Not Suitable':'#E05252',
     /* legacy values still stored on older leads: */Contacted:'#7FC8E8',Responded:'#F4DB71','Not a fit':'#E05252'};
   const FU_METHODS=[['call','☎ Call'],['text','💬 Text'],['email','✉ Email']];
+  // Day-level call tallies beyond discipline calls/booked. Stored under day._x.
+  const META_TYPES=[
+    ['cx','Cancellations','#E05252'],['rs','Reschedules','#F4DB71'],['wn','Wrong number','#9BA8B5'],
+    ['ei','Existing client — booking IA','#7FC8E8'],['ef','Existing client — follow-up','#66B8DA'],
+    ['lc','Late cancel calls','#E0A052'],['gi','General inquiries','#BB99FF'],['sc','Sales calls','#8FE0C0']];
+  // up = good? cancellations / wrong numbers / late cancels going up are bad.
+  const META_BAD_UP={cx:1,wn:1,lc:1};
   const methIcon=(m)=>m==='text'?'💬':m==='email'?'✉':'☎';
   const LOC_C={Mississauga:'#CAE8C1',Markham:'#7FC8E8'};
   const today=new Date().toISOString().slice(0,10);
@@ -2246,7 +2255,7 @@ function CallHistoryPage(){
       rows.slice(1).forEach(r=>{const date=_normDate(r[dateI]);if(!date){badDates++;return;}const disc=_discFromHeader(r[discColI]);if(!disc)return;const c=parseInt(String(r[callI]).replace(/[^0-9]/g,''))||0;const b=bookI>=0?(parseInt(String(r[bookI]).replace(/[^0-9]/g,''))||0):0;if(c||b)entries.push({date,loc:locI>=0?_normLocCSV(r[locI]):null,disc,c,b});});
     }else{ // shape B — wide
       const cols=[];const metaCols=[];const unmapped=[];
-      hdr.forEach((h,i)=>{if(i===dateI||i===locI)return;const hl=lh[i];if(/cancel/.test(hl)){metaCols.push({i,k:'cx'});return;}if(/re-?sched/.test(hl)){metaCols.push({i,k:'rs'});return;}if(/wrong/.test(hl)){metaCols.push({i,k:'wn'});return;}const isB=/book/.test(hl);const disc=_discFromHeader(h);if(disc)cols.push({i,disc,b:isB});else if(String(h).trim())unmapped.push(h);});
+      hdr.forEach((h,i)=>{if(i===dateI||i===locI)return;const hl=lh[i];if(/late.?cancel/.test(hl)){metaCols.push({i,k:'lc'});return;}if(/cancel/.test(hl)){metaCols.push({i,k:'cx'});return;}if(/re-?sched/.test(hl)){metaCols.push({i,k:'rs'});return;}if(/wrong/.test(hl)){metaCols.push({i,k:'wn'});return;}if(/existing.*(ia|initial)/.test(hl)){metaCols.push({i,k:'ei'});return;}if(/existing.*follow/.test(hl)){metaCols.push({i,k:'ef'});return;}if(/inquir/.test(hl)){metaCols.push({i,k:'gi'});return;}if(/sales/.test(hl)){metaCols.push({i,k:'sc'});return;}const isB=/book/.test(hl);const disc=_discFromHeader(h);if(disc)cols.push({i,disc,b:isB});else if(String(h).trim())unmapped.push(h);});
       if(!cols.length)return{error:'No discipline columns recognized. Headers should include e.g. Physio, Chiro, RMT, Osteo, Naturo, Sauna…'};
       if(unmapped.length)warn.push('Ignored columns: '+unmapped.slice(0,6).join(', ')+(unmapped.length>6?'…':''));
       rows.slice(1).forEach(r=>{const date=_normDate(r[dateI]);if(!date){badDates++;return;}const locV=locI>=0?_normLocCSV(r[locI]):null;cols.forEach(cl=>{const n=parseInt(String(r[cl.i]).replace(/[^0-9]/g,''))||0;if(!n)return;entries.push({date,loc:locV,disc:cl.disc,c:cl.b?0:n,b:cl.b?n:0});});metaCols.forEach(mc=>{const n=parseInt(String(r[mc.i]).replace(/[^0-9]/g,''))||0;if(!n)return;entries.push({date,loc:locV,meta:mc.k,c:n,b:0});});});
@@ -2292,9 +2301,10 @@ function CallHistoryPage(){
   const[entryDate,setEntryDate]=useState(today);
   const[entry,setEntry]=useState({});
   const[savedFlag,setSavedFlag]=useState(false);
-  useEffect(()=>{const e=(data.calls[loc]||{})[entryDate]||{};const base=Object.fromEntries(discList.map(([id])=>[id,{c:cOf(e[id])?String(cOf(e[id])):'',b:bOf(e[id])?String(bOf(e[id])):''}]));const x=e._x||{};base._x={cx:x.cx?String(x.cx):'',rs:x.rs?String(x.rs):'',wn:x.wn?String(x.wn):''};setEntry(base);setSavedFlag(false);},[entryDate,loc,data]);// eslint-disable-line
-  const saveEntry=()=>{const day={};discList.forEach(([id])=>{const c=parseInt(entry[id]&&entry[id].c)||0;const b=parseInt(entry[id]&&entry[id].b)||0;if(c||b)day[id]=b?{c,b}:c;});const _x=entry._x||{};const cx=parseInt(_x.cx)||0,rs=parseInt(_x.rs)||0,wn=parseInt(_x.wn)||0;if(cx||rs||wn)day._x={...(cx?{cx}:{}),...(rs?{rs}:{}),...(wn?{wn}:{})};const calls={...data.calls,[loc]:{...(data.calls[loc]||{})}};if(Object.keys(day).length)calls[loc][entryDate]=day;else delete calls[loc][entryDate];persist({...data,calls},true);setSavedFlag(true);setTimeout(()=>setSavedFlag(false),1600);};
-  const inTf=(d)=>{if(tf==='all')return true;if(tf==='month')return d.slice(0,7)===today.slice(0,7);const cut=new Date(Date.now()-parseInt(tf)*86400000).toISOString().slice(0,10);return d>=cut;};
+  useEffect(()=>{const e=(data.calls[loc]||{})[entryDate]||{};const base=Object.fromEntries(discList.map(([id])=>[id,{c:cOf(e[id])?String(cOf(e[id])):'',b:bOf(e[id])?String(bOf(e[id])):''}]));const x=e._x||{};base._x=Object.fromEntries(META_TYPES.map(([k])=>[k,x[k]?String(x[k]):'']));setEntry(base);setSavedFlag(false);},[entryDate,loc,data]);// eslint-disable-line
+  const saveEntry=()=>{const day={};discList.forEach(([id])=>{const c=parseInt(entry[id]&&entry[id].c)||0;const b=parseInt(entry[id]&&entry[id].b)||0;if(c||b)day[id]=b?{c,b}:c;});const _x=entry._x||{};const xv={};META_TYPES.forEach(([k])=>{const v=parseInt(_x[k])||0;if(v)xv[k]=v;});if(Object.keys(xv).length)day._x=xv;const calls={...data.calls,[loc]:{...(data.calls[loc]||{})}};if(Object.keys(day).length)calls[loc][entryDate]=day;else delete calls[loc][entryDate];persist({...data,calls},true);setSavedFlag(true);setTimeout(()=>setSavedFlag(false),1600);};
+  const[cFrom,setCFrom]=useState('');const[cTo,setCTo]=useState('');
+  const inTf=(d)=>{if(tf==='custom')return(!cFrom||d>=cFrom)&&(!cTo||d<=cTo);if(tf==='all')return true;if(tf==='month')return d.slice(0,7)===today.slice(0,7);const cut=new Date(Date.now()-parseInt(tf)*86400000).toISOString().slice(0,10);return d>=cut;};
   const locDays=Object.keys(data.calls[loc]||{}).filter(inTf).sort();
   const discTotals=discList.map(([id,label])=>{const calls=locDays.reduce((a,d)=>a+cOf((data.calls[loc][d]||{})[id]),0);const booked=locDays.reduce((a,d)=>a+bOf((data.calls[loc][d]||{})[id]),0);return{id,label,color:DISC_COLOR[id]||'#999',calls,booked,n:metric==='booked'?booked:calls};});
   const locCalls=discTotals.reduce((a,x)=>a+x.calls,0);
@@ -2309,6 +2319,7 @@ function CallHistoryPage(){
   const _tsRaw=locDays.map(d=>{const day=data.calls[loc][d]||{};return{d,calls:Object.values(day).reduce((s,v)=>s+cOf(v),0),booked:Object.values(day).reduce((s,v)=>s+bOf(v),0)};});
   let ts;
   if(gran==='week'){const wk={};_tsRaw.forEach(t=>{const w=_wkStart(t.d);if(!wk[w])wk[w]={calls:0,booked:0};wk[w].calls+=t.calls;wk[w].booked+=t.booked;});ts=Object.keys(wk).sort().slice(-26).map(w=>({d:w,calls:wk[w].calls,booked:wk[w].booked}));}
+  else if(gran==='mo'){const mo={};_tsRaw.forEach(t=>{const m=t.d.slice(0,7);if(!mo[m])mo[m]={calls:0,booked:0};mo[m].calls+=t.calls;mo[m].booked+=t.booked;});ts=Object.keys(mo).sort().slice(-24).map(m=>({d:m,calls:mo[m].calls,booked:mo[m].booked}));}
   else{ts=_tsRaw.slice(-30);}
   const _calls=ts.map(t=>t.calls).filter(v=>v>0).sort((a,b)=>a-b);
   const _p90=_calls.length?_calls[Math.min(_calls.length-1,Math.floor(_calls.length*0.9))]:0;
@@ -2324,13 +2335,19 @@ function CallHistoryPage(){
   const[leadPane,setLeadPane]=useState(null);
   useEffect(()=>{const h=(e)=>{if(e.key==='Escape')setExpandedLead(null);};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[]);
   const[leadFilter,setLeadFilter]=useState('all');
+  const[leadSort,setLeadSort]=useState('date');
   const sortLeads=(arr)=>[...arr].sort((a,b)=>{
+    if(leadSort==='date'){ // newest first — recent conversion performance up top
+      const da=(a.date||'')+'|'+(a.createdAt||''),db=(b.date||'')+'|'+(b.createdAt||'');
+      return da<db?1:da>db?-1:0;
+    }
     const closed=l=>(l.status==='Booked'||l.status==='Not Suitable'||l.status==='Not a fit')?1:0;
     const ca=closed(a),cb=closed(b);if(ca!==cb)return ca-cb;
     const da=a.nextDate||'',db=b.nextDate||'';
     if(da&&db)return da<db?-1:da>db?1:0;
     if(da)return -1;if(db)return 1;return 0;
   });
+  const rollupArr=(ls)=>{const c=ls.filter(l=>(l.followups||[]).length>0||(l.status&&l.status!=='New')).length;const b=ls.filter(l=>l.status==='Booked').length;return{total:ls.length,contacted:c,booked:b,conv:ls.length?b/ls.length*100:0};};
   const leadsOf=(sid)=>data.leads[sid]||[];
   const rollup=(sid)=>{const ls=leadsOf(sid);const c=ls.filter(l=>['Contacted','Responded','Booked'].includes(l.status)).length;const r=ls.filter(l=>['Responded','Booked'].includes(l.status)).length;const b=ls.filter(l=>l.status==='Booked').length;return{total:ls.length,contacted:c,responded:r,booked:b,conv:ls.length?b/ls.length*100:0};};
   const addSource=()=>{const name=prompt('New lead source / event name (e.g. "Jackalope 2026", "Sutherland Chan", "COMP Sessions")');if(!name||!name.trim())return;const id='src_'+Date.now().toString(36);persist({...data,sources:[...sources,{id,name:name.trim(),kind:'event'}]},true);setSelSource(id);};
@@ -2372,8 +2389,8 @@ function CallHistoryPage(){
     const days=[];for(let i=0;i<7;i++)days.push(_addDaysISO(ws,i));
     const byLoc={},byDisc={},daily=[];let calls=0,booked=0;
     REP_LOCS.forEach(L=>{byLoc[L]={calls:0,booked:0};});
-    const meta={cx:0,rs:0,wn:0};
-    days.forEach(d=>{let dc=0,db=0;REP_LOCS.forEach(L=>{const day=(data.calls[L]||{})[d]||{};Object.entries(day).forEach(([id,v])=>{if(id==='_x'){meta.cx+=(+v.cx||0);meta.rs+=(+v.rs||0);meta.wn+=(+v.wn||0);return;}const c=cOf(v),b=bOf(v);byLoc[L].calls+=c;byLoc[L].booked+=b;dc+=c;db+=b;if(!byDisc[id])byDisc[id]={calls:0,booked:0};byDisc[id].calls+=c;byDisc[id].booked+=b;});});calls+=dc;booked+=db;daily.push({d,calls:dc,booked:db});});
+    const meta={cx:0,rs:0,wn:0,ei:0,ef:0,lc:0,gi:0,sc:0};
+    days.forEach(d=>{let dc=0,db=0;REP_LOCS.forEach(L=>{const day=(data.calls[L]||{})[d]||{};Object.entries(day).forEach(([id,v])=>{if(id==='_x'){Object.keys(meta).forEach(k=>{meta[k]+=(+v[k]||0);});return;}const c=cOf(v),b=bOf(v);byLoc[L].calls+=c;byLoc[L].booked+=b;dc+=c;db+=b;if(!byDisc[id])byDisc[id]={calls:0,booked:0};byDisc[id].calls+=c;byDisc[id].booked+=b;});});calls+=dc;booked+=db;daily.push({d,calls:dc,booked:db});});
     return{ws,calls,booked,rate:calls?booked/calls*100:0,byLoc,byDisc,daily,meta};
   };
   const buildCallReport=(ws)=>({cur:buildCallWeek(ws),prev:buildCallWeek(_addDaysISO(ws,-7))});
@@ -2436,7 +2453,7 @@ function CallHistoryPage(){
           </div>))}
         </div>
         <div style={{marginTop:12,display:'flex',gap:14,flexWrap:'wrap'}}>
-          {[['cx','Cancellations','#E05252'],['rs','Reschedules','#F4DB71'],['wn','Wrong number','#9BA8B5']].map(([k,label,col])=>(
+          {META_TYPES.map(([k,label,col])=>(
             <div key={k} style={{flex:'0 0 150px'}}>
               <div style={{fontSize:11,color:col,textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4,fontWeight:700}}>{label}</div>
               <input type="number" min="0" placeholder="0" value={(entry._x&&entry._x[k])||''}
@@ -2445,7 +2462,7 @@ function CallHistoryPage(){
             </div>
           ))}
         </div>
-        <div style={{fontSize:11.5,color:'#666',marginTop:6}}>Day-level tallies for {loc} — cancellation &amp; reschedule calls, and wrong-number calls (not tied to a discipline).</div>
+        <div style={{fontSize:11.5,color:'#666',marginTop:6}}>Day-level tallies for {loc} — call types not tied to a discipline booking. Existing-client calls, late cancels, inquiries &amp; sales calls stay out of the booking-rate math.</div>
         <div style={{marginTop:12,display:'flex',alignItems:'center',gap:10}}>
           <button className="btn btn-lime btn-sm" onClick={saveEntry}>Save {entryDate}</button>
           {savedFlag&&<span style={{color:'#44CCAA',fontSize:13}}>Saved ✓</span>}
@@ -2482,9 +2499,14 @@ function CallHistoryPage(){
       <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
         <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginRight:2}}>View</span>
         {[['30','30d'],['90','90d'],['month','This Month'],['all','All Time']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${tf===v?'btn-go':'btn-ghost'}`} onClick={()=>setTf(v)}>{l}</button>))}
+        <span style={{fontSize:11,color:tf==='custom'?'#CAE8C1':'#777',marginLeft:4}}>or</span>
+        <input type="date" value={cFrom} onChange={e=>{setCFrom(e.target.value);setTf('custom');}} style={{background:'var(--surface3)',border:'1px solid '+(tf==='custom'?'var(--go-b)':'var(--border)'),borderRadius:6,color:'#ddd',padding:'5px 8px',fontSize:12.5}}/>
+        <span style={{color:'#666'}}>→</span>
+        <input type="date" value={cTo} onChange={e=>{setCTo(e.target.value);setTf('custom');}} style={{background:'var(--surface3)',border:'1px solid '+(tf==='custom'?'var(--go-b)':'var(--border)'),borderRadius:6,color:'#ddd',padding:'5px 8px',fontSize:12.5}}/>
+        {tf==='custom'&&<button className="btn btn-ghost btn-xs" onClick={()=>{setCFrom('');setCTo('');setTf('30');}}>✕</button>}
         <div style={{width:1,height:20,background:'var(--border2)',margin:'0 4px'}}/>
         <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'2px',textTransform:'uppercase',color:'#888',marginRight:2}}>By</span>
-        {[['day','Daily'],['week','Weekly']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${gran===v?'btn-go':'btn-ghost'}`} onClick={()=>setGran(v)}>{l}</button>))}
+        {[['day','Daily'],['week','Weekly'],['mo','Monthly']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${gran===v?'btn-go':'btn-ghost'}`} onClick={()=>setGran(v)}>{l}</button>))}
       </div>
 
       <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14,alignItems:'center'}}>
@@ -2516,7 +2538,7 @@ function CallHistoryPage(){
 
       <div className="perf-slot" style={{marginBottom:14}}>
         <div className="perf-slot-head" style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8}}>
-          <span className="perf-slot-title" style={{color:LOC_C[loc]}}>{gran==='week'?'Weekly':'Daily'} Calls &amp; Conversions — {loc}</span>
+          <span className="perf-slot-title" style={{color:LOC_C[loc]}}>{gran==='week'?'Weekly':gran==='mo'?'Monthly':'Daily'} Calls &amp; Conversions — {loc}</span>
           <div style={{display:'flex',gap:14,fontSize:12,color:'#999'}}>
             <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:11,height:11,borderRadius:2,background:LOC_C[loc],opacity:.35,display:'inline-block'}}/>Calls</span>
             <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:11,height:11,borderRadius:2,background:'#44CCAA',display:'inline-block'}}/>Converted</span>
@@ -2532,7 +2554,7 @@ function CallHistoryPage(){
               {t.booked>0&&<rect x={x} y={CH-padB-hb} width={bw} height={hb} rx={2} fill="#44CCAA"/>}
               {over&&<rect x={x} y={CH-padB-hc-3} width={bw} height={2.5} rx={1} fill="#F4DB71"/>}
               {t.calls>0&&bw>=16&&<text x={x+bw/2} y={CH-padB-hc-(over?7:3)} fontSize="9.5" fill={over?'#F4DB71':'#bbb'} textAnchor="middle" fontWeight={over?700:400}>{t.calls}</text>}
-              {i%Math.ceil(ts.length/12||1)===0&&<text x={x+bw/2} y={CH-padB+13} fontSize="9" fill="#777" textAnchor="middle">{t.d.slice(5)}</text>}
+              {i%Math.ceil(ts.length/12||1)===0&&<text x={x+bw/2} y={CH-padB+13} fontSize="9" fill="#777" textAnchor="middle">{gran==='mo'?t.d.slice(2):t.d.slice(5)}</text>}
             </g>);})}
           </svg>}
           <div style={{fontSize:12,color:'#666',marginTop:6}}>Each bar is total calls; the solid green portion is how many converted. Hover any bar for the exact split.{_clipped&&<span style={{color:'#F4DB71'}}> Busy days above {tsMax} are capped (gold tick) so the typical range stays readable — the number on top is the true count.</span>}</div>
@@ -2547,7 +2569,7 @@ function CallHistoryPage(){
               <span style={{fontSize:13,color:'#ccc',width:90}}>{d}</span>
               <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{discList.filter(([id])=>day[id]).map(([id,label])=>(<span key={id} style={{fontSize:11,color:'#1a1a1a',background:DISC_COLOR[id],borderRadius:4,padding:'1px 6px',fontWeight:700}}>{label.split(' ')[0]} {cOf(day[id])}{bOf(day[id])?'→'+bOf(day[id]):''}</span>))}</div>
             </div>
-            <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:13,fontWeight:700,color:'#ddd'}}>{tot}{tb?' / '+tb+' booked':''}</span>{(xx.cx||xx.rs||xx.wn)&&<span style={{fontSize:11.5}}>{xx.cx?<span style={{color:'#E05252'}}>{xx.cx} cx</span>:null}{xx.cx&&(xx.rs||xx.wn)?<span style={{color:'#555'}}> · </span>:null}{xx.rs?<span style={{color:'#F4DB71'}}>{xx.rs} rs</span>:null}{xx.rs&&xx.wn?<span style={{color:'#555'}}> · </span>:null}{xx.wn?<span style={{color:'#9BA8B5'}}>{xx.wn} wn</span>:null}</span>}<button className="btn btn-ghost btn-xs" onClick={()=>{const calls={...data.calls,[loc]:{...data.calls[loc]}};delete calls[loc][d];persist({...data,calls},true);}}>✕</button></div>
+            <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:13,fontWeight:700,color:'#ddd'}}>{tot}{tb?' / '+tb+' booked':''}</span>{META_TYPES.some(([k])=>xx[k])&&<span style={{fontSize:11.5}}>{META_TYPES.filter(([k])=>xx[k]).map(([k,label,col],i,arr)=>(<span key={k}><span style={{color:col}} title={label}>{xx[k]} {k}</span>{i<arr.length-1?<span style={{color:'#555'}}> · </span>:null}</span>))}</span>}<button className="btn btn-ghost btn-xs" onClick={()=>{const calls={...data.calls,[loc]:{...data.calls[loc]}};delete calls[loc][d];persist({...data,calls},true);}}>✕</button></div>
           </div>);})}
           {locDays.length===0&&<div style={{color:'#666',padding:'14px 0',textAlign:'center'}}>Nothing logged in this window.</div>}
         </div>
@@ -2568,9 +2590,17 @@ function CallHistoryPage(){
         <button onClick={addSource} style={{cursor:'pointer',background:'transparent',border:'1px dashed var(--border2)',borderRadius:9,padding:'13px 15px',color:'#888',fontSize:14,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'.5px'}}>+ Add source / event</button>
       </div>
 
-      {selSource&&(()=>{const s=sources.find(x=>x.id===selSource);if(!s)return null;const r=rollup(s.id);const lsAll=leadsOf(s.id);const ls=sortLeads(leadFilter==='all'?lsAll:lsAll.filter(l=>(l.status||'New')===leadFilter));const lblS={fontSize:11,color:'#9a9a9a',marginBottom:3};const lblG={fontSize:10.5,color:'#7a857d',textTransform:'uppercase',letterSpacing:'1px',margin:'14px 0 7px'};const COLS='16px minmax(110px,1.4fr) 92px minmax(140px,1.5fr) 118px 134px 84px 24px';return(<div>
+      {selSource&&(()=>{const s=sources.find(x=>x.id===selSource);if(!s)return null;
+        const lsRaw=leadsOf(s.id);
+        const inLR=(d)=>(!lFrom||(d||'')>=lFrom)&&(!lTo||(d||'')<=lTo);
+        const lsAll=(lFrom||lTo)?lsRaw.filter(l=>inLR(l.date)):lsRaw;
+        const r=rollupArr(lsAll);
+        const ls=sortLeads(leadFilter==='all'?lsAll:lsAll.filter(l=>(l.status||'New')===leadFilter));
+        // monthly series: leads received + booked, from the range-scoped set
+        const _mo={};lsAll.forEach(l=>{const m=(l.date||'').slice(0,7);if(!m)return;if(!_mo[m])_mo[m]={t:0,b:0};_mo[m].t++;if(l.status==='Booked')_mo[m].b++;});
+        const moSeries=Object.keys(_mo).sort().slice(-24).map(m=>({m,t:_mo[m].t,b:_mo[m].b}));const lblS={fontSize:11,color:'#9a9a9a',marginBottom:3};const lblG={fontSize:10.5,color:'#7a857d',textTransform:'uppercase',letterSpacing:'1px',margin:'14px 0 7px'};const COLS='16px minmax(110px,1.4fr) 92px minmax(140px,1.5fr) 118px 134px 84px 24px';return(<div>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,marginBottom:10}}>
-          <div style={{display:'flex',alignItems:'baseline',gap:10}}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#eee'}}>{s.name}</span><span style={{fontSize:12,color:'#777'}}>{r.total} leads · {r.contacted} contacted · {r.responded} responded · {r.booked} booked · {r.conv.toFixed(0)}% conversion</span></div>
+          <div style={{display:'flex',alignItems:'baseline',gap:10}}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'#eee'}}>{s.name}</span><span style={{fontSize:12,color:'#777'}}>{r.total} leads{(lFrom||lTo)?' in range':''} · {r.contacted} contacted · {r.booked} booked · <b style={{color:r.conv>=40?'#44CCAA':r.conv>=20?'#F4DB71':'#E05252'}}>{r.conv.toFixed(0)}% conversion</b></span></div>
           <div style={{display:'flex',gap:6}}>
             <button className="btn btn-lime btn-sm" onClick={()=>addLead(s.id)}>+ Add lead to {s.name}</button>
           </div>
@@ -2580,8 +2610,40 @@ function CallHistoryPage(){
         <div style={{display:'flex',gap:5,flexWrap:'wrap',alignItems:'center',marginBottom:9}}>
           <span style={{fontSize:10,color:'#777',textTransform:'uppercase',letterSpacing:'1px',marginRight:2}}>Filter</span>
           {['all',...LEAD_STATUS.filter(st=>lsAll.some(l=>(l.status||'New')===st))].map(st=>{const n=st==='all'?lsAll.length:lsAll.filter(l=>(l.status||'New')===st).length;return <button key={st} className={`btn btn-xs ${leadFilter===st?'btn-go':'btn-ghost'}`} onClick={()=>setLeadFilter(st)}>{st==='all'?'All':st}<span style={{opacity:.55,marginLeft:4}}>{n}</span></button>;})}
-          <span style={{fontSize:11,color:'#666',marginLeft:'auto'}}>sorted by soonest follow-up</span>
+          <div style={{width:1,height:16,background:'var(--border2)',margin:'0 3px'}}/>
+          <span style={{fontSize:10,color:'#777',textTransform:'uppercase',letterSpacing:'1px'}}>Range</span>
+          <input type="date" value={lFrom} onChange={e=>setLFrom(e.target.value)} style={{background:'var(--surface3)',border:'1px solid '+((lFrom||lTo)?'var(--go-b)':'var(--border)'),borderRadius:5,color:'#ddd',padding:'3px 7px',fontSize:12}}/>
+          <span style={{color:'#666',fontSize:11}}>→</span>
+          <input type="date" value={lTo} onChange={e=>setLTo(e.target.value)} style={{background:'var(--surface3)',border:'1px solid '+((lFrom||lTo)?'var(--go-b)':'var(--border)'),borderRadius:5,color:'#ddd',padding:'3px 7px',fontSize:12}}/>
+          {(lFrom||lTo)&&<button className="btn btn-ghost btn-xs" onClick={()=>{setLFrom('');setLTo('');}}>✕</button>}
+          <span style={{fontSize:11,color:'#666',marginLeft:'auto'}}>sort:</span>
+          {[['date','Newest first'],['followup','Soonest follow-up']].map(([v,l])=>(<button key={v} className={`btn btn-xs ${leadSort===v?'btn-go':'btn-ghost'}`} onClick={()=>setLeadSort(v)}>{l}</button>))}
         </div>
+        {moSeries.length>1&&(
+          <div className="perf-slot" style={{marginBottom:12}}>
+            <div className="perf-slot-head" style={{display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+              <span className="perf-slot-title" style={{color:'#BB99FF'}}>Monthly Leads &amp; Conversions — {s.name}</span>
+              <div style={{display:'flex',gap:14,fontSize:12,color:'#999'}}>
+                <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:11,height:11,borderRadius:2,background:'#BB99FF',opacity:.38,display:'inline-block'}}/>Leads</span>
+                <span style={{display:'flex',alignItems:'center',gap:5}}><span style={{width:11,height:11,borderRadius:2,background:'#44CCAA',display:'inline-block'}}/>Booked</span>
+              </div>
+            </div>
+            <div className="perf-slot-body" style={{overflowX:'auto'}}>
+              {(()=>{const W=Math.max(560,moSeries.length*44),H=190,pB=26,pT=16;const mx=Math.max(1,...moSeries.map(x=>x.t));const bwm=Math.min(32,(W)/moSeries.length-10);
+                return(<svg viewBox={`0 0 ${W} ${H}`} style={{width:'100%',minWidth:Math.min(W,560),height:H}}>
+                  {[0,.5,1].map(g=>{const y=pT+(1-g)*(H-pB-pT);return(<g key={g}><line x1={0} y1={y} x2={W} y2={y} stroke="var(--border)" strokeDasharray="2 4"/><text x={2} y={y-3} fontSize="9" fill="#666">{Math.round(mx*g)}</text></g>);})}
+                  {moSeries.map((t,i)=>{const x=i*(W/moSeries.length)+((W/moSeries.length)-bwm)/2;const uh=H-pB-pT;const ht=(t.t/mx)*uh;const hb=(t.b/mx)*uh;const rate=t.t?Math.round(t.b/t.t*100):0;return(<g key={t.m}>
+                    <title>{t.m}: {t.t} lead{t.t===1?'':'s'} · {t.b} booked · {rate}%</title>
+                    <rect x={x} y={H-pB-ht} width={bwm} height={ht} rx={2} fill="#BB99FF" opacity={0.38}/>
+                    {t.b>0&&<rect x={x} y={H-pB-hb} width={bwm} height={hb} rx={2} fill="#44CCAA"/>}
+                    {bwm>=18&&<text x={x+bwm/2} y={H-pB-ht-3} fontSize="9.5" fill="#bbb" textAnchor="middle">{t.t}</text>}
+                    <text x={x+bwm/2} y={H-pB+13} fontSize="9" fill="#777" textAnchor="middle">{t.m.slice(2)}</text>
+                  </g>);})}
+                </svg>);})()}
+              <div style={{fontSize:12,color:'#666',marginTop:4}}>Each bar is leads received that month; green is how many booked. Respects the date range above.</div>
+            </div>
+          </div>
+        )}
         {ls.length===0?<div style={{background:'var(--surface2)',border:'1px dashed var(--border2)',borderRadius:8,padding:'18px',textAlign:'center',color:'#777',fontSize:13}}>No <b style={{color:'#aaa'}}>{leadFilter}</b> leads. <span style={{color:'#7FC8E8',cursor:'pointer'}} onClick={()=>setLeadFilter('all')}>Show all</span></div>:
         <div style={{border:'1px solid var(--border)',borderRadius:10,overflow:'hidden'}}>
           <div style={{display:'grid',gridTemplateColumns:COLS,gap:10,padding:'9px 13px',background:'var(--surface3)',borderBottom:'1px solid var(--border)',fontSize:10,color:'#7a857d',textTransform:'uppercase',letterSpacing:'1px',fontWeight:700,alignItems:'center'}}>
@@ -2786,8 +2848,18 @@ function CallHistoryPage(){
             {(()=>{const d=delta(cur.calls,prev.calls);return(<div style={tileWrap}><div style={tLab}>Total Calls</div><div style={tVal('var(--c-grn)')}>{fmt(cur.calls)}</div><div style={dLine(d.up)}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'var(--c-faint)',fontWeight:400}}>vs prior week</span></div></div>);})()}
             {(()=>{const d=delta(cur.booked,prev.booked);return(<div style={tileWrap}><div style={tLab}>Booked (Conversions)</div><div style={tVal('var(--c-grn)')}>{fmt(cur.booked)}</div><div style={dLine(d.up)}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'var(--c-faint)',fontWeight:400}}>vs prior week</span></div></div>);})()}
             <div style={tileWrap}><div style={tLab}>Booking Rate</div><div style={tVal(rateColor(cur.rate))}>{cur.calls?cur.rate.toFixed(0)+'%':'—'}</div><div style={dLine(rd.up)}>{rd.up?'▲':'▼'}{rd.pts} pts <span style={{color:'var(--c-faint)',fontWeight:400}}>vs prior week ({prev.rate.toFixed(0)}%)</span></div></div>
-            {(cur.meta&&(cur.meta.cx||cur.meta.rs||cur.meta.wn)||prev.meta&&(prev.meta.cx||prev.meta.rs||prev.meta.wn))?[['cx','Cancellation Calls','var(--c-red)'],['rs','Reschedule Calls','var(--c-gold)'],['wn','Wrong Numbers','#9BA8B5']].map(([k,label,col])=>{const c=(cur.meta&&cur.meta[k])||0,p=(prev.meta&&prev.meta[k])||0;const d=delta(c,p);return(<div key={k} style={tileWrap}><div style={tLab}>{label}</div><div style={tVal(col)}>{fmt(c)}</div><div style={dLine(k==='cx'||k==='wn'?!d.up:d.up)}>{d.up?'▲':'▼'}{d.pct}% <span style={{color:'var(--c-faint)',fontWeight:400}}>vs prior week ({p})</span></div></div>);}):null}
           </div>
+          {(()=>{const M=[['cx','Cancellations','#E05252'],['rs','Reschedules','#F4DB71'],['wn','Wrong number','#9BA8B5'],['ei','Existing client — IA','#7FC8E8'],['ef','Existing client — follow-up','#66B8DA'],['lc','Late cancels','#E0A052'],['gi','General inquiries','#BB99FF'],['sc','Sales calls','#8FE0C0']];const BAD={cx:1,wn:1,lc:1};const any=M.some(([k])=>((cur.meta&&cur.meta[k])||0)>0||((prev.meta&&prev.meta[k])||0)>0);if(!any)return null;return(
+            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'13px 16px',marginTop:12}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'1.3px',textTransform:'uppercase',color:'var(--c-mut8)',marginBottom:8}}>Call Mix — other call types this week <span style={{textTransform:'none',letterSpacing:0,fontWeight:400}}>(not counted in booking rate)</span></div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'6px 18px'}}>
+                {M.map(([k,label,col])=>{const c=(cur.meta&&cur.meta[k])||0,p=(prev.meta&&prev.meta[k])||0;if(!c&&!p)return null;const d=delta(c,p);const good=BAD[k]?!d.up:d.up;return(
+                  <div key={k} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:8,fontSize:13}}>
+                    <span style={{color:'#aaa'}}>{label}</span>
+                    <span><b style={{color:col,fontSize:16}}>{c}</b> <span style={{fontSize:11.5,fontWeight:700,color:(c===p)?'var(--c-faint)':(good?'var(--c-grn)':'var(--c-red)')}}>{c===p?'—':(d.up?'▲':'▼')+d.pct+'%'}</span> <span style={{fontSize:10.5,color:'var(--c-faint)'}}>({p})</span></span>
+                  </div>);})}
+              </div>
+            </div>);})()}
 
           {/* Red flags / gaps / wins */}
           {!noData&&(
@@ -5879,7 +5951,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
               <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'16px 18px',marginBottom:14}}>
                 <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8,marginBottom:12}}>
                   <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,fontWeight:800,letterSpacing:'.5px',color:'#eee'}}>By Location{totalRev>0&&<span style={{fontSize:14,fontWeight:700,color:'#888',marginLeft:10}}>{fmtRev(totalRev)} total · {(()=>{const f=(usingCustomRange?customFrom:dateFrom||'').slice(0,7),t=(usingCustomRange?customTo:dateTo||'').slice(0,7);const lbl=(x)=>x?new Date(x+'-15').toLocaleDateString('en-CA',{month:'short',year:'numeric'}):'';const fm=lbl(f),tm=lbl(t);if(fm&&tm)return fm===tm?fm:fm+' – '+tm;if(tm&&!fm)return 'through '+tm;if(fm&&!tm)return fm+' onward';return 'all dates';})()}</span>}</span>
-                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>build L28</span></span>
+                  <span style={{fontSize:12,color:'#777'}}>revenue by actual billing location · visits/IAs/util by practitioner home site · <span style={{color:'#00aa88',fontWeight:700}}>{window.__BUILD}</span></span>
                 </div>
                 {!hasLocRevenue&&locRevNote}
                 <div style={{display:'grid',gridTemplateColumns:`repeat(auto-fit,minmax(230px,1fr))`,gap:12}}>
