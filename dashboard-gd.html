@@ -1838,7 +1838,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L30'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L31'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2169,6 +2169,10 @@ function CallHistoryPage(){
   const DISC_COLOR={pt:'#CAE8C1',pelvic:'#9BE0C0',chiro:'#BB99FF',rmt:'#F4DB71',osteo:'#7FC8E8',naturo:'#E89F7F',famdoc:'#E0A0C0',sauna:'#88CCEE',perf:'#D4B483',other:'#999'};
   const LEAD_DISCS=[['pt','Physio'],['chiro','Chiro'],['rmt','RMT'],['osteo','Osteo'],['naturo','Naturo'],['pelvic','Pelvic'],['sauna','Sauna/Plunge'],['perf','Perf Training'],['other','Other']];
   const DEFAULT_SOURCES=[{id:'form',name:'Form Fills',kind:'form'},{id:'meta',name:'Meta Leads',kind:'meta'},{id:'caremap',name:'Care Map Leads',kind:'caremap'}];
+  /* IA Tracker — where each initial assessment actually came from, logged by hand daily.
+     Stored as data.iaLog[Location][date] = {channelId: count}; custom channels in data.iaChannels. */
+  const IA_CHANNELS=[['ref','Internal referral','#44CCAA'],['online','Online marketing','#7FC8E8'],['google','Google / search','#F4DB71'],['social','Social media','#BB99FF'],['wom','Word of mouth','#8FE0C0'],['event','Event / community','#E0A052'],['other','Other','#9BA8B5']];
+  const iaChannelList=()=>[...IA_CHANNELS,...((data.iaChannels||[]).map(c=>[c.id,c.label,c.color||'#9BA8B5']))];
   const LEAD_STATUS=['New','No Response','Booked','Not Suitable'];
   const STATUS_C={New:'#888','No Response':'#F4DB71',Booked:'#44CCAA','Not Suitable':'#E05252',
     /* legacy values still stored on older leads: */Contacted:'#7FC8E8',Responded:'#F4DB71','Not a fit':'#E05252'};
@@ -2336,6 +2340,13 @@ function CallHistoryPage(){
   useEffect(()=>{const h=(e)=>{if(e.key==='Escape')setExpandedLead(null);};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[]);
   const[leadFilter,setLeadFilter]=useState('all');
   const[leadSort,setLeadSort]=useState('date');
+  // IA Tracker state
+  const[iaDate,setIaDate]=useState(today);
+  const[iaEntry,setIaEntry]=useState({});
+  const[iaFrom,setIaFrom]=useState('');
+  const[iaTo,setIaTo]=useState('');
+  const[iaSaved,setIaSaved]=useState(false);
+  useEffect(()=>{const day=((data.iaLog||{})[loc]||{})[iaDate]||{};const o={};Object.entries(day).forEach(([k,v])=>{o[k]=String(v);});setIaEntry(o);setIaSaved(false);},[iaDate,loc,data]);// eslint-disable-line
   const[lFrom,setLFrom]=useState('');   // lead-tracker custom range — from
   const[lTo,setLTo]=useState('');       // lead-tracker custom range — to
   const sortLeads=(arr)=>[...arr].sort((a,b)=>{
@@ -2392,8 +2403,10 @@ function CallHistoryPage(){
     const byLoc={},byDisc={},daily=[];let calls=0,booked=0;
     REP_LOCS.forEach(L=>{byLoc[L]={calls:0,booked:0};});
     const meta={cx:0,rs:0,wn:0,ei:0,ef:0,lc:0,gi:0,sc:0};
+    const iaCh={};let iaTot=0;
+    days.forEach(d=>{REP_LOCS.forEach(L=>{const day=((data.iaLog||{})[L]||{})[d]||{};Object.entries(day).forEach(([ch,v])=>{iaCh[ch]=(iaCh[ch]||0)+(+v||0);iaTot+=(+v||0);});});});
     days.forEach(d=>{let dc=0,db=0;REP_LOCS.forEach(L=>{const day=(data.calls[L]||{})[d]||{};Object.entries(day).forEach(([id,v])=>{if(id==='_x'){Object.keys(meta).forEach(k=>{meta[k]+=(+v[k]||0);});return;}const c=cOf(v),b=bOf(v);byLoc[L].calls+=c;byLoc[L].booked+=b;dc+=c;db+=b;if(!byDisc[id])byDisc[id]={calls:0,booked:0};byDisc[id].calls+=c;byDisc[id].booked+=b;});});calls+=dc;booked+=db;daily.push({d,calls:dc,booked:db});});
-    return{ws,calls,booked,rate:calls?booked/calls*100:0,byLoc,byDisc,daily,meta};
+    return{ws,calls,booked,rate:calls?booked/calls*100:0,byLoc,byDisc,daily,meta,iaCh,iaTot};
   };
   const buildCallReport=(ws)=>({cur:buildCallWeek(ws),prev:buildCallWeek(_addDaysISO(ws,-7))});
   const buildCallInsights=(cur,prev)=>{
@@ -2427,7 +2440,7 @@ function CallHistoryPage(){
       <span style={{fontSize:13,color:'#777'}}>Guest Experience · call volume by location + lead sources</span>
     </div>
     <div style={{display:'flex',gap:4,marginBottom:16,alignItems:'center'}}>
-      {[['calls','📞 Call Volume'],['leads','🎯 Lead Sources'],['agenda','🗓 Follow-ups'+(dueN>0?' ('+dueN+')':'')],['report','📄 Weekly Report']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${view===v?'btn-go':'btn-ghost'}`} onClick={()=>setView(v)}>{l}</button>))}
+      {[['calls','📞 Call Volume'],['leads','🎯 Lead Sources'],['ia','📋 IA Tracker'],['agenda','🗓 Follow-ups'+(dueN>0?' ('+dueN+')':'')],['report','📄 Weekly Report']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${view===v?'btn-go':'btn-ghost'}`} onClick={()=>setView(v)}>{l}</button>))}
       <input type="file" accept="application/json,.json" ref={backupRef} style={{display:'none'}} onChange={e=>{importBackup(e.target.files[0]);e.target.value='';}}/>
       <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}} onClick={exportBackup} title="Download a JSON backup of all calls, leads & sources">⬇ Backup</button>
       <button className="btn btn-ghost btn-sm" onClick={()=>backupRef.current&&backupRef.current.click()} title="Restore from a backup file — replaces current data for everyone">⬆ Restore</button>
@@ -2578,6 +2591,76 @@ function CallHistoryPage(){
       </div>
     </>)}
 
+    {view==='ia'&&(()=>{
+      const CH=iaChannelList();
+      const log=(data.iaLog&&data.iaLog[loc])||{};
+      const days=Object.keys(log).sort();
+      const inR=(d)=>(!iaFrom||d>=iaFrom)&&(!iaTo||d<=iaTo);
+      const rangeDays=days.filter(inR);
+      const tot={};let grand=0;
+      rangeDays.forEach(d=>{Object.entries(log[d]||{}).forEach(([ch,v])=>{tot[ch]=(tot[ch]||0)+(+v||0);grand+=(+v||0);});});
+      const saveIA=()=>{const day={};CH.forEach(([id])=>{const v=parseInt(iaEntry[id])||0;if(v)day[id]=v;});
+        const iaLog={...(data.iaLog||{}),[loc]:{...((data.iaLog||{})[loc]||{})}};
+        if(Object.keys(day).length)iaLog[loc][iaDate]=day;else delete iaLog[loc][iaDate];
+        persist({...data,iaLog},true);setIaSaved(true);setTimeout(()=>setIaSaved(false),1800);};
+      const addChannel=()=>{const label=(window.prompt('New IA channel label (e.g. "Physician referral"):')||'').trim();if(!label)return;
+        const id='ch_'+Date.now().toString(36);persist({...data,iaChannels:[...(data.iaChannels||[]),{id,label}]},true);};
+      return(<>
+      <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'16px 18px',marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',marginBottom:4}}>
+          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',color:'#999'}}>LOG INITIAL ASSESSMENTS — {loc.toUpperCase()}</span>
+          <input type="date" value={iaDate} max={today} onChange={e=>{setIaDate(e.target.value);}} style={{...inp,width:'auto'}}/>
+          <button className="btn btn-ghost btn-xs" style={{marginLeft:'auto'}} onClick={addChannel}>+ Add channel</button>
+        </div>
+        <div style={{fontSize:12,color:'#777',marginBottom:12}}>Where did each IA actually come from? Manual, honest attribution — tally the day's initials by origin.</div>
+        <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+          {CH.map(([id,label,col])=>(
+            <div key={id} style={{flex:'0 0 148px'}}>
+              <div style={{fontSize:11,color:col,textTransform:'uppercase',letterSpacing:'.4px',marginBottom:4,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={label}>{label}</div>
+              <input type="number" min="0" placeholder="0" value={iaEntry[id]||''} onChange={e=>setIaEntry(p=>({...p,[id]:e.target.value}))}
+                style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,color:'#eee',padding:'7px 9px',fontSize:14}}/>
+            </div>
+          ))}
+        </div>
+        <div style={{marginTop:12,display:'flex',alignItems:'center',gap:10}}>
+          <button className="btn btn-lime btn-sm" onClick={saveIA}>Save {iaDate}</button>
+          {iaSaved&&<span style={{color:'#44CCAA',fontSize:13}}>Saved ✓</span>}
+        </div>
+      </div>
+
+      <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'16px 18px',marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:12}}>
+          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',color:'#999'}}>IA SOURCES — {loc.toUpperCase()}</span>
+          <span style={{fontSize:12,color:'#666'}}>range</span>
+          <input type="date" value={iaFrom} onChange={e=>setIaFrom(e.target.value)} style={{...inp,width:'auto'}}/>
+          <span style={{color:'#555'}}>→</span>
+          <input type="date" value={iaTo} onChange={e=>setIaTo(e.target.value)} style={{...inp,width:'auto'}}/>
+          {(iaFrom||iaTo)&&<button className="btn btn-ghost btn-xs" onClick={()=>{setIaFrom('');setIaTo('');}}>All time</button>}
+          <span style={{marginLeft:'auto',fontSize:13,color:'#aaa'}}><b style={{color:'#fff',fontSize:16}}>{grand}</b> IAs across <b style={{color:'#ccc'}}>{rangeDays.length}</b> day{rangeDays.length===1?'':'s'}</span>
+        </div>
+        {grand===0?<div style={{color:'#666',fontSize:13,padding:'6px 0'}}>Nothing logged{(iaFrom||iaTo)?' in this range':''} yet — save a day above and the breakdown appears here.</div>:
+          CH.map(([id,label,col])=>{const v=tot[id]||0;if(!v)return null;const pct=grand?v/grand*100:0;return(
+            <div key={id} style={{display:'flex',alignItems:'center',gap:12,padding:'7px 0'}}>
+              <span style={{flex:'0 0 190px',fontSize:13.5,color:'#ccc'}}>{label}</span>
+              <div style={{flex:1,height:9,background:'var(--surface3)',borderRadius:5,overflow:'hidden'}}><div style={{height:'100%',width:pct+'%',background:col,borderRadius:5}}/></div>
+              <span style={{flex:'0 0 90px',textAlign:'right',fontSize:13.5}}><b style={{color:col}}>{v}</b> <span style={{color:'#666'}}>({pct.toFixed(0)}%)</span></span>
+            </div>);})}
+        <div style={{fontSize:11.5,color:'#666',marginTop:10,lineHeight:1.6}}>Manual attribution — this is your team's honest read of where initials originate, independent of Jane's arrived-IA counts on the reports (use both: Jane for volume truth, this for origin truth).</div>
+      </div>
+
+      {days.length>0&&(
+        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'16px 18px',marginBottom:14}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',color:'#999',marginBottom:10}}>RECENT DAYS</div>
+          {days.slice(-14).reverse().map(d=>{const day=log[d]||{};const t=Object.values(day).reduce((a,b)=>a+(+b||0),0);return(
+            <div key={d} style={{display:'flex',alignItems:'center',gap:12,padding:'7px 0',borderBottom:'1px solid var(--border)',flexWrap:'wrap'}}>
+              <button onClick={()=>setIaDate(d)} style={{background:'transparent',border:'none',cursor:'pointer',color:'#9BB8D0',fontSize:13,padding:0}} title="Load this day into the editor">{new Date(d+'T12:00').toLocaleDateString('en-CA',{weekday:'short',month:'short',day:'numeric'})}</button>
+              <span style={{fontSize:13,fontWeight:700,color:'#ddd'}}>{t} IA{t===1?'':'s'}</span>
+              <span style={{fontSize:12}}>{CH.filter(([id])=>day[id]).map(([id,label,col],i)=>(<span key={id}>{i>0&&<span style={{color:'#555'}}> · </span>}<span style={{color:col}}>{day[id]} {label.toLowerCase().split(' ')[0]}</span></span>))}</span>
+            </div>);})}
+        </div>
+      )}
+      </>);
+    })()}
     {view==='leads'&&(<>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10,marginBottom:18}}>
         {sources.map(s=>{const r=rollup(s.id);const on=selSource===s.id;return(<div key={s.id} onClick={()=>setSelSource(s.id)} style={{cursor:'pointer',background:on?'rgba(202,232,193,.07)':'var(--surface2)',border:'1px solid '+(on?'var(--go)':'var(--border)'),borderRadius:9,padding:'13px 15px'}}>
@@ -2976,6 +3059,18 @@ function CallHistoryPage(){
             </div>
           )}
 
+          {cur.iaTot>0&&(
+            <div style={{background:'var(--c-card)',border:'1px solid var(--c-bdk)',borderRadius:8,padding:'14px 16px',marginBottom:18}}>
+              <div style={{...secTitle,color:'var(--c-label)'}}>Initial Assessments by Origin — This Week</div>
+              <div style={{fontSize:12,color:'var(--c-faint)',marginBottom:10}}>{cur.iaTot} IAs manually attributed on the IA Tracker{prev.iaTot?` · prior week ${prev.iaTot}`:''}</div>
+              {iaChannelList().map(([id,label,col])=>{const v=cur.iaCh[id]||0;if(!v)return null;const pct=cur.iaTot?v/cur.iaTot*100:0;const pv=prev.iaCh&&prev.iaCh[id]||0;return(
+                <div key={id} style={{display:'flex',alignItems:'center',gap:12,padding:'5px 0'}}>
+                  <span style={{flex:'0 0 175px',fontSize:13,color:'var(--c-sec)'}}>{label}</span>
+                  <div style={{flex:1,height:8,background:'var(--c-sep)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',width:pct+'%',background:col,borderRadius:4}}/></div>
+                  <span style={{flex:'0 0 120px',textAlign:'right',fontSize:12.5}}><b style={{color:col}}>{v}</b> <span style={{color:'var(--c-faint)'}}>({pct.toFixed(0)}%{pv?` · prior ${pv}`:''})</span></span>
+                </div>);})}
+            </div>
+          )}
           {/* Lead Sources — pulled live from the Lead Sources tab */}
           {(()=>{
             const ws=saved?saved.ws:repWeek;const we=_addDaysISO(ws,6);
