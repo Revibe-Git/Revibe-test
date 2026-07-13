@@ -1838,7 +1838,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L31'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L32'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2173,8 +2173,8 @@ function CallHistoryPage(){
      Stored as data.iaLog[Location][date] = {channelId: count}; custom channels in data.iaChannels. */
   const IA_CHANNELS=[['ref','Internal referral','#44CCAA'],['online','Online marketing','#7FC8E8'],['google','Google / search','#F4DB71'],['social','Social media','#BB99FF'],['wom','Word of mouth','#8FE0C0'],['event','Event / community','#E0A052'],['other','Other','#9BA8B5']];
   const iaChannelList=()=>[...IA_CHANNELS,...((data.iaChannels||[]).map(c=>[c.id,c.label,c.color||'#9BA8B5']))];
-  const LEAD_STATUS=['New','No Response','Booked','Not Suitable'];
-  const STATUS_C={New:'#888','No Response':'#F4DB71',Booked:'#44CCAA','Not Suitable':'#E05252',
+  const LEAD_STATUS=['New','No Response','Pending','Booked','Not Suitable'];
+  const STATUS_C={New:'#888','No Response':'#F4DB71',Pending:'#7FC8E8',Booked:'#44CCAA','Not Suitable':'#E05252',
     /* legacy values still stored on older leads: */Contacted:'#7FC8E8',Responded:'#F4DB71','Not a fit':'#E05252'};
   const FU_METHODS=[['call','☎ Call'],['text','💬 Text'],['email','✉ Email']];
   // Day-level call tallies beyond discipline calls/booked. Stored under day._x.
@@ -2380,7 +2380,7 @@ function CallHistoryPage(){
     const d=new Date(today+'T12:00');d.setDate(d.getDate()+(call2?3:2));
     patch.nextDate=d.toISOString().slice(0,10);patch.nextMethod=/email/i.test(outcome||'')?'email':'call';
     patchLead(sid,lid,patch,true);};
-  const setLeadStatus=(sid,lid,v)=>{const patch={status:v};if(v==='Booked'||v==='Not Suitable'){patch.nextDate='';patch.nextTime='';}patchLead(sid,lid,patch,true);};
+  const setLeadStatus=(sid,lid,v)=>{const patch={status:v};if(v==='Booked'||v==='Not Suitable'){patch.nextDate='';patch.nextTime='';}if(v==='Booked'){const l=leadsOf(sid).find(x=>x.id===lid)||{};if(!l.bookedAt)patch.bookedAt=today;}patchLead(sid,lid,patch,true);};
   const updAttempt=(sid,lid,idx,k,v)=>{const l=leadsOf(sid).find(x=>x.id===lid);if(!l)return;patchLead(sid,lid,{followups:(l.followups||[]).map((e,i)=>i===idx?{...e,[k]:v}:e)});};
   const delAttempt=(sid,lid,idx)=>{const l=leadsOf(sid).find(x=>x.id===lid);if(!l)return;patchLead(sid,lid,{followups:(l.followups||[]).filter((e,i)=>i!==idx)},true);};
   const allFollowups=()=>{const out=[];sources.forEach(s=>{(data.leads[s.id]||[]).forEach(l=>{if(l.nextDate&&l.status!=='Booked'&&l.status!=='Not a fit')out.push({...l,_sid:s.id,_sname:s.name});});});return out.sort((a,b)=>(a.nextDate+(a.nextTime||'')).localeCompare(b.nextDate+(b.nextTime||'')));};
@@ -3071,53 +3071,106 @@ function CallHistoryPage(){
                 </div>);})}
             </div>
           )}
-          {/* Lead Sources — pulled live from the Lead Sources tab */}
+          {/* Lead pipelines — full funnel, per source, from the Lead Sources tab */}
           {(()=>{
             const ws=saved?saved.ws:repWeek;const we=_addDaysISO(ws,6);
-            const inWk=(d)=>!!d&&d>=ws&&d<=we;
-            const Lrows=sources.map(s=>{const ls=leadsOf(s.id);let nw=0,bk=0,tc=0,op=0;ls.forEach(l=>{if(inWk(l.date))nw++;(l.followups||[]).forEach(f=>{if(inWk(f.at)){tc++;if(f.outcome==='Booked')bk++;}});if(['New','Contacted','Responded'].includes(l.status||'New'))op++;});const r=rollup(s.id);return{id:s.id,name:s.name,nw,bk,tc,op,conv:r.conv,total:r.total};});
-            const LT={nw:Lrows.reduce((a,r)=>a+r.nw,0),bk:Lrows.reduce((a,r)=>a+r.bk,0),tc:Lrows.reduce((a,r)=>a+r.tc,0),op:Lrows.reduce((a,r)=>a+r.op,0)};
+            const inWk=(d)=>!!d&&(d||'').slice(0,10)>=ws&&(d||'').slice(0,10)<=we;
+            const OPEN=['New','No Response','Pending','Contacted','Responded'];
+            const bookedWk=(l)=>l.status==='Booked'&&(l.bookedAt?inWk(l.bookedAt):inWk(l.date)); // stamped when marked Booked; legacy/imported fall back to lead date
+            const Lrows=sources.map(src=>{
+              const ls=leadsOf(src.id);
+              let nw=0,tc=0,bkWk=0;const st={New:0,'No Response':0,Pending:0,Booked:0,'Not Suitable':0};
+              ls.forEach(l=>{
+                if(inWk(l.date))nw++;
+                (l.followups||[]).forEach(f=>{if(inWk(f.at))tc++;});
+                if(bookedWk(l))bkWk++;
+                const stat=(l.status||'New');
+                if(st[stat]!=null)st[stat]++;
+                else if(stat==='Not a fit')st['Not Suitable']++;
+                else if(stat==='Contacted'||stat==='Responded')st['No Response']++; // legacy open states
+                else st.New++;
+              });
+              const op=st.New+st['No Response']+st.Pending;
+              const total=ls.length,bkAll=st.Booked;
+              return{id:src.id,name:src.name,nw,tc,bkWk,convWk:nw?bkWk/nw*100:null,st,op,total,bkAll,convAll:total?bkAll/total*100:0};
+            });
+            const LT={nw:0,tc:0,bkWk:0,op:0,total:0,bkAll:0};Lrows.forEach(r=>{LT.nw+=r.nw;LT.tc+=r.tc;LT.bkWk+=r.bkWk;LT.op+=r.op;LT.total+=r.total;LT.bkAll+=r.bkAll;});
             const showRows=Lrows.filter(r=>r.total>0||r.nw||r.tc).sort((a,b)=>b.nw-a.nw||b.total-a.total);
-            if(!showRows.length&&!LT.nw&&!LT.bk&&!LT.op)return null;
+            // Booked by discipline (lead.interest) — this week + all-time, across every pipeline
+            const disc={};let dWk=0,dAll=0,dWkNoI=0,dAllNoI=0;
+            sources.forEach(src=>leadsOf(src.id).forEach(l=>{
+              if(l.status!=='Booked')return;
+              const key=(l.interest||'').trim();
+              const wk=bookedWk(l);
+              if(!key){dAllNoI++;if(wk)dWkNoI++;return;}
+              (disc[key]=disc[key]||{wk:0,all:0});disc[key].all++;dAll++;if(wk){disc[key].wk++;dWk++;}
+            }));
+            const discRows2=Object.entries(disc).sort((a,b)=>b[1].all-a[1].all);
+            if(!showRows.length&&!LT.nw&&!LT.bkWk&&!LT.op)return null;
+            const chip=(v,col)=>v?<b style={{color:col}}>{v}</b>:<span style={{color:'var(--c-d55)'}}>0</span>;
             return(
             <div style={{marginBottom:24}}>
-              <div style={{...secTitle,color:'var(--c-label)'}}>Lead Sources — This Week</div>
+              <div style={{...secTitle,color:'var(--c-label)'}}>Lead Pipelines — Full Funnel</div>
               <div style={{display:'flex',gap:'8px 22px',flexWrap:'wrap',marginBottom:12,fontSize:13.5}}>
-                <span><b style={{color:'var(--c-strong)',fontSize:17,fontFamily:"'Barlow Condensed',sans-serif"}}>{LT.nw}</b> <span style={{color:'var(--c-mut8)'}}>new leads</span></span>
-                <span><b style={{color:'var(--c-grn)',fontSize:17,fontFamily:"'Barlow Condensed',sans-serif"}}>{LT.bk}</b> <span style={{color:'var(--c-mut8)'}}>booked this week</span></span>
-                <span><b style={{color:'var(--c-strong)',fontSize:17,fontFamily:"'Barlow Condensed',sans-serif"}}>{LT.tc}</b> <span style={{color:'var(--c-mut8)'}}>follow-up touches</span></span>
+                <span><b style={{color:'var(--c-strong)',fontSize:17,fontFamily:"'Barlow Condensed',sans-serif"}}>{LT.nw}</b> <span style={{color:'var(--c-mut8)'}}>new leads (wk)</span></span>
+                <span><b style={{color:'var(--c-grn)',fontSize:17,fontFamily:"'Barlow Condensed',sans-serif"}}>{LT.bkWk}</b> <span style={{color:'var(--c-mut8)'}}>booked (wk)</span></span>
+                <span><b style={{color:LT.nw?(LT.bkWk/LT.nw>=.3?'var(--c-grn)':'var(--c-gold)'):'var(--c-mut7)',fontSize:17,fontFamily:"'Barlow Condensed',sans-serif"}}>{LT.nw?Math.round(LT.bkWk/LT.nw*100)+'%':'—'}</b> <span style={{color:'var(--c-mut8)'}}>conv (wk)</span></span>
+                <span><b style={{color:'var(--c-strong)',fontSize:17,fontFamily:"'Barlow Condensed',sans-serif"}}>{LT.tc}</b> <span style={{color:'var(--c-mut8)'}}>touches (wk)</span></span>
                 <span><b style={{color:'var(--c-blue)',fontSize:17,fontFamily:"'Barlow Condensed',sans-serif"}}>{LT.op}</b> <span style={{color:'var(--c-mut8)'}}>open in pipeline</span></span>
+                <span><b style={{color:'var(--c-strong)',fontSize:17,fontFamily:"'Barlow Condensed',sans-serif"}}>{LT.total?Math.round(LT.bkAll/LT.total*100)+'%':'—'}</b> <span style={{color:'var(--c-mut8)'}}>conv · all-time ({LT.bkAll}/{LT.total})</span></span>
               </div>
               {showRows.length>0&&(
                 <div style={{overflowX:'auto'}}>
-                  <table style={{width:'100%',borderCollapse:'collapse'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse',minWidth:820}}>
                     <thead><tr style={{borderBottom:'1px solid var(--border)'}}>
-                      <th style={thL}>Source</th><th style={thR}>New (wk)</th><th style={thR}>Touches (wk)</th><th style={thR}>Booked (wk)</th><th style={thR}>Open</th><th style={thR}>Conv · all-time</th>
+                      <th style={thL}>Source</th><th style={thR}>New (wk)</th><th style={thR}>Booked (wk)</th><th style={thR}>Conv (wk)</th><th style={thR}>Touches (wk)</th>
+                      <th style={{...thR,whiteSpace:'nowrap'}} title="Current pipeline state: New · No Response · Pending">Pipeline N·NR·P</th>
+                      <th style={thR}>Open</th><th style={thR}>Booked · all</th><th style={thR}>Not suitable</th><th style={thR}>Conv · all</th>
                     </tr></thead>
                     <tbody>
                       {showRows.map(r=>(
                         <tr key={r.id} style={{borderBottom:'1px solid var(--c-sep)'}}>
                           <td style={tdL}>{r.name}</td>
                           <td style={{...tdR,fontWeight:700,color:'var(--c-strong)'}}>{r.nw||'—'}</td>
+                          <td style={{...tdR,color:r.bkWk?'var(--c-grn)':'var(--c-mut7)'}}>{r.bkWk||'—'}</td>
+                          <td style={{...tdR,color:r.convWk==null?'var(--c-d55)':(r.convWk>=30?'var(--c-grn)':'var(--c-gold)')}}>{r.convWk==null?'—':r.convWk.toFixed(0)+'%'}</td>
                           <td style={tdR}>{r.tc||'—'}</td>
-                          <td style={{...tdR,color:r.bk?'var(--c-grn)':'var(--c-mut7)'}}>{r.bk||'—'}</td>
-                          <td style={tdR}>{r.op||'—'}</td>
-                          <td style={{...tdR,color:r.total?(r.conv>=30?'var(--c-grn)':'var(--c-gold)'):'var(--c-mut7)'}}>{r.total?r.conv.toFixed(0)+'%':'—'}</td>
+                          <td style={{...tdR,whiteSpace:'nowrap',fontSize:12.5}}>{chip(r.st.New,'#aaa')}<span style={{color:'var(--c-d55)'}}> · </span>{chip(r.st['No Response'],'var(--c-gold)')}<span style={{color:'var(--c-d55)'}}> · </span>{chip(r.st.Pending,'var(--c-blue)')}</td>
+                          <td style={{...tdR,color:'var(--c-blue)'}}>{r.op||'—'}</td>
+                          <td style={{...tdR,color:r.bkAll?'var(--c-grn)':'var(--c-mut7)'}}>{r.bkAll||'—'}</td>
+                          <td style={{...tdR,color:r.st['Not Suitable']?'var(--c-red)':'var(--c-mut7)'}}>{r.st['Not Suitable']||'—'}</td>
+                          <td style={{...tdR,color:r.total?(r.convAll>=30?'var(--c-grn)':'var(--c-gold)'):'var(--c-mut7)'}}>{r.total?r.convAll.toFixed(0)+'%':'—'}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot><tr style={{borderTop:'1px solid var(--border)'}}>
                       <td style={{...tdL,fontFamily:"'Barlow Condensed',sans-serif",textTransform:'uppercase',letterSpacing:'1px',color:'var(--c-mut8)',fontSize:12}}>Total</td>
                       <td style={{...tdR,fontWeight:800,color:'var(--c-ink)'}}>{LT.nw}</td>
+                      <td style={{...tdR,fontWeight:800,color:'var(--c-grn)'}}>{LT.bkWk}</td>
+                      <td style={{...tdR,fontWeight:800,color:'var(--c-strong)'}}>{LT.nw?Math.round(LT.bkWk/LT.nw*100)+'%':'—'}</td>
                       <td style={{...tdR,fontWeight:800,color:'var(--c-strong)'}}>{LT.tc}</td>
-                      <td style={{...tdR,fontWeight:800,color:'var(--c-grn)'}}>{LT.bk}</td>
-                      <td style={{...tdR,fontWeight:800,color:'var(--c-strong)'}}>{LT.op}</td>
                       <td/>
+                      <td style={{...tdR,fontWeight:800,color:'var(--c-blue)'}}>{LT.op}</td>
+                      <td style={{...tdR,fontWeight:800,color:'var(--c-grn)'}}>{LT.bkAll}</td>
+                      <td/>
+                      <td style={{...tdR,fontWeight:800,color:'var(--c-strong)'}}>{LT.total?Math.round(LT.bkAll/LT.total*100)+'%':'—'}</td>
                     </tr></tfoot>
                   </table>
                 </div>
               )}
-              <div style={{fontSize:11.5,color:'var(--c-faint)',marginTop:8,fontStyle:'italic'}}>New leads &amp; booked counted by date within the week · Open = current pipeline (New / Contacted / Responded) · Conv is all-time per source · pulled live from Lead Sources.</div>
+              {(dAll>0||dWk>0)&&(
+                <div style={{marginTop:16}}>
+                  <div style={{fontSize:12,fontFamily:"'Barlow Condensed',sans-serif",textTransform:'uppercase',letterSpacing:'1.5px',color:'var(--c-mut8)',marginBottom:8}}>Lead bookings by discipline <span style={{textTransform:'none',letterSpacing:0,color:'var(--c-faint)',fontWeight:400}}>— what booked leads were interested in (lead pipelines only; phone-call bookings are in By Discipline above)</span></div>
+                  {discRows2.map(([k,v])=>{const pct=dAll?v.all/dAll*100:0;return(
+                    <div key={k} style={{display:'flex',alignItems:'center',gap:12,padding:'4px 0'}}>
+                      <span style={{flex:'0 0 130px',fontSize:13,color:'var(--c-sec)'}}>{k}</span>
+                      <div style={{flex:1,height:8,background:'var(--c-sep)',borderRadius:4,overflow:'hidden'}}><div style={{height:'100%',width:pct+'%',background:'var(--c-grn)',opacity:.75,borderRadius:4}}/></div>
+                      <span style={{flex:'0 0 190px',textAlign:'right',fontSize:12.5,color:'var(--c-mut8)'}}>{v.wk?<b style={{color:'var(--c-grn)'}}>{v.wk} this wk · </b>:null}<b style={{color:'var(--c-strong)'}}>{v.all}</b> all-time ({pct.toFixed(0)}%)</span>
+                    </div>);})}
+                  {(dAllNoI>0)&&<div style={{fontSize:11.5,color:'var(--c-faint)',marginTop:6}}>{dAllNoI} booked lead{dAllNoI===1?'':'s'} ({dWkNoI} this wk) have no "Interested in" set — tag them on the lead card and they'll classify here.</div>}
+                </div>
+              )}
+              <div style={{fontSize:11.5,color:'var(--c-faint)',marginTop:10,fontStyle:'italic'}}>New = lead came in this week · Booked (wk) = marked Booked this week (older/imported leads fall back to their came-in date) · Pipeline shows current state per source: New / No Response / Pending · Open = those three combined · Conv = booked ÷ leads · pulled live from Lead Sources.</div>
             </div>);
           })()}
 
