@@ -1838,7 +1838,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L32'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L33'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2171,8 +2171,28 @@ function CallHistoryPage(){
   const DEFAULT_SOURCES=[{id:'form',name:'Form Fills',kind:'form'},{id:'meta',name:'Meta Leads',kind:'meta'},{id:'caremap',name:'Care Map Leads',kind:'caremap'}];
   /* IA Tracker — where each initial assessment actually came from, logged by hand daily.
      Stored as data.iaLog[Location][date] = {channelId: count}; custom channels in data.iaChannels. */
-  const IA_CHANNELS=[['ref','Internal referral','#44CCAA'],['online','Online marketing','#7FC8E8'],['google','Google / search','#F4DB71'],['social','Social media','#BB99FF'],['wom','Word of mouth','#8FE0C0'],['event','Event / community','#E0A052'],['other','Other','#9BA8B5']];
-  const iaChannelList=()=>[...IA_CHANNELS,...((data.iaChannels||[]).map(c=>[c.id,c.label,c.color||'#9BA8B5']))];
+  const IA_CHANNELS=[
+    ['ref','Internal referral','#44CCAA','Referred in by another clinician / team member'],
+    ['google','Google','#F4DB71','Found us on Google / search'],
+    ['fb','Facebook','#7FC8E8','Came via Facebook'],
+    ['ig','Instagram','#E0A0C0','Came via Instagram'],
+    ['web','Website','#9BB8D0','Came through revibeto.com directly'],
+    ['caremap','Care Map','#BB99FF','Came through the Care Map quiz'],
+    ['retSelf','Returning self-book','#8FE0C0','Past guest who booked themselves back in (call or online) — on their own accord, not referred'],
+    ['newSelf','Online self-book (new)','#CAE8C1','Brand-new guest, first visit, booked online on their own'],
+    ['wom','Word of mouth','#E0A052','Friend / family recommendation'],
+    ['event','Event / community','#C9B26B','Event, partnership, or community outreach'],
+    ['other','Other','#9BA8B5','Anything that does not fit the above']];
+  // Legacy channels (removed from the pick list) stay visible wherever days were already logged under them.
+  const IA_LEGACY={online:['Online marketing','#7FC8E8'],social:['Social media','#BB99FF']};
+  const iaChannelList=()=>{
+    const base=[...IA_CHANNELS,...((data.iaChannels||[]).map(c=>[c.id,c.label,c.color||'#9BA8B5',c.label]))];
+    const have=new Set(base.map(x=>x[0]));
+    const used=new Set();
+    Object.values(data.iaLog||{}).forEach(locLog=>Object.values(locLog||{}).forEach(day=>Object.keys(day||{}).forEach(k=>used.add(k))));
+    Object.entries(IA_LEGACY).forEach(([id,[label,color]])=>{if(used.has(id)&&!have.has(id))base.push([id,label+' (legacy)',color,label]);});
+    return base;
+  };
   const LEAD_STATUS=['New','No Response','Pending','Booked','Not Suitable'];
   const STATUS_C={New:'#888','No Response':'#F4DB71',Pending:'#7FC8E8',Booked:'#44CCAA','Not Suitable':'#E05252',
     /* legacy values still stored on older leads: */Contacted:'#7FC8E8',Responded:'#F4DB71','Not a fit':'#E05252'};
@@ -2614,9 +2634,9 @@ function CallHistoryPage(){
         </div>
         <div style={{fontSize:12,color:'#777',marginBottom:12}}>Where did each IA actually come from? Manual, honest attribution — tally the day's initials by origin.</div>
         <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-          {CH.map(([id,label,col])=>(
+          {CH.map(([id,label,col,desc])=>(
             <div key={id} style={{flex:'0 0 148px'}}>
-              <div style={{fontSize:11,color:col,textTransform:'uppercase',letterSpacing:'.4px',marginBottom:4,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={label}>{label}</div>
+              <div style={{fontSize:11,color:col,textTransform:'uppercase',letterSpacing:'.4px',marginBottom:4,fontWeight:700,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={desc||label}>{label}</div>
               <input type="number" min="0" placeholder="0" value={iaEntry[id]||''} onChange={e=>setIaEntry(p=>({...p,[id]:e.target.value}))}
                 style={{width:'100%',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,color:'#eee',padding:'7px 9px',fontSize:14}}/>
             </div>
