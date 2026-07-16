@@ -1839,7 +1839,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L38'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L40'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2178,11 +2178,14 @@ function CommunityPage({setPage}){
   const[exp,setExp]=useState(null);
   const[showAdd,setShowAdd]=useState(false);
   const[trendPeriod,setTrendPeriod]=useState('month');
-  const blankEv={name:'',eventDate:'',days:'1',eventType:'attended',venue:'',estPerBook:'',thCount:'',thHours:'',thRate:'150',coordHours:'',coordRate:'20',hardCost:'',notes:''};
+  const blankEv={name:'',eventDate:'',days:'1',eventType:'attended',venue:'',estPerBook:'125',thCount:'',thHours:'',thRate:'150',coordHours:'',coordRate:'20',hardCost:'',notes:''};
   const[ev,setEv]=useState(blankEv);
   const[ql,setQl]=useState({first:'',last:'',phone:''});
   const[showImp,setShowImp]=useState(false);
   const[imp,setImp]=useState(null);
+  const[showRep,setShowRep]=useState(false);
+  const[repGran,setRepGran]=useState('month');
+  const[repPer,setRepPer]=useState('');
 
   const saveEvent=()=>{
     if(!ev.name.trim())return window.alert('Give the event a name.');
@@ -2192,6 +2195,7 @@ function CommunityPage({setPage}){
     else{const id='src_'+Date.now().toString(36);sources.push({id,kind:'event',...ev,name:ev.name.trim(),...cf});}
     persist({...data,sources});setEv(blankEv);setShowAdd(false);
   };
+  const deleteEvent=(e)=>{const n=leadsOf(e.id).length;if(!window.confirm('Delete "'+(e.name||'this event')+'"'+(n?' and its '+n+' lead'+(n===1?'':'s'):'')+'? This cannot be undone.'))return;const sources=(data.sources||[]).filter(x=>x.id!==e.id);const leads={...(data.leads||{})};delete leads[e.id];persist({...data,sources,leads});setExp(cur=>cur===e.id?null:cur);};
   const quickAddLead=(sid)=>{
     if(!ql.first.trim()&&!ql.phone.trim())return;
     const today=new Date().toISOString().slice(0,10);
@@ -2269,7 +2273,18 @@ function CommunityPage({setPage}){
   const onImportFile=(file)=>{if(!file)return;const rd=new FileReader();rd.onload=(ev)=>{try{const XLSX=window.XLSX;if(!XLSX){window.alert('Spreadsheet reader is still loading \u2014 give it a second and try again.');return;}const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});const sheets=wb.SheetNames.map(nm=>modelSheet(nm,XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:false,defval:''}))).filter(Boolean);if(!sheets.length){window.alert('No readable rows found in that file.');return;}setImp({sheets});}catch(err){window.alert('Could not read that file: '+err.message);}};rd.readAsArrayBuffer(file);};
   const STATS=(sid)=>{const ls=leadsOf(sid);const b=ls.filter(l=>l.status==='Booked').length;const ns=ls.filter(l=>CLOSED.includes(l.status)&&l.status!=='Booked').length;const c=ls.filter(l=>(l.followups||[]).length>0||(l.status&&l.status!=='New')).length;return{n:ls.length,b,ns,c,open:ls.length-b-ns,conv:ls.length?b/ls.length*100:0};};
   const money=(v)=>'$'+(+v||0).toLocaleString('en-CA',{maximumFractionDigits:0});
-  const roiOf=(e)=>{const st=STATS(e.id);const opp=(+e.thCount||0)*(+e.thHours||0)*(+e.thRate||0);const labour=(+e.coordHours||0)*(+e.coordRate||0);let hard=+e.hardCost||0;if(!opp&&!labour&&!hard&&(+e.cost||0)>0)hard=+e.cost||0;const cost=opp+labour+hard;const est=(+e.estPerBook||0)*st.b;const roi=cost>0?((est-cost)/cost*100):null;return{...st,cost,opp,labour,hard,est,roi,cpl:st.n&&cost?cost/st.n:null,cpb:st.b&&cost?cost/st.b:null};};
+  const roiOf=(e)=>{const st=STATS(e.id);const opp=(+e.thCount||0)*(+e.thHours||0)*(+e.thRate||0);const labour=(+e.coordHours||0)*(+e.coordRate||0);let hard=+e.hardCost||0;if(!opp&&!labour&&!hard&&(+e.cost||0)>0)hard=+e.cost||0;const cost=opp+labour+hard;const est=(+e.estPerBook||125)*st.b;const roi=cost>0?((est-cost)/cost*100):null;return{...st,cost,opp,labour,hard,est,roi,cpl:st.n&&cost?cost/st.n:null,cpb:st.b&&cost?cost/st.b:null};};
+  const evDate=(e)=>e.eventDate||(leadsOf(e.id).map(l=>l.date).filter(Boolean).sort()[0]||'');
+  const rMonday=(iso)=>{const d=new Date(iso+'T12:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);};
+  const gKey=(iso,g)=>{if(!iso)return '';if(g==='year')return iso.slice(0,4);if(g==='quarter'){const m=parseInt(iso.slice(5,7))||1;return iso.slice(0,4)+' Q'+(Math.floor((m-1)/3)+1);}if(g==='week')return 'Wk of '+rMonday(iso);return iso.slice(0,7);};
+  const repPeriods=[...new Set(events.map(e=>gKey(evDate(e),repGran)).filter(Boolean))].sort((a,b)=>a<b?1:-1);
+  const curPer=repPeriods.includes(repPer)?repPer:(repPeriods[0]||'');
+  const repRows=events.filter(e=>gKey(evDate(e),repGran)===curPer).map(e=>({e,r:roiOf(e),when:evDate(e)})).sort((a,b)=>a.when<b.when?1:-1);
+  const repT=repRows.reduce((t,x)=>{t.n+=x.r.n;t.b+=x.r.b;t.cost+=x.r.cost;t.est+=x.r.est;return t;},{n:0,b:0,cost:0,est:0});
+  const repConv=repT.n?repT.b/repT.n*100:0;const repRoi=repT.cost>0?((repT.est-repT.cost)/repT.cost*100):null;
+  const repLeads=repRows.flatMap(x=>leadsOf(x.e.id));
+  const repStatus={};repLeads.forEach(l=>{const st=l.status||'New';repStatus[st]=(repStatus[st]||0)+1;});
+  const repLoc={};repLeads.forEach(l=>{const k=l.location||'—';(repLoc[k]=repLoc[k]||{n:0,b:0});repLoc[k].n++;if(l.status==='Booked')repLoc[k].b++;});
   const evSorted=[...events].sort((a,b)=>(b.eventDate||'')<(a.eventDate||'')?-1:1);
   const TOT=events.reduce((t,e)=>{const r=roiOf(e);t.cost+=r.cost;t.n+=r.n;t.b+=r.b;t.open+=r.open;t.est+=r.est;return t;},{cost:0,n:0,b:0,open:0,est:0});
   const openPipe=(sid)=>{try{sessionStorage.setItem('rvgd3_open_src',sid);}catch(e){}setPage&&setPage('calls');};
@@ -2292,6 +2307,7 @@ function CommunityPage({setPage}){
         <h2 style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,letterSpacing:'1px',textTransform:'uppercase',color:'#eee',margin:0}}>Community</h2>
         <span style={{fontSize:13,color:'#777'}}>events hosted &amp; attended · lead pipelines · ROI</span>
         <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}} onClick={()=>{setShowImp(v=>!v);}}>{showImp?'Close import':'⬆ Import form fills'}</button>
+        <button className="btn btn-ghost btn-sm" onClick={()=>{setShowRep(v=>!v);}}>{showRep?'Hide report':'📊 Report'}</button>
         <button className="btn btn-go btn-sm" onClick={()=>{setEv(blankEv);setShowAdd(v=>!v);}}>{showAdd?'Cancel':'+ Log event'}</button>
       </div>
 
@@ -2304,7 +2320,7 @@ function CommunityPage({setPage}){
             <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>TYPE</div><select style={inp} value={ev.eventType} onChange={e=>setEv(p=>({...p,eventType:e.target.value}))}><option value="attended">Attended</option><option value="hosted">Hosted</option></select></div>
             <div style={{flex:'1 1 160px'}}><div style={{fontSize:11,color:'#888',marginBottom:4}}>VENUE / WHERE</div><input style={{...inp,width:'100%'}} value={ev.venue} onChange={e=>setEv(p=>({...p,venue:e.target.value}))}/></div>
             <div><div style={{fontSize:11,color:'#888',marginBottom:4}} title="How many days the event ran (e.g. Jackalope = 3)">DAYS</div><input type="number" min="1" style={{...inp,width:70}} value={ev.days} onChange={e=>setEv(p=>({...p,days:e.target.value}))} placeholder="1"/></div>
-            <div><div style={{fontSize:11,color:'#888',marginBottom:4}} title="Used for ROI: estimated value of one booked guest (e.g. average first-visit or care-plan value)">EST $ / BOOKING</div><input type="number" min="0" style={{...inp,width:110}} value={ev.estPerBook} onChange={e=>setEv(p=>({...p,estPerBook:e.target.value}))} placeholder="e.g. 180"/></div>
+            <div><div style={{fontSize:11,color:'#888',marginBottom:4}} title="Used for ROI: estimated value of one booked guest (e.g. average first-visit or care-plan value)">EST $ / BOOKING</div><input type="number" min="0" style={{...inp,width:110}} value={ev.estPerBook} onChange={e=>setEv(p=>({...p,estPerBook:e.target.value}))} placeholder="125"/></div>
           </div>
           <div style={{marginTop:14,background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:8,padding:'12px 14px'}}>
             <div style={{fontSize:11,letterSpacing:'.5px',color:'#999',marginBottom:10,fontWeight:700}}>WHAT THE EVENT COST YOU</div>
@@ -2388,6 +2404,53 @@ function CommunityPage({setPage}){
         {TOT.cost>0&&<span><b style={{color:TOT.est>=TOT.cost?'#44CCAA':'#E05252',fontSize:18,fontFamily:"'Barlow Condensed',sans-serif"}}>{Math.round((TOT.est-TOT.cost)/TOT.cost*100)}%</b> <span style={{color:'#888'}}>blended ROI</span></span>}
       </div>
 
+      {showRep&&(
+        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'16px 18px',margin:'14px 0'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12,flexWrap:'wrap'}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'1px',color:'#eee'}}>EVENT REPORT</div>
+            <div style={{display:'flex',gap:4}}>{[['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly']].map(([k,lb])=>(<button key={k} className={`btn btn-xs ${repGran===k?'btn-go':'btn-ghost'}`} onClick={()=>{setRepGran(k);setRepPer('');}}>{lb}</button>))}</div>
+            <span style={{flex:1}}/>
+            {repPeriods.length>0&&<select style={{...inp,width:'auto'}} value={curPer} onChange={e=>setRepPer(e.target.value)}>{repPeriods.map(pk=><option key={pk} value={pk}>{pk}</option>)}</select>}
+          </div>
+          {repRows.length===0?<div style={{fontSize:13,color:'#666'}}>No events dated in this period. Give an event a date (or pick another period from the dropdown).</div>:(
+          <div>
+            <div style={{display:'flex',gap:'10px 22px',flexWrap:'wrap',marginBottom:14}}>
+              {[['Events',repRows.length,'#eee'],['Leads',repT.n,'#eee'],['Booked',repT.b,'#44CCAA'],['Conversion',repT.n?repConv.toFixed(0)+'%':'—','#7FC8E8'],['Cost',money(repT.cost),'#E0A052'],['Est. revenue',money(repT.est),'#CAE8C1'],['ROI',repRoi==null?'—':(repRoi>=0?'+':'')+repRoi.toFixed(0)+'%',repRoi==null?'#888':repRoi>=0?'#44CCAA':'#E05252'],['$ / lead',repT.n&&repT.cost?money(repT.cost/repT.n):'—','#aaa'],['$ / booking',repT.b&&repT.cost?money(repT.cost/repT.b):'—','#aaa']].map(([lb,val,col])=>(
+                <div key={lb}><div style={{fontSize:19,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",color:col}}>{val}</div><div style={{fontSize:11,color:'#888'}}>{lb}</div></div>))}
+            </div>
+            <div style={{overflowX:'auto',marginBottom:12}}>
+              <table style={{borderCollapse:'collapse',width:'100%',fontSize:12.5,minWidth:620}}>
+                <thead><tr style={{color:'#888'}}>
+                  <th style={{textAlign:'left',padding:'4px 8px',fontWeight:600}}>Event</th>
+                  <th style={{textAlign:'left',padding:'4px 8px',fontWeight:600}}>Date</th>
+                  <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>Leads</th>
+                  <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>Booked</th>
+                  <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>Conv %</th>
+                  <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>Cost</th>
+                  <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>$/booking</th>
+                  <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>ROI</th>
+                </tr></thead>
+                <tbody>{repRows.map(({e,r,when})=>(
+                  <tr key={e.id} style={{borderTop:'1px solid var(--border)'}}>
+                    <td style={{textAlign:'left',padding:'6px 8px',color:'#ddd'}}>{e.name}</td>
+                    <td style={{textAlign:'left',padding:'6px 8px',color:'#888'}}>{when||'—'}</td>
+                    <td style={{textAlign:'right',padding:'6px 8px',color:'#bbb'}}>{r.n}</td>
+                    <td style={{textAlign:'right',padding:'6px 8px',color:'#44CCAA'}}>{r.b}</td>
+                    <td style={{textAlign:'right',padding:'6px 8px',color:'#ccc'}}>{r.n?r.conv.toFixed(0)+'%':'—'}</td>
+                    <td style={{textAlign:'right',padding:'6px 8px',color:'#aaa'}}>{r.cost?money(r.cost):'—'}</td>
+                    <td style={{textAlign:'right',padding:'6px 8px',color:'#aaa'}}>{r.cpb!=null?money(r.cpb):'—'}</td>
+                    <td style={{textAlign:'right',padding:'6px 8px',fontWeight:700,color:r.roi==null?'#666':r.roi>=0?'#44CCAA':'#E05252'}}>{r.roi==null?'—':(r.roi>=0?'+':'')+r.roi.toFixed(0)+'%'}</td>
+                  </tr>))}</tbody>
+              </table>
+            </div>
+            <div style={{display:'flex',gap:24,flexWrap:'wrap',fontSize:12,marginBottom:4}}>
+              <div><div style={{fontSize:11,color:'#888',marginBottom:4,letterSpacing:'.5px'}}>LEADS BY STATUS</div>{Object.entries(repStatus).sort((a,b)=>b[1]-a[1]).map(([st,ct])=>(<span key={st} style={{marginRight:12,fontWeight:700,color:STATUS_C[st]||'#aaa'}}>{ct} <span style={{color:'#999',fontWeight:400}}>{st}</span></span>))}</div>
+              {Object.keys(repLoc).length>1&&<div><div style={{fontSize:11,color:'#888',marginBottom:4,letterSpacing:'.5px'}}>BY LOCATION</div>{Object.entries(repLoc).sort((a,b)=>b[1].n-a[1].n).map(([lc,v])=>(<span key={lc} style={{marginRight:12,color:'#bbb'}}>{lc}: {v.n} <span style={{color:'#44CCAA'}}>({v.b} bk)</span></span>))}</div>}
+            </div>
+          </div>)}
+          <div style={{fontSize:11,color:'#555',marginTop:10}}>Events count in the period they ran (by event date). Each event's full leads, bookings and cost are included. Bookings valued at $125 unless a per-event value is set.</div>
+        </div>
+      )}
       {(()=>{const dl=dueList();if(!dl.length)return null;const overdue=dl.filter(l=>dueDelta(l.nextDate)<0).length;return(
         <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'14px 16px',margin:'0 0 14px'}}>
           <div style={{display:'flex',alignItems:'baseline',gap:10,marginBottom:10,flexWrap:'wrap'}}>
@@ -2420,16 +2483,17 @@ function CommunityPage({setPage}){
             <span style={{fontSize:12.5,color:'#aaa'}}><b style={{color:'#44CCAA'}}>{r.b}</b> booked{r.n?<span style={{color:'#666'}}> ({r.conv.toFixed(0)}%)</span>:null}</span>
             <span style={{fontSize:12.5,color:'#aaa'}}><b style={{color:'#7FC8E8'}}>{r.open}</b> open</span>
             {r.cost>0&&<span style={{fontSize:12.5,color:'#aaa'}}>{money(r.cost)} cost</span>}
-            {r.roi!=null&&<span style={{fontSize:13,fontWeight:800,color:r.roi>=0?'#44CCAA':'#E05252'}} title={money(r.est)+' est. revenue ('+r.b+' × '+money(e.estPerBook)+') vs '+money(r.cost)+' cost'+(r.cpl!=null?' · '+money(r.cpl)+'/lead':'')+(r.cpb!=null?' · '+money(r.cpb)+'/booking':'')}>{r.roi>=0?'+':''}{r.roi.toFixed(0)}% ROI</span>}
+            {r.roi!=null&&<span style={{fontSize:13,fontWeight:800,color:r.roi>=0?'#44CCAA':'#E05252'}} title={money(r.est)+' est. revenue ('+r.b+' × '+money((+e.estPerBook||125))+') vs '+money(r.cost)+' cost'+(r.cpl!=null?' · '+money(r.cpl)+'/lead':'')+(r.cpb!=null?' · '+money(r.cpb)+'/booking':'')}>{r.roi>=0?'+':''}{r.roi.toFixed(0)}% ROI</span>}
             <span style={{color:'#666'}}>{open?'▾':'▸'}</span>
           </div>
           {open&&(
             <div style={{borderTop:'1px solid var(--border)',padding:'14px 16px'}}>
               <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
-                <button className="btn btn-ghost btn-xs" onClick={()=>{setEv({id:e.id,name:e.name||'',eventDate:e.eventDate||'',days:String(e.days||1),eventType:e.eventType||'attended',venue:e.venue||'',estPerBook:String(e.estPerBook||''),thCount:String(e.thCount||''),thHours:String(e.thHours||''),thRate:String(e.thRate||150),coordHours:String(e.coordHours||''),coordRate:String(e.coordRate||20),hardCost:String(e.hardCost|| (e.thCount||e.coordHours?'':(e.cost||'')) ||''),notes:e.notes||''});setShowAdd(false);window.scrollTo({top:0,behavior:'smooth'});}}>✎ Edit event</button>
+                <button className="btn btn-ghost btn-xs" onClick={()=>{setEv({id:e.id,name:e.name||'',eventDate:e.eventDate||'',days:String(e.days||1),eventType:e.eventType||'attended',venue:e.venue||'',estPerBook:String(e.estPerBook||125),thCount:String(e.thCount||''),thHours:String(e.thHours||''),thRate:String(e.thRate||150),coordHours:String(e.coordHours||''),coordRate:String(e.coordRate||20),hardCost:String(e.hardCost|| (e.thCount||e.coordHours?'':(e.cost||'')) ||''),notes:e.notes||''});setShowAdd(false);window.scrollTo({top:0,behavior:'smooth'});}}>✎ Edit event</button>
                 <button className="btn btn-ghost btn-xs" onClick={()=>openPipe(e.id)}>Open full pipeline in Call History →</button>
+                <button className="btn btn-ghost btn-xs" style={{color:'#E05252'}} onClick={()=>deleteEvent(e)}>🗑 Delete event</button>
                 {r.cost>0&&r.b>0&&<span style={{fontSize:12,color:'#888',alignSelf:'center'}}>{money(r.cpl)}/lead · {money(r.cpb)}/booking · est. {money(r.est)} from {r.b} booking{r.b===1?'':'s'}</span>}
-                {r.cost>0&&!e.estPerBook&&<span style={{fontSize:12,color:'#E0A052',alignSelf:'center'}}>Set "Est $ / booking" on the event to get ROI.</span>}
+                {r.cost>0&&!e.estPerBook&&<span style={{fontSize:11.5,color:'#777',alignSelf:'center'}}>ROI assumes $125 per booking — set "Est $ / booking" to override.</span>}
                 {r.cost>0&&<span style={{fontSize:11.5,color:'#777',alignSelf:'center'}}>Cost {money(r.cost)} = therapist opp {money(r.opp)} + coordination {money(r.labour)} + hard {money(r.hard)}{e.days>1?' · '+e.days+' days':''}</span>}
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginBottom:12}}>
