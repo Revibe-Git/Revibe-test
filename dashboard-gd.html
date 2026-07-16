@@ -1839,7 +1839,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L40'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L41'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2280,13 +2280,13 @@ function CommunityPage({setPage}){
   const repPeriods=[...new Set(events.map(e=>gKey(evDate(e),repGran)).filter(Boolean))].sort((a,b)=>a<b?1:-1);
   const curPer=repPeriods.includes(repPer)?repPer:(repPeriods[0]||'');
   const repRows=events.filter(e=>gKey(evDate(e),repGran)===curPer).map(e=>({e,r:roiOf(e),when:evDate(e)})).sort((a,b)=>a.when<b.when?1:-1);
-  const repT=repRows.reduce((t,x)=>{t.n+=x.r.n;t.b+=x.r.b;t.cost+=x.r.cost;t.est+=x.r.est;return t;},{n:0,b:0,cost:0,est:0});
+  const repT=repRows.reduce((t,x)=>{t.n+=x.r.n;t.b+=x.r.b;t.cost+=x.r.cost;t.opp+=x.r.opp;t.labour+=x.r.labour;t.hard+=x.r.hard;t.est+=x.r.est;return t;},{n:0,b:0,cost:0,opp:0,labour:0,hard:0,est:0});
   const repConv=repT.n?repT.b/repT.n*100:0;const repRoi=repT.cost>0?((repT.est-repT.cost)/repT.cost*100):null;
   const repLeads=repRows.flatMap(x=>leadsOf(x.e.id));
   const repStatus={};repLeads.forEach(l=>{const st=l.status||'New';repStatus[st]=(repStatus[st]||0)+1;});
   const repLoc={};repLeads.forEach(l=>{const k=l.location||'—';(repLoc[k]=repLoc[k]||{n:0,b:0});repLoc[k].n++;if(l.status==='Booked')repLoc[k].b++;});
   const evSorted=[...events].sort((a,b)=>(b.eventDate||'')<(a.eventDate||'')?-1:1);
-  const TOT=events.reduce((t,e)=>{const r=roiOf(e);t.cost+=r.cost;t.n+=r.n;t.b+=r.b;t.open+=r.open;t.est+=r.est;return t;},{cost:0,n:0,b:0,open:0,est:0});
+  const TOT=events.reduce((t,e)=>{const r=roiOf(e);t.cost+=r.cost;t.opp+=r.opp;t.labour+=r.labour;t.hard+=r.hard;t.n+=r.n;t.b+=r.b;t.open+=r.open;t.est+=r.est;return t;},{cost:0,opp:0,labour:0,hard:0,n:0,b:0,open:0,est:0});
   const openPipe=(sid)=>{try{sessionStorage.setItem('rvgd3_open_src',sid);}catch(e){}setPage&&setPage('calls');};
   const STATUS_C={New:'#888','No Response':'#F4DB71',Pending:'#7FC8E8',Booked:'#44CCAA','Not Suitable':'#E05252','No Availability':'#E0A052',Contacted:'#7FC8E8',Responded:'#F4DB71','Not a fit':'#E05252'};
   const LEAD_STATUS=['New','No Response','Pending','Booked','No Availability','Not Suitable'];
@@ -2396,7 +2396,8 @@ function CommunityPage({setPage}){
       )}
       <div style={{display:'flex',gap:'8px 26px',flexWrap:'wrap',margin:'14px 0 16px',fontSize:13.5}}>
         <span><b style={{color:'#eee',fontSize:18,fontFamily:"'Barlow Condensed',sans-serif"}}>{events.length}</b> <span style={{color:'#888'}}>events</span></span>
-        <span><b style={{color:'#E0A052',fontSize:18,fontFamily:"'Barlow Condensed',sans-serif"}}>{money(TOT.cost)}</b> <span style={{color:'#888'}}>invested</span></span>
+        <span><b style={{color:'#E0A052',fontSize:18,fontFamily:"'Barlow Condensed',sans-serif"}}>{money(TOT.cost)}</b> <span style={{color:'#888'}}>total cost</span></span>
+        {TOT.cost>0&&<span style={{color:'#777',fontSize:12,alignSelf:'center'}}>therapist opp {money(TOT.opp)} · coordination {money(TOT.labour)} · hard {money(TOT.hard)}</span>}
         <span><b style={{color:'#eee',fontSize:18,fontFamily:"'Barlow Condensed',sans-serif"}}>{TOT.n}</b> <span style={{color:'#888'}}>leads</span></span>
         <span><b style={{color:'#44CCAA',fontSize:18,fontFamily:"'Barlow Condensed',sans-serif"}}>{TOT.b}</b> <span style={{color:'#888'}}>booked ({TOT.n?Math.round(TOT.b/TOT.n*100):0}%)</span></span>
         <span><b style={{color:'#7FC8E8',fontSize:18,fontFamily:"'Barlow Condensed',sans-serif"}}>{TOT.open}</b> <span style={{color:'#888'}}>open in pipelines</span></span>
@@ -2418,6 +2419,7 @@ function CommunityPage({setPage}){
               {[['Events',repRows.length,'#eee'],['Leads',repT.n,'#eee'],['Booked',repT.b,'#44CCAA'],['Conversion',repT.n?repConv.toFixed(0)+'%':'—','#7FC8E8'],['Cost',money(repT.cost),'#E0A052'],['Est. revenue',money(repT.est),'#CAE8C1'],['ROI',repRoi==null?'—':(repRoi>=0?'+':'')+repRoi.toFixed(0)+'%',repRoi==null?'#888':repRoi>=0?'#44CCAA':'#E05252'],['$ / lead',repT.n&&repT.cost?money(repT.cost/repT.n):'—','#aaa'],['$ / booking',repT.b&&repT.cost?money(repT.cost/repT.b):'—','#aaa']].map(([lb,val,col])=>(
                 <div key={lb}><div style={{fontSize:19,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",color:col}}>{val}</div><div style={{fontSize:11,color:'#888'}}>{lb}</div></div>))}
             </div>
+            {repT.cost>0&&<div style={{fontSize:12,color:'#999',marginTop:-4,marginBottom:14}}>Total cost <b style={{color:'#E0A052'}}>{money(repT.cost)}</b> = therapist opportunity {money(repT.opp)} + coordination {money(repT.labour)} + hard {money(repT.hard)}</div>}
             <div style={{overflowX:'auto',marginBottom:12}}>
               <table style={{borderCollapse:'collapse',width:'100%',fontSize:12.5,minWidth:620}}>
                 <thead><tr style={{color:'#888'}}>
