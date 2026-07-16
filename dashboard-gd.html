@@ -35,6 +35,7 @@ if('serviceWorker' in navigator){window.addEventListener('load',function(){navig
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -1838,7 +1839,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L35'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L38'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2176,15 +2177,19 @@ function CommunityPage({setPage}){
   const CLOSED=['Booked','Not Suitable','Not a fit'];
   const[exp,setExp]=useState(null);
   const[showAdd,setShowAdd]=useState(false);
-  const blankEv={name:'',eventDate:'',eventType:'attended',venue:'',cost:'',estPerBook:'',notes:''};
+  const[trendPeriod,setTrendPeriod]=useState('month');
+  const blankEv={name:'',eventDate:'',days:'1',eventType:'attended',venue:'',estPerBook:'',thCount:'',thHours:'',thRate:'150',coordHours:'',coordRate:'20',hardCost:'',notes:''};
   const[ev,setEv]=useState(blankEv);
   const[ql,setQl]=useState({first:'',last:'',phone:''});
+  const[showImp,setShowImp]=useState(false);
+  const[imp,setImp]=useState(null);
 
   const saveEvent=()=>{
     if(!ev.name.trim())return window.alert('Give the event a name.');
     const sources=[...(data.sources||[])];
-    if(ev.id){const i=sources.findIndex(x=>x.id===ev.id);if(i>=0)sources[i]={...sources[i],...ev,cost:parseFloat(ev.cost)||0,estPerBook:parseFloat(ev.estPerBook)||0};}
-    else{const id='src_'+Date.now().toString(36);sources.push({id,kind:'event',...ev,name:ev.name.trim(),cost:parseFloat(ev.cost)||0,estPerBook:parseFloat(ev.estPerBook)||0});}
+    const cf={estPerBook:parseFloat(ev.estPerBook)||0,days:parseInt(ev.days)||1,thCount:parseFloat(ev.thCount)||0,thHours:parseFloat(ev.thHours)||0,thRate:parseFloat(ev.thRate)||0,coordHours:parseFloat(ev.coordHours)||0,coordRate:parseFloat(ev.coordRate)||0,hardCost:parseFloat(ev.hardCost)||0};
+    if(ev.id){const i=sources.findIndex(x=>x.id===ev.id);if(i>=0)sources[i]={...sources[i],...ev,...cf};}
+    else{const id='src_'+Date.now().toString(36);sources.push({id,kind:'event',...ev,name:ev.name.trim(),...cf});}
     persist({...data,sources});setEv(blankEv);setShowAdd(false);
   };
   const quickAddLead=(sid)=>{
@@ -2203,9 +2208,68 @@ function CommunityPage({setPage}){
   const dueDelta=(d)=>Math.round((new Date(d+'T12:00')-new Date(todayStr+'T12:00'))/86400000);
   const dueList=()=>{const out=[];events.forEach(e=>leadsOf(e.id).forEach(l=>{if(l.nextDate&&!CLOSED.includes(l.status))out.push({...l,_sid:e.id,_ename:e.name});}));return out.sort((a,b)=>(a.nextDate+(a.nextTime||'')).localeCompare(b.nextDate+(b.nextTime||'')));};
   const logTouch=(sid,lid)=>{const nd=new Date();nd.setDate(nd.getDate()+3);const nds=nd.toISOString().slice(0,10);const arr=leadsOf(sid).map(l=>l.id!==lid?l:{...l,followups:[...(l.followups||[]),{at:todayStr,method:l.nextMethod||'call'}],status:l.status==='New'?'No Response':l.status,firstContactAt:l.firstContactAt||todayStr,nextDate:nds});persist({...data,leads:{...(data.leads||{}),[sid]:arr}});};
+  // ---- Form-fill spreadsheet import (Jackalope / Ladies Lift style QR form fills) ----
+  const LOC_NORM=(v)=>{const t=(v||'').toString().trim().toLowerCase();if(!t)return '';if(t.startsWith('missis'))return 'Mississauga';if(t.startsWith('markham'))return 'Markham';if(t.startsWith('etobic'))return 'Etobicoke';return (v||'').toString().trim();};
+  const IMON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+  const parseDate=(v)=>{if(v==null)return '';const s=v.toString().trim();let m=s.match(/([A-Za-z]{3})[a-z]*\s+(\d{1,2}),?\s*(\d{4})/);if(m){const mo=IMON[m[1].toLowerCase()];if(mo!=null)return m[3]+'-'+String(mo+1).padStart(2,'0')+'-'+String(+m[2]).padStart(2,'0');}m=s.match(/(\d{4})-(\d{2})-(\d{2})/);if(m)return m[1]+'-'+m[2]+'-'+m[3];m=s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return m[3]+'-'+String(+m[1]).padStart(2,'0')+'-'+String(+m[2]).padStart(2,'0');return '';};
+  const looksEmail=(v)=>/@/.test((v||'').toString());
+  const looksPhone=(v)=>{const t=(v||'').toString().trim();return t.replace(/\D/g,'').length>=7&&/^[\d()+\-\s]+$/.test(t);};
+  const looksDate=(v)=>!!parseDate(v);
+  const IFIELDS=['ignore','date','first','last','fullname','email','phone','location','outreach1','outreach2','booked','notes'];
+  const IFLABEL={ignore:'\u2014 ignore \u2014',date:'Date',first:'First name',last:'Last name',fullname:'Full name',email:'Email',phone:'Phone',location:'Location',outreach1:'Outreach 1',outreach2:'Outreach 2',booked:'Booked?',notes:'Notes'};
+  const headMap=(h)=>{const t=(h||'').toString().trim().toLowerCase();if(!t)return '';if(/date|time|stamp/.test(t))return 'date';if(/e-?mail/.test(t))return 'email';if(/phone|mobile|cell|tel/.test(t))return 'phone';if(/first/.test(t))return 'first';if(/last|surname/.test(t))return 'last';if(/full ?name|^name$/.test(t))return 'fullname';if(/location|city|clinic|site/.test(t))return 'location';if(/outreach ?1|attempt ?1|contact ?1/.test(t))return 'outreach1';if(/outreach ?2|attempt ?2|contact ?2/.test(t))return 'outreach2';if(/book/.test(t))return 'booked';if(/note/.test(t))return 'notes';return '';};
+  const modelSheet=(name,aoa)=>{
+    const rows=(aoa||[]).filter(r=>r&&r.some(c=>c!=null&&c.toString().trim()!==''));
+    if(!rows.length)return null;
+    const isHeader=(r)=>r.some(c=>headMap(c))&&!r.some(c=>looksEmail(c))&&!r.some(c=>looksDate(c));
+    const hIdx=rows.findIndex(isHeader);
+    const header=hIdx>=0?rows[hIdx]:null;
+    const data=rows.slice(hIdx>=0?hIdx+1:0);
+    const ncol=Math.max(...rows.map(r=>r.length));
+    const samp=(c)=>data.slice(0,20).map(r=>r[c]).filter(v=>v!=null&&v.toString().trim()!=='');
+    const frac=(vals,fn)=>vals.length?vals.filter(fn).length/vals.length:0;
+    const map=[];
+    for(let c=0;c<ncol;c++){let f=header?headMap(header[c]):'';if(!f){const vals=samp(c);if(frac(vals,looksEmail)>=.5)f='email';else if(frac(vals,looksDate)>=.5)f='date';else if(frac(vals,looksPhone)>=.6)f='phone';else if(frac(vals,v=>['mississauga','markham','etobicoke'].includes((v||'').toString().trim().toLowerCase()))>=.5)f='location';else f='ignore';}map.push(f);}
+    const has=(f)=>map.includes(f);
+    const isOutreachish=(vals)=>vals.length&&frac(vals,v=>/^(call|text|email|dm|phone|left ?vm|vm|call ?\+)/i.test((v||'').toString().trim()))>=.5;
+    for(let c=0;c<ncol;c++){if(map[c]!=='ignore')continue;if(isOutreachish(samp(c)))map[c]=has('outreach1')?(has('outreach2')?'ignore':'outreach2'):'outreach1';}
+    if(!has('first')&&!has('last')&&!has('fullname')){
+      const cands=[];for(let c=0;c<ncol;c++){if(map[c]!=='ignore')continue;const vals=samp(c);if(vals.length&&frac(vals,v=>/^[A-Za-z][A-Za-z .'\u2019\-]{0,38}$/.test((v||'').toString().trim())&&!['mississauga','markham','etobicoke'].includes((v||'').toString().trim().toLowerCase()))>=.7)cands.push({c,sp:frac(vals,v=>/\s/.test(v.toString().trim()))});}
+      if(cands.length===1)map[cands[0].c]='fullname';
+      else if(cands.length===2){map[cands[0].c]='first';map[cands[1].c]='last';}
+      else if(cands.length>=3){const full=cands.slice().sort((a,b)=>b.sp-a.sp)[0];map[full.c]='fullname';const rest=cands.filter(x=>x.c!==full.c).sort((a,b)=>a.c-b.c);if(rest[0])map[rest[0].c]='first';if(rest[1])map[rest[1].c]='last';}
+    }
+    return {name:(name||'Sheet').trim(),rows:data,map,target:'',newName:(name||'Sheet').trim(),done:null};
+  };
+  const rowToLead=(r,map,sheetName)=>{
+    const get=(f)=>{const i=map.indexOf(f);return i>=0&&r[i]!=null?r[i].toString().trim():'';};
+    const email=get('email'),phone=get('phone');let first=get('first'),last=get('last');const full=get('fullname');
+    if((!first&&!last)&&full){const parts=full.split(/\s+/);first=parts.slice(0,-1).join(' ')||parts[0]||'';last=parts.length>1?parts[parts.length-1]:'';}
+    const date=parseDate(get('date'))||todayStr;const loc=LOC_NORM(get('location'));
+    const o1=get('outreach1'),o2=get('outreach2'),bk=get('booked');
+    const booked=bk!==''&&/^(y|yes|booked|true|1|\u2713|done|confirmed)/i.test(bk);
+    const meth=(t)=>/text/i.test(t)?'text':/e-?mail/i.test(t)?'email':'call';const fus=[];
+    if(o1)fus.push({at:date,method:meth(o1),note:'Outreach 1: '+o1});
+    if(o2)fus.push({at:date,method:meth(o2),note:'Outreach 2: '+o2});
+    const status=booked?'Booked':((o1||o2)?'No Response':'New');
+    const nn=get('notes');
+    return {id:'ld_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),date,first,last,email,phone,location:loc,interest:'',status,practice:'',notes:'Imported from '+sheetName+(nn?' \u2014 '+nn:''),nextDate:'',nextTime:'',nextMethod:'call',followups:fus,createdAt:date+'T00:00',firstContactAt:(o1||o2)?date:'',...(booked?{bookedAt:date}:{})};
+  };
+  const dedupeKey=(l)=>{const e=(l.email||'').toLowerCase().trim();if(e)return 'e:'+e;const ph=(l.phone||'').replace(/\D/g,'');if(ph)return 'p:'+ph;return 'n:'+((l.first||'')+' '+(l.last||'')).toLowerCase().trim();};
+  const runImport=(sh)=>{
+    let sources=[...(data.sources||[])];let sid=sh.target;
+    const di=sh.map.indexOf('date');const dates=di>=0?sh.rows.map(r=>parseDate(r[di])).filter(Boolean).sort():[];
+    if(sid==='__new__'||!sid){const id='src_'+Date.now().toString(36);const days=new Set(dates).size||1;sources.push({id,kind:'event',name:(sh.newName||sh.name).trim(),eventType:'attended',eventDate:dates[0]||'',days,estPerBook:0,thCount:0,thHours:0,thRate:150,coordHours:0,coordRate:20,hardCost:0,notes:'Created from form-fill import'});sid=id;}
+    const existing=(data.leads||{})[sid]||[];const seen=new Set(existing.map(dedupeKey));
+    let added=0,skipped=0;const newLeads=[];
+    sh.rows.forEach(r=>{const l=rowToLead(r,sh.map,sh.name);if(!l.email&&!l.phone&&!(l.first||l.last)){skipped++;return;}const k=dedupeKey(l);if(seen.has(k)){skipped++;return;}seen.add(k);newLeads.push(l);added++;});
+    persist({...data,sources,leads:{...(data.leads||{}),[sid]:[...newLeads,...existing]}});
+    return {added,skipped,sid};
+  };
+  const onImportFile=(file)=>{if(!file)return;const rd=new FileReader();rd.onload=(ev)=>{try{const XLSX=window.XLSX;if(!XLSX){window.alert('Spreadsheet reader is still loading \u2014 give it a second and try again.');return;}const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});const sheets=wb.SheetNames.map(nm=>modelSheet(nm,XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:false,defval:''}))).filter(Boolean);if(!sheets.length){window.alert('No readable rows found in that file.');return;}setImp({sheets});}catch(err){window.alert('Could not read that file: '+err.message);}};rd.readAsArrayBuffer(file);};
   const STATS=(sid)=>{const ls=leadsOf(sid);const b=ls.filter(l=>l.status==='Booked').length;const ns=ls.filter(l=>CLOSED.includes(l.status)&&l.status!=='Booked').length;const c=ls.filter(l=>(l.followups||[]).length>0||(l.status&&l.status!=='New')).length;return{n:ls.length,b,ns,c,open:ls.length-b-ns,conv:ls.length?b/ls.length*100:0};};
   const money=(v)=>'$'+(+v||0).toLocaleString('en-CA',{maximumFractionDigits:0});
-  const roiOf=(e)=>{const st=STATS(e.id);const cost=+e.cost||0;const est=(+e.estPerBook||0)*st.b;const roi=cost>0?((est-cost)/cost*100):null;return{...st,cost,est,roi,cpl:st.n&&cost?cost/st.n:null,cpb:st.b&&cost?cost/st.b:null};};
+  const roiOf=(e)=>{const st=STATS(e.id);const opp=(+e.thCount||0)*(+e.thHours||0)*(+e.thRate||0);const labour=(+e.coordHours||0)*(+e.coordRate||0);let hard=+e.hardCost||0;if(!opp&&!labour&&!hard&&(+e.cost||0)>0)hard=+e.cost||0;const cost=opp+labour+hard;const est=(+e.estPerBook||0)*st.b;const roi=cost>0?((est-cost)/cost*100):null;return{...st,cost,opp,labour,hard,est,roi,cpl:st.n&&cost?cost/st.n:null,cpb:st.b&&cost?cost/st.b:null};};
   const evSorted=[...events].sort((a,b)=>(b.eventDate||'')<(a.eventDate||'')?-1:1);
   const TOT=events.reduce((t,e)=>{const r=roiOf(e);t.cost+=r.cost;t.n+=r.n;t.b+=r.b;t.open+=r.open;t.est+=r.est;return t;},{cost:0,n:0,b:0,open:0,est:0});
   const openPipe=(sid)=>{try{sessionStorage.setItem('rvgd3_open_src',sid);}catch(e){}setPage&&setPage('calls');};
@@ -2213,16 +2277,22 @@ function CommunityPage({setPage}){
   const LEAD_STATUS=['New','No Response','Pending','Booked','No Availability','Not Suitable'];
   const inp={background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,color:'#eee',padding:'7px 10px',fontSize:13.5};
   // conversions over time — leads received vs booked per month across ALL events
-  const mo={};events.forEach(e=>leadsOf(e.id).forEach(l=>{const m=(l.date||'').slice(0,7);if(!m)return;(mo[m]=mo[m]||{n:0,b:0});mo[m].n++;if(l.status==='Booked')mo[m].b++;}));
-  const moArr=Object.entries(mo).sort((a,b)=>a[0]<b[0]?-1:1).slice(-18);
+  const perKey=(dt)=>{const t=(dt||'');if(!t)return '';if(trendPeriod==='year')return t.slice(0,4);if(trendPeriod==='quarter'){const y=t.slice(0,4);const m=parseInt(t.slice(5,7))||1;return y+' Q'+(Math.floor((m-1)/3)+1);}return t.slice(0,7);};
+  const perLabel=(k)=>trendPeriod==='month'?k.slice(2):k;
+  const mo={};events.forEach(e=>leadsOf(e.id).forEach(l=>{const m=perKey(l.date);if(!m)return;(mo[m]=mo[m]||{n:0,b:0});mo[m].n++;if(l.status==='Booked')mo[m].b++;}));
+  const moArr=Object.entries(mo).sort((a,b)=>a[0]<b[0]?-1:1).slice(trendPeriod==='year'?-12:trendPeriod==='quarter'?-16:-18);
   const moMax=Math.max(1,...moArr.map(([,v])=>v.n));
+  const seriesKey=(nm)=>{let x=(nm||'').split(/[·|:–—-]/)[0];x=x.replace(/\b20\d{2}\b/g,'').replace(/[#().,]/g,'').replace(/\b(vol|edition|ed|no|part|day)\s*\d+\b/gi,'').replace(/\s+/g,' ').trim().toLowerCase();return x||'(unnamed)';};
+  const series={};events.forEach(e=>{const k=seriesKey(e.name);const r=roiOf(e);const yr=(e.eventDate||'').slice(0,4)||'—';(series[k]=series[k]||{key:k,label:(e.name||'').split(/[·|:]/)[0].trim()||'(unnamed)',items:[]});series[k].items.push({id:e.id,name:e.name,date:e.eventDate||'',year:yr,n:r.n,b:r.b,conv:r.n?r.b/r.n*100:0,cost:r.cost,roi:r.roi,cpb:r.cpb});});
+  const recurring=Object.values(series).map(v=>{v.items.sort((a,b)=>(a.date||'')<(b.date||'')?-1:1);return v;}).filter(v=>v.items.length>1).sort((a,b)=>b.items.length-a.items.length||(a.label<b.label?-1:1));
 
   return(
     <div style={{padding:'26px 30px',maxWidth:1280}}>
       <div style={{display:'flex',alignItems:'baseline',gap:14,flexWrap:'wrap',marginBottom:4}}>
         <h2 style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,letterSpacing:'1px',textTransform:'uppercase',color:'#eee',margin:0}}>Community</h2>
         <span style={{fontSize:13,color:'#777'}}>events hosted &amp; attended · lead pipelines · ROI</span>
-        <button className="btn btn-go btn-sm" style={{marginLeft:'auto'}} onClick={()=>{setEv(blankEv);setShowAdd(v=>!v);}}>{showAdd?'Cancel':'+ Log event'}</button>
+        <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}} onClick={()=>{setShowImp(v=>!v);}}>{showImp?'Close import':'⬆ Import form fills'}</button>
+        <button className="btn btn-go btn-sm" onClick={()=>{setEv(blankEv);setShowAdd(v=>!v);}}>{showAdd?'Cancel':'+ Log event'}</button>
       </div>
 
       {(showAdd||ev.id)&&(
@@ -2233,14 +2303,81 @@ function CommunityPage({setPage}){
             <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>DATE</div><input type="date" style={inp} value={ev.eventDate} onChange={e=>setEv(p=>({...p,eventDate:e.target.value}))}/></div>
             <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>TYPE</div><select style={inp} value={ev.eventType} onChange={e=>setEv(p=>({...p,eventType:e.target.value}))}><option value="attended">Attended</option><option value="hosted">Hosted</option></select></div>
             <div style={{flex:'1 1 160px'}}><div style={{fontSize:11,color:'#888',marginBottom:4}}>VENUE / WHERE</div><input style={{...inp,width:'100%'}} value={ev.venue} onChange={e=>setEv(p=>({...p,venue:e.target.value}))}/></div>
-            <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>COST ($)</div><input type="number" min="0" style={{...inp,width:110}} value={ev.cost} onChange={e=>setEv(p=>({...p,cost:e.target.value}))} placeholder="0"/></div>
+            <div><div style={{fontSize:11,color:'#888',marginBottom:4}} title="How many days the event ran (e.g. Jackalope = 3)">DAYS</div><input type="number" min="1" style={{...inp,width:70}} value={ev.days} onChange={e=>setEv(p=>({...p,days:e.target.value}))} placeholder="1"/></div>
             <div><div style={{fontSize:11,color:'#888',marginBottom:4}} title="Used for ROI: estimated value of one booked guest (e.g. average first-visit or care-plan value)">EST $ / BOOKING</div><input type="number" min="0" style={{...inp,width:110}} value={ev.estPerBook} onChange={e=>setEv(p=>({...p,estPerBook:e.target.value}))} placeholder="e.g. 180"/></div>
+          </div>
+          <div style={{marginTop:14,background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:8,padding:'12px 14px'}}>
+            <div style={{fontSize:11,letterSpacing:'.5px',color:'#999',marginBottom:10,fontWeight:700}}>WHAT THE EVENT COST YOU</div>
+            <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'flex-end'}}>
+              <div><div style={{fontSize:10.5,color:'#888',marginBottom:3}} title="Therapists attend unpaid, but that is billable time they gave up — a real opportunity cost.">THERAPISTS (opportunity cost)</div>
+                <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12.5,color:'#aaa'}}>
+                  <input type="number" min="0" style={{...inp,width:52}} value={ev.thCount} onChange={e=>setEv(p=>({...p,thCount:e.target.value}))} placeholder="#"/><span>×</span>
+                  <input type="number" min="0" style={{...inp,width:56}} value={ev.thHours} onChange={e=>setEv(p=>({...p,thHours:e.target.value}))} placeholder="hrs"/><span>hrs @ $</span>
+                  <input type="number" min="0" style={{...inp,width:60}} value={ev.thRate} onChange={e=>setEv(p=>({...p,thRate:e.target.value}))} placeholder="150"/><span>/hr</span>
+                </div>
+              </div>
+              <div><div style={{fontSize:10.5,color:'#888',marginBottom:3}} title="Setup, coordination, meetings, staffing the booth — your team\u2019s time.">COORDINATION / SETUP</div>
+                <div style={{display:'flex',alignItems:'center',gap:5,fontSize:12.5,color:'#aaa'}}>
+                  <input type="number" min="0" style={{...inp,width:56}} value={ev.coordHours} onChange={e=>setEv(p=>({...p,coordHours:e.target.value}))} placeholder="hrs"/><span>hrs @ $</span>
+                  <input type="number" min="0" style={{...inp,width:56}} value={ev.coordRate} onChange={e=>setEv(p=>({...p,coordRate:e.target.value}))} placeholder="20"/><span>/hr</span>
+                </div>
+              </div>
+              <div><div style={{fontSize:10.5,color:'#888',marginBottom:3}} title="Booth fee, materials, travel, printing, etc.">OTHER HARD COSTS ($)</div>
+                <input type="number" min="0" style={{...inp,width:110}} value={ev.hardCost} onChange={e=>setEv(p=>({...p,hardCost:e.target.value}))} placeholder="0"/>
+              </div>
+            </div>
+            {(()=>{const opp=(parseFloat(ev.thCount)||0)*(parseFloat(ev.thHours)||0)*(parseFloat(ev.thRate)||0);const lab=(parseFloat(ev.coordHours)||0)*(parseFloat(ev.coordRate)||0);const hard=parseFloat(ev.hardCost)||0;const tot=opp+lab+hard;return(
+              <div style={{marginTop:10,fontSize:12.5,color:'#ccc'}}>Total event cost: <b style={{color:'#E0A052',fontSize:15}}>{money(tot)}</b> <span style={{color:'#777'}}>· therapist opp {money(opp)} · coordination {money(lab)} · hard {money(hard)}</span></div>);})()}
           </div>
           <div style={{marginTop:10}}><div style={{fontSize:11,color:'#888',marginBottom:4}}>NOTES</div><input style={{...inp,width:'100%'}} value={ev.notes} onChange={e=>setEv(p=>({...p,notes:e.target.value}))} placeholder="Booth details, partners, who worked it…"/></div>
           <div style={{marginTop:12,display:'flex',gap:10}}><button className="btn btn-lime btn-sm" onClick={saveEvent}>{ev.id?'Save changes':'Create event'}</button>{ev.id&&<button className="btn btn-ghost btn-sm" onClick={()=>{setEv(blankEv);setShowAdd(false);}}>Cancel</button>}</div>
         </div>
       )}
 
+      {showImp&&(
+        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'16px 18px',margin:'14px 0'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10,flexWrap:'wrap'}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',color:'#999'}}>IMPORT FORM-FILL LEADS</div>
+            <label className="btn btn-ghost btn-sm" style={{cursor:'pointer'}}>Choose .xlsx / .csv<input type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={e=>{onImportFile(e.target.files&&e.target.files[0]);e.target.value='';}}/></label>
+            <span style={{fontSize:11.5,color:'#666'}}>Each tab imports into its own event. Columns are auto-detected \u2014 check the mapping, pick the event, then import.</span>
+            <button className="btn btn-ghost btn-xs" style={{marginLeft:'auto'}} onClick={()=>{setImp(null);setShowImp(false);}}>Close</button>
+          </div>
+          {!imp&&<div style={{fontSize:12.5,color:'#666'}}>Drop your QR form-fill workbook above. Works with the multi-tab sheet (e.g. Jackalope + Ladies Lift) or a single CSV.</div>}
+          {imp&&imp.sheets.map((sh,si)=>{
+            const setMap=(ci,val)=>setImp(pv=>{const sheets=pv.sheets.slice();const m=sheets[si].map.slice();m[ci]=val;sheets[si]={...sheets[si],map:m};return{...pv,sheets};});
+            const setField=(k,val)=>setImp(pv=>{const sheets=pv.sheets.slice();sheets[si]={...sheets[si],[k]:val};return{...pv,sheets};});
+            const ncol=sh.map.length;const hasKey=sh.map.includes('email')||sh.map.includes('phone');const hasName=sh.map.includes('first')||sh.map.includes('fullname');
+            return(
+              <div key={si} style={{border:'1px solid var(--border)',borderRadius:8,padding:'12px 14px',marginBottom:12,background:'var(--surface3)'}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:10}}>
+                  <span style={{fontSize:14,fontWeight:700,color:'#eee'}}>{sh.name}</span>
+                  <span style={{fontSize:12,color:'#777'}}>{sh.rows.length} rows</span>
+                  <span style={{flex:1}}/>
+                  <span style={{fontSize:11,color:'#888'}}>Import into:</span>
+                  <select style={{...inp,width:'auto',padding:'4px 8px'}} value={sh.target||'__new__'} onChange={e=>setField('target',e.target.value)}>
+                    <option value="__new__">\u2795 New event</option>
+                    {events.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+                  </select>
+                  {(sh.target==='__new__'||!sh.target)&&<input style={{...inp,width:180}} value={sh.newName} onChange={e=>setField('newName',e.target.value)} placeholder="New event name"/>}
+                </div>
+                <div style={{overflowX:'auto',marginBottom:8}}>
+                  <table style={{borderCollapse:'collapse',fontSize:11.5}}>
+                    <thead><tr>{Array.from({length:ncol}).map((_,c)=>(
+                      <th key={c} style={{padding:'3px 6px',borderBottom:'1px solid var(--border)'}}>
+                        <select style={{...inp,padding:'2px 5px',fontSize:11}} value={sh.map[c]} onChange={e=>setMap(c,e.target.value)}>{IFIELDS.map(f=><option key={f} value={f}>{IFLABEL[f]}</option>)}</select>
+                      </th>))}</tr></thead>
+                    <tbody>{sh.rows.slice(0,4).map((r,ri)=>(<tr key={ri}>{Array.from({length:ncol}).map((_,c)=>(<td key={c} style={{padding:'3px 6px',color:'#aaa',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis'}} title={r[c]==null?'':r[c].toString()}>{r[c]==null?'':r[c].toString().slice(0,26)}</td>))}</tr>))}</tbody>
+                  </table>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                  <button className="btn btn-lime btn-sm" disabled={!hasName} onClick={()=>{const res=runImport(sh);setField('done',res);}}>Import {sh.rows.length} rows \u2192</button>
+                  {sh.done&&<span style={{fontSize:12.5,color:'#44CCAA'}}>\u2713 Added {sh.done.added} lead{sh.done.added===1?'':'s'}{sh.done.skipped?' \u00b7 skipped '+sh.done.skipped+' (dupes/blank)':''} \u2014 now in the event pipeline &amp; Follow-ups Due.</span>}
+                  {!hasKey&&<span style={{fontSize:11.5,color:'#E0A052'}}>Map an Email or Phone column so re-imports de-dupe.</span>}
+                  {!hasName&&<span style={{fontSize:11.5,color:'#E05252'}}>Map a Name column to import.</span>}
+                </div>
+              </div>);})}
+        </div>
+      )}
       <div style={{display:'flex',gap:'8px 26px',flexWrap:'wrap',margin:'14px 0 16px',fontSize:13.5}}>
         <span><b style={{color:'#eee',fontSize:18,fontFamily:"'Barlow Condensed',sans-serif"}}>{events.length}</b> <span style={{color:'#888'}}>events</span></span>
         <span><b style={{color:'#E0A052',fontSize:18,fontFamily:"'Barlow Condensed',sans-serif"}}>{money(TOT.cost)}</b> <span style={{color:'#888'}}>invested</span></span>
@@ -2289,10 +2426,11 @@ function CommunityPage({setPage}){
           {open&&(
             <div style={{borderTop:'1px solid var(--border)',padding:'14px 16px'}}>
               <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
-                <button className="btn btn-ghost btn-xs" onClick={()=>{setEv({id:e.id,name:e.name||'',eventDate:e.eventDate||'',eventType:e.eventType||'attended',venue:e.venue||'',cost:String(e.cost||''),estPerBook:String(e.estPerBook||''),notes:e.notes||''});setShowAdd(false);window.scrollTo({top:0,behavior:'smooth'});}}>✎ Edit event</button>
+                <button className="btn btn-ghost btn-xs" onClick={()=>{setEv({id:e.id,name:e.name||'',eventDate:e.eventDate||'',days:String(e.days||1),eventType:e.eventType||'attended',venue:e.venue||'',estPerBook:String(e.estPerBook||''),thCount:String(e.thCount||''),thHours:String(e.thHours||''),thRate:String(e.thRate||150),coordHours:String(e.coordHours||''),coordRate:String(e.coordRate||20),hardCost:String(e.hardCost|| (e.thCount||e.coordHours?'':(e.cost||'')) ||''),notes:e.notes||''});setShowAdd(false);window.scrollTo({top:0,behavior:'smooth'});}}>✎ Edit event</button>
                 <button className="btn btn-ghost btn-xs" onClick={()=>openPipe(e.id)}>Open full pipeline in Call History →</button>
                 {r.cost>0&&r.b>0&&<span style={{fontSize:12,color:'#888',alignSelf:'center'}}>{money(r.cpl)}/lead · {money(r.cpb)}/booking · est. {money(r.est)} from {r.b} booking{r.b===1?'':'s'}</span>}
                 {r.cost>0&&!e.estPerBook&&<span style={{fontSize:12,color:'#E0A052',alignSelf:'center'}}>Set "Est $ / booking" on the event to get ROI.</span>}
+                {r.cost>0&&<span style={{fontSize:11.5,color:'#777',alignSelf:'center'}}>Cost {money(r.cost)} = therapist opp {money(r.opp)} + coordination {money(r.labour)} + hard {money(r.hard)}{e.days>1?' · '+e.days+' days':''}</span>}
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',marginBottom:12}}>
                 <input style={{...inp,width:130}} placeholder="First name" value={ql.first} onChange={x=>setQl(p=>({...p,first:x.target.value}))}/>
@@ -2316,9 +2454,12 @@ function CommunityPage({setPage}){
           )}
         </div>);})}
 
-      {moArr.length>1&&(
+      {moArr.length>0&&(
         <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'16px 18px',marginTop:16}}>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',color:'#999',marginBottom:10}}>EVENT LEADS &amp; CONVERSIONS OVER TIME</div>
+          <div style={{display:'flex',alignItems:'baseline',gap:12,marginBottom:10,flexWrap:'wrap'}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',color:'#999'}}>EVENT LEADS &amp; CONVERSIONS OVER TIME</div>
+            <div style={{display:'flex',gap:4}}>{[['month','Monthly'],['quarter','Quarterly'],['year','Yearly']].map(([k,lb])=>(<button key={k} className={`btn btn-xs ${trendPeriod===k?'btn-go':'btn-ghost'}`} onClick={()=>setTrendPeriod(k)}>{lb}</button>))}</div>
+          </div>
           <div style={{display:'flex',gap:5,alignItems:'flex-end',height:130}}>
             {moArr.map(([m,v])=>{const hn=Math.round(v.n/moMax*96);const hb=Math.round(v.b/moMax*96);return(
               <div key={m} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3}} title={m+': '+v.n+' leads · '+v.b+' booked'+(v.n?' ('+Math.round(v.b/v.n*100)+'%)':'')}>
@@ -2327,10 +2468,46 @@ function CommunityPage({setPage}){
                   <div style={{width:'72%',height:hn,background:'#3a4a55',borderRadius:'3px 3px 0 0',position:'absolute',bottom:0}}/>
                   {v.b>0&&<div style={{width:'72%',height:hb,background:'#44CCAA',borderRadius:'3px 3px 0 0',position:'absolute',bottom:0}}/>}
                 </div>
-                <div style={{fontSize:9.5,color:'#666'}}>{m.slice(2)}</div>
+                <div style={{fontSize:9.5,color:'#666'}}>{perLabel(m)}</div>
+                <div style={{fontSize:9,fontWeight:700,color:v.n?'#8FB8A8':'#555'}}>{v.n?Math.round(v.b/v.n*100)+'%':''}</div>
               </div>);})}
           </div>
           <div style={{fontSize:11.5,color:'#666',marginTop:8}}>Each bar = leads received from events that month; green = how many are booked today. Hover for conversion.</div>
+        </div>
+      )}
+      {recurring.length>0&&(
+        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'16px 18px',marginTop:16}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',color:'#999',marginBottom:4}}>YEAR-OVER-YEAR BY EVENT</div>
+          <div style={{fontSize:11.5,color:'#666',marginBottom:12}}>Repeat events grouped by name (year stripped) so you can compare each run. Name them consistently — e.g. "Jackalope 2025", "Jackalope 2026" — to line them up. The ▲/▼ shows the conversion change vs the previous run.</div>
+          {recurring.map(sv=>{const bestConv=Math.max(...sv.items.map(i=>i.conv));const maxN=Math.max(1,...sv.items.map(i=>i.n));return(
+            <div key={sv.key} style={{marginBottom:16}}>
+              <div style={{fontSize:14,fontWeight:700,color:'#eee',marginBottom:8}}>{sv.label} <span style={{fontSize:11.5,color:'#777',fontWeight:400}}>· ran {sv.items.length} times</span></div>
+              <div style={{overflowX:'auto'}}>
+                <table style={{borderCollapse:'collapse',width:'100%',fontSize:12.5,minWidth:560}}>
+                  <thead><tr style={{color:'#888'}}>
+                    <th style={{textAlign:'left',padding:'4px 8px',fontWeight:600}}>When</th>
+                    <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>Leads</th>
+                    <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>Booked</th>
+                    <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>Conv %</th>
+                    <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>Cost</th>
+                    <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>$/booking</th>
+                    <th style={{textAlign:'right',padding:'4px 8px',fontWeight:600}}>ROI</th>
+                  </tr></thead>
+                  <tbody>
+                    {sv.items.map((it,i)=>{const prev=i>0?sv.items[i-1]:null;const dConv=prev?it.conv-prev.conv:null;return(
+                      <tr key={it.id} style={{borderTop:'1px solid var(--border)'}}>
+                        <td style={{textAlign:'left',padding:'6px 8px',color:'#ddd'}}>{it.date||it.year}</td>
+                        <td style={{textAlign:'right',padding:'6px 8px'}}><span style={{color:'#bbb'}}>{it.n}</span><span style={{display:'inline-block',height:6,width:Math.round(it.n/maxN*54),background:'#3a4a55',borderRadius:2,marginLeft:6,verticalAlign:'middle'}}/></td>
+                        <td style={{textAlign:'right',padding:'6px 8px',color:'#44CCAA'}}>{it.b}</td>
+                        <td style={{textAlign:'right',padding:'6px 8px',fontWeight:700,color:it.conv>0&&it.conv>=bestConv?'#44CCAA':'#ccc'}}>{it.conv.toFixed(0)}%{dConv!=null?<span style={{fontSize:10.5,color:dConv>=0?'#66C08A':'#E0806A',marginLeft:4}}>{dConv>=0?'▲':'▼'}{Math.abs(dConv).toFixed(0)}</span>:null}</td>
+                        <td style={{textAlign:'right',padding:'6px 8px',color:'#aaa'}}>{it.cost?money(it.cost):'—'}</td>
+                        <td style={{textAlign:'right',padding:'6px 8px',color:'#aaa'}}>{it.cpb!=null?money(it.cpb):'—'}</td>
+                        <td style={{textAlign:'right',padding:'6px 8px',fontWeight:700,color:it.roi==null?'#666':it.roi>=0?'#44CCAA':'#E05252'}}>{it.roi==null?'—':(it.roi>=0?'+':'')+it.roi.toFixed(0)+'%'}</td>
+                      </tr>);})}
+                  </tbody>
+                </table>
+              </div>
+            </div>);})}
         </div>
       )}
       <div style={{fontSize:11.5,color:'#555',marginTop:14,lineHeight:1.6}}>Every event pipeline is shared with <b style={{color:'#888'}}>Call History → Lead Sources</b> — same leads, same follow-up queue, same weekly-report funnel. ROI = (booked × est $/booking − cost) ÷ cost; set the est value per booking on each event (e.g. average first-visit or care-plan value).</div>
