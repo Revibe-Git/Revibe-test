@@ -1839,7 +1839,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L44'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L46'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2274,7 +2274,7 @@ function CommunityPage({setPage}){
   const onImportFile=(file)=>{if(!file)return;const rd=new FileReader();rd.onload=(ev)=>{try{const XLSX=window.XLSX;if(!XLSX){window.alert('Spreadsheet reader is still loading \u2014 give it a second and try again.');return;}const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});const sheets=wb.SheetNames.map(nm=>modelSheet(nm,XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:false,defval:''}))).filter(Boolean);if(!sheets.length){window.alert('No readable rows found in that file.');return;}setImp({sheets});}catch(err){window.alert('Could not read that file: '+err.message);}};rd.readAsArrayBuffer(file);};
   const STATS=(sid)=>{const ls=leadsOf(sid);const bk=ls.filter(l=>l.status==='Booked');const b=bk.length;const bComp=bk.filter(l=>l.bookedComp).length;const bPaid=b-bComp;const bSauna=bk.filter(l=>l.bookedType==='sauna').length;const bTreat=b-bSauna;const ns=ls.filter(l=>CLOSED.includes(l.status)&&l.status!=='Booked').length;const c=ls.filter(l=>(l.followups||[]).length>0||(l.status&&l.status!=='New')).length;return{n:ls.length,b,bComp,bPaid,bSauna,bTreat,ns,c,open:ls.length-b-ns,conv:ls.length?b/ls.length*100:0};};
   const money=(v)=>'$'+(+v||0).toLocaleString('en-CA',{maximumFractionDigits:0});
-  const roiOf=(e)=>{const st=STATS(e.id);const opp=(+e.thCount||0)*(+e.thHours||0)*(+e.thRate||0);const labour=(+e.coordHours||0)*(+e.coordRate||0);let hard=+e.hardCost||0;if(!opp&&!labour&&!hard&&(+e.cost||0)>0)hard=+e.cost||0;const cost=opp+labour+hard;const est=(+e.estPerBook||125)*st.bPaid;const roi=cost>0?((est-cost)/cost*100):null;return{...st,cost,opp,labour,hard,est,roi,cpl:st.n&&cost?cost/st.n:null,cpb:st.b&&cost?cost/st.b:null};};
+  const roiOf=(e)=>{const st=STATS(e.id);const opp=(+e.thCount||0)*(+e.thHours||0)*(+e.thRate||0);const labour=(+e.coordHours||0)*(+e.coordRate||0);let hard=+e.hardCost||0;if(!opp&&!labour&&!hard&&(+e.cost||0)>0)hard=+e.cost||0;const cost=opp+labour+hard;const perBk=+e.estPerBook||125;const est=leadsOf(e.id).reduce((sm,l)=>sm+((l.status==='Booked'&&!l.bookedComp)?((+l.bookedValue>0)?+l.bookedValue:perBk):0),0);const roi=cost>0?((est-cost)/cost*100):null;return{...st,cost,opp,labour,hard,est,roi,cpl:st.n&&cost?cost/st.n:null,cpb:st.b&&cost?cost/st.b:null};};
   const evDate=(e)=>e.eventDate||(leadsOf(e.id).map(l=>l.date).filter(Boolean).sort()[0]||'');
   const rMonday=(iso)=>{const d=new Date(iso+'T12:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);};
   const gKey=(iso,g)=>{if(!iso)return '';if(g==='year')return iso.slice(0,4);if(g==='quarter'){const m=parseInt(iso.slice(5,7))||1;return iso.slice(0,4)+' Q'+(Math.floor((m-1)/3)+1);}if(g==='week')return 'Wk of '+rMonday(iso);return iso.slice(0,7);};
@@ -2323,6 +2323,7 @@ function CommunityPage({setPage}){
     Object.entries(repLoc).sort((a,b)=>b[1].n-a[1].n).forEach(([lc,v])=>L.push(csvRow([lc,v.n,v.b])));
     try{const blob=new Blob([L.join('\n')],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='revibe-event-report-'+(curPer||'all').replace(/[^A-Za-z0-9]+/g,'-')+'.csv';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1200);}catch(err){window.alert('Could not generate the download: '+err.message);}
   };
+  const printReport=()=>{document.body.classList.add('evrpt-print');const done=()=>{document.body.classList.remove('evrpt-print');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);setTimeout(()=>{window.print();setTimeout(done,900);},60);};
   const evSorted=[...events].sort((a,b)=>(b.eventDate||'')<(a.eventDate||'')?-1:1);
   const TOT=events.reduce((t,e)=>{const r=roiOf(e);t.cost+=r.cost;t.opp+=r.opp;t.labour+=r.labour;t.hard+=r.hard;t.n+=r.n;t.b+=r.b;t.open+=r.open;t.est+=r.est;return t;},{cost:0,opp:0,labour:0,hard:0,n:0,b:0,open:0,est:0});
   const openPipe=(sid)=>{try{sessionStorage.setItem('rvgd3_open_src',sid);}catch(e){}setPage&&setPage('calls');};
@@ -2358,7 +2359,7 @@ function CommunityPage({setPage}){
             <div><div style={{fontSize:11,color:'#888',marginBottom:4}}>TYPE</div><select style={inp} value={ev.eventType} onChange={e=>setEv(p=>({...p,eventType:e.target.value}))}><option value="attended">Attended</option><option value="hosted">Hosted</option></select></div>
             <div style={{flex:'1 1 160px'}}><div style={{fontSize:11,color:'#888',marginBottom:4}}>VENUE / WHERE</div><input style={{...inp,width:'100%'}} value={ev.venue} onChange={e=>setEv(p=>({...p,venue:e.target.value}))}/></div>
             <div><div style={{fontSize:11,color:'#888',marginBottom:4}} title="How many days the event ran (e.g. Jackalope = 3)">DAYS</div><input type="number" min="1" style={{...inp,width:70}} value={ev.days} onChange={e=>setEv(p=>({...p,days:e.target.value}))} placeholder="1"/></div>
-            <div><div style={{fontSize:11,color:'#888',marginBottom:4}} title="Used for ROI: estimated value of one booked guest (e.g. average first-visit or care-plan value)">EST $ / BOOKING</div><input type="number" min="0" style={{...inp,width:110}} value={ev.estPerBook} onChange={e=>setEv(p=>({...p,estPerBook:e.target.value}))} placeholder="125"/></div>
+            <div><div style={{fontSize:11,color:'#888',marginBottom:4}} title="Default value of one booked appointment for ROI — you can override the amount on each individual booking in the lead list below">EST $ / BOOKING (default)</div><input type="number" min="0" style={{...inp,width:110}} value={ev.estPerBook} onChange={e=>setEv(p=>({...p,estPerBook:e.target.value}))} placeholder="125"/></div>
           </div>
           <div style={{marginTop:14,background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:8,padding:'12px 14px'}}>
             <div style={{fontSize:11,letterSpacing:'.5px',color:'#999',marginBottom:10,fontWeight:700}}>WHAT THE EVENT COST YOU</div>
@@ -2445,12 +2446,33 @@ function CommunityPage({setPage}){
 
       {showRep&&(
         <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'16px 18px',margin:'14px 0'}}>
-          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12,flexWrap:'wrap'}}>
+          <style>{`
+.evrpt-print-area .evrpt-only{display:none;}
+@media print{
+  @page{margin:14mm;}
+  body.evrpt-print *{visibility:hidden!important;}
+  body.evrpt-print .evrpt-print-area,body.evrpt-print .evrpt-print-area *{visibility:visible!important;}
+  body.evrpt-print .evrpt-print-area{position:absolute!important;left:0;top:0;width:100%!important;padding:0!important;border:none!important;background:#fff!important;}
+  body.evrpt-print .evrpt-print-area *{color:#243029!important;background:transparent!important;border-color:#d3ded7!important;}
+  body.evrpt-print .evrpt-print-area b,body.evrpt-print .evrpt-print-area .evrpt-h{color:#0B6E54!important;}
+  body.evrpt-print .evrpt-print-area table{border-top:1px solid #d3ded7!important;}
+  body.evrpt-print .evrpt-print-area .evrpt-only{display:block!important;}
+  body.evrpt-print .no-print{display:none!important;}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+}
+`}</style>
+          <div className="no-print" style={{display:'flex',alignItems:'center',gap:12,marginBottom:12,flexWrap:'wrap'}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'1px',color:'#eee'}}>EVENT REPORT</div>
             <div style={{display:'flex',gap:4}}>{[['week','Weekly'],['month','Monthly'],['quarter','Quarterly'],['year','Yearly']].map(([k,lb])=>(<button key={k} className={`btn btn-xs ${repGran===k?'btn-go':'btn-ghost'}`} onClick={()=>{setRepGran(k);setRepPer('');}}>{lb}</button>))}</div>
             <span style={{flex:1}}/>
             {repPeriods.length>0&&<select style={{...inp,width:'auto'}} value={curPer} onChange={e=>setRepPer(e.target.value)}>{repPeriods.map(pk=><option key={pk} value={pk}>{pk}</option>)}</select>}
             <button className="btn btn-ghost btn-xs" disabled={!repRows.length} onClick={downloadReport} title="Export this report as a CSV (opens in Excel / Google Sheets)">⬇ Download CSV</button>
+            <button className="btn btn-ghost btn-xs" disabled={!repRows.length} onClick={printReport} title="Open a clean, print-ready page — choose Save as PDF">🖨 Print / PDF</button>
+          </div>
+          <div className="evrpt-print-area">
+          <div className="evrpt-only" style={{marginBottom:14,borderBottom:'2px solid #0B6E54',paddingBottom:8}}>
+            <div className="evrpt-h" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:23,fontWeight:800,letterSpacing:'1px'}}>REVIBE — EVENT REPORT</div>
+            <div style={{fontSize:13,marginTop:2}}>{({week:'Weekly',month:'Monthly',quarter:'Quarterly',year:'Yearly'}[repGran]||repGran)+' · '+(curPer||'—')+' · generated '+new Date().toISOString().slice(0,10)}</div>
           </div>
           {repRows.length===0?<div style={{fontSize:13,color:'#666'}}>No events dated in this period. Give an event a date (or pick another period from the dropdown).</div>:(
           <div>
@@ -2490,7 +2512,8 @@ function CommunityPage({setPage}){
               {Object.keys(repLoc).length>1&&<div><div style={{fontSize:11,color:'#888',marginBottom:4,letterSpacing:'.5px'}}>BY LOCATION</div>{Object.entries(repLoc).sort((a,b)=>b[1].n-a[1].n).map(([lc,v])=>(<span key={lc} style={{marginRight:12,color:'#bbb'}}>{lc}: {v.n} <span style={{color:'#44CCAA'}}>({v.b} bk)</span></span>))}</div>}
             </div>
           </div>)}
-          <div style={{fontSize:11,color:'#555',marginTop:10}}>Events count in the period they ran (by event date). Each event's full leads, bookings and cost are included. Bookings valued at $125 unless a per-event value is set.</div>
+          <div style={{fontSize:11,color:'#555',marginTop:10}}>Events count in the period they ran (by event date). Each event's full leads, bookings and cost are included. Bookings valued at $125 unless a per-booking or per-event value is set.</div>
+          </div>
         </div>
       )}
       {(()=>{const dl=dueList();if(!dl.length)return null;const overdue=dl.filter(l=>dueDelta(l.nextDate)<0).length;return(
@@ -2554,6 +2577,7 @@ function CommunityPage({setPage}){
                     {l.nextDate&&<span style={{fontSize:11.5,color:'#9BB8D0'}}>↻ {l.nextDate}</span>}
                     <select value={l.status||'New'} onChange={x=>setLeadStatus(e.id,l.id,x.target.value)} style={{...inp,width:'auto',padding:'4px 8px',color:STATUS_C[l.status||'New']||'#eee',fontWeight:700,fontSize:12.5}}>{(LEAD_STATUS.includes(l.status||'New')?LEAD_STATUS:[l.status,...LEAD_STATUS]).map(x=><option key={x} value={x}>{x}</option>)}</select>
                     {l.status==='Booked'&&<select value={l.bookedType||'treatment'} onChange={x=>setBookMeta(e.id,l.id,{bookedType:x.target.value})} title="What was booked" style={{...inp,width:'auto',padding:'4px 7px',fontSize:11.5}}><option value="treatment">Treatment</option><option value="sauna">Sauna / Plunge</option></select>}
+                    {l.status==='Booked'&&!l.bookedComp&&<span style={{display:'inline-flex',alignItems:'center',gap:2,fontSize:11.5,color:'#888'}} title="Value of this booking — leave blank to use the event default"><span>$</span><input type="number" min="0" value={l.bookedValue||''} onChange={x=>setBookMeta(e.id,l.id,{bookedValue:parseFloat(x.target.value)||0})} placeholder={String(+e.estPerBook||125)} style={{...inp,width:60,padding:'3px 6px',fontSize:11.5}}/></span>}
                     {l.status==='Booked'&&<label style={{fontSize:11.5,color:l.bookedComp?'#E0A052':'#888',display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}} title="Comp = complimentary, not paid ($0 revenue)"><input type="checkbox" checked={!!l.bookedComp} onChange={x=>setBookMeta(e.id,l.id,{bookedComp:x.target.checked})}/>Comp</label>}
                   </div>
                 ))}
