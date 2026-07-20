@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // Initialize Supabase client immediately so it's available to all scripts
@@ -1839,7 +1842,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L51'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L53'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2114,7 +2117,7 @@ function App(){
           <div className="nav-item" onClick={()=>{setModal('addStaff');setNavOpen(false);}}><span className="nav-icon">+</span>Add Staff</div>
           <div className="nav-item" onClick={()=>{setModal('addEval');setNavOpen(false);}}><span className="nav-icon">+</span>Log Evaluation</div>
           <div className="nav-item" onClick={()=>{setModal('addSess');setNavOpen(false);}}><span className="nav-icon">+</span>Log Edu Session</div>
-          <div style={{padding:'14px 18px 10px',fontSize:10.5,color:'#4a524d',letterSpacing:'.5px'}} title="The version of this dashboard that is actually running. If a change seems missing, check this first — if it doesn't match the latest build, the deploy didn't take.">{window.__BUILD||'build ?'}</div>
+          <div style={{margin:'10px 14px 12px',padding:'6px 10px',fontSize:12,fontWeight:800,letterSpacing:'.5px',color:'#0e1512',background:'#44CCAA',borderRadius:6,textAlign:'center',textTransform:'uppercase'}} title="The version actually running right now. If a change seems missing, check this first: if it doesn't match the latest build sent, the deploy didn't take or your browser cached the old file — hard-refresh (Cmd+Shift+R) or add ?v=NEW to the URL.">{window.__BUILD||'build ?'}</div>
         </div>
         <div className="sidebar-foot">
           <div className="foot-card">
