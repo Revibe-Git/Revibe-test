@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L64'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L65'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -9400,7 +9400,27 @@ function FormFiller({formDef, staff, onSubmit, onBack}){
     const segs=[];(tr.lines||[]).forEach(l=>{const ws=(l.txt||'').trim().split(/\s+/).filter(Boolean);if(ws.length<3)return;if(ws.length<=36){segs.push({t:l.t,txt:ws.join(' ')});}else{for(let i=0;i<ws.length;i+=18){segs.push({t:l.t,txt:ws.slice(i,i+18).join(' ')});}}});
     if(!segs.length){setFilledNote('That transcript has no usable lines (everything under 3 words) — try a longer recording.');return;}
     const adds={};let matched=0;const unsorted=[];
-    segs.forEach(l=>{const hit=[...cueFields].reverse().find(cf=>cf.re.test(l.txt));if(hit){(adds[hit.sec+'|'+hit.fid]=adds[hit.sec+'|'+hit.fid]||[]).push('['+fmtTs(l.t)+'] '+l.txt);matched++;}else{unsorted.push('['+fmtTs(l.t)+'] '+l.txt);}});
+    // v3: conversation-aware routing — a lead's question sets the active section; answers follow it
+    const QSTART=/^(how|what|whats|when|where|why|who|which|do|does|did|are|is|was|can|could|would|will|have|has|any|anything|tell me|walk me|talk to me|lets|let's|give me|so how|and how|ok how|okay how)/i;
+    const STRONG=new Set(['gva','retention','utilization','fulfill','clinCommit','leadCommit','goals90','wins']);
+    const rev=[...cueFields].reverse();
+    let ctx=null; // {sec,fid}
+    const put=(key,l,pre)=>{(adds[key]=adds[key]||[]).push('['+fmtTs(l.t)+'] '+(pre||'')+l.txt);matched++;};
+    segs.forEach(l=>{
+      const isQ=QSTART.test(l.txt);
+      const hit=rev.find(cf=>cf.re.test(l.txt));
+      if(isQ){
+        if(hit){ctx={sec:hit.sec,fid:hit.fid};put(hit.sec+'|'+hit.fid,l,'Q: ');}
+        else if(ctx){put(ctx.sec+'|'+ctx.fid,l,'Q: ');}
+        else unsorted.push('['+fmtTs(l.t)+'] Q: '+l.txt);
+      }else{
+        const strongHit=hit&&STRONG.has(hit.fid)?hit:null;
+        if(strongHit){ctx={sec:strongHit.sec,fid:strongHit.fid};put(strongHit.sec+'|'+strongHit.fid,l);}
+        else if(ctx){put(ctx.sec+'|'+ctx.fid,l);}
+        else if(hit){ctx={sec:hit.sec,fid:hit.fid};put(hit.sec+'|'+hit.fid,l);}
+        else unsorted.push('['+fmtTs(l.t)+'] '+l.txt);
+      }
+    });
     if(unsorted.length){const k='openfloor|openFloor';(adds[k]=adds[k]||[]).push('— Unsorted from transcript (didn’t match a section — move where they belong) —');adds[k]=adds[k].concat(unsorted);}
     setData(prev=>{const nx={...prev};Object.entries(adds).forEach(([k,arr])=>{const[sec,fid]=k.split('|');if(!nx[sec])return;nx[sec]={...nx[sec],[fid]:((nx[sec][fid]||'')+(nx[sec][fid]?'\n':'')+arr.join('\n'))};});return nx;});
     setFilledNote('⚡ Pulled the FULL transcript: '+matched+' segments routed to sections'+(unsorted.length?' · '+unsorted.length+' unsorted segments added to Open Floor (nothing was dropped)':'')+' — review and edit before submitting.');
@@ -9481,7 +9501,7 @@ function FormFiller({formDef, staff, onSubmit, onBack}){
                       <button type="button" className="btn btn-lime btn-sm" disabled={!trPick} onClick={autoFill}>⚡ Auto-fill sections</button>
                     </div>)}
                   {filledNote&&<div style={{fontSize:12,color:'var(--c-grn)',marginTop:6}}>{filledNote}</div>}
-                  <div style={{fontSize:10.5,color:'var(--g-666)',marginTop:6}}>Lines are routed to sections by what was said (KPI talk → KPI review, goals → goal setting, etc.). It’s a starting draft — read each section and edit before submitting.</div>
+                  <div style={{fontSize:10.5,color:'var(--g-666)',marginTop:6}}>Routing follows the conversation: when the lead asks a section’s question (“how has retention been?”), the answers that follow route to that section until the topic changes — questions are marked “Q:”. Tip for best results: leads, read the section questions roughly as written. It’s a starting draft — review and edit before submitting.</div>
                 </div>
               )}
               {field.type==='text'&&(
