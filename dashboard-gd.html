@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L62'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L64'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -7877,7 +7877,7 @@ function MeetingTranscriber({staff=[]}){
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,letterSpacing:'1px',color:'var(--g-999)'}}>🎙 MEETING TRANSCRIBER</div>
         <select value={mtype} onChange={e=>setMtype(e.target.value)} disabled={state!=='idle'} style={{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:12.5,padding:'5px 8px',outline:'none'}}>{['Quarterly G&D','Yearly G&D','Evaluation debrief','Other meeting'].map(x=><option key={x}>{x}</option>)}</select>
-        <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Title (optional)" style={{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:12.5,padding:'5px 8px',outline:'none',width:200}}/>
+        <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Title — e.g. Mike · Q3 2026" style={{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:12.5,padding:'5px 8px',outline:'none',width:200}}/>
         <span style={{flex:1}}/>
         {state!=='idle'&&<span style={{fontSize:13,fontWeight:800,color:state==='live'?'var(--c-red)':'var(--c-amb)'}}>{state==='live'?<span style={{display:'inline-block',width:9,height:9,borderRadius:'50%',background:'var(--c-red)',marginRight:6,animation:'pulse 1.2s infinite'}}/>:null}{fmt(secs)}</span>}
         {state==='idle'&&<button className="btn btn-go btn-sm" onClick={start}>● Start transcribing</button>}
@@ -7901,6 +7901,7 @@ function MeetingTranscriber({staff=[]}){
                 <span style={{fontSize:13,fontWeight:700,color:'var(--g-ddd)',cursor:'pointer'}} onClick={()=>setOpen(open===en.id?null:en.id)}>{open===en.id?'▾ ':'▸ '}{en.title}</span>
                 <span style={{fontSize:11.5,color:'var(--g-777)'}}>{en.mtype} · {en.date} · {fmt(en.secs)} · {en.words} words</span>
                 <span style={{flex:1}}/>
+                <button className="btn btn-ghost btn-xs" title="Rename — e.g. who the meeting was with + date" onClick={()=>{const t=(window.prompt('Rename this transcript (who + date works well):',en.title)||'').trim();if(t)persistSaved(saved.map(x=>x.id===en.id?{...x,title:t}:x));}}>✎ Rename</button>
                 <button className="btn btn-ghost btn-xs" onClick={()=>dl(en)}>⬇ .txt</button>
                 <button className="btn btn-ghost btn-xs" onClick={()=>{try{navigator.clipboard.writeText(txtOf(en));}catch(e){}}}>📋 Copy</button>
                 <button className="btn btn-ghost btn-xs" style={{color:'var(--c-red)'}} onClick={()=>del(en.id)}>🗑</button>
@@ -9073,8 +9074,8 @@ const FORM_DEFS = {
       { id:'wins', title:'2 · Celebrate Successes', icon:'★', fields:[
         {id:'wins', label:'Wins since last review', type:'textarea', cue:'(win|success|proud|positive feedback|shout ?out|celebrat|patient (story|outcome)|milestone|accomplish|nailed|crushed)', placeholder:'Clinical wins, patient success stories, positive feedback, teamwork, leadership, initiative, achievements.'},
       ]},
-      { id:'kpi', title:'3 · KPI Review — Prev vs Current Quarter', icon:'▤', subtitle:'Hard numbers: GBA · Retention · Utilization. For each: what changed, why, what contributed, what improves next quarter.', fields:[
-        {id:'gba', label:'GBA', type:'textarea', cue:'(gba|gross bill|billed|billing|revenue)', placeholder:'Prev vs current · what changed & why · improvement plan'},
+      { id:'kpi', title:'3 · KPI Review — Prev vs Current Quarter', icon:'▤', subtitle:'Hard numbers: GVA · Retention · Utilization. For each: what changed, why, what contributed, what improves next quarter.', fields:[
+        {id:'gva', label:'GVA', type:'textarea', cue:'(gva|gross visit|visit average|average (visit|billing)|billed|billing|revenue)', placeholder:'Prev vs current · what changed & why · improvement plan'},
         {id:'retention', label:'Retention', type:'textarea', cue:'(retention|rebook|third visit|drop.?off|churn|coming back|return rate)', placeholder:'Prev vs current · what changed & why · improvement plan'},
         {id:'utilization', label:'Utilization', type:'textarea', cue:'(utili[sz]ation|capacity|fill rate|open slots|booked out|empty spots)', placeholder:'Prev vs current · what changed & why · improvement plan'},
       ]},
@@ -9094,7 +9095,7 @@ const FORM_DEFS = {
         {id:'feedback', label:'Leadership · clinic · team', type:'textarea', cue:'(feedback for|doing well|could improve|communication (is|has been)|feel (supported|recognized)|frustrat|workflow|patient experience|team dynamic|culture|collaborat|operational)', placeholder:'What is leadership doing well / can improve? Communication effective? Feel supported & recognized? Operational frustrations? Workflow / patient-experience improvements? Team dynamics, collaboration, culture?'},
       ]},
       { id:'goals', title:'9 · Goal Setting — Next 90 Days', icon:'◎', subtitle:'Collaborative goals in four areas, each with measurable actions, resources, and success measures.', fields:[
-        {id:'goals90', label:'Personal · Clinical · Business · Habit goals', type:'textarea', cue:'(goal|target|objective|aim|next (90|ninety)|this quarter i|by next quarter|kpi target|want to (hit|get|reach|grow))', placeholder:'PERSONAL:\nCLINICAL:\nBUSINESS (GBA / Retention / Utilization):\nHABIT:\n— actions, resources required, success measures for each'},
+        {id:'goals90', label:'Personal · Clinical · Business · Habit goals', type:'textarea', cue:'(goal|target|objective|aim|next (90|ninety)|this quarter i|by next quarter|kpi target|want to (hit|get|reach|grow))', placeholder:'PERSONAL:\nCLINICAL:\nBUSINESS (GVA / Retention / Utilization):\nHABIT:\n— actions, resources required, success measures for each'},
       ]},
       { id:'commit', title:'10 · Mutual Commitments', icon:'🤝', fields:[
         {id:'clinCommit', label:'Clinician — top 3 commitments', type:'textarea', cue:"(i (will|'ll|am going to|commit)|my commitment|i can commit)", placeholder:'1.\n2.\n3.'},
@@ -9114,7 +9115,7 @@ const FORM_DEFS = {
         {id:'motivators', label:'Motivators', type:'text'},
         {id:'supportReq', label:'Support required', type:'text'},
         {id:'focusNext', label:'Primary focus next quarter', type:'text'},
-        {id:'kpiTargets', label:'KPI targets next quarter', type:'text', placeholder:'GBA · Retention · Utilization'},
+        {id:'kpiTargets', label:'KPI targets next quarter', type:'text', placeholder:'GVA · Retention · Utilization'},
         {id:'nextReview', label:'Next review date', type:'date'},
       ]},
     ]
@@ -9396,11 +9397,13 @@ function FormFiller({formDef, staff, onSubmit, onBack}){
   const cueFields=[];formDef.sections.forEach(sc=>sc.fields.forEach(f=>{if(f.cue)cueFields.push({sec:sc.id,fid:f.id,re:new RegExp(f.cue,'i')});}));
   const autoFill=()=>{
     const tr=savedTr.find(t=>t.id===trPick);if(!tr)return;
-    const adds={};let matched=0;
-    (tr.lines||[]).forEach(l=>{if((l.txt||'').split(/\s+/).length<5)return;const hit=[...cueFields].reverse().find(cf=>cf.re.test(l.txt));if(!hit)return;(adds[hit.sec+'|'+hit.fid]=adds[hit.sec+'|'+hit.fid]||[]).push('['+fmtTs(l.t)+'] '+l.txt);matched++;});
-    if(!matched){setFilledNote('No lines matched the section cues — the conversation may need manual entry.');return;}
-    setData(prev=>{const nx={...prev};Object.entries(adds).forEach(([k,arr])=>{const[sec,fid]=k.split('|');nx[sec]={...nx[sec],[fid]:((nx[sec][fid]||'')+(nx[sec][fid]?'\n':'')+arr.join('\n'))};});return nx;});
-    setFilledNote('⚡ Pulled '+matched+' lines from “'+tr.title+'” into '+Object.keys(adds).length+' fields — review and edit each section; nothing is final until you submit.');
+    const segs=[];(tr.lines||[]).forEach(l=>{const ws=(l.txt||'').trim().split(/\s+/).filter(Boolean);if(ws.length<3)return;if(ws.length<=36){segs.push({t:l.t,txt:ws.join(' ')});}else{for(let i=0;i<ws.length;i+=18){segs.push({t:l.t,txt:ws.slice(i,i+18).join(' ')});}}});
+    if(!segs.length){setFilledNote('That transcript has no usable lines (everything under 3 words) — try a longer recording.');return;}
+    const adds={};let matched=0;const unsorted=[];
+    segs.forEach(l=>{const hit=[...cueFields].reverse().find(cf=>cf.re.test(l.txt));if(hit){(adds[hit.sec+'|'+hit.fid]=adds[hit.sec+'|'+hit.fid]||[]).push('['+fmtTs(l.t)+'] '+l.txt);matched++;}else{unsorted.push('['+fmtTs(l.t)+'] '+l.txt);}});
+    if(unsorted.length){const k='openfloor|openFloor';(adds[k]=adds[k]||[]).push('— Unsorted from transcript (didn’t match a section — move where they belong) —');adds[k]=adds[k].concat(unsorted);}
+    setData(prev=>{const nx={...prev};Object.entries(adds).forEach(([k,arr])=>{const[sec,fid]=k.split('|');if(!nx[sec])return;nx[sec]={...nx[sec],[fid]:((nx[sec][fid]||'')+(nx[sec][fid]?'\n':'')+arr.join('\n'))};});return nx;});
+    setFilledNote('⚡ Pulled the FULL transcript: '+matched+' segments routed to sections'+(unsorted.length?' · '+unsorted.length+' unsorted segments added to Open Floor (nothing was dropped)':'')+' — review and edit before submitting.');
   };
 
   const handleFinalSubmit = () => {
