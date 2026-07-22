@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L60'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L62'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -7816,7 +7816,7 @@ function StaffPage({staff,openProfile,setModal}){
 
 /* ══ EVALS PAGE ══ */
 // ===== G&D Meeting voice recorder (IndexedDB, device-local) =====
-function MeetingTranscriber(){
+function MeetingTranscriber({staff=[]}){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   const[state,setState]=useState('idle'); // idle|live|paused
   const[secs,setSecs]=useState(0);
@@ -7840,10 +7840,32 @@ function MeetingTranscriber(){
     if(!timer.current)timer.current=setInterval(()=>{setSecs(x=>{secsRef.current=x+1;return x+1;});},1000);};
   const pause=()=>{keep.current=false;try{rec.current&&rec.current.stop();}catch(e){}if(timer.current){clearInterval(timer.current);timer.current=null;}setState('paused');};
   const resume=()=>{start();};
-  const txtOf=(en)=>{return en.title+'\n'+en.mtype+' · '+en.date+' · '+fmt(en.secs)+' · Revibe G&D\n'+'—'.repeat(40)+'\n'+en.lines.map(l=>'['+fmt(l.t)+'] '+l.txt).join('\n')+'\n';};
+  const STOPW=new Set('the a an and or but so of to in on at for with is are was were be been am i we you they he she it this that these those as if then than there here just really very like kind sort dont don didnt cant wont im its were theyre weve youre going gonna yeah ok okay right well um uh know think mean thing things stuff lot want said say see get got make sure also maybe actually basically pretty much one two three what when where which who how why our your their my his her'.split(' '));
+  const staffFirst=(staff||[]).map(x=>((x.name||'').split(' ')[0]||'').toLowerCase()).filter(w=>w.length>2);
+  const ACT=/\b(will|going to|need to|needs to|have to|let's|lets|make sure|follow up|follow-up|action item|assign(ed)?|due|deadline|to do|todo|take care of|set up|schedule|book|send|create|build|run|demo|document|complete|finish|next step|by (next |end of )?(week|month|monday|tuesday|wednesday|thursday|friday|quarter|year))\b/i;
+  const GOAL=/\b(goal|target|objective|aim|we want to|by q[1-4]|this quarter|next quarter|this year|next year|kpi|milestone|priorit(y|ize)|focus (is|on)|get to|grow (to|by)|hit)\b/i;
+  const DEC=/\b(decided|agreed|we're going with|were going with|going with|confirmed|approved|finali[sz]ed?|settled on|conclusion)\b/i;
+  const summarize=(lns)=>{
+    const toks=(t)=>t.toLowerCase().replace(/[^a-z0-9\s']/g,' ').split(/\s+/).filter(w=>w.length>2&&!STOPW.has(w));
+    const freq={};lns.forEach(l=>toks(l.txt).forEach(w=>{freq[w]=(freq[w]||0)+1;}));
+    const score=(t)=>{const ws=toks(t);if(!ws.length)return 0;return ws.reduce((a,w)=>a+(freq[w]||0),0)/Math.sqrt(ws.length+3);};
+    const owner=(t)=>{const low=' '+t.toLowerCase()+' ';const hit=staffFirst.find(n=>low.includes(' '+n+' ')||low.includes(' '+n+"'"));return hit?hit.charAt(0).toUpperCase()+hit.slice(1):'';};
+    const goals=[],actions=[],decisions=[];const used=new Set();
+    lns.forEach((l,i)=>{const t=l.txt;if(t.split(/\s+/).length<4)return;
+      if(DEC.test(t)&&decisions.length<8){decisions.push({t:l.t,txt:t});used.add(i);}
+      else if(ACT.test(t)&&actions.length<12){actions.push({t:l.t,txt:t,owner:owner(t)});used.add(i);}
+      else if(GOAL.test(t)&&goals.length<8){goals.push({t:l.t,txt:t});used.add(i);}});
+    const nKey=Math.max(6,Math.min(16,Math.round(lns.length/12)));
+    const ranked=lns.map((l,i)=>({i,t:l.t,txt:l.txt,sc:used.has(i)?0:score(l.txt)})).filter(x=>x.sc>0&&x.txt.split(/\s+/).length>=6)
+      .sort((a,b)=>b.sc-a.sc).slice(0,nKey).sort((a,b)=>a.i-b.i).map(x=>({t:x.t,txt:x.txt}));
+    const topics=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
+    return{keyPoints:ranked,goals,actions,decisions,topics,words:lns.reduce((a,l)=>a+l.txt.split(/\s+/).length,0)};
+  };
+  const smOf=(en)=>en.summary||summarize(en.lines||[]);
+  const txtOf=(en)=>{const sm=smOf(en);const sec=(h,arr,fx)=>arr.length?('\n'+h+'\n'+arr.map(fx).join('\n')+'\n'):'';return en.title+'\n'+en.mtype+' · '+en.date+' · '+fmt(en.secs)+' · '+sm.words+' words · Revibe G&D\nTopics: '+sm.topics.join(', ')+'\n'+'—'.repeat(40)+sec('SUMMARY — KEY POINTS',sm.keyPoints,l=>'• ['+fmt(l.t)+'] '+l.txt)+sec('GOALS',sm.goals,l=>'🎯 ['+fmt(l.t)+'] '+l.txt)+sec('FOLLOW-UPS / ACTION ITEMS',sm.actions,l=>'☐ ['+fmt(l.t)+'] '+(l.owner?'['+l.owner+'] ':'')+l.txt)+sec('DECISIONS',sm.decisions,l=>'✔ ['+fmt(l.t)+'] '+l.txt)+'\n'+'—'.repeat(40)+'\nFULL TRANSCRIPT\n'+en.lines.map(l=>'['+fmt(l.t)+'] '+l.txt).join('\n')+'\n';};
   const dl=(en)=>{const blob=new Blob([txtOf(en)],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(en.title.replace(/[^A-Za-z0-9 _-]/g,'')||'transcript')+'.txt';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1500);};
   const stopSave=()=>{keep.current=false;try{rec.current&&rec.current.stop();}catch(e){}if(timer.current){clearInterval(timer.current);timer.current=null;}
-    const en={id:'tr_'+Date.now().toString(36),at:Date.now(),date:new Date().toISOString().slice(0,10),title:(title||'').trim()||(mtype+' — '+new Date().toISOString().slice(0,10)),mtype,secs,lines,words:lines.reduce((a,l)=>a+l.txt.split(/\s+/).length,0)};
+    const en={id:'tr_'+Date.now().toString(36),at:Date.now(),date:new Date().toISOString().slice(0,10),title:(title||'').trim()||(mtype+' — '+new Date().toISOString().slice(0,10)),mtype,secs,lines,words:lines.reduce((a,l)=>a+l.txt.split(/\s+/).length,0),summary:summarize(lines)};
     if(en.lines.length===0){setState('idle');setSecs(0);secsRef.current=0;setInterim('');return;}
     const ok=persistSaved([en,...saved]);
     if(!ok){window.alert('Could not save on this device (storage full) — downloading the transcript instead so it isn’t lost.');dl(en);}
@@ -7883,7 +7905,23 @@ function MeetingTranscriber(){
                 <button className="btn btn-ghost btn-xs" onClick={()=>{try{navigator.clipboard.writeText(txtOf(en));}catch(e){}}}>📋 Copy</button>
                 <button className="btn btn-ghost btn-xs" style={{color:'var(--c-red)'}} onClick={()=>del(en.id)}>🗑</button>
               </div>
-              {open===en.id&&<div style={{marginTop:6,maxHeight:300,overflowY:'auto',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:12.5,lineHeight:1.7,whiteSpace:'pre-wrap',color:'var(--g-ccc)'}}>{en.lines.map(l=>'['+fmt(l.t)+'] '+l.txt).join('\n')}</div>}
+              {open===en.id&&(()=>{const sm=smOf(en);const SEC=(icon,label,arr,col,ownerChip)=>arr.length?(
+                <div style={{marginBottom:10}}>
+                  <div style={{fontSize:10.5,color:col,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',marginBottom:4}}>{icon} {label}</div>
+                  {arr.map((l,i)=>(<div key={i} style={{fontSize:12.5,color:'var(--g-ccc)',lineHeight:1.6,marginBottom:3,paddingLeft:10,borderLeft:'2px solid '+col}}>{ownerChip&&l.owner?<span style={{fontSize:10,fontWeight:800,color:'var(--c-blu2)',border:'1px solid var(--c-blu2)',borderRadius:3,padding:'0 5px',marginRight:6}}>{l.owner}</span>:null}<span style={{color:'var(--g-777)',fontSize:10.5}}>[{fmt(l.t)}]</span> {l.txt}</div>))}
+                </div>):null;return(
+                <div style={{marginTop:6,background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 14px'}}>
+                  {sm.topics.length>0&&<div style={{fontSize:11,color:'var(--g-777)',marginBottom:10}}>Topics: {sm.topics.join(' · ')}</div>}
+                  {SEC('◆','Key points',sm.keyPoints,'var(--g-999)',false)}
+                  {SEC('🎯','Goals',sm.goals,'var(--c-yel)',false)}
+                  {SEC('✅','Follow-ups / action items',sm.actions,'var(--c-grn)',true)}
+                  {SEC('📌','Decisions',sm.decisions,'var(--c-blu2)',false)}
+                  {(sm.keyPoints.length+sm.goals.length+sm.actions.length+sm.decisions.length)===0&&<div style={{fontSize:12,color:'var(--g-777)',marginBottom:8}}>Transcript too short to summarize — full text below.</div>}
+                  <details style={{marginTop:6}}>
+                    <summary style={{cursor:'pointer',fontSize:11.5,color:'var(--g-888)',userSelect:'none'}}>▸ Full transcript ({en.lines.length} lines)</summary>
+                    <div style={{marginTop:6,maxHeight:300,overflowY:'auto',fontSize:12.5,lineHeight:1.7,whiteSpace:'pre-wrap',color:'var(--g-ccc)'}}>{en.lines.map(l=>'['+fmt(l.t)+'] '+l.txt).join('\n')}</div>
+                  </details>
+                </div>);})()}
             </div>))}
         </div>)}
     </div>);
@@ -7896,7 +7934,6 @@ function EvalsPage({staff,evals,setEvals,setModal,openProfile}){
   const filtered=sorted.filter(e=>(fTrack==='all'||e.track===fTrack)&&(fPeriod==='all'||e.type===fPeriod));
   return(
     <div>
-      <MeetingTranscriber/>
       <div className="filter-row">
         <div className="filter-grp">
           {['all','clinical','spa','sc'].map(t=><button key={t} className={`btn btn-sm ${fTrack===t?'btn-lime':'btn-ghost'}`} onClick={()=>setFTrack(t)}>{t==='all'?'All Tracks':TRACK_META[t]?.label||t}</button>)}
@@ -9017,62 +9054,71 @@ const FORM_DEFS = {
     id: 'quarterly',
     label: 'Quarterly G&D Review',
     short: 'Quarterly',
-    duration: '45–60 min (Part A) + 30 min (Part B)',
-    purpose: 'Two-part: live session observation + scoring review meeting',
-    note: 'Part A is real-time feedback only. Part B (scoring) happens within 7 days.',
+    duration: '60–90 min coaching conversation',
+    purpose: 'A coaching conversation, not a performance review — understand the person, reflect on the quarter, review KPIs, and build the next 90 days together.',
+    note: 'Run the 🎙 Meeting Transcriber during the session, then use ⚡ Auto-fill to pull the conversation into these sections. Everything stays editable.',
     color: 'var(--c-yel)',
     sections: [
-      {
-        id: 'basic', title: 'Session Info', icon: '◎',
-        fields: [
-          {id:'clinician', label:'Clinician',  type:'text', placeholder:'Full name'},
-          {id:'lead',      label:'Lead',       type:'text', placeholder:'Full name'},
-          {id:'date',      label:'Date',       type:'date'},
-        ]
-      },
-      {
-        id: 'parta', title: 'Part A — Observations During Live Session', icon: '◈',
-        subtitle: 'No scoring here — behaviours only. Format: Treatment-style, real-time feedback.',
-        fields: [
-          {id:'obsComm',       label:'Communication & Connection',        type:'textarea', placeholder:'What did you observe about how they connected, communicated, and adapted their tone?'},
-          {id:'obsHistory',    label:'Subjective Intake / History',       type:'textarea', placeholder:'How did they gather history? Did they connect the story to a diagnosis?'},
-          {id:'obsPlanning',   label:'Treatment Planning & Continuity',   type:'textarea', placeholder:'Was the plan clear and diagnosis-led? Did they explain the pathway?'},
-          {id:'obsPalpation',  label:'Palpation / Manual Diagnostics',    type:'textarea', placeholder:'How integrated was their palpation? Were they reading the tissue or just performing?'},
-          {id:'obsTechnique',  label:'Hands-On Technique & Execution',    type:'textarea', placeholder:'Confident? Adaptive? Responsive to what the body was telling them?'},
-          {id:'obsAssessment', label:'Observation / Assessment',          type:'textarea', placeholder:'Global vs. local view? Functional chain awareness?'},
-          {id:'obsExercise',   label:'Exercise / Movement Coaching',      type:'textarea', placeholder:'Phase-linked? Did the exercise connect to the treatment plan?'},
-        ]
-      },
-      {
-        id: 'partb', title: 'Part B — Scoring Review (Within 7 Days)', icon: '◉',
-        subtitle: 'Pre-work must be completed before this meeting.',
-        fields: [
-          {id:'prework', label:'Pre-Work Checklist', type:'checkboxes', options:[
-            'Audit Scorecard completed',
-            'Mentor Comment Logs reviewed',
-            'Growth Roadmap updated',
-          ]},
-          {id:'strengths',    label:'Key Strengths',             type:'textarea', hint:'Use Category Definitions tab for language', placeholder:'What are they genuinely doing well at a high level?'},
-          {id:'growthFocus',  label:'Primary Growth Focus (Max 2)', type:'textarea', placeholder:'The 1–2 categories that will move the needle most right now'},
-          {id:'movingScores', label:'What Would Move These Scores Up', type:'textarea', hint:'Concrete behaviours, not vague goals', placeholder:'Specific, observable things they can do differently…', tall:true},
-          {id:'nextPhase',    label:'Next-Phase Expectations',   type:'textarea', hint:'From Growth Roadmap tab', placeholder:'What does success look like at the next level?'},
-        ]
-      },
-      {
-        id: 'ack', title: 'Clinician Acknowledgement', icon: '☐',
-        fields: [
-          {id:'acknowledgement', label:'Clinician confirms they understand', type:'checkboxes', options:[
-            'I understand my scores',
-            'I understand my focus areas',
-            'I know what to work on next',
-          ]},
-          {id:'clinicianSig', label:'Clinician Signature', type:'text', placeholder:'Type full name as signature'},
-          {id:'sigDate',      label:'Date Signed',         type:'date'},
-        ]
-      },
+      { id:'basic', title:'Session Info', icon:'◎', fields:[
+        {id:'clinician', label:'Clinician', type:'text', placeholder:'Full name'},
+        {id:'lead', label:'Lead / reviewer', type:'text', placeholder:'Full name'},
+        {id:'date', label:'Date', type:'date'},
+        {id:'quarter', label:'Quarter', type:'text', placeholder:'e.g. Q3 2026'},
+      ]},
+      { id:'checkin', title:'1 · Personal & Professional Check-In', icon:'☺', subtitle:'Open conversation — the person before the numbers.', fields:[
+        {id:'life', label:'Open conversation', type:'textarea', cue:'(how (have|are) you|since we last|last quarter|biggest (win|challenge)|life update|famil|home|financ|travel|health|outside (of )?work|working toward personally)', placeholder:'How have they been? Quarter in their words. Biggest wins & challenges. Life updates (family, home, finances, travel, health). Anything outside work affecting work? What are they working toward personally?'},
+        {id:'habits', label:'Lifestyle & habits', type:'textarea', cue:'(sleep|exercise|nutrition|routine|energi[sz]ed|drained|work.?life|balance|habit)', placeholder:'Changes in sleep, exercise, nutrition, routines? Energized or drained? Work-life balance? Habits that helped or hurt performance?'},
+        {id:'practice', label:'Practice reflection', type:'textarea', cue:'(schedule|booking habit|calendar|pattern.{0,20}(notic|seen)|felt (busy|slow)|my books)', placeholder:'How has the schedule felt? Booking habits changed? Patterns noticed? What contributed to improvements or challenges?'},
+      ]},
+      { id:'wins', title:'2 · Celebrate Successes', icon:'★', fields:[
+        {id:'wins', label:'Wins since last review', type:'textarea', cue:'(win|success|proud|positive feedback|shout ?out|celebrat|patient (story|outcome)|milestone|accomplish|nailed|crushed)', placeholder:'Clinical wins, patient success stories, positive feedback, teamwork, leadership, initiative, achievements.'},
+      ]},
+      { id:'kpi', title:'3 · KPI Review — Prev vs Current Quarter', icon:'▤', subtitle:'Hard numbers: GBA · Retention · Utilization. For each: what changed, why, what contributed, what improves next quarter.', fields:[
+        {id:'gba', label:'GBA', type:'textarea', cue:'(gba|gross bill|billed|billing|revenue)', placeholder:'Prev vs current · what changed & why · improvement plan'},
+        {id:'retention', label:'Retention', type:'textarea', cue:'(retention|rebook|third visit|drop.?off|churn|coming back|return rate)', placeholder:'Prev vs current · what changed & why · improvement plan'},
+        {id:'utilization', label:'Utilization', type:'textarea', cue:'(utili[sz]ation|capacity|fill rate|open slots|booked out|empty spots)', placeholder:'Prev vs current · what changed & why · improvement plan'},
+      ]},
+      { id:'comp', title:'4 · Clinical Competency & Development Reflection', icon:'✚', subtitle:'Review competencies from the Annual G&D review.', fields:[
+        {id:'compRef', label:'Competency reflection', type:'textarea', cue:'(competenc|clinical reasoning|exercise prescription|manual therapy|patient education|documentation|time management|caseload management|confiden(ce|t)|colleague feedback|still needs work|has improved)', placeholder:'What improved? What still needs work? Confidence changes? Patient/colleague feedback? Still a priority? (Assessment · Clinical Reasoning · Exercise Prescription · Manual Therapy · Communication · Patient Education · Documentation · Time Management · Caseload Management)'},
+      ]},
+      { id:'growth', title:'5 · Clinical Growth', icon:'⤴', fields:[
+        {id:'growth', label:'Clinical growth', type:'textarea', cue:'(strongest (clinical )?area|challenging case|course|new learning|skill.{0,20}develop|patient population|certification|con.?ed|took a course|implement)', placeholder:'Strongest clinical area? Most challenging cases? New learning implemented? Courses completed? Skills to develop next quarter? Desired patient populations?'},
+      ]},
+      { id:'leadgrow', title:'6 · Leadership & Professional Growth', icon:'⚑', fields:[
+        {id:'leadgrow', label:'Beyond patient care', type:'textarea', cue:'(mentor|leadership|community involvement|clinic initiative|beyond patient care|career|aspiration|future role|want to lead|teach the team)', placeholder:'Contributions beyond patient care · mentoring · community involvement · clinic initiatives · future leadership interests · career aspirations within the clinic.'},
+      ]},
+      { id:'support', title:'7 · Support & Resources', icon:'⛑', fields:[
+        {id:'support', label:'Clinical · professional · personal support', type:'textarea', cue:'(support|resource|shadow|mentorship|barrier|slows me down|accommodat|flexib|need from (you|leadership)|help (me|with)|would love (to|some)|education i)', placeholder:'Mentorship areas · clinicians to shadow · desired education · systems creating barriers · resources needed · additional responsibilities desired · anything leadership should know · flexibility/accommodations · how leadership can better support.'},
+      ]},
+      { id:'feedback', title:'8 · Feedback for Leadership & Clinic', icon:'⇄', fields:[
+        {id:'feedback', label:'Leadership · clinic · team', type:'textarea', cue:'(feedback for|doing well|could improve|communication (is|has been)|feel (supported|recognized)|frustrat|workflow|patient experience|team dynamic|culture|collaborat|operational)', placeholder:'What is leadership doing well / can improve? Communication effective? Feel supported & recognized? Operational frustrations? Workflow / patient-experience improvements? Team dynamics, collaboration, culture?'},
+      ]},
+      { id:'goals', title:'9 · Goal Setting — Next 90 Days', icon:'◎', subtitle:'Collaborative goals in four areas, each with measurable actions, resources, and success measures.', fields:[
+        {id:'goals90', label:'Personal · Clinical · Business · Habit goals', type:'textarea', cue:'(goal|target|objective|aim|next (90|ninety)|this quarter i|by next quarter|kpi target|want to (hit|get|reach|grow))', placeholder:'PERSONAL:\nCLINICAL:\nBUSINESS (GBA / Retention / Utilization):\nHABIT:\n— actions, resources required, success measures for each'},
+      ]},
+      { id:'commit', title:'10 · Mutual Commitments', icon:'🤝', fields:[
+        {id:'clinCommit', label:'Clinician — top 3 commitments', type:'textarea', cue:"(i (will|'ll|am going to|commit)|my commitment|i can commit)", placeholder:'1.\n2.\n3.'},
+        {id:'leadCommit', label:'Leadership — top 3 commitments to support them', type:'textarea', cue:"(we (will|'ll)|leadership (will|commits?)|i'll (get|set|book) you|on our end)", placeholder:'1.\n2.\n3.'},
+        {id:'followupDate', label:'Follow-up scheduled (before next quarterly)', type:'date'},
+      ]},
+      { id:'openfloor', title:'11 · Open Floor & Fulfillment', icon:'…', fields:[
+        {id:'openFloor', label:'Open floor', type:'textarea', cue:'(anything else|any questions|concern|hesitant|been meaning to|bring up|one more thing)', placeholder:'Anything else to discuss? Questions? Concerns? Anything they have been hesitant to bring up?'},
+        {id:'fulfill', label:'Fulfillment — 1–10 & what moves it one point higher', type:'text', cue:'(scale of (one|1)|out of (ten|10)|fulfill)', placeholder:'e.g. 7/10 — one point higher if …'},
+      ]},
+      { id:'mgr', title:'Manager Summary', icon:'✎', subtitle:'Completed by the lead after the session.', fields:[
+        {id:'strength', label:'Biggest strength', type:'text'},
+        {id:'improvement', label:'Biggest improvement', type:'text'},
+        {id:'opportunity', label:'Biggest opportunity', type:'text'},
+        {id:'mindset', label:'Mindset', type:'text'},
+        {id:'stressors', label:'Stressors', type:'text'},
+        {id:'motivators', label:'Motivators', type:'text'},
+        {id:'supportReq', label:'Support required', type:'text'},
+        {id:'focusNext', label:'Primary focus next quarter', type:'text'},
+        {id:'kpiTargets', label:'KPI targets next quarter', type:'text', placeholder:'GBA · Retention · Utilization'},
+        {id:'nextReview', label:'Next review date', type:'date'},
+      ]},
     ]
   },
-
   annual: {
     id: 'annual',
     label: 'Annual Growth & Alignment',
@@ -9166,6 +9212,7 @@ function FormsPage({staff, evals}){
 
   return(
     <div>
+      <MeetingTranscriber staff={staff}/>
       {/* Header row */}
       <div className="flex aic jsb mb18">
         <div>
@@ -9342,6 +9389,19 @@ function FormFiller({formDef, staff, onSubmit, onBack}){
   const isLast = currentSection===totalSections-1;
   const colors = {monthly:'#6B9FD4',quarterly:'var(--c-yel)',annual:'var(--c-lime2)'};
   const c = colors[formDef.id];
+  const savedTr=(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_transcripts'))||[];}catch(e){return[];}})();
+  const[trPick,setTrPick]=useState('');
+  const[filledNote,setFilledNote]=useState('');
+  const fmtTs=(n)=>{const m=Math.floor(n/60),ss=n%60;return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss;};
+  const cueFields=[];formDef.sections.forEach(sc=>sc.fields.forEach(f=>{if(f.cue)cueFields.push({sec:sc.id,fid:f.id,re:new RegExp(f.cue,'i')});}));
+  const autoFill=()=>{
+    const tr=savedTr.find(t=>t.id===trPick);if(!tr)return;
+    const adds={};let matched=0;
+    (tr.lines||[]).forEach(l=>{if((l.txt||'').split(/\s+/).length<5)return;const hit=[...cueFields].reverse().find(cf=>cf.re.test(l.txt));if(!hit)return;(adds[hit.sec+'|'+hit.fid]=adds[hit.sec+'|'+hit.fid]||[]).push('['+fmtTs(l.t)+'] '+l.txt);matched++;});
+    if(!matched){setFilledNote('No lines matched the section cues — the conversation may need manual entry.');return;}
+    setData(prev=>{const nx={...prev};Object.entries(adds).forEach(([k,arr])=>{const[sec,fid]=k.split('|');nx[sec]={...nx[sec],[fid]:((nx[sec][fid]||'')+(nx[sec][fid]?'\n':'')+arr.join('\n'))};});return nx;});
+    setFilledNote('⚡ Pulled '+matched+' lines from “'+tr.title+'” into '+Object.keys(adds).length+' fields — review and edit each section; nothing is final until you submit.');
+  };
 
   const handleFinalSubmit = () => {
     onSubmit({formType:formDef.id, data});
@@ -9406,6 +9466,21 @@ function FormFiller({formDef, staff, onSubmit, onBack}){
             <div key={field.id} className="form-question">
               <label>{field.label}</label>
               {field.hint&&<div className="hint">{field.hint}</div>}
+              {currentSection===0&&cueFields.length>0&&field.id===formDef.sections[0].fields[0].id&&(
+                <div style={{gridColumn:'1 / -1',background:'var(--surface3)',border:'1px dashed var(--border)',borderRadius:7,padding:'10px 12px',marginBottom:14}}>
+                  <div style={{fontSize:11,fontWeight:800,letterSpacing:'.5px',color:'var(--c-yel)',marginBottom:6}}>⚡ AUTO-FILL FROM A SESSION TRANSCRIPT</div>
+                  {savedTr.length===0?<div style={{fontSize:12,color:'var(--g-888)'}}>No saved transcripts yet — run the 🎙 Meeting Transcriber (top of the Check-In Forms page) during the session, then come back here.</div>:(
+                    <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                      <select value={trPick} onChange={e=>setTrPick(e.target.value)} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:12.5,padding:'5px 8px',outline:'none',maxWidth:340}}>
+                        <option value="">Choose a transcript…</option>
+                        {savedTr.map(t=><option key={t.id} value={t.id}>{t.title} · {t.date} · {t.words} words</option>)}
+                      </select>
+                      <button type="button" className="btn btn-lime btn-sm" disabled={!trPick} onClick={autoFill}>⚡ Auto-fill sections</button>
+                    </div>)}
+                  {filledNote&&<div style={{fontSize:12,color:'var(--c-grn)',marginTop:6}}>{filledNote}</div>}
+                  <div style={{fontSize:10.5,color:'var(--g-666)',marginTop:6}}>Lines are routed to sections by what was said (KPI talk → KPI review, goals → goal setting, etc.). It’s a starting draft — read each section and edit before submitting.</div>
+                </div>
+              )}
               {field.type==='text'&&(
                 <input className="form-input" value={data[section.id][field.id]||''} onChange={e=>setField(section.id,field.id,e.target.value)} placeholder={field.placeholder||''}/>
               )}
