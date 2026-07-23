@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L67'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L68'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -3040,8 +3040,7 @@ function CallHistoryPage(){
         </div>
         <div style={{fontSize:11.5,color:'var(--g-666)',marginTop:6}}>Day-level tallies for {loc} — call types not tied to a discipline booking. Existing-client calls, late cancels, inquiries &amp; sales calls stay out of the booking-rate math.</div>
         <div style={{marginTop:12,display:'flex',alignItems:'center',gap:10}}>
-          <button className="btn btn-lime btn-sm" onClick={saveEntry}>{savedFlag?"✓ Saved":"Save now"}</button>
-        <span style={{fontSize:11,color:savedFlag?"var(--c-grn)":"var(--g-666)",alignSelf:"center",marginLeft:8}}>{savedFlag?"auto-saved · syncs to both tabs":"Auto-saves as you type — no need to press save"}</span>
+          <span style={{fontSize:12,fontWeight:700,color:savedFlag?"var(--c-grn)":"var(--g-666)",display:"inline-flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:"50%",background:savedFlag?"var(--c-grn)":"var(--g-666)",display:"inline-block"}}/>{savedFlag?"Saved":"Auto-saves as you type"}</span>
           {savedFlag&&<span style={{color:'var(--c-grn)',fontSize:13}}>Saved ✓</span>}
         </div>
       </div>
