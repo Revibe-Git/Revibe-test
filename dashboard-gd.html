@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L69'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L70'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2132,6 +2132,7 @@ function App(){
           <div className="nav-item" onClick={()=>{setModal('addEval');setNavOpen(false);}}><span className="nav-icon">+</span>Log Evaluation</div>
           <div className="nav-item" onClick={()=>{setModal('addSess');setNavOpen(false);}}><span className="nav-icon">+</span>Log Edu Session</div>
           <div style={{margin:'10px 14px 12px',padding:'6px 10px',fontSize:12,fontWeight:800,letterSpacing:'.5px',color:'#0e1512',background:'var(--c-grn)',borderRadius:6,textAlign:'center',textTransform:'uppercase'}} title="The version actually running right now. If a change seems missing, check this first: if it doesn't match the latest build sent, the deploy didn't take or your browser cached the old file — hard-refresh (Cmd+Shift+R) or add ?v=NEW to the URL.">{window.__BUILD||'build ?'}</div>
+          <SyncChip/>
         </div>
         <div className="sidebar-foot">
           <div className="foot-card">
@@ -7820,6 +7821,20 @@ function StaffPage({staff,openProfile,setModal}){
 
 /* ══ EVALS PAGE ══ */
 // ===== G&D Meeting voice recorder (IndexedDB, device-local) =====
+function SyncChip(){
+  const[st,setSt]=useState({ok:null,msg:'checking…'});
+  useEffect(()=>{let dead=false;
+    const probe=async()=>{const SB=window.__SB;if(!SB){if(!dead)setSt({ok:false,msg:'Supabase client not loaded'});return;}
+      try{
+        const r1=await SB.from('call_log').select('id').limit(1);if(r1.error)throw r1.error;
+        const r2=await SB.from('transcripts').select('id').limit(1);if(r2.error)throw r2.error;
+        if(!dead)setSt({ok:true,msg:'Database reachable — call data, forms, leadership & transcripts syncing'});
+      }catch(e){if(!dead)setSt({ok:false,msg:(e&&e.message)||'connection failed'});}
+    };
+    probe();const iv=setInterval(()=>{const w=window.__SYNC;if(w&&w.ok===false){setSt({ok:false,msg:'Last write failed: '+(w.msg||'unknown')});}else probe();},45000);
+    return()=>{dead=true;clearInterval(iv);};},[]);
+  return(<div style={{margin:'0 14px 12px',padding:'5px 10px',fontSize:10.5,fontWeight:800,letterSpacing:'.5px',color:st.ok?'#0e1512':'#fff',background:st.ok?'var(--c-grn)':st.ok===false?'var(--c-red)':'var(--surface3)',borderRadius:6,textAlign:'center',textTransform:'uppercase',cursor:'help'}} title={st.msg+(st.ok===false?' — run revibe-gd-setup.sql in Supabase SQL editor, then reload':'')}>{st.ok?'☁ DB SYNCED':st.ok===false?'⚠ DB NOT SYNCING':'☁ checking…'}</div>);
+}
 function MeetingTranscriber({staff=[],types}){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   const TYPESLIST=(types&&types.length)?types:['Quarterly G&D','Yearly G&D','Evaluation debrief','Other meeting'];
@@ -7834,6 +7849,16 @@ function MeetingTranscriber({staff=[],types}){
   const[open,setOpen]=useState(null);
   const rec=useRef(null);const keep=useRef(false);const timer=useRef(null);const secsRef=useRef(0);
   useEffect(()=>()=>{keep.current=false;try{rec.current&&rec.current.stop();}catch(e){}if(timer.current)clearInterval(timer.current);},[]);
+  const syncUp=(en)=>{const SB=window.__SB;if(!SB||!en)return;SB.from('transcripts').upsert({id:en.id,data:en}).then(r=>{window.__SYNC={ok:!r.error,at:Date.now(),msg:r.error?r.error.message:''};},e=>{window.__SYNC={ok:false,at:Date.now(),msg:(e&&e.message)||'upsert failed'};});};
+  const syncDel=(id)=>{const SB=window.__SB;if(!SB)return;SB.from('transcripts').delete().eq('id',id).then(()=>{},()=>{});};
+  useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}
+    try{const{data:rows,error}=await SB.from('transcripts').select('id,data');window.__SYNC={ok:!error,at:Date.now(),msg:error?error.message:''};if(error||c)return;
+      const srv=(rows||[]).map(r=>r&&r.data).filter(Boolean);let cur=[];try{cur=JSON.parse(localStorage.getItem('rvgd3_transcripts'))||[];}catch(e){}
+      const byId={};srv.forEach(e=>{byId[e.id]=e;});cur.forEach(e=>{const o=byId[e.id];if(!o||(e.at||0)>=(o.at||0))byId[e.id]=e;});
+      const merged=Object.values(byId).sort((a,b)=>(b.at||0)-(a.at||0));
+      merged.forEach(e=>{const sv=srv.find(x=>x.id===e.id);if(!sv||((e.at||0)>(sv.at||0)))SB.from('transcripts').upsert({id:e.id,data:e}).then(()=>{},()=>{});});
+      setSaved(merged);try{localStorage.setItem('rvgd3_transcripts',JSON.stringify(merged));}catch(e){}
+    }catch(e){window.__SYNC={ok:false,at:Date.now(),msg:(e&&e.message)||'sync failed'};}};ld();return()=>{c=true;};},[]);
   const fmt=(n)=>{const m=Math.floor(n/60),ss=n%60;return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss;};
   const persistSaved=(arr)=>{setSaved(arr);try{localStorage.setItem('rvgd3_transcripts',JSON.stringify(arr));return true;}catch(e){return false;}};
   const mkRec=()=>{const r=new SR();r.continuous=true;r.interimResults=true;r.lang='en-CA';
@@ -7873,10 +7898,10 @@ function MeetingTranscriber({staff=[],types}){
   const stopSave=()=>{keep.current=false;try{rec.current&&rec.current.stop();}catch(e){}if(timer.current){clearInterval(timer.current);timer.current=null;}
     const en={id:'tr_'+Date.now().toString(36),at:Date.now(),date:new Date().toISOString().slice(0,10),title:(title||'').trim()||(mtype+' — '+new Date().toISOString().slice(0,10)),mtype,secs,lines,words:lines.reduce((a,l)=>a+l.txt.split(/\s+/).length,0),summary:summarize(lines),notes:note.trim()};
     if(en.lines.length===0){setState('idle');setSecs(0);secsRef.current=0;setInterim('');return;}
-    const ok=persistSaved([en,...saved]);
+    const ok=persistSaved([en,...saved]);syncUp(en);
     if(!ok){window.alert('Could not save on this device (storage full) — downloading the transcript instead so it isn’t lost.');dl(en);}
     setState('idle');setSecs(0);secsRef.current=0;setLines([]);setInterim('');setTitle('');setNote('');};
-  const del=(id)=>{const en=saved.find(x=>x.id===id);if(!window.confirm('Delete "'+(en?en.title:'this transcript')+'"? If you haven’t downloaded it, it can’t be recovered.'))return;persistSaved(saved.filter(x=>x.id!==id));if(open===id)setOpen(null);};
+  const del=(id)=>{const en=saved.find(x=>x.id===id);if(!window.confirm('Delete "'+(en?en.title:'this transcript')+'"? If you haven’t downloaded it, it can’t be recovered.'))return;persistSaved(saved.filter(x=>x.id!==id));syncDel(id);if(open===id)setOpen(null);};
   if(!SR)return(<div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'12px 16px',marginBottom:16,fontSize:12.5,color:'var(--g-888)'}}>🎙 Meeting transcription needs Chrome (or Edge) — this browser doesn’t support in-page speech recognition.</div>);
   return(
     <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'14px 16px',marginBottom:16}}>
@@ -7901,14 +7926,14 @@ function MeetingTranscriber({staff=[],types}){
       {state!=='idle'&&<textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="📝 Session notes — type alongside the transcript; saved with it and included in the summary view + .txt" style={{width:'100%',marginTop:8,minHeight:64,resize:'vertical',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',color:'var(--text)',fontSize:12.5,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}/>}
       {saved.length>0&&(
         <div style={{marginTop:12}}>
-          <div style={{fontSize:11,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>Saved transcripts — on this device · download to archive</div>
+          <div style={{fontSize:11,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>Saved transcripts — synced to the database (☁ chip below the sidebar shows sync health) · ⬇ .txt for external archives</div>
           {saved.map(en=>(
             <div key={en.id} style={{borderTop:'1px solid var(--border)',padding:'7px 0'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
                 <span style={{fontSize:13,fontWeight:700,color:'var(--g-ddd)',cursor:'pointer'}} onClick={()=>setOpen(open===en.id?null:en.id)}>{open===en.id?'▾ ':'▸ '}{en.title}</span>
                 <span style={{fontSize:11.5,color:'var(--g-777)'}}>{en.mtype} · {en.date} · {fmt(en.secs)} · {en.words} words</span>
                 <span style={{flex:1}}/>
-                <button className="btn btn-ghost btn-xs" title="Rename — e.g. who the meeting was with + date" onClick={()=>{const t=(window.prompt('Rename this transcript (who + date works well):',en.title)||'').trim();if(t)persistSaved(saved.map(x=>x.id===en.id?{...x,title:t}:x));}}>✎ Rename</button>
+                <button className="btn btn-ghost btn-xs" title="Rename — e.g. who the meeting was with + date" onClick={()=>{const t=(window.prompt('Rename this transcript (who + date works well):',en.title)||'').trim();if(t){const nx=saved.map(x=>x.id===en.id?{...x,title:t,at:Date.now()}:x);persistSaved(nx);syncUp(nx.find(x=>x.id===en.id));}}}>✎ Rename</button>
                 <button className="btn btn-ghost btn-xs" onClick={()=>dl(en)}>⬇ .txt</button>
                 <button className="btn btn-ghost btn-xs" onClick={()=>{try{navigator.clipboard.writeText(txtOf(en));}catch(e){}}}>📋 Copy</button>
                 <button className="btn btn-ghost btn-xs" style={{color:'var(--c-red)'}} onClick={()=>del(en.id)}>🗑</button>
