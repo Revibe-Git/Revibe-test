@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L72'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L73'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -7849,6 +7849,7 @@ function MeetingTranscriber({staff=[],types}){
   const[open,setOpen]=useState(null);
   const[aikey,setAikey]=useState(()=>{try{return localStorage.getItem('rvgd3_aikey')||'';}catch(e){return'';}});
   const[genBusy,setGenBusy]=useState(null);
+  const[aiUse,setAiUse]=useState(null);
   const rec=useRef(null);const keep=useRef(false);const timer=useRef(null);const secsRef=useRef(0);
   useEffect(()=>()=>{keep.current=false;try{rec.current&&rec.current.stop();}catch(e){}if(timer.current)clearInterval(timer.current);},[]);
   const syncUp=(en)=>{const SB=window.__SB;if(!SB||!en)return;SB.from('transcripts').upsert({id:en.id,data:en}).then(r=>{window.__SYNC={ok:!r.error,at:Date.now(),msg:r.error?r.error.message:''};},e=>{window.__SYNC={ok:false,at:Date.now(),msg:(e&&e.message)||'upsert failed'};});};
@@ -7863,7 +7864,7 @@ function MeetingTranscriber({staff=[],types}){
       try{
         const pr=await fetch(su+'/functions/v1/ai-summary',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+sk,'apikey':sk},body:JSON.stringify({prompt})});
         const pj=await pr.json().catch(()=>({}));
-        if(pr.ok&&pj&&pj.text){txt=pj.text;mdl=pj.model||mdl;proxied=true;}
+        if(pr.ok&&pj&&pj.text){txt=pj.text;mdl=pj.model||mdl;proxied=true;if(pj.usage)setAiUse(pj.usage);}else if(pj&&pj.usage){setAiUse(pj.usage);}
         else if(pj&&pj.error&&!/not\s*found/i.test(String(pj.error)))throw new Error('Clinic AI proxy: '+pj.error);
       }catch(e){if(String(e&&e.message||'').indexOf('Clinic AI proxy:')===0)throw e;/* proxy absent — fall through */}
       if(!proxied){
@@ -7887,6 +7888,7 @@ function MeetingTranscriber({staff=[],types}){
       merged.forEach(e=>{const sv=srv.find(x=>x.id===e.id);if(!sv||((e.at||0)>(sv.at||0)))SB.from('transcripts').upsert({id:e.id,data:e}).then(()=>{},()=>{});});
       setSaved(merged);try{localStorage.setItem('rvgd3_transcripts',JSON.stringify(merged));}catch(e){}
     }catch(e){window.__SYNC={ok:false,at:Date.now(),msg:(e&&e.message)||'sync failed'};}};ld();return()=>{c=true;};},[]);
+  useEffect(()=>{let d=false;const m=new Date().toISOString().slice(0,7);const go=async()=>{const SB=window.__SB;if(!SB){if(!d)setTimeout(go,500);return;}try{const{data,error}=await SB.from('ai_usage').select('data').eq('id',m).maybeSingle();if(!d&&!error&&data&&data.data)setAiUse(data.data);}catch(e){}};go();return()=>{d=true;};},[]);
   const fmt=(n)=>{const m=Math.floor(n/60),ss=n%60;return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss;};
   const persistSaved=(arr)=>{setSaved(arr);try{localStorage.setItem('rvgd3_transcripts',JSON.stringify(arr));return true;}catch(e){return false;}};
   const mkRec=()=>{const r=new SR();r.continuous=true;r.interimResults=true;r.lang='en-CA';
@@ -7957,6 +7959,7 @@ function MeetingTranscriber({staff=[],types}){
           <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
             <span style={{fontSize:11,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.5px'}}>Saved transcripts — synced to the database · ⬇ .txt for external archives</span>
             <span style={{flex:1}}/>
+            {aiUse&&aiUse.budget?(()=>{const r=(+aiUse.est_cost||0)/aiUse.budget;return(<span title={'AI summaries this month (server-metered estimate): $'+(+aiUse.est_cost||0).toFixed(2)+' of the $'+aiUse.budget+' budget · '+(aiUse.calls||0)+' summaries. The clinic proxy refuses calls past the budget.'} style={{fontSize:11,fontWeight:800,color:r>=1?'var(--c-red)':r>=.8?'var(--c-amb)':'var(--g-888)'}}>AI ${(+aiUse.est_cost||0).toFixed(2)}<span style={{fontWeight:400,color:'var(--g-666)'}}> / ${aiUse.budget}</span></span>);})():null}
             <button className="btn btn-ghost btn-xs" title="Your Anthropic API key powers the 🤖 AI summaries. Stored only on this device." onClick={setKeyUI}>🔑 personal key{aikey?' ✓':''}</button>
           </div>
           {saved.map(en=>(
