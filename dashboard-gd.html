@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L70'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L72'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -7847,10 +7847,38 @@ function MeetingTranscriber({staff=[],types}){
   const[interim,setInterim]=useState('');
   const[saved,setSaved]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_transcripts'))||[];}catch(e){return[];}});
   const[open,setOpen]=useState(null);
+  const[aikey,setAikey]=useState(()=>{try{return localStorage.getItem('rvgd3_aikey')||'';}catch(e){return'';}});
+  const[genBusy,setGenBusy]=useState(null);
   const rec=useRef(null);const keep=useRef(false);const timer=useRef(null);const secsRef=useRef(0);
   useEffect(()=>()=>{keep.current=false;try{rec.current&&rec.current.stop();}catch(e){}if(timer.current)clearInterval(timer.current);},[]);
   const syncUp=(en)=>{const SB=window.__SB;if(!SB||!en)return;SB.from('transcripts').upsert({id:en.id,data:en}).then(r=>{window.__SYNC={ok:!r.error,at:Date.now(),msg:r.error?r.error.message:''};},e=>{window.__SYNC={ok:false,at:Date.now(),msg:(e&&e.message)||'upsert failed'};});};
   const syncDel=(id)=>{const SB=window.__SB;if(!SB)return;SB.from('transcripts').delete().eq('id',id).then(()=>{},()=>{});};
+  const setKeyUI=()=>{const v=window.prompt('Paste your Anthropic API key (console.anthropic.com → API Keys).\nStored ONLY on this device — deliberately never synced to the database (it is a secret).\nType CLEAR to remove the saved key.','');if(v===null)return;const t=v.trim();if(!t)return;if(t.toUpperCase()==='CLEAR'){setAikey('');try{localStorage.removeItem('rvgd3_aikey');}catch(e){}return;}setAikey(t);try{localStorage.setItem('rvgd3_aikey',t);}catch(e){}};
+  const genAI=async(en)=>{if(genBusy)return;setGenBusy(en.id);
+    try{
+      const names=(staff||[]).map(x=>x.name).filter(Boolean).join(', ');
+      const prompt='You are summarizing a meeting at Revibe, a multi-site wellness & performance clinic. The transcript below is raw browser speech-to-text: no punctuation, speakers NOT separated, some words garbled — read past the noise to the meaning and do NOT quote garbled text verbatim.\n\nStaff names for attribution: '+names+'\n\nWrite, in markdown:\n## Summary\nA detailed narrative of what was actually discussed — the topics, the context, the why (2–5 paragraphs).\n## Goals\n## Follow-ups / Action items\nBullets, owner name in [brackets] when identifiable.\n## Decisions\n## Concerns / friction\nOnly if present.\n\nBe specific and faithful to the conversation; mark genuinely unclear passages with (unclear).\n\nTRANSCRIPT ('+en.mtype+' · '+en.date+' · '+fmt(en.secs)+'):\n'+en.lines.map(l=>'['+fmt(l.t)+'] '+l.txt).join('\n')+(en.notes?'\n\nSESSION NOTES typed by the lead during the meeting:\n'+en.notes:'');
+      let txt='',mdl='claude-sonnet-4-5',proxied=false;
+      const SB=window.__SB;const su=((SB&&SB.supabaseUrl)||'https://ekjzbdvvxvylembmrphv.supabase.co').replace(/\/$/,'');const sk=(SB&&SB.supabaseKey)||'';
+      try{
+        const pr=await fetch(su+'/functions/v1/ai-summary',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+sk,'apikey':sk},body:JSON.stringify({prompt})});
+        const pj=await pr.json().catch(()=>({}));
+        if(pr.ok&&pj&&pj.text){txt=pj.text;mdl=pj.model||mdl;proxied=true;}
+        else if(pj&&pj.error&&!/not\s*found/i.test(String(pj.error)))throw new Error('Clinic AI proxy: '+pj.error);
+      }catch(e){if(String(e&&e.message||'').indexOf('Clinic AI proxy:')===0)throw e;/* proxy absent — fall through */}
+      if(!proxied){
+        if(!aikey){setGenBusy(null);window.alert('The clinic AI proxy isn\u2019t deployed yet, and no personal API key is saved on this device.\n\nEasiest fix (once, for everyone): Supabase \u2192 Edge Functions \u2192 deploy \u201cai-summary\u201d from revibe-ai-summary-function.ts and add the ANTHROPIC_API_KEY secret.\n\nOr click \ud83d\udd11 AI key to use a personal key on this device.');return;}
+        const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'content-type':'application/json','x-api-key':aikey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:2500,messages:[{role:'user',content:prompt}]})});
+        const j=await res.json();
+        if(!res.ok)throw new Error((j&&j.error&&j.error.message)||('HTTP '+res.status));
+        txt=(j.content||[]).map(b=>b.type==='text'?b.text:'').join('').trim();
+        if(!txt)throw new Error('empty response');
+      }
+      const upd={...en,aiSummary:{text:txt,model:mdl+(proxied?' · clinic proxy':''),at:Date.now()},at:Date.now()};
+      persistSaved(saved.map(x=>x.id===en.id?upd:x));syncUp(upd);
+    }catch(e){window.alert('AI summary failed: '+((e&&e.message)||'unknown error')+'\n\nCheck the key (🔑 AI key button), your Anthropic account credits, and your connection.');}
+    setGenBusy(null);};
+  const mdLite=(t)=>String(t).split('\n').map((ln,i)=>{if(/^##\s/.test(ln))return(<div key={i} style={{fontSize:10.5,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--c-yel)',margin:'10px 0 4px'}}>{ln.replace(/^##\s*/,'')}</div>);if(/^[-•*]\s/.test(ln))return(<div key={i} style={{fontSize:12.5,color:'var(--g-ccc)',lineHeight:1.6,paddingLeft:12,marginBottom:2}}>• {ln.replace(/^[-•*]\s*/,'')}</div>);if(!ln.trim())return(<div key={i} style={{height:6}}/>);return(<div key={i} style={{fontSize:12.5,color:'var(--g-ccc)',lineHeight:1.65,marginBottom:2}}>{ln}</div>);});
   useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}
     try{const{data:rows,error}=await SB.from('transcripts').select('id,data');window.__SYNC={ok:!error,at:Date.now(),msg:error?error.message:''};if(error||c)return;
       const srv=(rows||[]).map(r=>r&&r.data).filter(Boolean);let cur=[];try{cur=JSON.parse(localStorage.getItem('rvgd3_transcripts'))||[];}catch(e){}
@@ -7893,7 +7921,7 @@ function MeetingTranscriber({staff=[],types}){
     return{keyPoints:ranked,goals,actions,decisions,topics,words:lns.reduce((a,l)=>a+l.txt.split(/\s+/).length,0)};
   };
   const smOf=(en)=>en.summary||summarize(en.lines||[]);
-  const txtOf=(en)=>{const sm=smOf(en);const sec=(h,arr,fx)=>arr.length?('\n'+h+'\n'+arr.map(fx).join('\n')+'\n'):'';return en.title+'\n'+en.mtype+' · '+en.date+' · '+fmt(en.secs)+' · '+sm.words+' words · Revibe G&D\nTopics: '+sm.topics.join(', ')+'\n'+'—'.repeat(40)+sec('SUMMARY — KEY POINTS',sm.keyPoints,l=>'• ['+fmt(l.t)+'] '+l.txt)+sec('GOALS',sm.goals,l=>'🎯 ['+fmt(l.t)+'] '+l.txt)+sec('FOLLOW-UPS / ACTION ITEMS',sm.actions,l=>'☐ ['+fmt(l.t)+'] '+(l.owner?'['+l.owner+'] ':'')+l.txt)+sec('DECISIONS',sm.decisions,l=>'✔ ['+fmt(l.t)+'] '+l.txt)+(en.notes?'\n'+'—'.repeat(40)+'\nSESSION NOTES\n'+en.notes+'\n':'')+'\n'+'—'.repeat(40)+'\nFULL TRANSCRIPT\n'+en.lines.map(l=>'['+fmt(l.t)+'] '+l.txt).join('\n')+'\n';};
+  const txtOf=(en)=>{const sm=smOf(en);const sec=(h,arr,fx)=>arr.length?('\n'+h+'\n'+arr.map(fx).join('\n')+'\n'):'';return en.title+'\n'+en.mtype+' · '+en.date+' · '+fmt(en.secs)+' · '+sm.words+' words · Revibe G&D\nTopics: '+sm.topics.join(', ')+'\n'+'—'.repeat(40)+(en.aiSummary?('\nAI SUMMARY ('+en.aiSummary.model+')\n'+en.aiSummary.text+'\n'+'—'.repeat(40)):'')+sec('QUOTED HIGHLIGHTS — KEY POINTS',sm.keyPoints,l=>'• ['+fmt(l.t)+'] '+l.txt)+sec('GOALS',sm.goals,l=>'🎯 ['+fmt(l.t)+'] '+l.txt)+sec('FOLLOW-UPS / ACTION ITEMS',sm.actions,l=>'☐ ['+fmt(l.t)+'] '+(l.owner?'['+l.owner+'] ':'')+l.txt)+sec('DECISIONS',sm.decisions,l=>'✔ ['+fmt(l.t)+'] '+l.txt)+(en.notes?'\n'+'—'.repeat(40)+'\nSESSION NOTES\n'+en.notes+'\n':'')+'\n'+'—'.repeat(40)+'\nFULL TRANSCRIPT\n'+en.lines.map(l=>'['+fmt(l.t)+'] '+l.txt).join('\n')+'\n';};
   const dl=(en)=>{const blob=new Blob([txtOf(en)],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(en.title.replace(/[^A-Za-z0-9 _-]/g,'')||'transcript')+'.txt';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1500);};
   const stopSave=()=>{keep.current=false;try{rec.current&&rec.current.stop();}catch(e){}if(timer.current){clearInterval(timer.current);timer.current=null;}
     const en={id:'tr_'+Date.now().toString(36),at:Date.now(),date:new Date().toISOString().slice(0,10),title:(title||'').trim()||(mtype+' — '+new Date().toISOString().slice(0,10)),mtype,secs,lines,words:lines.reduce((a,l)=>a+l.txt.split(/\s+/).length,0),summary:summarize(lines),notes:note.trim()};
@@ -7926,13 +7954,18 @@ function MeetingTranscriber({staff=[],types}){
       {state!=='idle'&&<textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="📝 Session notes — type alongside the transcript; saved with it and included in the summary view + .txt" style={{width:'100%',marginTop:8,minHeight:64,resize:'vertical',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',color:'var(--text)',fontSize:12.5,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}/>}
       {saved.length>0&&(
         <div style={{marginTop:12}}>
-          <div style={{fontSize:11,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>Saved transcripts — synced to the database (☁ chip below the sidebar shows sync health) · ⬇ .txt for external archives</div>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+            <span style={{fontSize:11,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.5px'}}>Saved transcripts — synced to the database · ⬇ .txt for external archives</span>
+            <span style={{flex:1}}/>
+            <button className="btn btn-ghost btn-xs" title="Your Anthropic API key powers the 🤖 AI summaries. Stored only on this device." onClick={setKeyUI}>🔑 personal key{aikey?' ✓':''}</button>
+          </div>
           {saved.map(en=>(
             <div key={en.id} style={{borderTop:'1px solid var(--border)',padding:'7px 0'}}>
               <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
                 <span style={{fontSize:13,fontWeight:700,color:'var(--g-ddd)',cursor:'pointer'}} onClick={()=>setOpen(open===en.id?null:en.id)}>{open===en.id?'▾ ':'▸ '}{en.title}</span>
                 <span style={{fontSize:11.5,color:'var(--g-777)'}}>{en.mtype} · {en.date} · {fmt(en.secs)} · {en.words} words</span>
                 <span style={{flex:1}}/>
+                <button className="btn btn-ghost btn-xs" style={{color:genBusy===en.id?'var(--g-666)':'var(--c-grn)'}} disabled={genBusy===en.id} onClick={()=>genAI(en)}>{genBusy===en.id?'🤖 Summarizing…':(en.aiSummary?'🤖 Re-summarize':'🤖 AI summary')}</button>
                 <button className="btn btn-ghost btn-xs" title="Rename — e.g. who the meeting was with + date" onClick={()=>{const t=(window.prompt('Rename this transcript (who + date works well):',en.title)||'').trim();if(t){const nx=saved.map(x=>x.id===en.id?{...x,title:t,at:Date.now()}:x);persistSaved(nx);syncUp(nx.find(x=>x.id===en.id));}}}>✎ Rename</button>
                 <button className="btn btn-ghost btn-xs" onClick={()=>dl(en)}>⬇ .txt</button>
                 <button className="btn btn-ghost btn-xs" onClick={()=>{try{navigator.clipboard.writeText(txtOf(en));}catch(e){}}}>📋 Copy</button>
@@ -7944,6 +7977,11 @@ function MeetingTranscriber({staff=[],types}){
                   {arr.map((l,i)=>(<div key={i} style={{fontSize:12.5,color:'var(--g-ccc)',lineHeight:1.6,marginBottom:3,paddingLeft:10,borderLeft:'2px solid '+col}}>{ownerChip&&l.owner?<span style={{fontSize:10,fontWeight:800,color:'var(--c-blu2)',border:'1px solid var(--c-blu2)',borderRadius:3,padding:'0 5px',marginRight:6}}>{l.owner}</span>:null}<span style={{color:'var(--g-777)',fontSize:10.5}}>[{fmt(l.t)}]</span> {l.txt}</div>))}
                 </div>):null;return(
                 <div style={{marginTop:6,background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,padding:'10px 14px'}}>
+                  {en.aiSummary&&<div style={{marginBottom:12,paddingBottom:10,borderBottom:'1px solid var(--border)'}}>
+                    <div style={{fontSize:10.5,fontWeight:800,letterSpacing:'.5px',color:'var(--c-grn)',textTransform:'uppercase',marginBottom:6}}>🤖 AI Summary <span style={{color:'var(--g-666)',fontWeight:400,textTransform:'none'}}>· written by {en.aiSummary.model} · quoted highlights below</span></div>
+                    {mdLite(en.aiSummary.text)}
+                  </div>}
+                  {!en.aiSummary&&<div style={{fontSize:11,color:'var(--g-666)',marginBottom:8}}>The sections below are auto-extracted QUOTES grouped by pattern — fast and free, but not a written summary. For a real narrative summary hit 🤖 AI summary — it uses the clinic AI proxy automatically (or a 🔑 personal key on this device).</div>}
                   {sm.topics.length>0&&<div style={{fontSize:11,color:'var(--g-777)',marginBottom:10}}>Topics: {sm.topics.join(' · ')}</div>}
                   {en.notes&&<div style={{marginBottom:10}}><div style={{fontSize:10.5,color:'var(--c-amb)',fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',marginBottom:4}}>📝 Session notes</div><div style={{fontSize:12.5,color:'var(--g-ccc)',whiteSpace:'pre-wrap',lineHeight:1.6,paddingLeft:10,borderLeft:'2px solid var(--c-amb)'}}>{en.notes}</div></div>}
                   {SEC('◆','Key points',sm.keyPoints,'var(--g-999)',false)}
