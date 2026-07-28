@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L73'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L75'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2183,6 +2183,42 @@ function App(){
 /* ══ COMMUNITY — events, their lead pipelines, and ROI ══
    Shares the call_log store (sources kind:'event' + leads), so every event pipeline also
    appears in Call History → Lead Sources with the full CRM (activity buttons, follow-ups). */
+function GhlPanel(){
+  const[st,setSt]=useState(null); // {ok,msg}
+  const[rows,setRows]=useState(null); // {kind,items}
+  const[busy,setBusy]=useState('');
+  const ghlCall=async(path,qs)=>{
+    const SB=window.__SB;const su=((SB&&SB.supabaseUrl)||'https://ekjzbdvvxvylembmrphv.supabase.co').replace(/\/$/,'');const sk=(SB&&SB.supabaseKey)||'';
+    const r=await fetch(su+'/functions/v1/ghl',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+sk,'apikey':sk},body:JSON.stringify({path,qs})});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||j.error)throw new Error((j&&j.error)||('HTTP '+r.status));
+    return j;};
+  const test=async()=>{setBusy('test');try{await ghlCall('/contacts/',{limit:1});setSt({ok:true,msg:'Connected — GHL contacts reachable through the clinic proxy.'});}catch(e){setSt({ok:false,msg:(e&&e.message)||'failed'});}setBusy('');};
+  const nameOf=(c)=>c.contactName||[c.firstName,c.lastName].filter(Boolean).join(' ')||c.name||'(no name)';
+  const pullContacts=async()=>{setBusy('c');try{const j=await ghlCall('/contacts/',{limit:50});const items=(j.contacts||j.data||j.items||[]).map(c=>({a:nameOf(c),b:c.email||'—',c:c.phone||'—',d:(c.dateAdded||'').slice(0,10),e:(c.tags||[]).join(', ')||(c.source||'')}));setRows({kind:'Contacts (newest 50)',head:['Name','Email','Phone','Added','Tags / source'],items});setSt({ok:true,msg:'Pulled '+items.length+' contacts.'});}catch(e){setSt({ok:false,msg:(e&&e.message)||'failed'});}setBusy('');};
+  const pullOpps=async()=>{setBusy('o');try{const j=await ghlCall('/opportunities/search',{limit:50});const items=(j.opportunities||j.data||j.items||[]).map(o=>({a:o.name||o.title||'(no name)',b:o.status||'—',c:(o.monetaryValue!=null?('$'+o.monetaryValue):'—'),d:(o.createdAt||o.dateAdded||'').slice(0,10),e:o.pipelineStageName||o.pipelineStageId||''}));setRows({kind:'Opportunities (50)',head:['Name','Status','Value','Created','Stage'],items});setSt({ok:true,msg:'Pulled '+items.length+' opportunities.'});}catch(e){setSt({ok:false,msg:(e&&e.message)||'failed'});}setBusy('');};
+  return(
+    <details style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'12px 16px',marginBottom:16}}>
+      <summary style={{cursor:'pointer',fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:'var(--g-aaa)',userSelect:'none'}}>🔗 GoHighLevel — CRM connection</summary>
+      <div style={{marginTop:10,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+        <button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={test}>{busy==='test'?'Testing…':'Test connection'}</button>
+        <button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={pullContacts}>{busy==='c'?'Pulling…':'⬇ Recent contacts'}</button>
+        <button className="btn btn-ghost btn-sm" disabled={!!busy} onClick={pullOpps}>{busy==='o'?'Pulling…':'⬇ Opportunities'}</button>
+        {st&&<span style={{fontSize:12,fontWeight:700,color:st.ok?'var(--c-grn)':'var(--c-red)'}}>{st.ok?'✓ ':'⚠ '}{st.msg}{!st.ok&&' — deploy the “ghl” Edge Function + GHL_PI_TOKEN / GHL_LOCATION_ID secrets (see revibe-ghl-function.ts).'}</span>}
+      </div>
+      {rows&&(
+        <div style={{marginTop:10,overflowX:'auto'}}>
+          <div style={{fontSize:11,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>{rows.kind}</div>
+          <table style={{borderCollapse:'collapse',fontSize:12,minWidth:640}}>
+            <thead><tr>{rows.head.map(h=><th key={h} style={{textAlign:'left',padding:'3px 10px',color:'var(--g-888)'}}>{h}</th>)}</tr></thead>
+            <tbody>{rows.items.map((r,i)=>(<tr key={i} style={{borderTop:'1px solid var(--border)',background:i%2?'transparent':'var(--stripe)'}}>
+              <td style={{padding:'4px 10px',color:'var(--g-ddd)',whiteSpace:'nowrap'}}>{r.a}</td><td style={{padding:'4px 10px',color:'var(--g-aaa)'}}>{r.b}</td><td style={{padding:'4px 10px',color:'var(--g-aaa)',whiteSpace:'nowrap'}}>{r.c}</td><td style={{padding:'4px 10px',color:'var(--g-999)',whiteSpace:'nowrap'}}>{r.d}</td><td style={{padding:'4px 10px',color:'var(--g-999)'}}>{r.e}</td>
+            </tr>))}</tbody>
+          </table>
+        </div>)}
+      <div style={{fontSize:11,color:'var(--g-666)',marginTop:8}}>Read-only first connection — nothing is written to GHL or imported yet. Once your real data shows here, tell me where it should flow (Community leads · Lead Sources · bookings) and the import gets wired with dedupe.</div>
+    </details>);
+}
 function CommunityPage({setPage}){
   const LS='rvgd3_call_log';
   const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||'{}');}catch(e){return{};}};
@@ -2361,6 +2397,7 @@ function CommunityPage({setPage}){
 
   return(
     <div style={{padding:'26px 30px',maxWidth:1280}}>
+      <GhlPanel/>
       <div style={{display:'flex',alignItems:'baseline',gap:14,flexWrap:'wrap',marginBottom:4}}>
         <h2 style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,letterSpacing:'1px',textTransform:'uppercase',color:'var(--g-eee)',margin:0}}>Community</h2>
         <span style={{fontSize:13,color:'var(--g-777)'}}>events hosted &amp; attended · lead pipelines · ROI</span>
@@ -7850,8 +7887,10 @@ function MeetingTranscriber({staff=[],types}){
   const[aikey,setAikey]=useState(()=>{try{return localStorage.getItem('rvgd3_aikey')||'';}catch(e){return'';}});
   const[genBusy,setGenBusy]=useState(null);
   const[aiUse,setAiUse]=useState(null);
-  const rec=useRef(null);const keep=useRef(false);const timer=useRef(null);const secsRef=useRef(0);
+  const rec=useRef(null);const keep=useRef(false);const timer=useRef(null);const secsRef=useRef(0);const baseMs=useRef(0);const runStart=useRef(0);const hidAt=useRef(0);
+  const[hiddenGap,setHiddenGap]=useState(0);
   useEffect(()=>()=>{keep.current=false;try{rec.current&&rec.current.stop();}catch(e){}if(timer.current)clearInterval(timer.current);},[]);
+  useEffect(()=>{if(state==='idle')return;const onVis=()=>{if(document.hidden){hidAt.current=Date.now();}else if(hidAt.current){const gap=Date.now()-hidAt.current;hidAt.current=0;if(gap>3000)setHiddenGap(g=>g+Math.round(gap/1000));if(state==='live'&&keep.current){try{rec.current&&rec.current.start();}catch(e){}}}};document.addEventListener('visibilitychange',onVis);return()=>document.removeEventListener('visibilitychange',onVis);},[state]);
   const syncUp=(en)=>{const SB=window.__SB;if(!SB||!en)return;SB.from('transcripts').upsert({id:en.id,data:en}).then(r=>{window.__SYNC={ok:!r.error,at:Date.now(),msg:r.error?r.error.message:''};},e=>{window.__SYNC={ok:false,at:Date.now(),msg:(e&&e.message)||'upsert failed'};});};
   const syncDel=(id)=>{const SB=window.__SB;if(!SB)return;SB.from('transcripts').delete().eq('id',id).then(()=>{},()=>{});};
   const setKeyUI=()=>{const v=window.prompt('Paste your Anthropic API key (console.anthropic.com → API Keys).\nStored ONLY on this device — deliberately never synced to the database (it is a secret).\nType CLEAR to remove the saved key.','');if(v===null)return;const t=v.trim();if(!t)return;if(t.toUpperCase()==='CLEAR'){setAikey('');try{localStorage.removeItem('rvgd3_aikey');}catch(e){}return;}setAikey(t);try{localStorage.setItem('rvgd3_aikey',t);}catch(e){}};
@@ -7898,8 +7937,8 @@ function MeetingTranscriber({staff=[],types}){
     return r;};
   const start=()=>{if(!SR){return;}try{rec.current=mkRec();rec.current.start();}catch(e){window.alert('Could not start transcription: '+e.message);return;}
     keep.current=true;setState('live');
-    if(!timer.current)timer.current=setInterval(()=>{setSecs(x=>{secsRef.current=x+1;return x+1;});},1000);};
-  const pause=()=>{keep.current=false;try{rec.current&&rec.current.stop();}catch(e){}if(timer.current){clearInterval(timer.current);timer.current=null;}setState('paused');};
+    runStart.current=Date.now();const tick=()=>{const el=Math.floor((baseMs.current+(Date.now()-runStart.current))/1000);secsRef.current=el;setSecs(el);};tick();if(!timer.current)timer.current=setInterval(tick,1000);};
+  const pause=()=>{keep.current=false;try{rec.current&&rec.current.stop();}catch(e){}if(timer.current){clearInterval(timer.current);timer.current=null;}baseMs.current+=Date.now()-runStart.current;setState('paused');};
   const resume=()=>{start();};
   const STOPW=new Set('the a an and or but so of to in on at for with is are was were be been am i we you they he she it this that these those as if then than there here just really very like kind sort dont don didnt cant wont im its were theyre weve youre going gonna yeah ok okay right well um uh know think mean thing things stuff lot want said say see get got make sure also maybe actually basically pretty much one two three what when where which who how why our your their my his her'.split(' '));
   const staffFirst=(staff||[]).map(x=>((x.name||'').split(' ')[0]||'').toLowerCase()).filter(w=>w.length>2);
@@ -7927,10 +7966,10 @@ function MeetingTranscriber({staff=[],types}){
   const dl=(en)=>{const blob=new Blob([txtOf(en)],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=(en.title.replace(/[^A-Za-z0-9 _-]/g,'')||'transcript')+'.txt';document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(url),1500);};
   const stopSave=()=>{keep.current=false;try{rec.current&&rec.current.stop();}catch(e){}if(timer.current){clearInterval(timer.current);timer.current=null;}
     const en={id:'tr_'+Date.now().toString(36),at:Date.now(),date:new Date().toISOString().slice(0,10),title:(title||'').trim()||(mtype+' — '+new Date().toISOString().slice(0,10)),mtype,secs,lines,words:lines.reduce((a,l)=>a+l.txt.split(/\s+/).length,0),summary:summarize(lines),notes:note.trim()};
-    if(en.lines.length===0){setState('idle');setSecs(0);secsRef.current=0;setInterim('');return;}
+    if(en.lines.length===0){setState('idle');setSecs(0);secsRef.current=0;baseMs.current=0;runStart.current=0;hidAt.current=0;setHiddenGap(0);setInterim('');return;}
     const ok=persistSaved([en,...saved]);syncUp(en);
     if(!ok){window.alert('Could not save on this device (storage full) — downloading the transcript instead so it isn’t lost.');dl(en);}
-    setState('idle');setSecs(0);secsRef.current=0;setLines([]);setInterim('');setTitle('');setNote('');};
+    setState('idle');setSecs(0);secsRef.current=0;baseMs.current=0;runStart.current=0;hidAt.current=0;setHiddenGap(0);setLines([]);setInterim('');setTitle('');setNote('');};
   const del=(id)=>{const en=saved.find(x=>x.id===id);if(!window.confirm('Delete "'+(en?en.title:'this transcript')+'"? If you haven’t downloaded it, it can’t be recovered.'))return;persistSaved(saved.filter(x=>x.id!==id));syncDel(id);if(open===id)setOpen(null);};
   if(!SR)return(<div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'12px 16px',marginBottom:16,fontSize:12.5,color:'var(--g-888)'}}>🎙 Meeting transcription needs Chrome (or Edge) — this browser doesn’t support in-page speech recognition.</div>);
   return(
@@ -7946,13 +7985,14 @@ function MeetingTranscriber({staff=[],types}){
         {state==='paused'&&<button className="btn btn-go btn-sm" onClick={resume}>▶ Resume</button>}
         {state!=='idle'&&<button className="btn btn-lime btn-sm" onClick={stopSave}>■ Stop &amp; save</button>}
       </div>
+      {hiddenGap>0&&state!=='idle'&&<div style={{marginTop:8,fontSize:12,color:'var(--c-amb)',border:'1px solid rgba(224,160,82,.45)',borderRadius:6,padding:'6px 10px'}}>⚠ This tab was in the background for ~{Math.floor(hiddenGap/60)?Math.floor(hiddenGap/60)+'m ':''}{hiddenGap%60}s — Chrome pauses speech recognition in background tabs, so that stretch is likely missing from the transcript. Keep this window visible (side-by-side with other work is fine).</div>}
       {state!=='idle'&&(
         <div style={{marginTop:10,maxHeight:170,overflowY:'auto',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',fontSize:13,lineHeight:1.65}}>
           {lines.slice(-10).map((l,i)=>(<div key={i}><span style={{color:'var(--g-777)',fontSize:11}}>[{fmt(l.t)}]</span> <span style={{color:'var(--g-ddd)'}}>{l.txt}</span></div>))}
           {interim&&<div style={{color:'var(--g-888)',fontStyle:'italic'}}>{interim}…</div>}
           {lines.length===0&&!interim&&<div style={{color:'var(--g-777)'}}>Listening — speak and the transcript appears here…</div>}
         </div>)}
-      {state!=='idle'&&<div style={{fontSize:11,color:'var(--g-666)',marginTop:6}}>Keep this tab open and in the foreground; put the laptop near the middle of the room. Transcription runs through the browser’s speech engine (Chrome), English.</div>}
+      {state!=='idle'&&<div style={{fontSize:11,color:'var(--g-666)',marginTop:6}}>Keep this window VISIBLE — side-by-side with other work is fine, but switching to another tab or minimizing makes Chrome pause transcription (the timer stays accurate regardless, and you’ll get a warning showing how long it was hidden). Laptop near the middle of the room; Chrome’s speech engine; English.</div>}
       {state!=='idle'&&<textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="📝 Session notes — type alongside the transcript; saved with it and included in the summary view + .txt" style={{width:'100%',marginTop:8,minHeight:64,resize:'vertical',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,padding:'8px 12px',color:'var(--text)',fontSize:12.5,fontFamily:'inherit',outline:'none',boxSizing:'border-box'}}/>}
       {saved.length>0&&(
         <div style={{marginTop:12}}>
