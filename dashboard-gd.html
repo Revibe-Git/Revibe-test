@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L80'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L81'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -7385,7 +7385,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
             <div className="perf-slot-body">
               {staff.filter(s=>s.discipline!=='mgmt'&&s.discipline!=='ops'&&s.discipline!=='edu').map(s=>{
                 const roadmapN=parseInt((s.roadmap||'').match(/L(\d)/)?.[1]||'1');
-                const targets=s.tracks?.includes('spa')&&!s.tracks?.includes('clinical')?[6,9,12,18]:[4,6,8,12];
+                const targets=[3,3,6,9]; // universal GVA ladder: L2 ≥3.0 · L3 ≥6.0 · L4 ≥9.0
                 const target=targets[Math.min(roadmapN-1,3)];
                 const editing=gvaEdits[s.id]!==undefined;
                 const val=editing?gvaEdits[s.id]:(data.gva[s.id]||'');
@@ -11992,7 +11992,7 @@ function LeadershipPage(){
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
           {[
             {title:'Risk Tolerance',items:[{sub:'Low Risk',text:'Avoids uncomfortable conversations · Hesitates without approval · Cannot hold Expansion roles',color:'var(--c-red)'},{sub:'Moderate Risk',text:'Leads small initiatives with support · Takes ownership when structure exists · Tier 2 roles with mentorship',color:'var(--c-yel)'},{sub:'High Risk',text:'Comfortable with performance-based compensation · Decides without perfect clarity · Stabilizes underperforming teams → Required for Expansion roles',color:'var(--c-lime2)'}]},
-            {title:'Metric Definitions',items:[{sub:'Utilization %',text:'Booked Treatment Hours ÷ Available Clinical Hours · 75%+ minimum for leadership consideration',color:'var(--c-yel)'},{sub:'GVA',text:'Average visits per active guest · Target ≥ 6 · Represents clinical reasoning quality and care continuity',color:'var(--c-yel)'},{sub:'Why Metrics Are Indicators',text:'Metrics support leadership — they do not replace character. Ownership, emotional maturity, and risk tolerance matter equally.',color:'#6B9FD4'}]},
+            {title:'Metric Definitions',items:[{sub:'Utilization %',text:'Booked Treatment Hours ÷ Available Clinical Hours · 75%+ minimum for leadership consideration',color:'var(--c-yel)'},{sub:'GVA',text:'Average visits per active guest · L2 ≥3.0 · L3 ≥6.0 · L4 ≥9.0 · Represents clinical reasoning quality and care continuity',color:'var(--c-yel)'},{sub:'Why Metrics Are Indicators',text:'Metrics support leadership — they do not replace character. Ownership, emotional maturity, and risk tolerance matter equally.',color:'#6B9FD4'}]},
             {title:'Promotion Logic',items:[{sub:'Cannot Promote',text:'Time Availability = No · Risk = Low for Expansion · 2+ Red Flags · 2+ Gates = No',color:'var(--c-red)'},{sub:'Micro-Lead Only',text:'Part-Time + Limited → Education / culture / peer mentorship only. NOT operational leadership.',color:'var(--c-yel)'},{sub:'Expansion Candidate',text:'High Risk · 6+ hrs/wk available · Score ≥ 85 · Zero blocks · Zero flags',color:'var(--c-lime2)'}]},
             {title:'How To Grade',items:[{sub:'Principles',text:'Compare within discipline · Compare within location context · Evaluate trends not snapshots · Separate personality from production',color:'#6B9FD4'},{sub:'Categories',text:'📍 Contributor → ⭐ Location Lead → 🔄 Regional Support → 🌐 Multi-Loc Operator → 🚀 Expansion Leader',color:'var(--c-pur)'},{sub:'Core Standard',text:'"Leadership = Stability Under Weight" — Can they hold the team when things get hard?',color:'var(--c-lime2)'}]},
           ].map(section=>(
