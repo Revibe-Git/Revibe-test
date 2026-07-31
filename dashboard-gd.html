@@ -554,6 +554,22 @@ textarea{resize:vertical;min-height:60px;}
   .pg{padding:11px 10px;}
 }
 
+
+/* ===== GLOBAL PRINT MODE (evrpt) — moved out of CommunityPage so EVERY page can print reports (L84) ===== */
+@media print{
+  @page{margin:14mm;}
+  body.evrpt-print *{visibility:hidden!important;}
+  body.evrpt-print .evrpt-print-area,body.evrpt-print .evrpt-print-area *{visibility:visible!important;}
+  body.evrpt-print .evrpt-print-area{position:absolute!important;left:0;top:0;width:100%!important;padding:0!important;border:none!important;background:#fff!important;}
+  body.evrpt-print .evrpt-print-area *{color:#243029!important;background:transparent!important;border-color:#d3ded7!important;}
+  body.evrpt-print .evrpt-print-area b,body.evrpt-print .evrpt-print-area .evrpt-h{color:#0B6E54!important;}
+  body.evrpt-print .evrpt-print-area table{border-top:1px solid #d3ded7!important;}
+  body.evrpt-print .evrpt-print-area .evrpt-only{display:block!important;}
+  body.evrpt-print .no-print{display:none!important;}
+  body.evrpt-print,body.evrpt-print #root,body.evrpt-print #root>div,body.evrpt-print .main,body.evrpt-print .scroll{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;}
+  body.evrpt-print .sidebar{display:none!important;}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+}
 </style>
 </head>
 <body>
@@ -1855,7 +1871,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L83';
+window.__BUILD='build L84';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
