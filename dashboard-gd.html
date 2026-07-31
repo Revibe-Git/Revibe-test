@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L81'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L82'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2514,6 +2514,8 @@ function CommunityPage({setPage}){
   body.evrpt-print .evrpt-print-area table{border-top:1px solid #d3ded7!important;}
   body.evrpt-print .evrpt-print-area .evrpt-only{display:block!important;}
   body.evrpt-print .no-print{display:none!important;}
+  body.evrpt-print,body.evrpt-print #root,body.evrpt-print #root>div,body.evrpt-print .main,body.evrpt-print .scroll{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;}
+  body.evrpt-print .sidebar{display:none!important;}
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
 }
 `}</style>
@@ -3528,8 +3530,8 @@ function CallHistoryPage(){
           {rType==='m'&&<input type="month" value={pk0} onChange={e=>{setMoPick(e.target.value);setMoAI(null);}} style={SELSTY}/>}
           {rType==='q'&&<select value={qPick} onChange={e=>{setQPick(e.target.value);setMoAI(null);}} style={SELSTY}>{qOpts.map(q=><option key={q} value={q}>{q}</option>)}</select>}
           {rType==='y'&&<select value={yPick} onChange={e=>{setYPick(e.target.value);setMoAI(null);}} style={SELSTY}>{yOpts.map(y=><option key={y} value={y}>{y}</option>)}</select>}
-          <button className="btn btn-ghost btn-sm" onClick={csv}>⬇ CSV</button>
-          <button className="btn btn-ghost btn-sm" onClick={()=>{document.body.classList.add('evrpt-print');window.print();setTimeout(()=>document.body.classList.remove('evrpt-print'),500);}}>🖨 Print / PDF</button>
+          <button className="btn btn-ghost btn-sm" onClick={csv} title="Export this report as a CSV (opens in Excel / Google Sheets)">⬇ Download CSV</button>
+          <button className="btn btn-ghost btn-sm" title="Open a clean, print-ready page — choose Save as PDF" onClick={()=>{document.body.classList.add('evrpt-print');const done=()=>{document.body.classList.remove('evrpt-print');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);setTimeout(()=>{window.print();setTimeout(done,900);},60);}}>🖨 Print / PDF</button>
           <button className="btn btn-lime btn-sm" disabled={moAIBusy} onClick={()=>genMonthlyAI(digest,pk)}>{moAIBusy?'🤖 Analyzing 4 '+perNoun+'s…':(moAI&&moAI.mo===pk?'🤖 Regenerate write-up':'🤖 AI trend write-up')}</button>
           <span style={{fontSize:11,color:'var(--g-666)'}}>Compares {pk} against the previous 3 {perNoun}s · both locations combined</span>
         </div>
