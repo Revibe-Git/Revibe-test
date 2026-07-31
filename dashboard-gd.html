@@ -715,22 +715,22 @@ const RUBRIC_SYSTEMS = {
       "clinicalExcellence": [
         {
           "level": "Level 1",
-          "mandatory": "SOAP \u226595%, GVA \u22654",
+          "mandatory": "SOAP \u226595% (GVA building toward 3.0)",
           "recommended": "1 case review/month"
         },
         {
           "level": "Level 2",
-          "mandatory": "SOAP \u226598%, GVA \u22656",
+          "mandatory": "SOAP \u226598%, GVA \u22653.0",
           "recommended": "Present 1 case/quarter"
         },
         {
           "level": "Level 3",
-          "mandatory": "Maintain \u226598%, GVA \u22658",
+          "mandatory": "Maintain \u226598%, GVA \u22656.0",
           "recommended": "Lead education session"
         },
         {
           "level": "Level 4",
-          "mandatory": "Maintain \u226598%, GVA \u226512",
+          "mandatory": "Maintain \u226598%, GVA \u22659.0",
           "recommended": "Build advanced protocols"
         }
       ],
@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L77'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L79'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2230,7 +2230,7 @@ function CommunityPage({setPage}){
   const events=(data.sources||[]).filter(x=>x.kind==='event');
   const leadsOf=(sid)=>(data.leads||{})[sid]||[];
   const CLOSED=['Booked','Not Suitable','Not a fit'];
-  const[exp,setExp]=useState(null);
+  const[exp,setExp]=useState(null);const[edLead,setEdLead]=useState(null);
   const[showAdd,setShowAdd]=useState(false);
   const[trendPeriod,setTrendPeriod]=useState('month');
   const blankEv={name:'',eventDate:'',days:'1',eventType:'attended',venue:'',estPerBook:'125',thCount:'',thHours:'',thRate:'150',coordHours:'',coordRate:'20',hardCost:'',notes:''};
@@ -2627,8 +2627,16 @@ function CommunityPage({setPage}){
               {leadsOf(e.id).length===0?<div style={{fontSize:13,color:'var(--g-666)'}}>No leads yet.</div>:
                 leadsOf(e.id).slice(0,30).map(l=>(
                   <div key={l.id} style={{display:'flex',alignItems:'center',gap:12,padding:'6px 0',borderBottom:'1px solid var(--border)',flexWrap:'wrap'}}>
-                    <span style={{flex:'0 0 200px',fontSize:13.5,color:'var(--g-ddd)',fontWeight:600}}>{(l.first||'')+' '+(l.last||'')||'Unnamed'}</span>
-                    <span style={{fontSize:12,color:'var(--g-777)'}}>{l.date||''}{l.phone?' · '+l.phone:''}</span>
+                    {edLead===l.id?(<>
+                      <input style={{...inp,width:105,padding:'4px 7px',fontSize:12.5}} placeholder="First" value={l.first||''} onChange={x=>setBookMeta(e.id,l.id,{first:x.target.value})}/>
+                      <input style={{...inp,width:105,padding:'4px 7px',fontSize:12.5}} placeholder="Last" value={l.last||''} onChange={x=>setBookMeta(e.id,l.id,{last:x.target.value})}/>
+                      <input style={{...inp,width:118,padding:'4px 7px',fontSize:12.5}} placeholder="Phone" value={l.phone||''} onChange={x=>setBookMeta(e.id,l.id,{phone:x.target.value})}/>
+                      <input type="date" style={{...inp,width:132,padding:'4px 7px',fontSize:12}} value={l.date||''} onChange={x=>setBookMeta(e.id,l.id,{date:x.target.value})}/>
+                    </>):(<>
+                      <span style={{flex:'0 0 200px',fontSize:13.5,color:'var(--g-ddd)',fontWeight:600}}>{((l.first||'')+' '+(l.last||'')).trim()||'Unnamed'}</span>
+                      <span style={{fontSize:12,color:'var(--g-777)'}}>{l.date||''}{l.phone?' · '+l.phone:''}</span>
+                    </>)}
+                    <button className="btn btn-ghost btn-xs" title={edLead===l.id?'Done editing':'Edit this lead — name, phone, date'} onClick={()=>setEdLead(edLead===l.id?null:l.id)}>{edLead===l.id?'✓ Done':'✎'}</button>
                     <span style={{flex:1}}/>
                     {l.nextDate&&<span style={{fontSize:11.5,color:'#9BB8D0'}}>↻ {l.nextDate}</span>}
                     <select value={l.status||'New'} onChange={x=>setLeadStatus(e.id,l.id,x.target.value)} style={{...inp,width:'auto',padding:'4px 8px',color:STATUS_C[l.status||'New']||'var(--g-eee)',fontWeight:700,fontSize:12.5}}>{(LEAD_STATUS.includes(l.status||'New')?LEAD_STATUS:[l.status,...LEAD_STATUS]).map(x=><option key={x} value={x}>{x}</option>)}</select>
@@ -2870,6 +2878,24 @@ function CallHistoryPage(){
 
   const[entryDate,setEntryDate]=useState(today);
   const[ncMonth,setNcMonth]=useState(today.slice(0,7));
+  const[moPick,setMoPick]=useState(today.slice(0,7));
+  const[rType,setRType]=useState('m');
+  const[qPick,setQPick]=useState(today.slice(0,4)+'-Q'+(Math.floor((+today.slice(5,7)-1)/3)+1));
+  const[yPick,setYPick]=useState(today.slice(0,4));
+  const[moAI,setMoAI]=useState(null);
+  const[moAIBusy,setMoAIBusy]=useState(false);
+  const genMonthlyAI=async(digest,label)=>{
+    if(moAIBusy)return;setMoAIBusy(true);
+    try{
+      const prompt='You are writing the periodic performance commentary for Revibe, a two-location wellness clinic (Mississauga + Markham). Below is a JSON digest of the CALL TRACKER (front-desk new-patient calls: calls vs booked, per discipline, day-level call mix, reasons callers did not book) and LEAD SOURCES (leads created per source and their statuses) for the period '+label+' and the three like-periods before it (months, quarters, or years).\n\nWrite a management write-up in markdown:\n## Period in review\n2-3 paragraphs: overall volume and conversion vs the prior 3 periods — call out real trends, not noise.\n## Disciplines\nWhich disciplines rose/fell in volume and conversion; anything shifting for 2+ periods.\n## Lead sources\nWhich sources produced and converted; shifts worth attention.\n## Why calls did not book\nWhat the no-conversion reasons and call mix suggest.\n## Recommendations\n3-5 specific, practical actions for the next period.\n\nRules: be specific with numbers and percent changes; say when data is too thin to conclude; do not invent data; ~350-500 words total.\n\nDATA:\n'+digest;
+      const SB=window.__SB;const su=((SB&&SB.supabaseUrl)||'https://ekjzbdvvxvylembmrphv.supabase.co').replace(/\/$/,'');const sk=(SB&&SB.supabaseKey)||'';
+      const r=await fetch(su+'/functions/v1/ai-summary',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+sk,'apikey':sk},body:JSON.stringify({prompt,max_tokens:1600})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok||j.error)throw new Error((j&&j.error)||('HTTP '+r.status+' — is the ai-summary Edge Function deployed?'));
+      setMoAI({text:String(j.text||'').trim(),mo:label,at:Date.now()});
+    }catch(e){window.alert('AI write-up failed: '+((e&&e.message)||'unknown'));}
+    setMoAIBusy(false);
+  };
   const[openReason,setOpenReason]=useState({});
   const[entry,setEntry]=useState({});
   const[savedFlag,setSavedFlag]=useState(false);
@@ -3020,7 +3046,7 @@ function CallHistoryPage(){
       <span style={{fontSize:13,color:'var(--g-777)'}}>Guest Experience · call volume by location + lead sources</span>
     </div>
     <div style={{display:'flex',gap:4,marginBottom:16,alignItems:'center'}}>
-      {[['calls','📞 Call Volume'],['leads','🎯 Lead Sources'],['ia','📋 IA Tracker'],['agenda','🗓 Follow-ups'+(dueN>0?' ('+dueN+')':'')],['report','📄 Weekly Report']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${view===v?'btn-go':'btn-ghost'}`} onClick={()=>setView(v)}>{l}</button>))}
+      {[['calls','📞 Call Volume'],['leads','🎯 Lead Sources'],['ia','📋 IA Tracker'],['agenda','🗓 Follow-ups'+(dueN>0?' ('+dueN+')':'')],['report','📄 Weekly Report'],['monthly','📆 Reports']].map(([v,l])=>(<button key={v} className={`btn btn-sm ${view===v?'btn-go':'btn-ghost'}`} onClick={()=>setView(v)}>{l}</button>))}
       <input type="file" accept="application/json,.json" ref={backupRef} style={{display:'none'}} onChange={e=>{importBackup(e.target.files[0]);e.target.value='';}}/>
       <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}} onClick={exportBackup} title="Download a JSON backup of all calls, leads & sources">⬇ Backup</button>
       <button className="btn btn-ghost btn-sm" onClick={()=>backupRef.current&&backupRef.current.click()} title="Restore from a backup file — replaces current data for everyone">⬆ Restore</button>
@@ -3464,6 +3490,118 @@ function CallHistoryPage(){
       </>);
     })()}
 
+    {view==='monthly'&&(()=>{
+      const SITES=Object.keys(SITE_DISC);const pk0=moPick;
+      const DLBL={};SITES.forEach(L=>(SITE_DISC[L]||[]).forEach(([id,lb])=>{if(!DLBL[id])DLBL[id]=lb;}));
+      const mAdd=(mo,d)=>{const[y,m]=mo.split('-').map(Number);const dt=new Date(y,m-1+d,1);return dt.getFullYear()+'-'+String(dt.getMonth()+1).padStart(2,'0');};
+      const pk=rType==='m'?pk0:rType==='q'?qPick:yPick;
+      const perNoun=rType==='m'?'month':rType==='q'?'quarter':'year';
+      const prevOf=(k,d)=>{if(rType==='m')return mAdd(k,d);if(rType==='y')return String((+k)+d);const[qy,qq]=k.split('-Q');const n=(+qy)*4+((+qq)-1)+d;return Math.floor(n/4)+'-Q'+(((n%4)+4)%4+1);};
+      const monthsOf=(k)=>{if(rType==='m')return[k];if(rType==='y')return Array.from({length:12},(_,i)=>k+'-'+String(i+1).padStart(2,'0'));const[qy,qq]=k.split('-Q');return[0,1,2].map(i=>qy+'-'+String(((+qq)-1)*3+i+1).padStart(2,'0'));};
+      const chLbl=(ch)=>{const f=IA_CHANNELS.find(x=>x[0]===ch);if(f)return f[1];const c=(data.iaChannels||[]).find(x=>x.id===ch);if(c)return c.label;if(IA_LEGACY[ch])return IA_LEGACY[ch][0];return ch;};
+      const SELSTY={background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:12.5,padding:'5px 8px',outline:'none'};
+      const _ny=+today.slice(0,4);const yOpts=Array.from({length:6},(_,i)=>String(_ny-i));
+      const qOpts=[];for(let qy=_ny;qy>=_ny-3;qy--)for(let qq=4;qq>=1;qq--){if(qy===_ny&&qq>Math.floor((+today.slice(5,7)-1)/3)+1)continue;qOpts.push(qy+'-Q'+qq);}
+      const mStats=(mos)=>{const inP=(x)=>mos.indexOf(String(x).slice(0,7))>=0;const disc={};let tc=0,tb=0;const meta={};const reasons={};
+        SITES.forEach(L=>{const days=(data.calls&&data.calls[L])||{};Object.keys(days).forEach(dt=>{if(!inP(dt))return;const day=days[dt]||{};Object.keys(day).forEach(k=>{if(k==='_x'){Object.entries(day._x||{}).forEach(([mk,v])=>{meta[mk]=(meta[mk]||0)+(+v||0);});return;}const c=cOf(day[k]),b=bOf(day[k]);if(!c&&!b)return;disc[k]=disc[k]||{c:0,b:0};disc[k].c+=c;disc[k].b+=b;tc+=c;tb+=b;const rr=(day[k]&&typeof day[k]==='object'&&day[k].r)||{};Object.entries(rr).forEach(([lab,n])=>{reasons[lab]=(reasons[lab]||0)+(+n||0);});});});});
+        const src={};let lt=0,lb=0;const statuses={};
+        (data.sources||[]).forEach(sc=>{(((data.leads||{})[sc.id])||[]).forEach(l=>{if(!inP(l.createdAt||l.date||''))return;lt++;const st=l.status||'New';statuses[st]=(statuses[st]||0)+1;const e=src[sc.id]=src[sc.id]||{name:sc.name||sc.id,kind:sc.kind||'',t:0,b:0};e.t++;if(st==='Booked'){e.b++;lb++;}});});
+        const ia={};SITES.forEach(L=>{const il=(data.iaLog&&data.iaLog[L])||{};Object.keys(il).forEach(dt=>{if(!inP(dt))return;Object.entries(il[dt]||{}).forEach(([ch,n])=>{ia[ch]=(ia[ch]||0)+(+n||0);});});});return{disc,tc,tb,meta,reasons,src,lt,lb,statuses,ia};};
+      const S=[0,-1,-2,-3].map(d=>{const k=prevOf(pk,d);return{mo:k,st:mStats(monthsOf(k))};});
+      const cur=S[0].st,prev=S[1].st;
+      const pc=(b,c)=>c?Math.round(b/c*100):0;
+      const D=(a,b)=>{if(b==null||b===0)return null;const d=Math.round((a-b)/b*100);return d;};
+      const Del=({a,b,pp})=>{const d=pp?(a-b):D(a,b);if(d==null||!isFinite(d)||(pp&&b===0&&a===0))return <span style={{color:'var(--g-666)',fontSize:10.5}}>—</span>;const up=d>0;const zero=d===0;return <span style={{fontSize:10.5,fontWeight:800,color:zero?'var(--g-666)':up?'var(--c-grn)':'var(--c-red)'}}>{zero?'=':up?'▲':'▼'}{Math.abs(d)}{pp?'pp':'%'}</span>;};
+      const discIds=Object.keys({...prev.disc,...cur.disc}).sort((a,b)=>((cur.disc[b]||{}).c||0)-((cur.disc[a]||{}).c||0));
+      const srcRows=Object.values(cur.src).sort((a,b)=>b.t-a.t).slice(0,14);
+      const topReasons=Object.entries(cur.reasons).sort((a,b)=>b[1]-a[1]).slice(0,6);
+      const digest=JSON.stringify(S.map(x=>({period:x.mo,calls:x.st.tc,booked:x.st.tb,convPct:pc(x.st.tb,x.st.tc),byDiscipline:Object.fromEntries(Object.entries(x.st.disc).map(([k,v])=>[DLBL[k]||k,v])),callMix:Object.fromEntries(META_TYPES.map(([k,lb])=>[lb,x.st.meta[k]||0]).filter(([,v])=>v)),noBookReasons:x.st.reasons,leads:x.st.lt,leadsBooked:x.st.lb,leadConvPct:pc(x.st.lb,x.st.lt),bySource:Object.fromEntries(Object.values(x.st.src).map(v=>[v.name,{leads:v.t,booked:v.b}])),leadStatuses:x.st.statuses,iaOrigins:Object.fromEntries(Object.entries(x.st.ia||{}).filter(([,n])=>n).map(([ch,n])=>[chLbl(ch),n]))})));
+      const csv=()=>{const esc=(v)=>'"'+String(v??'').replace(/"/g,'""')+'"';const rows=[['REVIBE '+(perNoun+'LY').toUpperCase()+' REPORT',pk],[],[perNoun,'Calls','Booked','Call conv %','Leads','Leads booked','Lead conv %']];[...S].reverse().forEach(x=>rows.push([x.mo,x.st.tc,x.st.tb,pc(x.st.tb,x.st.tc),x.st.lt,x.st.lb,pc(x.st.lb,x.st.lt)]));rows.push([],['Discipline ('+pk+')','Calls','Booked','Conv %']);discIds.forEach(id=>{const d=cur.disc[id]||{c:0,b:0};rows.push([DLBL[id]||id,d.c,d.b,pc(d.b,d.c)]);});rows.push([],['Call mix ('+pk+')','Count']);META_TYPES.forEach(([k,lb])=>{if(cur.meta[k])rows.push([lb,cur.meta[k]]);});rows.push([],['No-book reason','Count']);Object.entries(cur.reasons).sort((a,b)=>b[1]-a[1]).forEach(([lab,n])=>rows.push([lab,n]));rows.push([],['IA origin ('+pk+')','Count']);Object.entries(cur.ia||{}).sort((a,b)=>b[1]-a[1]).forEach(([ch,n])=>rows.push([chLbl(ch),n]));rows.push([],['Lead source ('+pk+')','Kind','Leads','Booked','Conv %']);Object.values(cur.src).sort((a,b)=>b.t-a.t).forEach(v=>rows.push([v.name,v.kind,v.t,v.b,pc(v.b,v.t)]));const blob=new Blob([rows.map(r=>r.map(esc).join(',')).join('\n')],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='revibe-report-'+pk+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);};
+      const mdL=(t)=>String(t).split('\n').map((ln,i)=>{if(/^##\s/.test(ln))return(<div key={i} style={{fontSize:11,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--c-yel)',margin:'12px 0 4px'}}>{ln.replace(/^##\s*/,'')}</div>);if(/^[-•*]\s/.test(ln))return(<div key={i} style={{fontSize:12.5,color:'var(--g-ccc)',lineHeight:1.6,paddingLeft:12,marginBottom:2}}>• {ln.replace(/^[-•*]\s*/,'')}</div>);if(!ln.trim())return(<div key={i} style={{height:6}}/>);return(<div key={i} style={{fontSize:12.5,color:'var(--g-ccc)',lineHeight:1.65,marginBottom:2}}>{ln}</div>);});
+      const TH={textAlign:'left',padding:'4px 12px',color:'var(--g-888)',fontSize:11,textTransform:'uppercase',letterSpacing:'.5px'};
+      const TD={padding:'5px 12px',fontSize:12.5,color:'var(--g-ddd)'};
+      const kpis=[['Calls',cur.tc,prev.tc,false],['Booked (calls)',cur.tb,prev.tb,false],['Call conv %',pc(cur.tb,cur.tc),pc(prev.tb,prev.tc),true],['New leads',cur.lt,prev.lt,false],['Leads booked',cur.lb,prev.lb,false],['Lead conv %',pc(cur.lb,cur.lt),pc(prev.lb,prev.lt),true],['IAs logged',Object.values(cur.ia||{}).reduce((a,b)=>a+(+b||0),0),Object.values(prev.ia||{}).reduce((a,b)=>a+(+b||0),0),false]];
+      return(
+      <div>
+        <div className="flex aic g8 no-print" style={{flexWrap:'wrap',marginBottom:14}}>
+          {[['m','Month'],['q','Quarter'],['y','Year']].map(([k,lb])=>(<button key={k} className={`btn btn-sm ${rType===k?'btn-go':'btn-ghost'}`} onClick={()=>{setRType(k);setMoAI(null);}}>{lb}</button>))}
+          {rType==='m'&&<input type="month" value={pk0} onChange={e=>{setMoPick(e.target.value);setMoAI(null);}} style={SELSTY}/>}
+          {rType==='q'&&<select value={qPick} onChange={e=>{setQPick(e.target.value);setMoAI(null);}} style={SELSTY}>{qOpts.map(q=><option key={q} value={q}>{q}</option>)}</select>}
+          {rType==='y'&&<select value={yPick} onChange={e=>{setYPick(e.target.value);setMoAI(null);}} style={SELSTY}>{yOpts.map(y=><option key={y} value={y}>{y}</option>)}</select>}
+          <button className="btn btn-ghost btn-sm" onClick={csv}>⬇ CSV</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>{document.body.classList.add('evrpt-print');window.print();setTimeout(()=>document.body.classList.remove('evrpt-print'),500);}}>🖨 Print / PDF</button>
+          <button className="btn btn-lime btn-sm" disabled={moAIBusy} onClick={()=>genMonthlyAI(digest,pk)}>{moAIBusy?'🤖 Analyzing 4 '+perNoun+'s…':(moAI&&moAI.mo===pk?'🤖 Regenerate write-up':'🤖 AI trend write-up')}</button>
+          <span style={{fontSize:11,color:'var(--g-666)'}}>Compares {pk} against the previous 3 {perNoun}s · both locations combined</span>
+        </div>
+        <div className="evrpt-print-area">
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,letterSpacing:'2px',color:'var(--text)'}}>REVIBE — {(perNoun+'LY').toUpperCase()} REPORT</div>
+          <div style={{fontSize:12.5,color:'var(--g-999)',marginBottom:14}}>{pk} · calls + lead sources · generated {new Date().toISOString().slice(0,10)}</div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,marginBottom:16}}>
+            {kpis.map(([lb,a,b,pp])=>(
+              <div key={lb} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'10px 12px'}}>
+                <div style={{fontSize:10.5,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.5px'}}>{lb}</div>
+                <div style={{fontSize:22,fontWeight:800,color:'var(--text)',lineHeight:1.2}}>{a}{pp?'%':''} <Del a={a} b={b} pp={pp}/></div>
+                <div style={{fontSize:10.5,color:'var(--g-666)'}}>prev: {b}{pp?'%':''}</div>
+              </div>))}
+          </div>
+          <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--g-aaa)',margin:'6px 0'}}>📞 Call volume by discipline — {pk}</div>
+          <table style={{borderCollapse:'collapse',minWidth:560,marginBottom:14}}>
+            <thead><tr><th style={TH}>Discipline</th><th style={TH}>Calls</th><th style={TH}>Booked</th><th style={TH}>Conv %</th><th style={TH}>vs prev</th></tr></thead>
+            <tbody>{discIds.map((id,i)=>{const d=cur.disc[id]||{c:0,b:0};const pv=prev.disc[id]||{c:0,b:0};return(
+              <tr key={id} style={{borderTop:'1px solid var(--border)',background:i%2?'transparent':'var(--stripe)'}}>
+                <td style={{...TD,fontWeight:700,color:DISC_COLOR[id]||'var(--g-ddd)'}}>{DLBL[id]||id}</td>
+                <td style={TD}>{d.c} <Del a={d.c} b={pv.c}/></td><td style={TD}>{d.b}</td>
+                <td style={TD}>{pc(d.b,d.c)}% <Del a={pc(d.b,d.c)} b={pc(pv.b,pv.c)} pp={true}/></td>
+                <td style={{...TD,fontSize:10.5,color:'var(--g-777)'}}>{pv.c} calls · {pc(pv.b,pv.c)}%</td>
+              </tr>);})}
+              {discIds.length===0&&<tr><td style={TD} colSpan={5}>No call data logged for {pk}.</td></tr>}
+            </tbody>
+          </table>
+          <div style={{display:'flex',gap:24,flexWrap:'wrap',marginBottom:14}}>
+            <div>
+              <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--g-aaa)',margin:'6px 0'}}>Call mix (day tallies)</div>
+              {META_TYPES.map(([k,lb,col])=>cur.meta[k]?<div key={k} style={{fontSize:12,color:'var(--g-ccc)',lineHeight:1.7}}><span style={{color:col,fontWeight:800}}>{cur.meta[k]}</span> {lb} <Del a={cur.meta[k]} b={prev.meta[k]||0}/></div>:null)}
+              {Object.keys(cur.meta).length===0&&<div style={{fontSize:12,color:'var(--g-666)'}}>None logged.</div>}
+            </div>
+            <div>
+              <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--g-aaa)',margin:'6px 0'}}>Top “why not booked” reasons</div>
+              {topReasons.map(([lab,n])=><div key={lab} style={{fontSize:12,color:'var(--g-ccc)',lineHeight:1.7}}><span style={{fontWeight:800,color:'var(--c-amb)'}}>{n}</span> {lab}</div>)}
+              {topReasons.length===0&&<div style={{fontSize:12,color:'var(--g-666)'}}>None attributed this {perNoun}.</div>}
+            </div>
+            <div>
+              <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--g-aaa)',margin:'6px 0'}}>📋 IA origins</div>
+              {Object.entries(cur.ia||{}).sort((a,b)=>b[1]-a[1]).map(([ch,n])=><div key={ch} style={{fontSize:12,color:'var(--g-ccc)',lineHeight:1.7}}><span style={{fontWeight:800,color:'var(--c-blu2)'}}>{n}</span> {chLbl(ch)} <Del a={n} b={(prev.ia||{})[ch]||0}/></div>)}
+              {Object.keys(cur.ia||{}).length===0&&<div style={{fontSize:12,color:'var(--g-666)'}}>No IAs logged this {perNoun}.</div>}
+            </div>
+          </div>
+          <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--g-aaa)',margin:'6px 0'}}>🎯 Lead sources — {pk} (by created date)</div>
+          <table style={{borderCollapse:'collapse',minWidth:560,marginBottom:6}}>
+            <thead><tr><th style={TH}>Source</th><th style={TH}>Kind</th><th style={TH}>Leads</th><th style={TH}>Booked</th><th style={TH}>Conv %</th></tr></thead>
+            <tbody>{srcRows.map((v,i)=>(<tr key={v.name+i} style={{borderTop:'1px solid var(--border)',background:i%2?'transparent':'var(--stripe)'}}>
+              <td style={{...TD,fontWeight:700}}>{v.name}</td><td style={{...TD,fontSize:11,color:'var(--g-888)'}}>{v.kind}</td><td style={TD}>{v.t}</td><td style={TD}>{v.b}</td><td style={TD}>{pc(v.b,v.t)}%</td></tr>))}
+              {srcRows.length===0&&<tr><td style={TD} colSpan={5}>No leads created in {pk}.</td></tr>}
+            </tbody>
+          </table>
+          <div style={{fontSize:11,color:'var(--g-777)',marginBottom:14}}>{Object.entries(cur.statuses).map(([k,v])=>v+' '+k).join(' · ')||''}</div>
+          <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--g-aaa)',margin:'6px 0'}}>4-{perNoun} comparison</div>
+          <table style={{borderCollapse:'collapse',minWidth:520,marginBottom:16}}>
+            <thead><tr><th style={TH}>Metric</th>{[...S].reverse().map(x=><th key={x.mo} style={TH}>{x.mo}</th>)}</tr></thead>
+            <tbody>{[['Calls',x=>x.tc],['Booked',x=>x.tb],['Call conv %',x=>pc(x.tb,x.tc)+'%'],['Leads',x=>x.lt],['Leads booked',x=>x.lb],['Lead conv %',x=>pc(x.lb,x.lt)+'%'],['IAs logged',x=>Object.values(x.ia||{}).reduce((a,b)=>a+(+b||0),0)]].map(([lb,fn],i)=>(
+              <tr key={lb} style={{borderTop:'1px solid var(--border)',background:i%2?'transparent':'var(--stripe)'}}>
+                <td style={{...TD,fontWeight:700}}>{lb}</td>{[...S].reverse().map(x=><td key={x.mo} style={TD}>{fn(x.st)}</td>)}
+              </tr>))}
+            </tbody>
+          </table>
+          {moAI&&moAI.mo===pk?(
+            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'12px 16px'}}>
+              <div style={{fontSize:10.5,fontWeight:800,letterSpacing:'.5px',color:'var(--c-grn)',textTransform:'uppercase',marginBottom:6}}>🤖 AI trend write-up <span style={{color:'var(--g-666)',fontWeight:400,textTransform:'none'}}>· vs previous 3 {perNoun}s · review before sharing</span></div>
+              {mdL(moAI.text)}
+            </div>
+          ):(
+            <div className="no-print" style={{fontSize:11.5,color:'var(--g-666)'}}>Hit 🤖 AI trend write-up above for a management narrative comparing {pk} to the prior 3 {perNoun}s (~2-3¢ via the clinic AI proxy · included in Print once generated).</div>
+          )}
+        </div>
+      </div>);})()}
     {view==='report'&&(()=>{
       const saved=viewingSavedRep?savedCallReports.find(r=>r.id===viewingSavedRep):null;
       const built=saved?{cur:saved.cur,prev:saved.prev}:buildCallReport(repWeek);
@@ -7237,7 +7375,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       {tab==='gva'&&(
         <div>
           <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:14,color:'var(--g-aaa)',lineHeight:1.7}}>
-            <strong style={{color:'var(--lime)'}}>GVA (Guest Visit Average)</strong> — Rolling 365-day average visits per active guest. Manually entered. Targets vary by track and level: Clinical L1 ≥4 · L2 ≥6 · L3 ≥8 · L4 ≥12
+            <strong style={{color:'var(--lime)'}}>GVA (Guest Visit Average)</strong> — Rolling 365-day average visits per active guest. Manually entered. Targets by level: Clinical L2 ≥3.0 · L3 ≥6.0 · L4 ≥9.0 (L1 = building toward 3.0)
           </div>
           <div className="perf-slot">
             <div className="perf-slot-head">
@@ -8768,7 +8906,7 @@ function StaffNumbersTab({staff,perfData}){
 
   // Roadmap target for GVA
   const roadmapN=parseInt((staff.roadmap||'').match(/L(\d)/)?.[1]||'1');
-  const gvaTargets=staff.tracks?.includes('spa')&&!staff.tracks?.includes('clinical')?[6,9,12,18]:[4,6,8,12];
+  const gvaTargets=staff.tracks?.includes('spa')&&!staff.tracks?.includes('clinical')?[6,9,12,18]:[3,3,6,9];
   const gvaTarget=gvaTargets[Math.min(roadmapN-1,3)];
 
   const StatCard=({label,value,sub,color,target,fmt,metric})=>{
