@@ -924,22 +924,22 @@ const RUBRIC_SYSTEMS = {
       "clinicalExcellence": [
         {
           "level": "Level 1",
-          "mandatory": "SOAP \u226595%, GVA \u22656",
+          "mandatory": "SOAP \u226595% (GVA building toward 3.0)",
           "recommended": "1 case review/month"
         },
         {
           "level": "Level 2",
-          "mandatory": "SOAP \u226598%, GVA \u22659",
+          "mandatory": "SOAP \u226598%, GVA \u22653.0",
           "recommended": "Present 1 case/quarter"
         },
         {
           "level": "Level 3",
-          "mandatory": "Maintain \u226598%, GVA \u226512",
+          "mandatory": "Maintain \u226598%, GVA \u22656.0",
           "recommended": "Lead education session"
         },
         {
           "level": "Level 4",
-          "mandatory": "Maintain \u226598%, GVA \u226518",
+          "mandatory": "Maintain \u226598%, GVA \u22659.0",
           "recommended": "Build advanced protocols"
         }
       ],
@@ -1107,22 +1107,22 @@ const RUBRIC_SYSTEMS = {
       "clinicalExcellence": [
         {
           "level": "Level 1",
-          "mandatory": "SOAP \u226595%, GVA \u226412",
+          "mandatory": "SOAP \u226595% (GVA building toward 3.0)",
           "recommended": "1 case review/month"
         },
         {
           "level": "Level 2",
-          "mandatory": "SOAP \u226598%, GVA \u226512",
+          "mandatory": "SOAP \u226598%, GVA \u22653.0",
           "recommended": "Present 1 case/quarter"
         },
         {
           "level": "Level 3",
-          "mandatory": "Maintain \u226598%, GVA \u226524",
+          "mandatory": "Maintain \u226598%, GVA \u22656.0",
           "recommended": "Lead education session"
         },
         {
           "level": "Level 4",
-          "mandatory": "Maintain \u226598%, GVA \u226548",
+          "mandatory": "Maintain \u226598%, GVA \u22659.0",
           "recommended": "Build advanced protocols"
         }
       ],
@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L79'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L80'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -7375,7 +7375,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
       {tab==='gva'&&(
         <div>
           <div style={{background:'var(--go-dim)',border:'1px solid var(--go-b)',borderRadius:6,padding:'11px 16px',marginBottom:14,fontSize:14,color:'var(--g-aaa)',lineHeight:1.7}}>
-            <strong style={{color:'var(--lime)'}}>GVA (Guest Visit Average)</strong> — Rolling 365-day average visits per active guest. Manually entered. Targets by level: Clinical L2 ≥3.0 · L3 ≥6.0 · L4 ≥9.0 (L1 = building toward 3.0)
+            <strong style={{color:'var(--lime)'}}>GVA (Guest Visit Average)</strong> — Rolling 365-day average visits per active guest. Manually entered. Targets by level — all tracks: L2 ≥3.0 · L3 ≥6.0 · L4 ≥9.0 (L1 = building toward 3.0)
           </div>
           <div className="perf-slot">
             <div className="perf-slot-head">
@@ -8906,7 +8906,7 @@ function StaffNumbersTab({staff,perfData}){
 
   // Roadmap target for GVA
   const roadmapN=parseInt((staff.roadmap||'').match(/L(\d)/)?.[1]||'1');
-  const gvaTargets=staff.tracks?.includes('spa')&&!staff.tracks?.includes('clinical')?[6,9,12,18]:[3,3,6,9];
+  const gvaTargets=[3,3,6,9]; // universal ladder per Dave: L2 ≥3.0 · L3 ≥6.0 · L4 ≥9.0 (L1 building toward 3.0)
   const gvaTarget=gvaTargets[Math.min(roadmapN-1,3)];
 
   const StatCard=({label,value,sub,color,target,fmt,metric})=>{
