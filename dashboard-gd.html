@@ -1855,7 +1855,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L75'; // bump every delivery — the sidebar badge and By-Location stamp both read this
+window.__BUILD='build L77'; // bump every delivery — the sidebar badge and By-Location stamp both read this
 const siteList=(s)=>String((s&&s.site)||'').split(',').map(x=>x.trim()).filter(Boolean);
 const siteMatch=(s,fs)=>!fs||fs==='all'||siteList(s).includes(fs);
 // Revenue attributable to a given site comes from the transaction's location (revByLoc),
@@ -2717,6 +2717,7 @@ function CallHistoryPage(){
      Stored as data.iaLog[Location][date] = {channelId: count}; custom channels in data.iaChannels. */
   const IA_CHANNELS=[
     ['ref','Internal referral','var(--c-grn)','Referred in by another clinician / team member'],
+    ['persRef','Personal referral','var(--c-grn2)','An existing guest / patient personally sent this person in — they can name who referred them'],
     ['google','Google','var(--c-yel)','Found us on Google / search'],
     ['fb','Facebook','var(--c-blu2)','Came via Facebook'],
     ['ig','Instagram','#E0A0C0','Came via Instagram'],
@@ -2724,7 +2725,7 @@ function CallHistoryPage(){
     ['caremap','Care Map','var(--c-pur)','Came through the Care Map quiz'],
     ['retSelf','Returning self-book','var(--c-mint)','Past guest who booked themselves back in (call or online) — on their own accord, not referred'],
     ['newSelf','Online self-book (new)','var(--c-lime2)','Brand-new guest, first visit, booked online on their own'],
-    ['wom','Word of mouth','var(--c-amb)','Friend / family recommendation'],
+    ['wom','Word of mouth','var(--c-amb)','General recommendation — heard about us through friends / family, no specific referrer (use Personal referral when they can name who sent them)'],
     ['event','Event / community','#C9B26B','Event, partnership, or community outreach'],
     ['other','Other','#9BA8B5','Anything that does not fit the above']];
   // Legacy channels (removed from the pick list) stay visible wherever days were already logged under them.
@@ -9517,6 +9518,7 @@ function FormFiller({formDef, staff, onSubmit, onBack}){
   const savedTr=(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_transcripts'))||[];}catch(e){return[];}})();
   const[trPick,setTrPick]=useState('');
   const[filledNote,setFilledNote]=useState('');
+  const[aiBusy,setAiBusy]=useState(false);
   const fmtTs=(n)=>{const m=Math.floor(n/60),ss=n%60;return (m<10?'0':'')+m+':'+(ss<10?'0':'')+ss;};
   const cueFields=[];formDef.sections.forEach(sc=>sc.fields.forEach(f=>{if(f.cue)cueFields.push({sec:sc.id,fid:f.id,re:new RegExp(f.cue,'i')});}));
   const autoFill=()=>{
@@ -9548,6 +9550,29 @@ function FormFiller({formDef, staff, onSubmit, onBack}){
     if(unsorted.length){const k='openfloor|openFloor';(adds[k]=adds[k]||[]).push('— Unsorted from transcript (didn’t match a section — move where they belong) —');adds[k]=adds[k].concat(unsorted);}
     setData(prev=>{const nx={...prev};Object.entries(adds).forEach(([k,arr])=>{const[sec,fid]=k.split('|');if(!nx[sec])return;nx[sec]={...nx[sec],[fid]:((nx[sec][fid]||'')+(nx[sec][fid]?'\n':'')+arr.join('\n'))};});return nx;});
     setFilledNote('⚡ Pulled the FULL transcript: '+matched+' segments routed to sections'+(unsorted.length?' · '+unsorted.length+' unsorted segments added to Open Floor (nothing was dropped)':'')+' — review and edit before submitting.');
+  };
+  const aiAutoFill=async()=>{
+    const tr=savedTr.find(t=>t.id===trPick);if(!tr||aiBusy)return;setAiBusy(true);setFilledNote('');
+    try{
+      const fieldsSpec=formDef.sections.filter(sc=>sc.fields.some(f=>f.cue)).map(sc=>sc.id+' — '+sc.title+(sc.subtitle?' ('+sc.subtitle+')':'')+':\n'+sc.fields.filter(f=>f.cue).map(f=>'  · '+sc.id+'.'+f.id+' ('+f.label+'): '+String(f.placeholder||'').replace(/\n/g,' | ')).join('\n')).join('\n');
+      const prompt='You are filling out Revibe’s Quarterly G&D Review form from a recorded coaching conversation between a lead and a clinician. The transcript is raw browser speech-to-text: no punctuation, speakers not separated, some words garbled — read past the noise.\n\nRULES:\n- The FULL transcript is the source of truth. Every substantive detail (numbers, names, commitments, concerns, requests) must land in exactly the one best-fitting field — do not drop details.\n- Light cleanup is fine (fix garble, punctuate), but keep their actual words and specifics; this is their review record, not your interpretation. Use concise bullet lines.\n- Prefix lines with the [mm:ss] timestamp of where it was said when identifiable.\n- The lead asks the form’s questions; the answers that follow belong to that section even without keywords.\n- Anything that fits nowhere goes in openfloor.openFloor.\n- Omit a field entirely if the conversation never touched it.'+(tr.aiSummary?'\n- An AI SUMMARY of this meeting is included below as a GUIDE for themes, goals and follow-ups — helpful, but the transcript outranks it; the summary may omit details.':'')+'\n\nFIELDS (use exactly these keys):\n'+fieldsSpec+'\n\nOUTPUT: ONLY a JSON object mapping "sectionId.fieldId" → string. No markdown fences, no commentary.'+(tr.aiSummary?'\n\nAI SUMMARY (guide):\n'+tr.aiSummary.text:'')+'\n\nTRANSCRIPT ('+tr.mtype+' · '+tr.date+'):\n'+(tr.lines||[]).map(l=>'['+fmtTs(l.t)+'] '+l.txt).join('\n')+(tr.notes?'\n\nSESSION NOTES typed by the lead:\n'+tr.notes:'');
+      const SB=window.__SB;const su=((SB&&SB.supabaseUrl)||'https://ekjzbdvvxvylembmrphv.supabase.co').replace(/\/$/,'');const sk=(SB&&SB.supabaseKey)||'';
+      const r=await fetch(su+'/functions/v1/ai-summary',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+sk,'apikey':sk},body:JSON.stringify({prompt,max_tokens:4000})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok||j.error)throw new Error((j&&j.error)||('HTTP '+r.status+' — is the ai-summary Edge Function deployed?'));
+      let raw=String(j.text||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'');
+      let parsed=null;try{parsed=JSON.parse(raw);}catch(e){}
+      if(!parsed||typeof parsed!=='object'){
+        setData(prev=>({...prev,openfloor:{...prev.openfloor,openFloor:((prev.openfloor.openFloor||'')+(prev.openfloor.openFloor?'\n':'')+'— AI fill (could not be auto-routed; sort manually) —\n'+raw)}}));
+        setFilledNote('🤖 The AI response couldn’t be parsed into fields — its full text was placed in Open Floor so nothing is lost. (Very long meetings: re-paste the updated ai-summary function for a higher output limit.)');
+      }else{
+        const valid={};formDef.sections.forEach(sc=>sc.fields.forEach(f=>{valid[sc.id+'.'+f.id]=[sc.id,f.id];}));
+        let filled=0;
+        setData(prev=>{const nx={...prev};Object.entries(parsed).forEach(([k,v])=>{if(!valid[k]||typeof v!=='string'||!v.trim())return;const[sec,fid]=valid[k];if(!nx[sec])return;nx[sec]={...nx[sec],[fid]:((nx[sec][fid]||'')+(nx[sec][fid]?'\n':'')+v.trim())};filled++;});return nx;});
+        setFilledNote('🤖 AI filled '+Object.keys(parsed).length+' fields from the FULL transcript'+(tr.aiSummary?' (guided by its summary)':'')+' — read every section and edit before submitting; counts toward the monthly AI budget.');
+      }
+    }catch(e){window.alert('AI auto-fill failed: '+((e&&e.message)||'unknown')+'\n\nThe free ⚡ pattern fill still works below.');}
+    setAiBusy(false);
   };
 
   const handleFinalSubmit = () => {
@@ -9622,10 +9647,11 @@ function FormFiller({formDef, staff, onSubmit, onBack}){
                         <option value="">Choose a transcript…</option>
                         {savedTr.map(t=><option key={t.id} value={t.id}>{t.title} · {t.date} · {t.words} words</option>)}
                       </select>
-                      <button type="button" className="btn btn-lime btn-sm" disabled={!trPick} onClick={autoFill}>⚡ Auto-fill sections</button>
+                      <button type="button" className="btn btn-lime btn-sm" disabled={!trPick||aiBusy} onClick={aiAutoFill}>{aiBusy?'🤖 Mapping the transcript…':'🤖 AI auto-fill (best)'}</button>
+                      <button type="button" className="btn btn-ghost btn-sm" disabled={!trPick||aiBusy} onClick={autoFill}>⚡ Quick fill (pattern · free)</button>
                     </div>)}
                   {filledNote&&<div style={{fontSize:12,color:'var(--c-grn)',marginTop:6}}>{filledNote}</div>}
-                  <div style={{fontSize:10.5,color:'var(--g-666)',marginTop:6}}>Routing follows the conversation: when the lead asks a section’s question (“how has retention been?”), the answers that follow route to that section until the topic changes — questions are marked “Q:”. Tip for best results: leads, read the section questions roughly as written. It’s a starting draft — review and edit before submitting.</div>
+                  <div style={{fontSize:10.5,color:'var(--g-666)',marginTop:6}}>🤖 AI auto-fill reads the FULL transcript (nothing dropped), uses the meeting’s AI summary as a guide when one exists, and writes cleaned-up content into the right sections (~5–10¢, counts toward the monthly AI budget). ⚡ Quick fill is the free instant fallback: verbatim segments routed by conversation flow. Both are drafts — review and edit before submitting.</div>
                 </div>
               )}
               {field.type==='text'&&(
