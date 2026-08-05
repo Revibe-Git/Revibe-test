@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L88';
+window.__BUILD='build L89';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -3085,7 +3085,7 @@ function CallHistoryPage(){
 
       <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:8,padding:'14px 16px',marginBottom:16}}>
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
-          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:'var(--g-aaa)'}}>Log calls — {loc}</span>
+          <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:13,letterSpacing:'1px',textTransform:'uppercase',color:'var(--g-aaa)'}}>Log calls — {loc}</span><span style={{fontSize:10.5,fontWeight:800,letterSpacing:'.5px',color:'var(--c-grn)',textTransform:'uppercase'}}>🆕 New treatment-seeking calls</span>
           <input type="date" value={entryDate} max={today} onChange={e=>setEntryDate(e.target.value)} style={{...inp,width:'auto'}}/>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(170px,1fr))',gap:8}}>
@@ -3118,7 +3118,9 @@ function CallHistoryPage(){
               </div>);})}
             <div style={{fontSize:11,color:'var(--g-666)'}}>Log why non-booked calls didn’t convert — feeds the monthly report below.</div>
           </div>);})()}
-        <div style={{marginTop:12,display:'flex',gap:14,flexWrap:'wrap'}}>
+        <div style={{marginTop:18,paddingTop:14,borderTop:'1px dashed var(--border)'}}>
+        <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.6px',textTransform:'uppercase',color:'var(--c-amb)',marginBottom:8}}>📊 Other calls — day tallies <span style={{color:'var(--g-666)',fontWeight:400,textTransform:'none'}}>· existing clients, cancels, inquiries, sales — real phone volume, not new-treatment demand</span></div>
+        <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
           {META_TYPES.map(([k,label,col])=>(
             <div key={k} style={{flex:'0 0 150px'}}>
               <div style={{fontSize:11,color:col,textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4,fontWeight:700}}>{label}</div>
@@ -3128,9 +3130,11 @@ function CallHistoryPage(){
             </div>
           ))}
         </div>
-        <div style={{fontSize:11.5,color:'var(--g-666)',marginTop:6}}>Day-level tallies for {loc} — call types not tied to a discipline booking. Existing-client calls, late cancels, inquiries &amp; sales calls stay out of the booking-rate math.</div>
+        <div style={{fontSize:11.5,color:'var(--g-666)',marginTop:6}}>Day-level tallies for {loc} — call types not tied to a discipline booking. Existing-client calls, late cancels, inquiries &amp; sales calls stay out of the booking-rate math — but count toward total calls handled.</div>
+        </div>
         <div style={{marginTop:12,display:'flex',alignItems:'center',gap:10}}>
           <span style={{fontSize:12,fontWeight:700,color:savedFlag?"var(--c-grn)":"var(--g-666)",display:"inline-flex",alignItems:"center",gap:6}}><span style={{width:8,height:8,borderRadius:"50%",background:savedFlag?"var(--c-grn)":"var(--g-666)",display:"inline-block"}}/>{savedFlag?"Saved":"Auto-saves as you type"}</span>
+        {(()=>{const nt=discList.reduce((a,[id])=>a+(+(((entry||{})[id]||{}).c)||0),0);const ot=Object.values((entry&&entry._x)||{}).reduce((a,v)=>a+(+v||0),0);return(<span style={{marginLeft:14,fontSize:12,color:'var(--g-aaa)'}} title="New treatment-seeking calls (the discipline grid) + other handled calls (day tallies below) = every call the front desk answered today"><b style={{color:'var(--c-grn)'}}>{nt}</b> treatment · <b style={{color:'var(--c-amb)'}}>{ot}</b> other · <b style={{color:'var(--g-eee)'}}>{nt+ot}</b> total handled</span>);})()}
           {savedFlag&&<span style={{color:'var(--c-grn)',fontSize:13}}>Saved ✓</span>}
         </div>
       </div>
@@ -3539,12 +3543,13 @@ function CallHistoryPage(){
       const discIds=Object.keys({...prev.disc,...cur.disc}).sort((a,b)=>((cur.disc[b]||{}).c||0)-((cur.disc[a]||{}).c||0));
       const srcRows=Object.values(cur.src).sort((a,b)=>b.t-a.t).slice(0,14);
       const topReasons=Object.entries(cur.reasons).sort((a,b)=>b[1]-a[1]).slice(0,6);
-      const digest=JSON.stringify(S.map(x=>({period:x.mo,calls:x.st.tc,booked:x.st.tb,convPct:pc(x.st.tb,x.st.tc),byDiscipline:Object.fromEntries(Object.entries(x.st.disc).map(([k,v])=>[DLBL[k]||k,v])),callMix:Object.fromEntries(META_TYPES.map(([k,lb])=>[lb,x.st.meta[k]||0]).filter(([,v])=>v)),noBookReasons:x.st.reasons,leads:x.st.lt,leadsBooked:x.st.lb,leadConvPct:pc(x.st.lb,x.st.lt),bySource:Object.fromEntries(Object.values(x.st.src).map(v=>[v.name,{leads:v.t,booked:v.b}])),leadStatuses:x.st.statuses,iaOrigins:Object.fromEntries(Object.entries(x.st.ia||{}).filter(([,n])=>n).map(([ch,n])=>[chLbl(ch),n]))})));
-      const csv=()=>{const esc=(v)=>'"'+String(v??'').replace(/"/g,'""')+'"';const rows=[['REVIBE '+(perNoun+'LY').toUpperCase()+' REPORT',pk],[],[perNoun,'Calls (phone)','Calls booked','Call conv %','New leads (forms/ads/events)','New leads booked','New lead conv %']];[...S].reverse().forEach(x=>rows.push([x.mo,x.st.tc,x.st.tb,pc(x.st.tb,x.st.tc),x.st.lt,x.st.lb,pc(x.st.lb,x.st.lt)]));rows.push([],['Discipline ('+pk+')','Calls','Booked','Conv %']);discIds.forEach(id=>{const d=cur.disc[id]||{c:0,b:0};rows.push([DLBL[id]||id,d.c,d.b,pc(d.b,d.c)]);});rows.push([],['Call mix ('+pk+')','Count']);META_TYPES.forEach(([k,lb])=>{if(cur.meta[k])rows.push([lb,cur.meta[k]]);});rows.push([],['No-book reason','Count']);Object.entries(cur.reasons).sort((a,b)=>b[1]-a[1]).forEach(([lab,n])=>rows.push([lab,n]));rows.push([],['IA origin ('+pk+')','Count']);Object.entries(cur.ia||{}).sort((a,b)=>b[1]-a[1]).forEach(([ch,n])=>rows.push([chLbl(ch),n]));rows.push([],['Lead source ('+pk+')','Kind','Leads','Booked','Conv %']);Object.values(cur.src).sort((a,b)=>b.t-a.t).forEach(v=>rows.push([v.name,v.kind,v.t,v.b,pc(v.b,v.t)]));const blob=new Blob([rows.map(r=>r.map(esc).join(',')).join('\n')],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='revibe-report-'+pk+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);};
+      const oc=(st)=>Object.values(((st||{}).meta)||{}).reduce((a,b)=>a+(+b||0),0);
+      const digest=JSON.stringify(S.map(x=>({period:x.mo,treatmentCalls:x.st.tc,otherCallsHandled:oc(x.st),totalCallsHandled:x.st.tc+oc(x.st),booked:x.st.tb,convPct:pc(x.st.tb,x.st.tc),byDiscipline:Object.fromEntries(Object.entries(x.st.disc).map(([k,v])=>[DLBL[k]||k,v])),callMix:Object.fromEntries(META_TYPES.map(([k,lb])=>[lb,x.st.meta[k]||0]).filter(([,v])=>v)),noBookReasons:x.st.reasons,leads:x.st.lt,leadsBooked:x.st.lb,leadConvPct:pc(x.st.lb,x.st.lt),bySource:Object.fromEntries(Object.values(x.st.src).map(v=>[v.name,{leads:v.t,booked:v.b}])),leadStatuses:x.st.statuses,iaOrigins:Object.fromEntries(Object.entries(x.st.ia||{}).filter(([,n])=>n).map(([ch,n])=>[chLbl(ch),n]))})));
+      const csv=()=>{const esc=(v)=>'"'+String(v??'').replace(/"/g,'""')+'"';const rows=[['REVIBE '+(perNoun+'LY').toUpperCase()+' REPORT',pk],[],[perNoun,'Treatment calls (new)','Calls booked','Call conv %','Other calls (tallies)','Total calls handled','New leads (forms/ads/events)','New leads booked','New lead conv %']];[...S].reverse().forEach(x=>rows.push([x.mo,x.st.tc,x.st.tb,pc(x.st.tb,x.st.tc),oc(x.st),x.st.tc+oc(x.st),x.st.lt,x.st.lb,pc(x.st.lb,x.st.lt)]));rows.push([],['Discipline ('+pk+')','Calls','Booked','Conv %']);discIds.forEach(id=>{const d=cur.disc[id]||{c:0,b:0};rows.push([DLBL[id]||id,d.c,d.b,pc(d.b,d.c)]);});rows.push([],['Call mix ('+pk+')','Count']);META_TYPES.forEach(([k,lb])=>{if(cur.meta[k])rows.push([lb,cur.meta[k]]);});rows.push([],['No-book reason','Count']);Object.entries(cur.reasons).sort((a,b)=>b[1]-a[1]).forEach(([lab,n])=>rows.push([lab,n]));rows.push([],['IA origin ('+pk+')','Count']);Object.entries(cur.ia||{}).sort((a,b)=>b[1]-a[1]).forEach(([ch,n])=>rows.push([chLbl(ch),n]));rows.push([],['Lead source ('+pk+')','Kind','Leads','Booked','Conv %']);Object.values(cur.src).sort((a,b)=>b.t-a.t).forEach(v=>rows.push([v.name,v.kind,v.t,v.b,pc(v.b,v.t)]));const blob=new Blob([rows.map(r=>r.map(esc).join(',')).join('\n')],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='revibe-report-'+pk+'.csv';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);};
       const mdL=(t)=>String(t).split('\n').map((ln,i)=>{if(/^##\s/.test(ln))return(<div key={i} style={{fontSize:11,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--c-yel)',margin:'12px 0 4px'}}>{ln.replace(/^##\s*/,'')}</div>);if(/^[-•*]\s/.test(ln))return(<div key={i} style={{fontSize:12.5,color:'var(--g-ccc)',lineHeight:1.6,paddingLeft:12,marginBottom:2}}>• {ln.replace(/^[-•*]\s*/,'')}</div>);if(!ln.trim())return(<div key={i} style={{height:6}}/>);return(<div key={i} style={{fontSize:12.5,color:'var(--g-ccc)',lineHeight:1.65,marginBottom:2}}>{ln}</div>);});
       const TH={textAlign:'left',padding:'4px 12px',color:'var(--g-888)',fontSize:11,textTransform:'uppercase',letterSpacing:'.5px'};
       const TD={padding:'5px 12px',fontSize:12.5,color:'var(--g-ddd)'};
-      const kpis=[['Calls',cur.tc,prev.tc,false],['Booked (calls)',cur.tb,prev.tb,false],['Call conv %',pc(cur.tb,cur.tc),pc(prev.tb,prev.tc),true],['New leads (forms·ads·events)',cur.lt,prev.lt,false],['Leads booked',cur.lb,prev.lb,false],['Lead conv %',pc(cur.lb,cur.lt),pc(prev.lb,prev.lt),true],['IAs logged',Object.values(cur.ia||{}).reduce((a,b)=>a+(+b||0),0),Object.values(prev.ia||{}).reduce((a,b)=>a+(+b||0),0),false]];
+      const kpis=[['Treatment calls (new)',cur.tc,prev.tc,false],['Booked (calls)',cur.tb,prev.tb,false],['Call conv %',pc(cur.tb,cur.tc),pc(prev.tb,prev.tc),true],['Other calls (tallies)',oc(cur),oc(prev),false],['Total calls handled',cur.tc+oc(cur),prev.tc+oc(prev),false],['New leads (forms·ads·events)',cur.lt,prev.lt,false],['Leads booked',cur.lb,prev.lb,false],['Lead conv %',pc(cur.lb,cur.lt),pc(prev.lb,prev.lt),true],['IAs logged',Object.values(cur.ia||{}).reduce((a,b)=>a+(+b||0),0),Object.values(prev.ia||{}).reduce((a,b)=>a+(+b||0),0),false]];
       return(
       <div>
         <div className="flex aic g8 no-print" style={{flexWrap:'wrap',marginBottom:14}}>
@@ -3583,7 +3588,7 @@ function CallHistoryPage(){
           </table>
           <div style={{display:'flex',gap:24,flexWrap:'wrap',marginBottom:14}}>
             <div>
-              <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--g-aaa)',margin:'6px 0'}}>Call mix (day tallies)</div>
+              <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--g-aaa)',margin:'6px 0'}}>Other calls — day tallies · {oc(cur)} total</div>
               {META_TYPES.map(([k,lb,col])=>cur.meta[k]?<div key={k} style={{fontSize:12,color:'var(--g-ccc)',lineHeight:1.7}}><span style={{color:col,fontWeight:800}}>{cur.meta[k]}</span> {lb} <Del a={cur.meta[k]} b={prev.meta[k]||0}/></div>:null)}
               {Object.keys(cur.meta).length===0&&<div style={{fontSize:12,color:'var(--g-666)'}}>None logged.</div>}
             </div>
@@ -3611,7 +3616,7 @@ function CallHistoryPage(){
             <div style={{fontSize:11,color:'var(--g-666)',marginBottom:6}}>Calls = phone calls to the front desk (booked over the phone) · New leads = people added through forms, ads & community events, counted by created date — calls are never included · IAs = initial assessments logged in the IA Tracker. Three separate doors into the clinic.</div>
           <table style={{borderCollapse:'collapse',minWidth:520,marginBottom:16}}>
             <thead><tr><th style={TH}>Metric</th>{[...S].reverse().map(x=><th key={x.mo} style={TH}>{x.mo}</th>)}</tr></thead>
-            <tbody>{[['Calls (phone)',x=>x.tc],['Booked',x=>x.tb],['Call conv %',x=>pc(x.tb,x.tc)+'%'],['New leads (forms·ads·events)',x=>x.lt],['New leads booked',x=>x.lb],['New lead conv %',x=>pc(x.lb,x.lt)+'%'],['IAs logged',x=>Object.values(x.ia||{}).reduce((a,b)=>a+(+b||0),0)]].map(([lb,fn],i)=>(
+            <tbody>{[['Treatment calls (new)',x=>x.tc],['Booked',x=>x.tb],['Call conv %',x=>pc(x.tb,x.tc)+'%'],['Other calls (tallies)',x=>oc(x)],['Total calls handled',x=>x.tc+oc(x)],['New leads (forms·ads·events)',x=>x.lt],['New leads booked',x=>x.lb],['New lead conv %',x=>pc(x.lb,x.lt)+'%'],['IAs logged',x=>Object.values(x.ia||{}).reduce((a,b)=>a+(+b||0),0)]].map(([lb,fn],i)=>(
               <tr key={lb} style={{borderTop:'1px solid var(--border)',background:i%2?'transparent':'var(--stripe)'}}>
                 <td style={{...TD,fontWeight:700}}>{lb}</td>{[...S].reverse().map(x=><td key={x.mo} style={TD}>{fn(x.st)}</td>)}
               </tr>))}
