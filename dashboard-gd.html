@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L90';
+window.__BUILD='build L92';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -1943,7 +1943,9 @@ const avColor=n=>{const p=['var(--c-lime2)','#6B9FD4','var(--c-yel)','var(--c-pu
 const fmt=d=>d?new Date(d).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):'—';
 const fmtSz=b=>b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB';
 const ld=(k,fb)=>{try{const v=localStorage.getItem('rvgd3_'+k);return v?JSON.parse(v):fb;}catch{return fb;}};
-const sv=(k,v)=>{try{localStorage.setItem('rvgd3_'+k,JSON.stringify(v));}catch(e){}};
+const sv=(k,v)=>{try{localStorage.setItem('rvgd3_'+k,JSON.stringify(v));}catch(e){}
+  try{const m=JSON.parse(localStorage.getItem('rvgd3__ts')||'{}');m[k]=Date.now();localStorage.setItem('rvgd3__ts',JSON.stringify(m));}catch(e){}
+  try{if(window.__SB&&window.__GDSYNC&&window.__GDSYNC.ready){sv._t=sv._t||{};clearTimeout(sv._t[k]);sv._t[k]=setTimeout(()=>{window.__SB.from('gd_store').upsert({id:k,data:{v:v,t:Date.now()}}).then(r=>{window.__SYNC={ok:!r.error,at:Date.now(),msg:r.error?r.error.message:''};},()=>{});},600);}}catch(e){}};
 const calcScore=(scores,rubricId)=>{
   if(!scores||!rubricId||!RUBRIC_SYSTEMS[rubricId])return null;
   const cats=RUBRIC_SYSTEMS[rubricId].cats;
@@ -2016,6 +2018,35 @@ function App(){
   useEffect(()=>sv('staff',staff),[staff]);
   useEffect(()=>sv('evals',evals),[evals]);
   useEffect(()=>sv('sessions',sessions),[sessions]);
+  useEffect(()=>{let c=false,tries=0;const go=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(go,400);return;}
+    try{
+      const{data:rows,error}=await SB.from('gd_store').select('id,data');
+      if(error){window.__GDSYNC={ready:true};window.__SYNC={ok:false,at:Date.now(),msg:error.message||'gd_store missing — re-run revibe-gd-setup.sql'};return;}
+      if(c){window.__GDSYNC={ready:true};return;}
+      let ts={};try{ts=JSON.parse(localStorage.getItem('rvgd3__ts')||'{}');}catch(e){}
+      const srv={};(rows||[]).forEach(r=>{if(r&&r.data)srv[r.id]={v:r.data.v,t:+r.data.t||0};});
+      const setters={staff:setStaff,evals:setEvals,sessions:setSessions};
+      ['staff','evals','sessions'].forEach(k=>{
+        const lt=+ts[k]||0;const sRow=srv[k];
+        let localV=null;try{const raw=localStorage.getItem('rvgd3_'+k);localV=raw?JSON.parse(raw):null;}catch(e){}
+        if(sRow&&sRow.v!=null&&sRow.t>lt){
+          let v=sRow.v;
+          if(k==='staff'&&Array.isArray(localV)&&localV.length&&Array.isArray(v)&&!localStorage.getItem('rvgd3__staffunion')){
+            const kid=(pp)=>pp&&(pp.id!=null?String(pp.id):String(pp.name||''));
+            const by={};v.forEach(pp=>{const kk=kid(pp);if(kk)by[kk]=pp;});localV.forEach(pp=>{const kk=kid(pp);if(kk&&!by[kk])by[kk]=pp;});
+            const un=Object.values(by);try{localStorage.setItem('rvgd3__staffunion','1');}catch(e){}
+            if(un.length!==v.length){v=un;SB.from('gd_store').upsert({id:k,data:{v:un,t:Date.now()}}).then(()=>{},()=>{});}
+          }
+          try{localStorage.setItem('rvgd3_'+k,JSON.stringify(v));}catch(e){}
+          ts[k]=sRow.t;if(setters[k])setters[k](v);
+        }else if(localV!=null&&(!sRow||lt>sRow.t)){
+          SB.from('gd_store').upsert({id:k,data:{v:localV,t:lt||Date.now()}}).then(()=>{},()=>{});
+        }
+      });
+      try{localStorage.setItem('rvgd3__ts',JSON.stringify(ts));}catch(e){}
+    }catch(e){}
+    window.__GDSYNC={ready:true};
+  };go();return()=>{c=true;};},[]);// eslint-disable-line — gd_store sync: staff/evals/sessions
 
   // ── Supabase sync helpers ──────────────────────────────────────
   const SB=()=>window.__SB;
@@ -2825,6 +2856,24 @@ function CallHistoryPage(){
   const _push=(next)=>{const SB=window.__SB;if(!SB){setSync({s:'local',at:Date.now()});return;}try{const r=SB.from('call_log').upsert({id:'singleton',data:next});if(r&&r.then)r.then(({error})=>setSync({s:error?'error':'synced',at:Date.now()})).catch(()=>setSync({s:'error',at:Date.now()}));else setSync({s:'synced',at:Date.now()});}catch(e){setSync({s:'error',at:Date.now()});}};
   const[data,setData]=useState(()=>{let raw={};try{raw=JSON.parse(localStorage.getItem('rvgd3_call_log')||'{}');}catch(e){}return leadSeedMerge(seedMerge(migrate(raw)));});
   const persist=(next,sbNow)=>{const stamped={...next,_savedAt:Date.now()};setData(stamped);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(stamped));}catch(e){}try{RV_SNAP(stamped);}catch(e){}if(!window.__SB){setSync({s:'local',at:Date.now()});return;}setSync(p=>({s:'saving',at:p.at}));if(sbNow){_push(stamped);return;}if(sbTimer.current)clearTimeout(sbTimer.current);sbTimer.current=setTimeout(()=>_push(stamped),1200);};
+  const lastEdit=useRef(0);
+  useEffect(()=>{let dead=false;const check=async()=>{const SB=window.__SB;if(!SB)return;try{
+      if(Date.now()-lastEdit.current<8000)return; // never merge under the user's fingers
+      const{data:r,error}=await SB.from('call_log').select('data').eq('id','singleton').maybeSingle();
+      if(dead||error||!r||!r.data)return;
+      const srvTs=+r.data._savedAt||0;
+      let loc={};try{loc=JSON.parse(localStorage.getItem('rvgd3_call_log')||'{}');}catch(e){}
+      const locTs=+loc._savedAt||0;
+      if(srvTs>locTs){
+        RV_SNAP(loc);
+        const mg=leadSeedMerge(seedMerge(migrate(RV_MERGE(loc,r.data))));mg._savedAt=srvTs;
+        setData(mg);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(mg));}catch(e){}
+        try{if(JSON.stringify(mg)!==JSON.stringify(r.data))SB.from('call_log').upsert({id:'singleton',data:mg}).then(()=>{},()=>{});}catch(e){}
+        if(!dead)setSync({s:'pulled',at:Date.now()});
+      }else if(!dead)setSync(p=>(p.s==='saving'?p:{s:'fresh',at:Date.now()}));
+    }catch(e){}};
+    const iv=setInterval(check,60000);const t0=setTimeout(check,8000);
+    return()=>{dead=true;clearInterval(iv);clearTimeout(t0);};},[]);// eslint-disable-line — live cross-device freshness
   const backupRef=React.useRef(null);
   const exportBackup=()=>{try{const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='revibe-callhistory-backup-'+today+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}catch(e){window.alert('Export failed: '+((e&&e.message)||e));}};
   const importBackup=(file)=>{if(!file)return;const r=new FileReader();r.onload=()=>{try{const obj=JSON.parse(r.result);if(!obj||typeof obj!=='object'||!obj.calls)throw new Error('That file does not look like a Call History backup.');if(window.confirm('Restore this backup? It will REPLACE all current calls, leads, and sources — for everyone — with the contents of this file.')){persist(obj,true);window.alert('Backup restored.');}}catch(e){window.alert('Restore failed: '+((e&&e.message)||e));}};r.readAsText(file);};
@@ -2927,7 +2976,7 @@ function CallHistoryPage(){
   useEffect(()=>{if(selfSave.current){selfSave.current=false;return;}const e=(data.calls[loc]||{})[entryDate]||{};const base=Object.fromEntries(discList.map(([id])=>[id,{c:cOf(e[id])?String(cOf(e[id])):'',b:bOf(e[id])?String(bOf(e[id])):'',r:(e[id]&&typeof e[id]==='object'&&e[id].r)?{...e[id].r}:{}}]));const x=e._x||{};base._x=Object.fromEntries(META_TYPES.map(([k])=>[k,x[k]?String(x[k]):'']));justHydrated.current=true;setEntry(base);setSavedFlag(false);},[entryDate,loc,data]);// eslint-disable-line
   const saveEntry=()=>{const day={};discList.forEach(([id])=>{const c=parseInt(entry[id]&&entry[id].c)||0;const b=parseInt(entry[id]&&entry[id].b)||0;const rr={};const rsrc=(entry[id]&&entry[id].r)||{};Object.keys(rsrc).forEach(k=>{const n=parseInt(rsrc[k])||0;if(n>0)rr[k]=n;});const hasR=Object.keys(rr).length>0;if(c||b||hasR)day[id]=(b||hasR)?{c,b,...(hasR?{r:rr}:{})}:c;});const _x=entry._x||{};const xv={};META_TYPES.forEach(([k])=>{const v=parseInt(_x[k])||0;if(v)xv[k]=v;});if(Object.keys(xv).length)day._x=xv;const calls={...data.calls,[loc]:{...(data.calls[loc]||{})}};if(Object.keys(day).length){day._t=Date.now();calls[loc][entryDate]=day;}else delete calls[loc][entryDate];selfSave.current=true;persist({...data,calls},true);setSavedFlag(true);setTimeout(()=>setSavedFlag(false),1600);};
   saveRef.current=saveEntry;
-  useEffect(()=>{if(justHydrated.current){justHydrated.current=false;return;}if(autoT.current)clearTimeout(autoT.current);autoT.current=setTimeout(()=>{saveRef.current&&saveRef.current();},900);return()=>{if(autoT.current)clearTimeout(autoT.current);};},[entry]);// autosave: debounced on any field change
+  useEffect(()=>{if(justHydrated.current){justHydrated.current=false;return;}if(autoT.current)clearTimeout(autoT.current);lastEdit.current=Date.now();autoT.current=setTimeout(()=>{saveRef.current&&saveRef.current();},900);return()=>{if(autoT.current)clearTimeout(autoT.current);};},[entry]);// autosave: debounced on any field change
   const NC_REASONS_DEFAULT=['Scheduling conflict / Specific time request','Price concerns / Shopping around','Location too far','Wanted to think about it / call back','Prefers to book online / Needs to check schedule',"Looking for a service we don't provide",'Existing patient (not a new lead)','Insurance / Coverage issue','Inappropriate call'];
   const[ncOpts,setNcOpts]=useState(()=>{try{const raw=JSON.parse(localStorage.getItem('rvgd3_nc_reasons'))||[];return raw.map(x=>typeof x==='string'?x:(x&&x.label)).filter(Boolean);}catch(e){return[];}});
   const addCustomReason=(lab)=>{lab=(lab||'').trim();if(!lab||NC_REASONS_DEFAULT.includes(lab)||ncOpts.includes(lab))return;const next=[...ncOpts,lab];setNcOpts(next);try{localStorage.setItem('rvgd3_nc_reasons',JSON.stringify(next));}catch(e){}};
@@ -3074,7 +3123,7 @@ function CallHistoryPage(){
       <input type="file" accept="application/json,.json" ref={backupRef} style={{display:'none'}} onChange={e=>{importBackup(e.target.files[0]);e.target.value='';}}/>
       <button className="btn btn-ghost btn-sm" style={{marginLeft:'auto'}} onClick={exportBackup} title="Download a JSON backup of all calls, leads & sources">⬇ Backup</button>
       <button className="btn btn-ghost btn-sm" onClick={()=>backupRef.current&&backupRef.current.click()} title="Restore from a backup file — replaces current data for everyone">⬆ Restore</button>
-      {(()=>{const t=sync.at?new Date(sync.at).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}):null;const map={idle:['var(--g-666)','●','All changes save automatically'],saving:['var(--c-yel)','◌','Saving…'],synced:['var(--c-grn)','●','Synced to cloud'+(t?' · '+t:'')],local:['var(--c-amb)','⚠','Saved on this device — cloud unavailable'],error:['var(--c-red)','⚠','Saved locally — cloud sync failed']};const[c,icon,txt]=map[sync.s]||map.idle;return(<span style={{marginLeft:10,display:'flex',alignItems:'center',gap:6,fontSize:12.5,color:c}}><span>{icon}</span>{txt}</span>);})()}
+      {(()=>{const t=sync.at?new Date(sync.at).toLocaleTimeString('en-CA',{hour:'numeric',minute:'2-digit'}):null;const map={idle:['var(--g-666)','●','All changes save automatically'],saving:['var(--c-yel)','◌','Saving…'],synced:['var(--c-grn)','●','Synced to cloud'+(t?' · '+t:'')],fresh:['var(--c-grn)','●','Up to date with cloud'+(t?' · checked '+t:'')],pulled:['var(--c-grn)','⬇','Updated from the other location'+(t?' · '+t:'')],local:['var(--c-amb)','⚠','Saved on this device — cloud unavailable'],error:['var(--c-red)','⚠','Saved locally — cloud sync failed']};const[c,icon,txt]=map[sync.s]||map.idle;return(<span style={{marginLeft:10,display:'flex',alignItems:'center',gap:6,fontSize:12.5,color:c}}><span>{icon}</span>{txt}</span>);})()}
     </div>
 
     {view==='calls'&&(<>
@@ -8051,6 +8100,7 @@ function SyncChip(){
       try{
         const r1=await SB.from('call_log').select('id').limit(1);if(r1.error)throw r1.error;
         const r2=await SB.from('transcripts').select('id').limit(1);if(r2.error)throw r2.error;
+        const r3=await SB.from('gd_store').select('id').limit(1);if(r3.error)throw r3.error;
         if(!dead)setSt({ok:true,msg:'Database reachable — call data, forms, leadership & transcripts syncing'});
       }catch(e){if(!dead)setSt({ok:false,msg:(e&&e.message)||'connection failed'});}
     };
