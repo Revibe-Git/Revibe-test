@@ -561,9 +561,10 @@ textarea{resize:vertical;min-height:60px;}
   body.evrpt-print *{visibility:hidden!important;}
   body.evrpt-print .evrpt-print-area,body.evrpt-print .evrpt-print-area *{visibility:visible!important;}
   body.evrpt-print .evrpt-print-area{position:absolute!important;left:0;top:0;width:100%!important;padding:0!important;border:none!important;background:#fff!important;}
-  body.evrpt-print .evrpt-print-area *{color:#243029!important;background:transparent!important;border-color:#d3ded7!important;}
-  body.evrpt-print .evrpt-print-area b,body.evrpt-print .evrpt-print-area .evrpt-h{color:#0B6E54!important;}
-  body.evrpt-print .evrpt-print-area table{border-top:1px solid #d3ded7!important;}
+  body.evrpt-print .evrpt-print-area.evrpt-dark{background:var(--surface,#10160f)!important;padding:18px 22px!important;border-radius:0!important;}
+  body.evrpt-print .evrpt-print-area:not(.evrpt-dark) *{color:#243029!important;background:transparent!important;border-color:#d3ded7!important;}
+  body.evrpt-print .evrpt-print-area:not(.evrpt-dark) b,body.evrpt-print .evrpt-print-area:not(.evrpt-dark) .evrpt-h{color:#0B6E54!important;}
+  body.evrpt-print .evrpt-print-area:not(.evrpt-dark) table{border-top:1px solid #d3ded7!important;}
   body.evrpt-print .evrpt-print-area .evrpt-only{display:block!important;}
   body.evrpt-print .no-print{display:none!important;}
   body.evrpt-print,body.evrpt-print #root,body.evrpt-print #root>div,body.evrpt-print .main,body.evrpt-print .scroll{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;}
@@ -1871,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L85';
+window.__BUILD='build L88';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -2243,8 +2244,8 @@ function CommunityPage({setPage}){
   const load=()=>{try{return JSON.parse(localStorage.getItem(LS)||'{}');}catch(e){return{};}};
   const[data,setData]=useState(()=>{const d=load();return d&&d.calls?d:{v:2,calls:{},sources:[],leads:{}};});
   const _t=React.useRef(null);
-  useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data:row}=await SB.from('call_log').select('data').eq('id','singleton').maybeSingle();if(c)return;let localRaw={},localTs=0;try{localRaw=JSON.parse(localStorage.getItem(LS)||'{}');localTs=localRaw._savedAt||0;}catch(e){}const localHasContent=!!(localRaw&&localRaw.calls&&(Object.keys(localRaw.leads||{}).length||(localRaw.sources||[]).length||Object.keys(localRaw.calls||{}).length));if(row&&row.data&&row.data.calls){const srvTs=row.data._savedAt||0;const adopt=srvTs>localTs||(srvTs===localTs&&!localHasContent);if(adopt){setData(row.data);try{localStorage.setItem(LS,JSON.stringify(row.data));}catch(e){}}else{SB.from('call_log').upsert({id:'singleton',data:localRaw}).then(()=>{},()=>{});}}else if(localHasContent){SB.from('call_log').upsert({id:'singleton',data:localRaw}).then(()=>{},()=>{});}}catch(e){}};ld();return()=>{c=true;};},[]);
-  const persist=(next,now)=>{const stamped={...next,_savedAt:Date.now()};setData(stamped);try{localStorage.setItem(LS,JSON.stringify(stamped));}catch(e){}const SB=window.__SB;if(!SB)return;clearTimeout(_t.current);const push=()=>{SB.from('call_log').upsert({id:'singleton',data:stamped}).then(()=>{},()=>{});};if(now)push();else _t.current=setTimeout(push,700);};
+  useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data:row}=await SB.from('call_log').select('data').eq('id','singleton').maybeSingle();if(c)return;let localRaw={},localTs=0;try{localRaw=JSON.parse(localStorage.getItem(LS)||'{}');localTs=localRaw._savedAt||0;}catch(e){}const localHasContent=!!(localRaw&&localRaw.calls&&(Object.keys(localRaw.leads||{}).length||(localRaw.sources||[]).length||Object.keys(localRaw.calls||{}).length));if(row&&row.data&&row.data.calls){const srvTs=row.data._savedAt||0;const adopt=srvTs>localTs||(srvTs===localTs&&!localHasContent);if(adopt){RV_SNAP(localRaw);const mg=RV_MERGE(localRaw,row.data);mg._savedAt=Math.max(srvTs,localTs);setData(mg);try{localStorage.setItem(LS,JSON.stringify(mg));}catch(e){}try{if(JSON.stringify(mg)!==JSON.stringify(row.data))SB.from('call_log').upsert({id:'singleton',data:mg}).then(()=>{},()=>{});}catch(e){}}else{SB.from('call_log').upsert({id:'singleton',data:localRaw}).then(()=>{},()=>{});}}else if(localHasContent){SB.from('call_log').upsert({id:'singleton',data:localRaw}).then(()=>{},()=>{});}}catch(e){}};ld();return()=>{c=true;};},[]);
+  const persist=(next,now)=>{const stamped={...next,_savedAt:Date.now()};setData(stamped);try{localStorage.setItem(LS,JSON.stringify(stamped));}catch(e){}try{RV_SNAP(stamped);}catch(e){}const SB=window.__SB;if(!SB)return;clearTimeout(_t.current);const push=()=>{SB.from('call_log').upsert({id:'singleton',data:stamped}).then(()=>{},()=>{});};if(now)push();else _t.current=setTimeout(push,700);};
 
   const events=(data.sources||[]).filter(x=>x.kind==='event');
   const leadsOf=(sid)=>(data.leads||{})[sid]||[];
@@ -2348,15 +2349,15 @@ function CommunityPage({setPage}){
   const onImportFile=(file)=>{if(!file)return;const rd=new FileReader();rd.onload=(ev)=>{try{const XLSX=window.XLSX;if(!XLSX){window.alert('Spreadsheet reader is still loading \u2014 give it a second and try again.');return;}const wb=XLSX.read(new Uint8Array(ev.target.result),{type:'array'});const sheets=wb.SheetNames.map(nm=>modelSheet(nm,XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:false,defval:''}))).filter(Boolean);if(!sheets.length){window.alert('No readable rows found in that file.');return;}setImp({sheets});}catch(err){window.alert('Could not read that file: '+err.message);}};rd.readAsArrayBuffer(file);};
   const STATS=(sid)=>{const ls=leadsOf(sid);const bk=ls.filter(l=>l.status==='Booked');const b=bk.length;const bComp=bk.filter(l=>l.bookedComp).length;const bPaid=b-bComp;const bSauna=bk.filter(l=>l.bookedType==='sauna').length;const bTreat=b-bSauna;const ns=ls.filter(l=>CLOSED.includes(l.status)&&l.status!=='Booked').length;const c=ls.filter(l=>(l.followups||[]).length>0||(l.status&&l.status!=='New')).length;return{n:ls.length,b,bComp,bPaid,bSauna,bTreat,ns,c,open:ls.length-b-ns,conv:ls.length?b/ls.length*100:0};};
   const money=(v)=>'$'+(+v||0).toLocaleString('en-CA',{maximumFractionDigits:0});
-  const roiOf=(e)=>{const st=STATS(e.id);const opp=(+e.thCount||0)*(+e.thHours||0)*(+e.thRate||0);const labour=(+e.coordHours||0)*(+e.coordRate||0);let hard=+e.hardCost||0;if(!opp&&!labour&&!hard&&(+e.cost||0)>0)hard=+e.cost||0;const cost=opp+labour+hard;const perBk=+e.estPerBook||125;const est=leadsOf(e.id).reduce((sm,l)=>sm+((l.status==='Booked'&&!l.bookedComp)?((+l.bookedValue>0)?+l.bookedValue:perBk):0),0);const roi=cost>0?((est-cost)/cost*100):null;return{...st,cost,opp,labour,hard,est,roi,cpl:st.n&&cost?cost/st.n:null,cpb:st.b&&cost?cost/st.b:null};};
+  const roiOf=(e)=>{const st=STATS(e.id);const opp=(+e.thCount||0)*(+e.thHours||0)*(+e.thRate||0);const labour=(+e.coordHours||0)*(+e.coordRate||0);let hard=+e.hardCost||0;if(!opp&&!labour&&!hard&&(+e.cost||0)>0)hard=+e.cost||0;const cost=opp+labour+hard;const perBk=+e.estPerBook||125;const est=leadsOf(e.id).reduce((sm,l)=>sm+((l.status==='Booked'&&!l.bookedComp)?((+l.bookedValue>0)?+l.bookedValue:perBk):0),0);const roi=cost>0?((est-cost)/cost*100):null;const ltV=leadsOf(e.id).reduce((sm,l)=>sm+(+l.ltVisits||0),0);const ltR=leadsOf(e.id).reduce((sm,l)=>sm+(+l.ltRev||0),0);const ltRoi=cost>0&&ltR>0?((ltR-cost)/cost*100):null;return{...st,cost,opp,labour,hard,est,roi,ltV,ltR,ltRoi,cpl:st.n&&cost?cost/st.n:null,cpb:st.b&&cost?cost/st.b:null};};
   const evDate=(e)=>e.eventDate||(leadsOf(e.id).map(l=>l.date).filter(Boolean).sort()[0]||'');
   const rMonday=(iso)=>{const d=new Date(iso+'T12:00');const wd=(d.getDay()+6)%7;d.setDate(d.getDate()-wd);return d.toISOString().slice(0,10);};
   const gKey=(iso,g)=>{if(!iso)return '';if(g==='year')return iso.slice(0,4);if(g==='quarter'){const m=parseInt(iso.slice(5,7))||1;return iso.slice(0,4)+' Q'+(Math.floor((m-1)/3)+1);}if(g==='week')return 'Wk of '+rMonday(iso);return iso.slice(0,7);};
   const repPeriods=[...new Set(events.map(e=>gKey(evDate(e),repGran)).filter(Boolean))].sort((a,b)=>a<b?1:-1);
   const curPer=repPeriods.includes(repPer)?repPer:(repPeriods[0]||'');
   const repRows=events.filter(e=>gKey(evDate(e),repGran)===curPer).map(e=>({e,r:roiOf(e),when:evDate(e)})).sort((a,b)=>a.when<b.when?1:-1);
-  const repT=repRows.reduce((t,x)=>{t.n+=x.r.n;t.b+=x.r.b;t.bComp+=x.r.bComp;t.bTreat+=x.r.bTreat;t.bSauna+=x.r.bSauna;t.cost+=x.r.cost;t.opp+=x.r.opp;t.labour+=x.r.labour;t.hard+=x.r.hard;t.est+=x.r.est;return t;},{n:0,b:0,bComp:0,bTreat:0,bSauna:0,cost:0,opp:0,labour:0,hard:0,est:0});
-  const repConv=repT.n?repT.b/repT.n*100:0;const repRoi=repT.cost>0?((repT.est-repT.cost)/repT.cost*100):null;
+  const repT=repRows.reduce((t,x)=>{t.n+=x.r.n;t.b+=x.r.b;t.bComp+=x.r.bComp;t.bTreat+=x.r.bTreat;t.bSauna+=x.r.bSauna;t.cost+=x.r.cost;t.opp+=x.r.opp;t.labour+=x.r.labour;t.hard+=x.r.hard;t.est+=x.r.est;t.ltV+=x.r.ltV;t.ltR+=x.r.ltR;return t;},{n:0,b:0,bComp:0,bTreat:0,bSauna:0,cost:0,opp:0,labour:0,hard:0,est:0,ltV:0,ltR:0});
+  const repConv=repT.n?repT.b/repT.n*100:0;const repRoi=repT.cost>0?((repT.est-repT.cost)/repT.cost*100):null;const repLtRoi=repT.cost>0&&repT.ltR>0?((repT.ltR-repT.cost)/repT.cost*100):null;
   const repLeads=repRows.flatMap(x=>leadsOf(x.e.id));
   const repStatus={};repLeads.forEach(l=>{const st=l.status||'New';repStatus[st]=(repStatus[st]||0)+1;});
   const repLoc={};repLeads.forEach(l=>{const k=l.location||'—';(repLoc[k]=repLoc[k]||{n:0,b:0});repLoc[k].n++;if(l.status==='Booked')repLoc[k].b++;});
@@ -2379,14 +2380,14 @@ function CommunityPage({setPage}){
     L.push(csvRow(['  Therapist opportunity',r2(repT.opp)]));
     L.push(csvRow(['  Coordination',r2(repT.labour)]));
     L.push(csvRow(['  Hard costs',r2(repT.hard)]));
-    L.push(csvRow(['Est. revenue',r2(repT.est)]));
+    L.push(csvRow(['Est. revenue (event day)',r2(repT.est)]));L.push(csvRow(['Lifetime revenue',r2(repT.ltR)]));L.push(csvRow(['Lifetime visits',repT.ltV]));L.push(csvRow(['Lifetime ROI %',repLtRoi==null?'':r2(repLtRoi)]));
     L.push(csvRow(['ROI %',repRoi==null?'':r2(repRoi)]));
     L.push(csvRow(['$ per lead',repT.n&&repT.cost?r2(repT.cost/repT.n):'']));
     L.push(csvRow(['$ per booking',repT.b&&repT.cost?r2(repT.cost/repT.b):'']));
     L.push('');
     L.push(csvRow(['Events']));
-    L.push(csvRow(['Event','Date','Type','Leads','Booked','Conversion %','Total cost','Therapist opp','Coordination','Hard','Est. revenue','$/booking','ROI %']));
-    repRows.forEach(({e,r,when})=>L.push(csvRow([e.name,when,e.eventType||'',r.n,r.b,r.n?r2(r.conv):'',r2(r.cost),r2(r.opp),r2(r.labour),r2(r.hard),r2(r.est),r.cpb!=null?r2(r.cpb):'',r.roi==null?'':r2(r.roi)])));
+    L.push(csvRow(['Event','Date','Type','Leads','Booked','Conversion %','Total cost','Therapist opp','Coordination','Hard','Est. revenue','$/booking','ROI %','Lifetime visits','Lifetime revenue','Lifetime ROI %']));
+    repRows.forEach(({e,r,when})=>L.push(csvRow([e.name,when,e.eventType||'',r.n,r.b,r.n?r2(r.conv):'',r2(r.cost),r2(r.opp),r2(r.labour),r2(r.hard),r2(r.est),r.cpb!=null?r2(r.cpb):'',r.roi==null?'':r2(r.roi),r.ltV||0,r2(r.ltR||0),r.ltRoi==null?'':r2(r.ltRoi)])));
     L.push('');
     L.push(csvRow(['Leads by status']));
     L.push(csvRow(['Status','Count']));
@@ -2554,7 +2555,7 @@ function CommunityPage({setPage}){
           {repRows.length===0?<div style={{fontSize:13,color:'var(--g-666)'}}>No events dated in this period. Give an event a date (or pick another period from the dropdown).</div>:(
           <div>
             <div style={{display:'flex',gap:'10px 22px',flexWrap:'wrap',marginBottom:14}}>
-              {[['Events',repRows.length,'var(--g-eee)'],['Leads',repT.n,'var(--g-eee)'],['Booked',repT.b,'var(--c-grn)'],['Conversion',repT.n?repConv.toFixed(0)+'%':'—','var(--c-blu2)'],['Cost',money(repT.cost),'var(--c-amb)'],['Est. revenue',money(repT.est),'var(--c-lime2)'],['ROI',repRoi==null?'—':(repRoi>=0?'+':'')+repRoi.toFixed(0)+'%',repRoi==null?'var(--g-888)':repRoi>=0?'var(--c-grn)':'var(--c-red)'],['$ / lead',repT.n&&repT.cost?money(repT.cost/repT.n):'—','var(--g-aaa)'],['$ / booking',repT.b&&repT.cost?money(repT.cost/repT.b):'—','var(--g-aaa)']].map(([lb,val,col])=>(
+              {[['Events',repRows.length,'var(--g-eee)'],['Leads',repT.n,'var(--g-eee)'],['Booked',repT.b,'var(--c-grn)'],['Conversion',repT.n?repConv.toFixed(0)+'%':'—','var(--c-blu2)'],['Cost',money(repT.cost),'var(--c-amb)'],['Est. revenue',money(repT.est),'var(--c-lime2)'],['ROI',repRoi==null?'—':(repRoi>=0?'+':'')+repRoi.toFixed(0)+'%',repRoi==null?'var(--g-888)':repRoi>=0?'var(--c-grn)':'var(--c-red)'],['Lifetime rev',repT.ltR?money(repT.ltR):'—','var(--c-lime2)'],['Lifetime ROI',repLtRoi==null?'—':(repLtRoi>=0?'+':'')+repLtRoi.toFixed(0)+'%',repLtRoi==null?'var(--g-888)':repLtRoi>=0?'var(--c-grn)':'var(--c-red)'],['Lifetime visits',repT.ltV||'—','var(--g-aaa)'],['$ / lead',repT.n&&repT.cost?money(repT.cost/repT.n):'—','var(--g-aaa)'],['$ / booking',repT.b&&repT.cost?money(repT.cost/repT.b):'—','var(--g-aaa)']].map(([lb,val,col])=>(
                 <div key={lb}><div style={{fontSize:19,fontWeight:700,fontFamily:"'Barlow Condensed',sans-serif",color:col}}>{val}</div><div style={{fontSize:11,color:'var(--g-888)'}}>{lb}</div></div>))}
             </div>
             {repT.cost>0&&<div style={{fontSize:12,color:'var(--g-999)',marginTop:-4,marginBottom:14}}>Total cost <b style={{color:'var(--c-amb)'}}>{money(repT.cost)}</b> = therapist opportunity {money(repT.opp)} + coordination {money(repT.labour)} + hard {money(repT.hard)}</div>}
@@ -2664,6 +2665,8 @@ function CommunityPage({setPage}){
                     {l.status==='Booked'&&<select value={l.bookedType||'treatment'} onChange={x=>setBookMeta(e.id,l.id,{bookedType:x.target.value})} title="What was booked" style={{...inp,width:'auto',padding:'4px 7px',fontSize:11.5}}><option value="treatment">Treatment</option><option value="sauna">Sauna / Plunge</option></select>}
                     {l.status==='Booked'&&!l.bookedComp&&<span style={{display:'inline-flex',alignItems:'center',gap:2,fontSize:11.5,color:'var(--g-888)'}} title="Value of this booking — leave blank to use the event default"><span>$</span><input type="number" min="0" value={l.bookedValue||''} onChange={x=>setBookMeta(e.id,l.id,{bookedValue:parseFloat(x.target.value)||0})} placeholder={String(+e.estPerBook||125)} style={{...inp,width:60,padding:'3px 6px',fontSize:11.5}}/></span>}
                     {l.status==='Booked'&&<label style={{fontSize:11.5,color:l.bookedComp?'var(--c-amb)':'var(--g-888)',display:'inline-flex',alignItems:'center',gap:3,cursor:'pointer'}} title="Comp = complimentary, not paid ($0 revenue)"><input type="checkbox" checked={!!l.bookedComp} onChange={x=>setBookMeta(e.id,l.id,{bookedComp:x.target.checked})}/>Comp</label>}
+                    {l.status==='Booked'&&<span style={{display:'inline-flex',alignItems:'center',gap:3,fontSize:11.5,color:'var(--g-888)'}} title="Lifetime visits — total visits this person has had since the event. Front desk: update each quarter."><input type="number" min="0" value={l.ltVisits??''} onChange={x=>setBookMeta(e.id,l.id,{ltVisits:x.target.value===''?null:Math.max(0,parseInt(x.target.value)||0)})} placeholder="visits" style={{...inp,width:58,padding:'3px 6px',fontSize:11.5}}/><span>vis</span></span>}
+                    {l.status==='Booked'&&<span style={{display:'inline-flex',alignItems:'center',gap:2,fontSize:11.5,color:'var(--c-lime2)'}} title="Lifetime revenue — total $ this person has generated since the event, all visits and services. Front desk: update each quarter."><span>Σ$</span><input type="number" min="0" value={l.ltRev??''} onChange={x=>setBookMeta(e.id,l.id,{ltRev:x.target.value===''?null:Math.max(0,parseFloat(x.target.value)||0)})} placeholder="lifetime" style={{...inp,width:72,padding:'3px 6px',fontSize:11.5}}/></span>}
                   </div>
                 ))}
               {leadsOf(e.id).length>30&&<div style={{fontSize:12,color:'var(--g-666)',marginTop:6}}>Showing 30 of {leadsOf(e.id).length} — open the full pipeline for the rest.</div>}
@@ -2821,7 +2824,7 @@ function CallHistoryPage(){
   const[sync,setSync]=useState({s:'idle',at:null});
   const _push=(next)=>{const SB=window.__SB;if(!SB){setSync({s:'local',at:Date.now()});return;}try{const r=SB.from('call_log').upsert({id:'singleton',data:next});if(r&&r.then)r.then(({error})=>setSync({s:error?'error':'synced',at:Date.now()})).catch(()=>setSync({s:'error',at:Date.now()}));else setSync({s:'synced',at:Date.now()});}catch(e){setSync({s:'error',at:Date.now()});}};
   const[data,setData]=useState(()=>{let raw={};try{raw=JSON.parse(localStorage.getItem('rvgd3_call_log')||'{}');}catch(e){}return leadSeedMerge(seedMerge(migrate(raw)));});
-  const persist=(next,sbNow)=>{const stamped={...next,_savedAt:Date.now()};setData(stamped);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(stamped));}catch(e){}if(!window.__SB){setSync({s:'local',at:Date.now()});return;}setSync(p=>({s:'saving',at:p.at}));if(sbNow){_push(stamped);return;}if(sbTimer.current)clearTimeout(sbTimer.current);sbTimer.current=setTimeout(()=>_push(stamped),1200);};
+  const persist=(next,sbNow)=>{const stamped={...next,_savedAt:Date.now()};setData(stamped);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(stamped));}catch(e){}try{RV_SNAP(stamped);}catch(e){}if(!window.__SB){setSync({s:'local',at:Date.now()});return;}setSync(p=>({s:'saving',at:p.at}));if(sbNow){_push(stamped);return;}if(sbTimer.current)clearTimeout(sbTimer.current);sbTimer.current=setTimeout(()=>_push(stamped),1200);};
   const backupRef=React.useRef(null);
   const exportBackup=()=>{try{const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='revibe-callhistory-backup-'+today+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);}catch(e){window.alert('Export failed: '+((e&&e.message)||e));}};
   const importBackup=(file)=>{if(!file)return;const r=new FileReader();r.onload=()=>{try{const obj=JSON.parse(r.result);if(!obj||typeof obj!=='object'||!obj.calls)throw new Error('That file does not look like a Call History backup.');if(window.confirm('Restore this backup? It will REPLACE all current calls, leads, and sources — for everyone — with the contents of this file.')){persist(obj,true);window.alert('Backup restored.');}}catch(e){window.alert('Restore failed: '+((e&&e.message)||e));}};r.readAsText(file);};
@@ -2886,7 +2889,7 @@ function CallHistoryPage(){
     setCsvPrev(null);
   };
   useEffect(()=>{try{localStorage.setItem('rvgd3_call_log',JSON.stringify(data));}catch(e){}},[]);// eslint-disable-line
-  useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data:row}=await SB.from('call_log').select('data').eq('id','singleton').maybeSingle();if(c)return;let localRaw={},localTs=0;try{localRaw=JSON.parse(localStorage.getItem('rvgd3_call_log')||'{}');localTs=localRaw._savedAt||0;}catch(e){}const localHasContent=!!(localRaw&&localRaw.calls&&(Object.keys(localRaw.leads||{}).length||(localRaw.sources||[]).length||Object.keys(localRaw.calls||{}).length));if(row&&row.data&&typeof row.data==='object'&&row.data.calls){const srvTs=row.data._savedAt||0;const adopt=srvTs>localTs||(srvTs===localTs&&!localHasContent);if(adopt){const merged=leadSeedMerge(seedMerge(migrate(row.data)));merged._savedAt=srvTs;setData(merged);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(merged));}catch(e){}SB.from('call_log').upsert({id:'singleton',data:merged});}else{SB.from('call_log').upsert({id:'singleton',data:localRaw}).then(()=>{},()=>{});}}else if(localHasContent){SB.from('call_log').upsert({id:'singleton',data:localRaw}).then(()=>{},()=>{});}}catch(e){}};ld();return()=>{c=true;};},[]);// eslint-disable-line
+  useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data:row}=await SB.from('call_log').select('data').eq('id','singleton').maybeSingle();if(c)return;let localRaw={},localTs=0;try{localRaw=JSON.parse(localStorage.getItem('rvgd3_call_log')||'{}');localTs=localRaw._savedAt||0;}catch(e){}const localHasContent=!!(localRaw&&localRaw.calls&&(Object.keys(localRaw.leads||{}).length||(localRaw.sources||[]).length||Object.keys(localRaw.calls||{}).length));if(row&&row.data&&typeof row.data==='object'&&row.data.calls){const srvTs=row.data._savedAt||0;const adopt=srvTs>localTs||(srvTs===localTs&&!localHasContent);if(adopt){RV_SNAP(localRaw);const merged=leadSeedMerge(seedMerge(migrate(RV_MERGE(localRaw,row.data))));merged._savedAt=Math.max(srvTs,localTs);setData(merged);try{localStorage.setItem('rvgd3_call_log',JSON.stringify(merged));}catch(e){}SB.from('call_log').upsert({id:'singleton',data:merged}).then(()=>{},()=>{});}else{SB.from('call_log').upsert({id:'singleton',data:localRaw}).then(()=>{},()=>{});}}else if(localHasContent){SB.from('call_log').upsert({id:'singleton',data:localRaw}).then(()=>{},()=>{});}}catch(e){}};ld();return()=>{c=true;};},[]);// eslint-disable-line
 
   const[view,setView]=useState(()=>{try{return sessionStorage.getItem('rvgd3_open_src')?'leads':'calls';}catch(e){return 'calls';}});
   const[loc,setLoc]=useState('Mississauga');
@@ -2922,7 +2925,7 @@ function CallHistoryPage(){
   const[savedFlag,setSavedFlag]=useState(false);
   const selfSave=useRef(false);const justHydrated=useRef(true);const autoT=useRef(null);const saveRef=useRef(null);
   useEffect(()=>{if(selfSave.current){selfSave.current=false;return;}const e=(data.calls[loc]||{})[entryDate]||{};const base=Object.fromEntries(discList.map(([id])=>[id,{c:cOf(e[id])?String(cOf(e[id])):'',b:bOf(e[id])?String(bOf(e[id])):'',r:(e[id]&&typeof e[id]==='object'&&e[id].r)?{...e[id].r}:{}}]));const x=e._x||{};base._x=Object.fromEntries(META_TYPES.map(([k])=>[k,x[k]?String(x[k]):'']));justHydrated.current=true;setEntry(base);setSavedFlag(false);},[entryDate,loc,data]);// eslint-disable-line
-  const saveEntry=()=>{const day={};discList.forEach(([id])=>{const c=parseInt(entry[id]&&entry[id].c)||0;const b=parseInt(entry[id]&&entry[id].b)||0;const rr={};const rsrc=(entry[id]&&entry[id].r)||{};Object.keys(rsrc).forEach(k=>{const n=parseInt(rsrc[k])||0;if(n>0)rr[k]=n;});const hasR=Object.keys(rr).length>0;if(c||b||hasR)day[id]=(b||hasR)?{c,b,...(hasR?{r:rr}:{})}:c;});const _x=entry._x||{};const xv={};META_TYPES.forEach(([k])=>{const v=parseInt(_x[k])||0;if(v)xv[k]=v;});if(Object.keys(xv).length)day._x=xv;const calls={...data.calls,[loc]:{...(data.calls[loc]||{})}};if(Object.keys(day).length)calls[loc][entryDate]=day;else delete calls[loc][entryDate];selfSave.current=true;persist({...data,calls},true);setSavedFlag(true);setTimeout(()=>setSavedFlag(false),1600);};
+  const saveEntry=()=>{const day={};discList.forEach(([id])=>{const c=parseInt(entry[id]&&entry[id].c)||0;const b=parseInt(entry[id]&&entry[id].b)||0;const rr={};const rsrc=(entry[id]&&entry[id].r)||{};Object.keys(rsrc).forEach(k=>{const n=parseInt(rsrc[k])||0;if(n>0)rr[k]=n;});const hasR=Object.keys(rr).length>0;if(c||b||hasR)day[id]=(b||hasR)?{c,b,...(hasR?{r:rr}:{})}:c;});const _x=entry._x||{};const xv={};META_TYPES.forEach(([k])=>{const v=parseInt(_x[k])||0;if(v)xv[k]=v;});if(Object.keys(xv).length)day._x=xv;const calls={...data.calls,[loc]:{...(data.calls[loc]||{})}};if(Object.keys(day).length){day._t=Date.now();calls[loc][entryDate]=day;}else delete calls[loc][entryDate];selfSave.current=true;persist({...data,calls},true);setSavedFlag(true);setTimeout(()=>setSavedFlag(false),1600);};
   saveRef.current=saveEntry;
   useEffect(()=>{if(justHydrated.current){justHydrated.current=false;return;}if(autoT.current)clearTimeout(autoT.current);autoT.current=setTimeout(()=>{saveRef.current&&saveRef.current();},900);return()=>{if(autoT.current)clearTimeout(autoT.current);};},[entry]);// autosave: debounced on any field change
   const NC_REASONS_DEFAULT=['Scheduling conflict / Specific time request','Price concerns / Shopping around','Location too far','Wanted to think about it / call back','Prefers to book online / Needs to check schedule',"Looking for a service we don't provide",'Existing patient (not a new lead)','Insurance / Coverage issue','Inappropriate call'];
@@ -3554,7 +3557,7 @@ function CallHistoryPage(){
           <button className="btn btn-lime btn-sm" disabled={moAIBusy} onClick={()=>genMonthlyAI(digest,pk)}>{moAIBusy?'🤖 Analyzing 4 '+perNoun+'s…':(moAI&&moAI.mo===pk?'🤖 Regenerate write-up':'🤖 AI trend write-up')}</button>
           <span style={{fontSize:11,color:'var(--g-666)'}}>Compares {pk} against the previous 3 {perNoun}s · both locations combined</span>
         </div>
-        <div className="evrpt-print-area">
+        <div className="evrpt-print-area evrpt-dark">
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,letterSpacing:'2px',color:'var(--text)'}}>REVIBE — {(perNoun+'LY').toUpperCase()} REPORT</div>
           <div style={{fontSize:12.5,color:'var(--g-999)',marginBottom:14}}>{pk} · calls + lead sources · generated {new Date().toISOString().slice(0,10)}</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:10,marginBottom:16}}>
@@ -8019,7 +8022,24 @@ function StaffPage({staff,openProfile,setModal}){
 
 /* ══ EVALS PAGE ══ */
 // ===== G&D Meeting voice recorder (IndexedDB, device-local) =====
+function RV_SNAP(d){try{const day=new Date().toISOString().slice(0,10);const key='rvgd3_snap_'+day;if(localStorage.getItem(key))return;localStorage.setItem(key,JSON.stringify(d||{}));const ks=Object.keys(localStorage).filter(k=>k.indexOf('rvgd3_snap_')===0).sort();while(ks.length>10){localStorage.removeItem(ks.shift());}}catch(e){}}
+function RV_MERGE(a,b){ // a = rescue-from copy, b = base copy; result = b with a's data unioned in (day/lead level — nothing silently lost)
+  a=a&&typeof a==='object'?a:{};b=b&&typeof b==='object'?b:{};const out={...b};
+  const cellCount=(day)=>{let n=0;Object.entries(day||{}).forEach(([k,v])=>{if(k==='_x'||k==='_t')return;const c=+((v||{}).c)||0,bk=+((v||{}).b)||0;const r=(v||{}).r||{};if(c||bk||Object.keys(r).length)n++;});if(Object.keys(((day||{})._x)||{}).length)n++;return n;};
+  out.calls={...(b.calls||{})};
+  Object.entries(a.calls||{}).forEach(([L,days])=>{out.calls[L]={...(out.calls[L]||{})};Object.entries(days||{}).forEach(([dt,day])=>{const sv=out.calls[L][dt];if(!sv){out.calls[L][dt]=day;return;}const at=+((day||{})._t)||0,st=+((sv||{})._t)||0;if(at&&st){if(at>st)out.calls[L][dt]=day;}else if(cellCount(day)>cellCount(sv)){out.calls[L][dt]=day;}});});
+  const iaSum=(d)=>Object.values(d||{}).reduce((sm,n)=>sm+(+n||0),0);
+  out.iaLog={...(b.iaLog||{})};
+  Object.entries(a.iaLog||{}).forEach(([L,days])=>{out.iaLog[L]={...(out.iaLog[L]||{})};Object.entries(days||{}).forEach(([dt,d])=>{const sv=out.iaLog[L][dt];if(!sv||iaSum(d)>iaSum(sv))out.iaLog[L][dt]=d;});});
+  const sIds=new Set((b.sources||[]).map(x=>x&&x.id));out.sources=[...(b.sources||[])];(a.sources||[]).forEach(x=>{if(x&&!sIds.has(x.id))out.sources.push(x);});
+  out.leads={...(b.leads||{})};
+  Object.entries(a.leads||{}).forEach(([sid,arr])=>{const by={};(out.leads[sid]||[]).forEach(l=>{if(l&&l.id)by[l.id]=l;});(arr||[]).forEach(l=>{if(!l||!l.id)return;const o=by[l.id];if(!o){by[l.id]=l;}else{try{if(JSON.stringify(l).length>JSON.stringify(o).length)by[l.id]=l;}catch(e){}}});out.leads[sid]=Object.values(by);});
+  return out;
+}
 function SyncChip(){
+  const[showB,setShowB]=useState(false);
+  const listSnaps=()=>{try{return Object.keys(localStorage).filter(k=>k.indexOf('rvgd3_snap_')===0).sort().reverse().map(k=>{let n=0;try{const d=JSON.parse(localStorage.getItem(k));Object.values((d&&d.calls)||{}).forEach(ds=>{n+=Object.keys(ds||{}).length;});}catch(e){}return{k,day:k.slice(11),days:n};});}catch(e){return[];}};
+  const restore=async(k)=>{if(!window.confirm('Merge the '+k.slice(11)+' backup back into the live data? Nothing is overwritten — days and leads are unioned in, then synced.'))return;try{const snap=JSON.parse(localStorage.getItem(k)||'{}');let cur={};try{cur=JSON.parse(localStorage.getItem('rvgd3_call_log')||'{}');}catch(e){}const mg=RV_MERGE(snap,cur);mg._savedAt=Date.now();localStorage.setItem('rvgd3_call_log',JSON.stringify(mg));const SB=window.__SB;if(SB){try{await SB.from('call_log').upsert({id:'singleton',data:mg});}catch(e){}}window.alert('Backup merged and synced — reloading.');location.reload();}catch(e){window.alert('Restore failed: '+(e&&e.message||e));}};
   const[st,setSt]=useState({ok:null,msg:'checking…'});
   useEffect(()=>{let dead=false;
     const probe=async()=>{const SB=window.__SB;if(!SB){if(!dead)setSt({ok:false,msg:'Supabase client not loaded'});return;}
@@ -8031,7 +8051,14 @@ function SyncChip(){
     };
     probe();const iv=setInterval(()=>{const w=window.__SYNC;if(w&&w.ok===false){setSt({ok:false,msg:'Last write failed: '+(w.msg||'unknown')});}else probe();},45000);
     return()=>{dead=true;clearInterval(iv);};},[]);
-  return(<div style={{margin:'0 14px 12px',padding:'5px 10px',fontSize:10.5,fontWeight:800,letterSpacing:'.5px',color:st.ok?'#0e1512':'#fff',background:st.ok?'var(--c-grn)':st.ok===false?'var(--c-red)':'var(--surface3)',borderRadius:6,textAlign:'center',textTransform:'uppercase',cursor:'help'}} title={st.msg+(st.ok===false?' — run revibe-gd-setup.sql in Supabase SQL editor, then reload':'')}>{st.ok?'☁ DB SYNCED':st.ok===false?'⚠ DB NOT SYNCING':'☁ checking…'}</div>);
+  return(<><div style={{margin:'0 14px 12px',padding:'5px 10px',fontSize:10.5,fontWeight:800,letterSpacing:'.5px',color:st.ok?'#0e1512':'#fff',background:st.ok?'var(--c-grn)':st.ok===false?'var(--c-red)':'var(--surface3)',borderRadius:6,textAlign:'center',textTransform:'uppercase',cursor:'help'}} title={st.msg+(st.ok===false?' — run revibe-gd-setup.sql in Supabase SQL editor, then reload':'')}>{st.ok?'☁ DB SYNCED':st.ok===false?'⚠ DB NOT SYNCING':'☁ checking…'}</div>
+    <div style={{margin:'0 14px 10px',textAlign:'center'}}>
+      <button onClick={()=>setShowB(v=>!v)} title="Daily on-device backups of the call & lead data. Restore merges a backup back in — it can only add, never erase." style={{background:'none',border:'1px solid var(--border)',borderRadius:6,color:'var(--g-888)',fontSize:10,padding:'3px 8px',cursor:'pointer'}}>🛟 Backups</button>
+      {showB&&<div style={{marginTop:6,textAlign:'left',background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,padding:'6px 8px'}}>
+        {listSnaps().length===0&&<div style={{fontSize:10.5,color:'var(--g-666)'}}>No backups on this device yet — one is taken automatically each day the dashboard is used.</div>}
+        {listSnaps().map(sn=>(<div key={sn.k} style={{display:'flex',alignItems:'center',gap:6,fontSize:10.5,color:'var(--g-aaa)',padding:'2px 0'}}><span style={{flex:1}}>{sn.day} · {sn.days} call-days</span><button onClick={()=>restore(sn.k)} style={{background:'none',border:'1px solid var(--c-grn)',borderRadius:4,color:'var(--c-grn)',fontSize:10,padding:'1px 6px',cursor:'pointer'}}>Restore</button></div>))}
+      </div>}
+    </div></>);
 }
 function MeetingTranscriber({staff=[],types}){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
