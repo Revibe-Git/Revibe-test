@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L94';
+window.__BUILD='build L95';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -3014,7 +3014,7 @@ function CallHistoryPage(){
   const bw=ts.length?Math.min(30,(CW-padL)/ts.length-8):20;
 
   const sources=(data.sources&&data.sources.length)?data.sources:DEFAULT_SOURCES;
-  const[selSource,setSelSource]=useState(()=>{try{const h=sessionStorage.getItem('rvgd3_open_src');if(h){sessionStorage.removeItem('rvgd3_open_src');return h;}}catch(e){}return sources[0]?sources[0].id:'form';});
+  const[selSource,setSelSource]=useState(()=>{try{const h=sessionStorage.getItem('rvgd3_open_src');const[showAllEv,setShowAllEv]=useState(false);if(h){sessionStorage.removeItem('rvgd3_open_src');return h;}}catch(e){}return sources[0]?sources[0].id:'form';});
   const[expandedLead,setExpandedLead]=useState(null);
   const[leadPane,setLeadPane]=useState(null);
   useEffect(()=>{const h=(e)=>{if(e.key==='Escape')setExpandedLead(null);};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[]);
@@ -3387,8 +3387,8 @@ function CallHistoryPage(){
       </>);
     })()}
     {view==='leads'&&(<>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10,marginBottom:18}}>
-        {sources.map(s=>{const r=rollup(s.id);const on=selSource===s.id;return(<div key={s.id} onClick={()=>setSelSource(s.id)} style={{cursor:'pointer',background:on?'rgba(202,232,193,.07)':'var(--surface2)',border:'1px solid '+(on?'var(--go)':'var(--border)'),borderRadius:9,padding:'13px 15px'}}>
+      {(()=>{
+        const CARD=(s)=>{const r=rollup(s.id);const on=selSource===s.id;return(<div key={s.id} onClick={()=>setSelSource(s.id)} style={{cursor:'pointer',background:on?'rgba(202,232,193,.07)':'var(--surface2)',border:'1px solid '+(on?'var(--go)':'var(--border)'),borderRadius:9,padding:'13px 15px'}}>
           <div style={{display:'flex',alignItems:'flex-start',gap:8,marginBottom:6}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,color:'var(--g-eee)',flex:1,lineHeight:1.1}}>{s.name}</div>
             {on&&<div style={{display:'flex',gap:8,flexShrink:0,alignItems:'center'}}>
@@ -3396,9 +3396,24 @@ function CallHistoryPage(){
             </div>}
           </div>
           <div style={{display:'flex',gap:12,fontSize:12,color:'var(--g-999)'}}><span><b style={{color:'var(--g-ddd)'}}>{r.total}</b> leads</span><span><b style={{color:'var(--c-grn)'}}>{r.booked}</b> booked</span><span><b style={{color:r.conv>=30?'var(--c-lime2)':'var(--c-yel)'}}>{r.conv.toFixed(0)}%</b></span></div>
-        </div>);})}
-        <button onClick={addSource} style={{cursor:'pointer',background:'transparent',border:'1px dashed var(--border2)',borderRadius:9,padding:'13px 15px',color:'var(--g-888)',fontSize:14,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'.5px'}}>+ Add source / event</button>
-      </div>
+        </div>);};
+        const chans=sources.filter(x=>x.kind!=='event');
+        const evts=sources.filter(x=>x.kind==='event').slice().sort((a,b)=>{const da=a.eventDate||'',db=b.eventDate||'';if(da&&db)return db<da?-1:db>da?1:0;if(da)return -1;if(db)return 1;return 0;});
+        const shown=showAllEv?evts:evts.slice(0,8);
+        return(<>
+          {chans.length>0&&<>
+            <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.6px',textTransform:'uppercase',color:'var(--c-blu2)',margin:'2px 0 8px'}}>📡 Always-on channels <span style={{color:'var(--g-666)',fontWeight:400,textTransform:'none'}}>· forms, ads & ongoing programs</span></div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10,marginBottom:16}}>{chans.map(CARD)}</div>
+          </>}
+          <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.6px',textTransform:'uppercase',color:'var(--c-grn)',margin:'2px 0 8px'}}>🤝 Community events & partners <span style={{color:'var(--g-666)',fontWeight:400,textTransform:'none'}}>· {evts.length} total · newest first</span></div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10,marginBottom:6}}>
+            {shown.map(CARD)}
+            <button onClick={addSource} style={{cursor:'pointer',background:'transparent',border:'1px dashed var(--border2)',borderRadius:9,padding:'13px 15px',color:'var(--g-888)',fontSize:14,fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:'.5px'}}>+ Add source / event</button>
+          </div>
+          {evts.length>8&&<button className="btn btn-ghost btn-xs" style={{marginBottom:12}} onClick={()=>setShowAllEv(v=>!v)}>{showAllEv?'▲ Show recent only':'▼ Show all '+evts.length+' events & partners'}</button>}
+          <div style={{marginBottom:10}}/>
+        </>);
+      })()}
 
       {selSource&&(()=>{const s=sources.find(x=>x.id===selSource);if(!s)return null;
         const lsRaw=leadsOf(s.id);
