@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L95';
+window.__BUILD='build L96';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -3014,7 +3014,8 @@ function CallHistoryPage(){
   const bw=ts.length?Math.min(30,(CW-padL)/ts.length-8):20;
 
   const sources=(data.sources&&data.sources.length)?data.sources:DEFAULT_SOURCES;
-  const[selSource,setSelSource]=useState(()=>{try{const h=sessionStorage.getItem('rvgd3_open_src');const[showAllEv,setShowAllEv]=useState(false);if(h){sessionStorage.removeItem('rvgd3_open_src');return h;}}catch(e){}return sources[0]?sources[0].id:'form';});
+  const[selSource,setSelSource]=useState(()=>{try{const h=sessionStorage.getItem('rvgd3_open_src');if(h){sessionStorage.removeItem('rvgd3_open_src');return h;}}catch(e){}return sources[0]?sources[0].id:'form';});
+  const[showAllEv,setShowAllEv]=useState(false);
   const[expandedLead,setExpandedLead]=useState(null);
   const[leadPane,setLeadPane]=useState(null);
   useEffect(()=>{const h=(e)=>{if(e.key==='Escape')setExpandedLead(null);};window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[]);
