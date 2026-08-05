@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L89';
+window.__BUILD='build L90';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -2934,9 +2934,9 @@ function CallHistoryPage(){
   const setReason=(id,lab,cnt)=>setEntry(p=>{const r={...((p[id]&&p[id].r)||{})};if(cnt==='')delete r[lab];else r[lab]=cnt;return{...p,[id]:{...p[id],r}};});
   const addReason=(id,lab)=>setEntry(p=>{const cur=(p[id]&&p[id].r)||{};if(cur[lab]!=null)return p;const nc=(parseInt(p[id]&&p[id].c)||0)-(parseInt(p[id]&&p[id].b)||0);const alloc=Object.values(cur).reduce((a,v)=>a+(parseInt(v)||0),0);const rem=nc-alloc;return{...p,[id]:{...p[id],r:{...cur,[lab]:String(rem>0?rem:1)}}};});
   const removeReason=(id,lab)=>setEntry(p=>{const r={...((p[id]&&p[id].r)||{})};delete r[lab];return{...p,[id]:{...p[id],r}};});
-  const reasonsInData=(()=>{const t=new Set();['Mississauga','Markham'].forEach(L=>{const lo=data.calls[L]||{};Object.keys(lo).forEach(d=>{const day=lo[d]||{};Object.keys(day).forEach(id=>{if(id==='_x')return;const v=day[id];if(v&&typeof v==='object'&&v.r)Object.keys(v.r).forEach(k=>t.add(k));});});});return Array.from(t);})();
+  const reasonsInData=(()=>{const t=new Set();['Mississauga','Markham'].forEach(L=>{const lo=data.calls[L]||{};Object.keys(lo).forEach(d=>{const day=lo[d]||{};Object.keys(day).forEach(id=>{if(id&&id[0]==='_')return;const v=day[id];if(v&&typeof v==='object'&&v.r)Object.keys(v.r).forEach(k=>t.add(k));});});});return Array.from(t);})();
   const NC_OPTS=Array.from(new Set([...NC_REASONS_DEFAULT,...ncOpts,...reasonsInData]));
-  const ncBuild=(mo)=>{const byReason={},byDisc={};let nonConv=0,attributed=0;['Mississauga','Markham'].forEach(L=>{const lo=data.calls[L]||{};Object.keys(lo).forEach(d=>{if(d.slice(0,7)!==mo)return;const day=lo[d]||{};Object.entries(day).forEach(([id,v])=>{if(id==='_x')return;const nc=cOf(v)-bOf(v);if(nc>0)nonConv+=nc;const r=(v&&typeof v==='object'&&v.r)||{};Object.entries(r).forEach(([lab,cnt])=>{const n=+cnt||0;if(!n)return;byReason[lab]=(byReason[lab]||0)+n;attributed+=n;(byDisc[id]=byDisc[id]||{})[lab]=(byDisc[id][lab]||0)+n;});});});});return{byReason,byDisc,nonConv,attributed};};
+  const ncBuild=(mo)=>{const byReason={},byDisc={};let nonConv=0,attributed=0;['Mississauga','Markham'].forEach(L=>{const lo=data.calls[L]||{};Object.keys(lo).forEach(d=>{if(d.slice(0,7)!==mo)return;const day=lo[d]||{};Object.entries(day).forEach(([id,v])=>{if(id&&id[0]==='_')return;const nc=cOf(v)-bOf(v);if(nc>0)nonConv+=nc;const r=(v&&typeof v==='object'&&v.r)||{};Object.entries(r).forEach(([lab,cnt])=>{const n=+cnt||0;if(!n)return;byReason[lab]=(byReason[lab]||0)+n;attributed+=n;(byDisc[id]=byDisc[id]||{})[lab]=(byDisc[id][lab]||0)+n;});});});});return{byReason,byDisc,nonConv,attributed};};
   const[cFrom,setCFrom]=useState('');const[cTo,setCTo]=useState('');
   const inTf=(d)=>{if(tf==='custom')return(!cFrom||d>=cFrom)&&(!cTo||d<=cTo);if(tf==='all')return true;if(tf==='month')return d.slice(0,7)===today.slice(0,7);const cut=new Date(Date.now()-parseInt(tf)*86400000).toISOString().slice(0,10);return d>=cut;};
   const locDays=Object.keys(data.calls[loc]||{}).filter(inTf).sort();
@@ -3035,7 +3035,7 @@ function CallHistoryPage(){
     const meta={cx:0,rs:0,wn:0,ei:0,ef:0,lc:0,gi:0,sc:0};
     const iaCh={};let iaTot=0;
     days.forEach(d=>{REP_LOCS.forEach(L=>{const day=((data.iaLog||{})[L]||{})[d]||{};Object.entries(day).forEach(([ch,v])=>{iaCh[ch]=(iaCh[ch]||0)+(+v||0);iaTot+=(+v||0);});});});
-    days.forEach(d=>{let dc=0,db=0;REP_LOCS.forEach(L=>{const day=(data.calls[L]||{})[d]||{};Object.entries(day).forEach(([id,v])=>{if(id==='_x'){Object.keys(meta).forEach(k=>{meta[k]+=(+v[k]||0);});return;}const c=cOf(v),b=bOf(v);byLoc[L].calls+=c;byLoc[L].booked+=b;dc+=c;db+=b;if(!byDisc[id])byDisc[id]={calls:0,booked:0};byDisc[id].calls+=c;byDisc[id].booked+=b;});});calls+=dc;booked+=db;daily.push({d,calls:dc,booked:db});});
+    days.forEach(d=>{let dc=0,db=0;REP_LOCS.forEach(L=>{const day=(data.calls[L]||{})[d]||{};Object.entries(day).forEach(([id,v])=>{if(id==='_x'){Object.keys(meta).forEach(k=>{meta[k]+=(+v[k]||0);});return;}if(id&&id[0]==='_')return;const c=cOf(v),b=bOf(v);byLoc[L].calls+=c;byLoc[L].booked+=b;dc+=c;db+=b;if(!byDisc[id])byDisc[id]={calls:0,booked:0};byDisc[id].calls+=c;byDisc[id].booked+=b;});});calls+=dc;booked+=db;daily.push({d,calls:dc,booked:db});});
     return{ws,calls,booked,rate:calls?booked/calls*100:0,byLoc,byDisc,daily,meta,iaCh,iaTot};
   };
   const buildCallReport=(ws)=>({cur:buildCallWeek(ws),prev:buildCallWeek(_addDaysISO(ws,-7))});
@@ -3531,7 +3531,7 @@ function CallHistoryPage(){
       const _ny=+today.slice(0,4);const yOpts=Array.from({length:6},(_,i)=>String(_ny-i));
       const qOpts=[];for(let qy=_ny;qy>=_ny-3;qy--)for(let qq=4;qq>=1;qq--){if(qy===_ny&&qq>Math.floor((+today.slice(5,7)-1)/3)+1)continue;qOpts.push(qy+'-Q'+qq);}
       const mStats=(mos)=>{const inP=(x)=>mos.indexOf(String(x).slice(0,7))>=0;const disc={};let tc=0,tb=0;const meta={};const reasons={};
-        SITES.forEach(L=>{const days=(data.calls&&data.calls[L])||{};Object.keys(days).forEach(dt=>{if(!inP(dt))return;const day=days[dt]||{};Object.keys(day).forEach(k=>{if(k==='_x'){Object.entries(day._x||{}).forEach(([mk,v])=>{meta[mk]=(meta[mk]||0)+(+v||0);});return;}const c=cOf(day[k]),b=bOf(day[k]);if(!c&&!b)return;disc[k]=disc[k]||{c:0,b:0};disc[k].c+=c;disc[k].b+=b;tc+=c;tb+=b;const rr=(day[k]&&typeof day[k]==='object'&&day[k].r)||{};Object.entries(rr).forEach(([lab,n])=>{reasons[lab]=(reasons[lab]||0)+(+n||0);});});});});
+        SITES.forEach(L=>{const days=(data.calls&&data.calls[L])||{};Object.keys(days).forEach(dt=>{if(!inP(dt))return;const day=days[dt]||{};Object.keys(day).forEach(k=>{if(k==='_x'){Object.entries(day._x||{}).forEach(([mk,v])=>{meta[mk]=(meta[mk]||0)+(+v||0);});return;}if(k&&k[0]==='_')return;const c=cOf(day[k]),b=bOf(day[k]);if(!c&&!b)return;disc[k]=disc[k]||{c:0,b:0};disc[k].c+=c;disc[k].b+=b;tc+=c;tb+=b;const rr=(day[k]&&typeof day[k]==='object'&&day[k].r)||{};Object.entries(rr).forEach(([lab,n])=>{reasons[lab]=(reasons[lab]||0)+(+n||0);});});});});
         const src={};let lt=0,lb=0;const statuses={};
         (data.sources||[]).forEach(sc=>{(((data.leads||{})[sc.id])||[]).forEach(l=>{if(!inP(l.createdAt||l.date||''))return;lt++;const st=l.status||'New';statuses[st]=(statuses[st]||0)+1;const e=src[sc.id]=src[sc.id]||{name:sc.name||sc.id,kind:sc.kind||'',t:0,b:0};e.t++;if(st==='Booked'){e.b++;lb++;}});});
         const ia={};SITES.forEach(L=>{const il=(data.iaLog&&data.iaLog[L])||{};Object.keys(il).forEach(dt=>{if(!inP(dt))return;Object.entries(il[dt]||{}).forEach(([ch,n])=>{ia[ch]=(ia[ch]||0)+(+n||0);});});});return{disc,tc,tb,meta,reasons,src,lt,lb,statuses,ia};};
