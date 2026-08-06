@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L96';
+window.__BUILD='build L97';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -2946,7 +2946,7 @@ function CallHistoryPage(){
   const[tf,setTf]=useState('all');
   const[metric,setMetric]=useState('calls');
   const[gran,setGran]=useState('day');
-  const cOf=(v)=>(typeof v==='object'&&v)?(+v.c||0):(+v||0);
+  const cOf=(v)=>(typeof v==='object'&&v)?(+v.c||0):((+v>0&&+v<100000)?+v:0);
   const bOf=(v)=>(typeof v==='object'&&v)?(+v.b||0):0;
   const discList=SITE_DISC[loc];
 
@@ -2996,11 +2996,11 @@ function CallHistoryPage(){
   const locRate=locCalls?locBooked/locCalls*100:0;
   const locTotal=discTotals.reduce((a,x)=>a+x.n,0);
   const otherLoc=loc==='Mississauga'?'Markham':'Mississauga';
-  const otherTotal=Object.keys(data.calls[otherLoc]||{}).filter(inTf).reduce((a,d)=>a+Object.values(data.calls[otherLoc][d]||{}).reduce((s,v)=>s+cOf(v),0),0);
+  const otherTotal=Object.keys(data.calls[otherLoc]||{}).filter(inTf).reduce((a,d)=>a+Object.entries(data.calls[otherLoc][d]||{}).reduce((s,[k,v])=>s+(k&&k[0]==='_'?0:cOf(v)),0),0);
   const busiest=discTotals.slice().sort((a,b)=>b.n-a.n)[0];
   const discMax=Math.max(1,...discTotals.map(x=>x.n));
   const _wkStart=(ds)=>{const dt=new Date(ds+'T12:00');const dow=(dt.getDay()+6)%7;dt.setDate(dt.getDate()-dow);return dt.toISOString().slice(0,10);};
-  const _tsRaw=locDays.map(d=>{const day=data.calls[loc][d]||{};return{d,calls:Object.values(day).reduce((s,v)=>s+cOf(v),0),booked:Object.values(day).reduce((s,v)=>s+bOf(v),0)};});
+  const _tsRaw=locDays.map(d=>{const day=data.calls[loc][d]||{};return{d,calls:Object.entries(day).reduce((s,[k,v])=>s+(k&&k[0]==='_'?0:cOf(v)),0),booked:Object.entries(day).reduce((s,[k,v])=>s+(k&&k[0]==='_'?0:bOf(v)),0)};});
   let ts;
   if(gran==='week'){const wk={};_tsRaw.forEach(t=>{const w=_wkStart(t.d);if(!wk[w])wk[w]={calls:0,booked:0};wk[w].calls+=t.calls;wk[w].booked+=t.booked;});ts=Object.keys(wk).sort().slice(-26).map(w=>({d:w,calls:wk[w].calls,booked:wk[w].booked}));}
   else if(gran==='mo'){const mo={};_tsRaw.forEach(t=>{const m=t.d.slice(0,7);if(!mo[m])mo[m]={calls:0,booked:0};mo[m].calls+=t.calls;mo[m].booked+=t.booked;});ts=Object.keys(mo).sort().slice(-24).map(m=>({d:m,calls:mo[m].calls,booked:mo[m].booked}));}
@@ -3305,7 +3305,7 @@ function CallHistoryPage(){
       <div className="perf-slot">
         <div className="perf-slot-head"><span className="perf-slot-title">Recent Entries — {loc}</span></div>
         <div className="perf-slot-body">
-          {locDays.slice(-14).reverse().map(d=>{const day=data.calls[loc][d]||{};const tot=Object.values(day).reduce((s,v)=>s+cOf(v),0);const tb=Object.values(day).reduce((s,v)=>s+bOf(v),0);const xx=day._x||{};return(<div key={d} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+          {locDays.slice(-14).reverse().map(d=>{const day=data.calls[loc][d]||{};const tot=Object.entries(day).reduce((s,[k,v])=>s+(k&&k[0]==='_'?0:cOf(v)),0);const tb=Object.entries(day).reduce((s,[k,v])=>s+(k&&k[0]==='_'?0:bOf(v)),0);const xx=day._x||{};return(<div key={d} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'7px 0',borderBottom:'1px solid rgba(255,255,255,.04)'}}>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
               <span style={{fontSize:13,color:'var(--g-ccc)',width:90}}>{d}</span>
               <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{discList.filter(([id])=>day[id]).map(([id,label])=>(<span key={id} style={{fontSize:11,color:'#1a1a1a',background:DISC_COLOR[id],borderRadius:4,padding:'1px 6px',fontWeight:700}}>{label.split(' ')[0]} {cOf(day[id])}{bOf(day[id])?'→'+bOf(day[id]):''}</span>))}</div>
