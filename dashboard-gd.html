@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L97';
+window.__BUILD='build L98';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -1908,6 +1908,7 @@ const NAV=[
   {id:'overview',  icon:'▣', label:'Overview'},
   {id:'staff',     icon:'◎', label:'Staff Profiles'},
   {id:'evals',     icon:'◈', label:'G&D Evaluations'},
+  {id:'gx',        icon:'🤝', label:'Guest Experience'},
   {id:'education', icon:'◉', label:'Education Sessions'},
   {id:'mentors',   icon:'◐', label:'Mentor Leads'},
   {id:'gaps',      icon:'⚑', label:'Gap Analysis'},
@@ -2026,7 +2027,7 @@ function App(){
       let ts={};try{ts=JSON.parse(localStorage.getItem('rvgd3__ts')||'{}');}catch(e){}
       const srv={};(rows||[]).forEach(r=>{if(r&&r.data)srv[r.id]={v:r.data.v,t:+r.data.t||0};});
       const setters={staff:setStaff,evals:setEvals,sessions:setSessions};
-      ['staff','evals','sessions'].forEach(k=>{
+      ['staff','evals','sessions','gx'].forEach(k=>{
         const lt=+ts[k]||0;const sRow=srv[k];
         let localV=null;try{const raw=localStorage.getItem('rvgd3_'+k);localV=raw?JSON.parse(raw):null;}catch(e){}
         if(sRow&&sRow.v!=null&&sRow.t>lt){
@@ -2161,7 +2162,7 @@ function App(){
     return{...s,evals:sEvals};
   },[activeId,staff,evals]);
 
-  const PAGES={overview:Overview,staff:StaffPage,evals:EvalsPage,education:EduPage,mentors:MentorsPage,gaps:GapsPage,performance:PerformancePage,reports:PerformancePage,calls:CallHistoryPage,community:CommunityPage,forms:FormsPage,meetings:MeetingsPage,resources:ResourcesPage,leadership:LeadershipPage,schedule:SchedulePage,clinresources:ClinResourcesPage,gdtracker:GDTrackerPage,systematic:SystematicPage};
+  const PAGES={overview:Overview,staff:StaffPage,evals:EvalsPage,gx:GuestExperiencePage,education:EduPage,mentors:MentorsPage,gaps:GapsPage,performance:PerformancePage,reports:PerformancePage,calls:CallHistoryPage,community:CommunityPage,forms:FormsPage,meetings:MeetingsPage,resources:ResourcesPage,leadership:LeadershipPage,schedule:SchedulePage,clinresources:ClinResourcesPage,gdtracker:GDTrackerPage,systematic:SystematicPage};
   const PageComp=PAGES[page]||Overview;
 
   return(
@@ -8309,6 +8310,143 @@ function MeetingsPage({staff}){
         <div style={{fontSize:12.5,color:'var(--g-777)',maxWidth:760,lineHeight:1.6}}>Transcribe any meeting — team huddles, one-on-ones, leadership, operations, community planning — with live session notes and an automatic summary (key points · goals · follow-ups · decisions). Quarterly / Yearly G&D transcripts saved here also appear in the ⚡ Auto-fill picker on the Check-In Forms quarterly review.</div>
       </div>
       <MeetingTranscriber staff={staff} types={['Team meeting','One-on-one','Leadership meeting','Operations','Community / Events','Education session','Quarterly G&D','Yearly G&D','Evaluation debrief','Other']}/>
+    </div>);
+}
+const GX_SCALE=[['1 · Awareness','I know this number exists.'],['2 · Understanding','I understand what this number means and what affects it.'],['3 · Execution','I know what actions to take to influence this number.'],['4 · Ownership & Diagnosis','I can own the outcome and determine why performance is changing.'],['5 · Leadership & System Building','I can improve this metric through people and systems.']];
+const GX_PROG='AWARE → UNDERSTAND → EXECUTE → INFLUENCE → OWN → DIAGNOSE → LEAD → BUILD';
+const GX_SUB10=[
+ ['KPI Awareness',['Limited exposure to metrics','Knows relevant GE metrics and basic definitions','Consistently reviews metrics relevant to their responsibilities','Uses KPIs to identify priorities and performance issues','Creates a performance-oriented culture where metrics improve decisions']],
+ ['KPI Understanding / Literacy',['Numbers require explanation','Understands basic meaning','Can interpret metric, target and variance','Understands relationships between multiple metrics','Can teach managers to interpret performance and avoid misleading conclusions']],
+ ['KPI Workflow Execution',['Requires direction','Completes assigned KPI-related tasks','Independently executes expected workflows','Identifies weaknesses and improves workflow','Designs scalable workflows and creates accountability around execution']],
+ ['KPI Monitoring',['Does not independently review performance','Reviews when prompted','Regularly monitors assigned metrics','Proactively identifies emerging trends and problems','Designs monitoring cadence and reporting systems for team / locations']],
+ ['Target Awareness',['Unaware of target','Knows target','Understands current performance relative to target','Uses variance from target to prioritize action','Helps establish and evaluate appropriate targets']],
+ ['Variance Recognition',['Does not recognize performance deviation','Recognizes obvious misses','Consistently identifies meaningful variance','Determines likely reasons for variance','Builds systems that automatically surface meaningful variance']],
+ ['KPI Diagnosis',['Sees number only','Can identify obvious explanation','Can identify likely contributing behaviours','Performs root-cause analysis using multiple data points','Teaches managers to diagnose performance rather than react superficially']],
+ ['Corrective Action',['Waits for manager direction','Performs assigned corrective action','Independently takes appropriate action','Develops and implements a performance-improvement plan','Builds repeatable corrective-action systems and develops managers to execute them']],
+ ['Outcome Measurement',['Completes activity without measuring result','Reports basic activity','Reports activity and outcome','Measures whether the intervention changed the KPI','Builds a testing culture where interventions are evaluated, not assumed effective']],
+ ['KPI Communication',['Limited ability to explain numbers','Can report the number','Can explain performance clearly','Communicates metric + cause + implication + proposed action','Translates complex performance into clear priorities for different audiences']],
+ ['KPI Accountability',["Sees KPIs as management's responsibility",'Understands personal contribution','Takes responsibility for assigned performance areas','Holds team accountable to agreed actions and outcomes','Creates healthy performance accountability across managers / locations']],
+ ['KPI Improvement Through Others',['Not yet applicable','Can remind others about tasks','Can manage team execution against a metric','Can coach the team and improve the KPI through others','Develops managers who independently improve performance']]
+];
+const GX_DDA=['Frequent errors / missing information','Generally accurate','Consistently accurate and complete','Identifies data-quality problems and corrects patterns','Builds standards and audits protecting data quality across GE'];
+const GX_CATS=[['c1','Reliability & Professional Standards'],['c2','GE Execution & Systems'],['c3','Guest Experience & Communication'],['c4','Revibe & Clinic Knowledge'],['c5','Schedule, Retention & Revenue'],['c6','Problem Solving & Ownership'],['c7','Management & Accountability'],['c8','Leadership & People Development'],['c9','Systems & Operations Thinking'],['c10','KPI & Performance Management']];
+const GX_PAY=[['$18','Entry','Exposure — understands the work is measured; enters information accurately'],['$18.50','Core Execution','Data integrity — accurate booking / status / documentation; accurate execution creates accurate reporting'],['$19','Independent Shift','Basic awareness — spots shift-level issues (gaps, cancellations, unbooked guests, outstanding tasks)'],['$19.50','Advanced GE','Understanding — can explain what is measured and why it matters'],['$20','Problem Solving','Action — recognizes a performance issue and takes appropriate operational action'],['$21','Business Awareness','Literacy — knows GE KPIs, targets & the schedule → utilization → retention → revenue links; reads the dashboard'],['$22','Business Impact','Outcome ownership — independently owns ≥1 measurable GE area; Activity → Outcome, not activity alone'],['$22.50','Ownership','Trend recognition — monitor, spot change, ask why, investigate, propose, track whether it worked'],['$23','Emerging Manager','Managing execution — assign KPI work, follow up, hold accountable, report, spot basic variance'],['$24','Independent Manager','Performance management — review dashboard, diagnose cause, corrective action, assign, follow up'],['$25','Location / Performance Manager','Location ownership — Target → Actual → Variance → Cause → Action → Owner → Follow-Up, unaided'],['$26','People Development','Develops KPI competency in others — their numbers, impact, responsibilities, gaps'],['$27','Department Leadership','Improves GE performance through training, coaching, accountability & process — not by doing it all'],['$28','Senior Leadership','Develops managers who independently understand, diagnose, correct and hold accountable'],['$30','Operations','Multi-location performance — compare, diagnose systemic vs local, build cadence & allocation'],['$32+','Organizational Operations','Performance architecture — determines what Revibe measures and builds the system around it']];
+const GX_KPI_CATALOG=[['Schedule Performance',['Schedule utilization','Open appointment / gap rate','Same-day gaps','Next-day gaps','Waitlist utilization','Gap recovery','Schedule optimization']],['Booking & Retention',['Rebooking','Returning visits','Multiple return visits','Cancellation rate','Cancellation recovery','No-show rate','Fall-off','Reactivation','Reactivation conversion']],['Guest Conversion / Journey',['Initial bookings','Inquiry-to-booking conversion','Guest follow-up','Recovery conversion','Package opportunities','Membership opportunities','Internal service connections','Guest progression through Revibe']],['Financial / Administrative',['Outstanding balances','Balance recovery','Payment accuracy','Administrative errors','Revenue awareness','Daily / weekly revenue performance']],['Operational',['Opening compliance','Closing compliance','Task completion','Follow-up completion','Recovery utilization','Inventory accuracy','Training completion','GE workflow compliance']],['Guest Experience',['Guest satisfaction','Complaints','Complaint resolution','Service recovery','Reviews','Guest feedback','Response times']]];
+const GX_INFL=['Direct control','Strong influence','Shared influence','Contextual'];
+const gxSeed=()=>{const kpis=[];GX_KPI_CATALOG.forEach(([cat,list])=>list.forEach((n,i)=>kpis.push({id:cat.slice(0,3).toLowerCase()+'_'+i,name:n,cat,target:'TBD',range:'TBD',warn:'TBD',crit:'TBD',infl:'Shared influence',req:3,freq:'Weekly',def:'',calc:'',src:'',owner:'',cur:'',trend:'—',act:''})));return{people:{},kpis};};
+function GuestExperiencePage({staff}){
+  const[gx,setGx]=useState(()=>{const g=ld('gx',null);if(g&&g.kpis)return g;return gxSeed();});
+  useEffect(()=>sv('gx',gx),[gx]);
+  const[gxTab,setGxTab]=useState('gd');
+  const[person,setPerson]=useState('');
+  const[openCat,setOpenCat]=useState('c10');
+  const[kOpen,setKOpen]=useState(null);
+  const names=(staff||[]).map(x=>x.name).filter(Boolean);
+  const pk=person||'';
+  const pd=(gx.people||{})[pk]||{};
+  const setPd=(patch)=>{if(!pk)return;setGx(g=>({...g,people:{...(g.people||{}),[pk]:{...((g.people||{})[pk]||{}),...patch}}}));};
+  const setKpi=(id,patch)=>setGx(g=>({...g,kpis:(g.kpis||[]).map(k=>k.id===id?{...k,...patch}:k)}));
+  const SEL={background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:12,padding:'4px 7px',outline:'none'};
+  const H=(t,sub)=>(<div style={{margin:'18px 0 8px'}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'1.5px',textTransform:'uppercase',color:'var(--g-ddd)',fontWeight:800}}>{t}</div>{sub&&<div style={{fontSize:11.5,color:'var(--g-777)'}}>{sub}</div>}</div>);
+  const kpiComp=(()=>{const c10=(pd.cats||{}).c10;const subs=pd.sub10||{};const vals=Object.values(subs).map(Number).filter(Boolean);if(vals.length)return (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);return c10||'—';})();
+  const LvlSel=(val,on)=>(<select value={val||''} onChange={e=>on(e.target.value?+e.target.value:null)} style={SEL}><option value="">—</option>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select>);
+  return(
+    <div style={{padding:'26px 30px',maxWidth:1280}}>
+      <div style={{display:'flex',alignItems:'baseline',gap:14,flexWrap:'wrap',marginBottom:4}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,letterSpacing:'1px',color:'var(--g-eee)'}}>🤝 GUEST EXPERIENCE — G&D</div>
+        <div style={{fontSize:12,color:'var(--g-888)'}}>Competency + KPI literacy + demonstration + consistency + responsibility + measurable results = increased value = increased compensation</div>
+      </div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',margin:'10px 0 6px'}}>
+        {[['gd','🎓 G&D System'],['kpi','📈 KPI Scorecard']].map(([id,lb])=>(<button key={id} className={`btn btn-sm ${gxTab===id?'btn-go':'btn-ghost'}`} onClick={()=>setGxTab(id)}>{lb}</button>))}
+        <span style={{flex:1}}/>
+        <span style={{fontSize:12,color:'var(--g-888)'}}>Team member:</span>
+        <select value={person} onChange={e=>setPerson(e.target.value)} style={{...SEL,minWidth:180}}><option value="">— select GE staff —</option>{names.map(n=><option key={n} value={n}>{n}</option>)}</select>
+        {pk&&<span style={{fontSize:11.5,fontWeight:800,color:'var(--c-blu2)',border:'1px solid var(--c-blu2)',borderRadius:5,padding:'2px 8px'}} title="Average of the graded Category-10 sub-competencies (or the category level if no subs graded)">KPI literacy: {kpiComp}</span>}
+      </div>
+      <div style={{fontSize:11,color:'var(--g-666)',marginBottom:10}}>KPI competency progression runs through the whole career path: {GX_PROG}. Targets & ranges are configurable placeholders (TBD) until the final GE scorecard lands — the framework doesn't change when they do.</div>
+
+      {gxTab==='gd'&&(<div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:10,marginBottom:6}}>
+          {GX_SCALE.map(([t,d])=>(<div key={t} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 13px'}}><div style={{fontSize:12.5,fontWeight:800,color:'var(--c-grn)'}}>{t}</div><div style={{fontSize:12,color:'var(--g-aaa)',lineHeight:1.5}}>“{d}”</div></div>))}
+        </div>
+        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:4,fontSize:12,color:'var(--g-aaa)',lineHeight:1.6}}><b style={{color:'var(--c-yel)'}}>Competency ≠ Performance.</b> Two separate questions: does the employee understand how to work with the metric, and is the metric within range? A good number doesn't equal high competency; a bad number doesn't equal poor competency. Grade what they could reasonably influence and how effectively they responded. <b style={{color:'var(--c-grn)'}}>Fairness guardrails:</b> every KPI carries an influence level — Direct control · Strong influence · Shared influence · Contextual — protecting staff from metrics moved by clinician availability, vacations, seasonality, marketing volume, staffing or demographics.</div>
+        {H('The 10 master competency categories', pk?('Grading: '+pk+' — every change saves & syncs automatically'):'Select a team member above to grade')}
+        {GX_CATS.map(([cid,cname])=>{const isOpen=openCat===cid;const lvl=(pd.cats||{})[cid];return(
+          <div key={cid} style={{background:'var(--surface2)',border:'1px solid '+(isOpen?'var(--go)':'var(--border)'),borderRadius:9,padding:'10px 14px',marginBottom:8}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}} onClick={()=>setOpenCat(isOpen?null:cid)}>
+              <span style={{fontSize:13.5,fontWeight:800,color:'var(--g-eee)',flex:1}}>{cid.replace('c','')}. {cname}{cid==='c10'&&<span style={{marginLeft:8,fontSize:10.5,color:'var(--c-grn)',fontWeight:800}}>FULLY SEEDED</span>}{cid==='c2'&&<span style={{marginLeft:8,fontSize:10.5,color:'var(--c-blu2)',fontWeight:800}}>+ DATA ACCURACY</span>}</span>
+              {pk&&<span onClick={e=>e.stopPropagation()}>{LvlSel(lvl,(v)=>setPd({cats:{...(pd.cats||{}),[cid]:v}}))}</span>}
+              <span style={{color:'var(--g-666)'}}>{isOpen?'▾':'▸'}</span>
+            </div>
+            {isOpen&&cid==='c10'&&(<div style={{marginTop:10}}>
+              {GX_SUB10.map(([sn,lvls],si)=>{const sv2=(pd.sub10||{})['s'+si];return(
+                <div key={si} style={{borderTop:'1px solid var(--border)',padding:'8px 0'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:12.5,fontWeight:800,color:'var(--g-ddd)',flex:1}}>10.{si+1} {sn}</span>{pk&&LvlSel(sv2,(v)=>setPd({sub10:{...(pd.sub10||{}),['s'+si]:v}}))}</div>
+                  <div style={{fontSize:11.5,color:'var(--g-999)',lineHeight:1.55,marginTop:3}}>{lvls.map((d,i)=><span key={i} style={{marginRight:10,color:sv2===i+1?'var(--c-grn)':'var(--g-999)'}}><b>{i+1}</b> {d}.</span>)}</div>
+                </div>);})}
+            </div>)}
+            {isOpen&&cid==='c2'&&(<div style={{marginTop:10,borderTop:'1px solid var(--border)',padding:'8px 0'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:12.5,fontWeight:800,color:'var(--g-ddd)',flex:1}}>Data & Documentation Accuracy <span style={{fontWeight:400,color:'var(--g-777)'}}>· bad input creates bad KPI data</span></span>{pk&&LvlSel((pd.sub2||{}).dda,(v)=>setPd({sub2:{...(pd.sub2||{}),dda:v}}))}</div>
+              <div style={{fontSize:11.5,color:'var(--g-999)',lineHeight:1.55,marginTop:3}}>{GX_DDA.map((d,i)=><span key={i} style={{marginRight:10,color:((pd.sub2||{}).dda)===i+1?'var(--c-grn)':'var(--g-999)'}}><b>{i+1}</b> {d}.</span>)}</div>
+              <div style={{fontSize:11,color:'var(--g-666)',marginTop:6}}>Full GE Execution sub-competencies arrive with the master framework (Tab 1) — send it and they'll be seeded here.</div>
+            </div>)}
+            {isOpen&&cid!=='c10'&&cid!=='c2'&&(<div style={{marginTop:8,fontSize:11.5,color:'var(--g-666)'}}>Category-level grading is live now; the detailed sub-competencies for this category come from the master framework (Tab 1) — send that tab and they'll be seeded here without changing any grades already entered.</div>)}
+          </div>);})}
+        {pk&&<div style={{marginBottom:10}}><div style={{fontSize:11.5,fontWeight:800,color:'var(--g-aaa)',marginBottom:4}}>NOTES — {pk}</div><textarea value={pd.notes||''} onChange={e=>setPd({notes:e.target.value})} placeholder="Development notes, evidence, context…" style={{...SEL,width:'100%',minHeight:64,fontSize:12.5,lineHeight:1.5}}/></div>}
+        {H('Pay progression × KPI expectation','Each step raises the KPI relationship — from “I enter it correctly” to “I build the performance architecture.”'+(pk?' Click a row to set '+pk+'’s current level.':''))}
+        <table style={{borderCollapse:'collapse',fontSize:12,width:'100%'}}>
+          <thead><tr>{['Pay','Stage','KPI expectation'].map(h=><th key={h} style={{textAlign:'left',padding:'4px 10px',color:'var(--g-888)'}}>{h}</th>)}</tr></thead>
+          <tbody>{GX_PAY.map(([pay,stage,exp],i)=>{const cur=pd.payLevel===i;return(<tr key={i} onClick={()=>{if(pk)setPd({payLevel:cur?null:i});}} style={{borderTop:'1px solid var(--border)',background:cur?'rgba(202,232,193,.09)':(i%2?'transparent':'var(--stripe)'),cursor:pk?'pointer':'default'}}>
+            <td style={{padding:'5px 10px',fontWeight:800,color:cur?'var(--c-grn)':'var(--g-ddd)',whiteSpace:'nowrap'}}>{cur?'● ':''}{pay}</td>
+            <td style={{padding:'5px 10px',color:'var(--g-ccc)',whiteSpace:'nowrap'}}>{stage}</td>
+            <td style={{padding:'5px 10px',color:'var(--g-999)'}}>{exp}</td></tr>);})}</tbody>
+        </table>
+      </div>)}
+
+      {gxTab==='kpi'&&(<div>
+        <div style={{background:'rgba(224,160,82,.08)',border:'1px solid rgba(224,160,82,.4)',borderRadius:9,padding:'9px 13px',fontSize:12,color:'var(--c-amb)',marginBottom:10}}>⏳ Final KPI targets, ranges & formulas are pending — every field below is a configurable placeholder (TBD). When the final GE scorecard lands, map the numbers in here; nothing else needs rebuilding. Competency (does the person understand the metric?) is graded on the 🎓 tab; performance (is the metric in range?) lives here.</div>
+        {H('KPI registry — '+(gx.kpis||[]).length+' metrics across 6 categories','Per the dashboard KPI structure: name · category · target · ranges · influence · required competency level · definition / calculation / source / owner underneath ✎')}
+        <div style={{display:'flex',gap:8,marginBottom:8}}><button className="btn btn-ghost btn-sm" onClick={()=>{const n=window.prompt('New KPI name:');if(!n)return;setGx(g=>({...g,kpis:[...(g.kpis||[]),{id:'k_'+Date.now().toString(36),name:n,cat:GX_KPI_CATALOG[0][0],target:'TBD',range:'TBD',warn:'TBD',crit:'TBD',infl:'Shared influence',req:3,freq:'Weekly',def:'',calc:'',src:'',owner:'',cur:'',trend:'—',act:''}]}));}}>＋ Add KPI</button></div>
+        <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',fontSize:12,minWidth:900,width:'100%'}}>
+          <thead><tr>{['KPI','Category','Target','Accept','Warn','Crit','Influence','Req lvl',''].map(h=><th key={h} style={{textAlign:'left',padding:'4px 8px',color:'var(--g-888)'}}>{h}</th>)}</tr></thead>
+          <tbody>{(gx.kpis||[]).map((k,i)=>(<React.Fragment key={k.id}>
+            <tr style={{borderTop:'1px solid var(--border)',background:i%2?'transparent':'var(--stripe)'}}>
+              <td style={{padding:'4px 8px',color:'var(--g-ddd)',fontWeight:700,whiteSpace:'nowrap'}}>{k.name}</td>
+              <td style={{padding:'4px 8px'}}><select value={k.cat} onChange={e=>setKpi(k.id,{cat:e.target.value})} style={SEL}>{GX_KPI_CATALOG.map(([c])=><option key={c} value={c}>{c}</option>)}</select></td>
+              {['target','range','warn','crit'].map(f=><td key={f} style={{padding:'4px 8px'}}><input value={k[f]||''} onChange={e=>setKpi(k.id,{[f]:e.target.value})} style={{...SEL,width:64,color:(k[f]==='TBD'||!k[f])?'var(--c-amb)':'var(--text)'}}/></td>)}
+              <td style={{padding:'4px 8px'}}><select value={k.infl} onChange={e=>setKpi(k.id,{infl:e.target.value})} style={SEL}>{GX_INFL.map(o=><option key={o} value={o}>{o}</option>)}</select></td>
+              <td style={{padding:'4px 8px'}}><select value={k.req} onChange={e=>setKpi(k.id,{req:+e.target.value})} style={SEL}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select></td>
+              <td style={{padding:'4px 8px',whiteSpace:'nowrap'}}><button className="btn btn-ghost btn-xs" onClick={()=>setKOpen(kOpen===k.id?null:k.id)}>{kOpen===k.id?'▾':'✎'}</button><button className="btn btn-ghost btn-xs" title="Remove this KPI" onClick={()=>{if(window.confirm('Remove “'+k.name+'”?'))setGx(g=>({...g,kpis:(g.kpis||[]).filter(x=>x.id!==k.id)}));}}>×</button></td>
+            </tr>
+            {kOpen===k.id&&<tr><td colSpan={9} style={{padding:'6px 8px 12px',background:'var(--surface3)'}}>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:8}}>
+                {[['def','Definition — exactly what it measures'],['calc','Calculation / formula'],['src','Data source'],['owner','Owner'],['cur','Current performance'],['act','Action required if outside range']].map(([f,lb])=>(<div key={f}><div style={{fontSize:10.5,color:'var(--g-777)',marginBottom:2}}>{lb}</div><input value={k[f]||''} onChange={e=>setKpi(k.id,{[f]:e.target.value})} style={{...SEL,width:'100%'}}/></div>))}
+                <div><div style={{fontSize:10.5,color:'var(--g-777)',marginBottom:2}}>Frequency</div><select value={k.freq} onChange={e=>setKpi(k.id,{freq:e.target.value})} style={SEL}>{['Daily','Weekly','Monthly','Rolling average'].map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+                <div><div style={{fontSize:10.5,color:'var(--g-777)',marginBottom:2}}>Trend</div><select value={k.trend} onChange={e=>setKpi(k.id,{trend:e.target.value})} style={SEL}>{['—','Improving','Stable','Declining'].map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+              </div></td></tr>}
+          </React.Fragment>))}</tbody>
+        </table></div>
+        {H('Individual KPI development — '+(pk||'select a team member above'),'Assign metrics with a competency grade + ownership role. Ownership: Primary · Assigned · Shared · Support')}
+        {pk&&(<div>
+          {((pd.kpiRows)||[]).map((r,i)=>(<div key={i} style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',padding:'5px 0',borderBottom:'1px solid var(--border)'}}>
+            <select value={r.kpi} onChange={e=>{const rows=[...pd.kpiRows];rows[i]={...r,kpi:e.target.value};setPd({kpiRows:rows});}} style={{...SEL,minWidth:200}}>{(gx.kpis||[]).map(k=><option key={k.id} value={k.id}>{k.name}</option>)}</select>
+            <span style={{fontSize:11,color:'var(--g-777)'}}>competency</span>{LvlSel(r.comp,(v)=>{const rows=[...pd.kpiRows];rows[i]={...r,comp:v};setPd({kpiRows:rows});})}
+            <select value={r.own} onChange={e=>{const rows=[...pd.kpiRows];rows[i]={...r,own:e.target.value};setPd({kpiRows:rows});}} style={SEL}>{['Primary','Assigned','Shared','Support'].map(o=><option key={o} value={o}>{o}</option>)}</select>
+            <span style={{fontSize:11,color:'var(--c-amb)'}}>target/current: TBD</span>
+            <button className="btn btn-ghost btn-xs" onClick={()=>{setPd({kpiRows:pd.kpiRows.filter((_,x)=>x!==i)});}}>×</button>
+          </div>))}
+          <button className="btn btn-ghost btn-sm" style={{marginTop:6}} onClick={()=>setPd({kpiRows:[...((pd.kpiRows)||[]),{kpi:(gx.kpis[0]||{}).id,comp:3,own:'Assigned'}]})}>＋ Assign a KPI</button>
+          {H('Development assignments','KPI-ownership development sprints — e.g. “Own cancellation recovery for six weeks”: baseline → execute → track → identify barriers → test → report weekly. Grade the thinking, not just the number.')}
+          {((pd.assigns)||[]).map((a,i)=>(<div key={i} style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',padding:'5px 0',borderBottom:'1px solid var(--border)'}}>
+            <input value={a.area||''} placeholder="Development area — e.g. Schedule & Revenue L3 → L4" onChange={e=>{const rows=[...pd.assigns];rows[i]={...a,area:e.target.value};setPd({assigns:rows});}} style={{...SEL,minWidth:250,flex:1}}/>
+            <input type="date" value={a.start||''} onChange={e=>{const rows=[...pd.assigns];rows[i]={...a,start:e.target.value};setPd({assigns:rows});}} style={SEL}/>
+            <input value={a.weeks||''} placeholder="wks" onChange={e=>{const rows=[...pd.assigns];rows[i]={...a,weeks:e.target.value};setPd({assigns:rows});}} style={{...SEL,width:48}}/>
+            <select value={a.status||'Active'} onChange={e=>{const rows=[...pd.assigns];rows[i]={...a,status:e.target.value};setPd({assigns:rows});}} style={SEL}>{['Active','Complete','Paused'].map(o=><option key={o} value={o}>{o}</option>)}</select>
+            <button className="btn btn-ghost btn-xs" onClick={()=>setPd({assigns:pd.assigns.filter((_,x)=>x!==i)})}>×</button>
+          </div>))}
+          <button className="btn btn-ghost btn-sm" style={{marginTop:6}} onClick={()=>setPd({assigns:[...((pd.assigns)||[]),{area:'',start:'',weeks:'6',status:'Active'}]})}>＋ Add assignment</button>
+        </div>)}
+      </div>)}
     </div>);
 }
 function EvalsPage({staff,evals,setEvals,setModal,openProfile}){
