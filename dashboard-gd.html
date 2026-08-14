@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L102';
+window.__BUILD='build L104';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8432,7 +8432,7 @@ const gxSeed=()=>{const kpis=GX_KPI_SLIM.map(([cat,n],i)=>({id:'fd_'+i,name:n,ca
 function GuestExperiencePage({staff}){
   const[gx,setGx]=useState(()=>{const g=ld('gx',null);if(g&&g.kpis){const untouched=g.kpis.length>=35&&g.kpis.every(k=>k.target==='TBD'&&!k.def&&!k.cur);if(untouched)return{...g,kpis:gxSeed().kpis};return g;}return gxSeed();});
   useEffect(()=>sv('gx',gx),[gx]);
-  const[gxTab,setGxTab]=useState('gd');
+  const[gxTab,setGxTab]=useState('grade');
   const[live,setLive]=useState(null);
   useEffect(()=>{try{
     const d=JSON.parse(localStorage.getItem('rvgd3_call_log')||'{}');const mo=new Date().toISOString().slice(0,7);
@@ -8472,9 +8472,9 @@ function GuestExperiencePage({staff}){
         </div>
       </div>
       <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',margin:'14px 0 6px'}}>
-        {[['gd','🎓 G&D System'],['kpi','📈 KPI Scorecard']].map(([id,lb])=>(<button key={id} className={`btn btn-sm ${gxTab===id?'btn-go':'btn-ghost'}`} style={{fontSize:14,padding:'8px 16px'}} onClick={()=>setGxTab(id)}>{lb}</button>))}
+        {[['grade','✍️ Grading'],['sys','📖 The System'],['kpi','📈 KPI Scorecard']].map(([id,lb])=>(<button key={id} className={`btn btn-sm ${gxTab===id?'btn-go':'btn-ghost'}`} style={{fontSize:14,padding:'8px 16px'}} onClick={()=>setGxTab(id)}>{lb}</button>))}
       </div>
-      {(()=>{const isGE=(p2)=>{try{return /guest experience|front desk|frontdesk|reception|concierge|guest services|ge lead/.test(JSON.stringify(p2).toLowerCase());}catch(e){return false;}};
+      {gxTab!=='sys'&&(()=>{const isGE=(p2)=>{try{const f=[(p2||{}).role,(p2||{}).title,(p2||{}).discipline].filter(Boolean).join(' · ').toLowerCase();return /guest experience|front ?desk|reception|concierge|guest services|\bgx\b|\bge\b/.test(f);}catch(e){return false;}}; // role fields ONLY — notes must never drive the roster
         const geStaff=(staff||[]).filter(isGE);const pool=(showAllStaff||geStaff.length===0)?(staff||[]):geStaff;
         return(<div style={{display:'flex',gap:9,flexWrap:'wrap',alignItems:'center',margin:'8px 0 10px'}}>
           <span style={{fontSize:12,fontWeight:800,letterSpacing:'.6px',textTransform:'uppercase',color:'var(--g-888)'}}>GE team</span>
@@ -8485,7 +8485,8 @@ function GuestExperiencePage({staff}){
         </div>);})()}
       <div style={{fontSize:12,color:'var(--g-666)',margin:'4px 0 20px'}}>KPI competency progression runs through the whole career path: {GX_PROG}. Targets & ranges are configurable placeholders (TBD) until the final GE scorecard lands — the framework doesn't change when they do.</div>
 
-      {gxTab==='gd'&&(<div>
+      {gxTab!=='kpi'&&(<div>
+        {gxTab==='sys'&&(<>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:12,marginBottom:14}}>
           {GX_SCALE.map(([t,d])=>(<div key={t} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'13px 16px'}}><div style={{fontSize:14,fontWeight:800,color:'var(--c-grn)'}}>{t}</div><div style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.5}}>“{d}”</div></div>))}
         </div>
@@ -8496,15 +8497,33 @@ function GuestExperiencePage({staff}){
           {GX_GRADE.map(([n,d,m])=>(<span key={n} style={{fontSize:13,color:'var(--g-aaa)',border:'1px solid var(--border)',borderRadius:9,padding:'7px 13px',background:'var(--surface2)'}}><b style={{color:'var(--c-blu2)'}}>{n} {d}</b> <span style={{color:'var(--g-666)'}}>“{m}”</span></span>))}
         </div>
         <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 18px',marginBottom:4,fontSize:13,color:'var(--g-aaa)',lineHeight:1.7}}><b style={{color:'var(--c-yel)'}}>Competency ≠ Performance.</b> Two separate questions: does the employee understand how to work with the metric, and is the metric within range? A good number doesn't equal high competency; a bad number doesn't equal poor competency. Grade what they could reasonably influence and how effectively they responded. <b style={{color:'var(--c-grn)'}}>Fairness guardrails:</b> every KPI carries an influence level — Direct control · Strong influence · Shared influence · Contextual — protecting staff from metrics moved by clinician availability, vacations, seasonality, marketing volume, staffing or demographics.</div>
-        {H('The 10 master competency categories', pk?('Grading: '+pk+' — every change saves & syncs automatically'):'Select a team member above to grade')}
+        {H('The 10 master competency categories — full reference','Every sub-competency with all five level requirements, exactly as the master framework defines them. Grading happens on the ✍️ Grading tab.')}
+        {GX_CATS.map(([cid,cname])=>{const subs=cid==='c10'?GX_SUB10:(GX_SUBS[cid]||[]);const n=subs.length+(cid==='c2'?1:0);return(
+          <details key={cid} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'12px 18px',marginBottom:10}}>
+            <summary style={{cursor:'pointer',fontSize:15,fontWeight:800,color:'var(--g-eee)'}}>{cid.replace('c','')}. {cname} <span style={{color:'var(--g-666)',fontWeight:400,fontSize:12.5}}>· {n} competencies{cid==='c10'?' · the KPI bridge → 📈':''}</span></summary>
+            <div style={{marginTop:10}}>
+              {subs.map(([sn,lvls],si)=>(<div key={si} style={{borderTop:'1px solid var(--border)',padding:'12px 0'}}>
+                <div style={{fontSize:14,fontWeight:800,color:'var(--g-ddd)',marginBottom:6}}>{cid.replace('c','')}.{si+1} {sn}</div>
+                {lvls.map((d,i2)=>(<div key={i2} style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.7,paddingLeft:6}}><b style={{color:'var(--c-blu2)'}}>{i2+1} · {GX_GRADE[i2][1]}</b> — {d}.</div>))}
+              </div>))}
+              {cid==='c2'&&(<div style={{borderTop:'1px solid var(--border)',padding:'12px 0'}}>
+                <div style={{fontSize:14,fontWeight:800,color:'var(--g-ddd)',marginBottom:6}}>2.13 Data & Documentation Accuracy <span style={{fontWeight:400,color:'var(--g-777)',fontSize:12.5}}>· bad input creates bad KPI data</span></div>
+                {GX_DDA.map((d,i2)=>(<div key={i2} style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.7,paddingLeft:6}}><b style={{color:'var(--c-blu2)'}}>{i2+1} · {GX_GRADE[i2][1]}</b> — {d}.</div>))}
+              </div>)}
+            </div>
+          </details>);})}
+        </>)}
+        {gxTab==='grade'&&(<>
+        {H('Grade & review', pk?('Grading: '+pk+' — every change saves & syncs automatically · ⓘ on any row for the level guide, or see 📖 The System for the full reference'):'Select a team member above to grade — the full framework lives on 📖 The System tab')}
         {pk&&(<div style={{background:'linear-gradient(135deg,var(--surface2),var(--surface3))',border:'1px solid var(--go)',borderRadius:11,padding:'18px 22px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',marginBottom:10}}>
             <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'var(--g-eee)'}}>{pk}</div>
             {pd.payLevel!=null?(<>
               <span style={{fontSize:13,color:'var(--g-aaa)'}}>Current: <b style={{color:'var(--c-grn)'}}>{GX_PAY[pd.payLevel][0]}</b> · {GX_ROLEBYPAY[pd.payLevel]} · {GX_PAY[pd.payLevel][1]}</span>
               {nxtIdx!=null&&<span style={{fontSize:13,color:'var(--g-aaa)'}}>Next: <b style={{color:'var(--c-yel)'}}>{GX_PAY[nxtIdx][0]}</b> · {GX_PAY[nxtIdx][1]}</span>}
-            </>):(<span style={{fontSize:13,color:'var(--c-amb)'}}>Set the current pay level on the ladder below to unlock the progression roadmap</span>)}
+            </>):(<span style={{fontSize:13,color:'var(--c-amb)'}}>Choose the current pay level (dropdown on the right) to unlock the progression roadmap</span>)}
             <span style={{flex:1}}/>
+            <span style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:13,color:'var(--g-aaa)'}}>Pay level:<select value={pd.payLevel??''} onChange={e=>setPd({payLevel:e.target.value===''?null:+e.target.value})} style={SEL}><option value="">—</option>{GX_PAY.map((pp,pi)=><option key={pi} value={pi}>{pp[0]} · {pp[1]}</option>)}</select></span>
             <button className="btn btn-ghost btn-xs" title="Save a dated snapshot of all category scores + gate progress — builds the review-over-time history" onClick={()=>{const snap={date:new Date().toISOString().slice(0,10),avgs:Object.fromEntries(GX_CATS.map(([cid])=>[cid,catAvg(cid)?+catAvg(cid).toFixed(2):null])),gates:nxtIdx!=null?(gatesMet+'/'+gateRows.length):'—',pay:pd.payLevel!=null?GX_PAY[pd.payLevel][0]:'—'};setPd({history:[...(pd.history||[]),snap]});}}>📸 Snapshot review</button>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:'8px 18px',marginBottom:nxtIdx!=null?12:0}}>
@@ -8563,7 +8582,7 @@ function GuestExperiencePage({staff}){
                     {pk&&<span style={{display:'inline-flex',gap:3}}>{[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setS(si,sv2===n?null:n)} title={'Level '+n+' — '+lvls[n-1]} style={{width:26,height:24,borderRadius:5,border:'1px solid '+(sv2===n?'var(--c-grn)':'var(--border)'),background:sv2===n?'rgba(122,196,144,.2)':(sv2&&n<sv2?'rgba(122,196,144,.08)':'var(--surface3)'),color:(sv2&&n<=sv2)?'var(--c-grn)':'var(--g-888)',fontWeight:800,fontSize:13,cursor:'pointer'}}>{n}</button>))}</span>}
                   </div>
                   {sv2?<div style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.6,marginTop:4}}><b style={{color:'var(--c-grn)'}}>Level {sv2} · {GX_GRADE[sv2-1][1]}:</b> {lvls[sv2-1]}.{sv2<5&&<span style={{color:'var(--g-777)'}}> <b>To reach {sv2+1}:</b> {lvls[sv2]}.</span>}</div>
-                       :<div style={{fontSize:12.5,color:'var(--g-777)',lineHeight:1.6,marginTop:4}}>Not graded — click a level. <b>1:</b> {lvls[0]} … <b>5:</b> {lvls[4]}. (ⓘ for all levels)</div>}
+                       :<div style={{fontSize:12.5,color:'var(--g-777)',lineHeight:1.6,marginTop:4}}>Not graded — click a level · ⓘ for the level guide</div>}
                   {lvOpen===ek&&<div style={{fontSize:12.5,lineHeight:1.7,marginTop:4,background:'var(--surface3)',borderRadius:7,padding:'7px 10px'}}>{lvls.map((d,i2)=><div key={i2} style={{color:sv2===i2+1?'var(--c-grn)':'var(--g-999)'}}><b>{i2+1} · {GX_GRADE[i2][1]}</b> — {d}.</div>)}</div>}
                   {eOpen&&pk&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:8,marginTop:6,background:'var(--surface3)',borderRadius:7,padding:'8px 10px'}}>
                     {[['e','Evidence — behaviour/results supporting the score'],['g','Gap to next level — what specifically prevents it'],['a','Development action — what to actually do']].map(([f,lb])=>(<div key={f}><div style={{fontSize:11.5,color:'var(--g-777)',marginBottom:2}}>{lb}</div><input value={ev[f]||''} onChange={x=>setPd({ev:{...(pd.ev||{}),[ek]:{...ev,[f]:x.target.value}}})} style={{...SEL,width:'100%'}}/></div>))}
@@ -8577,15 +8596,18 @@ function GuestExperiencePage({staff}){
             </div>);})()}
           </div>);})}
         {pk&&<div style={{marginBottom:10}}><div style={{fontSize:12.5,fontWeight:800,color:'var(--g-aaa)',marginBottom:4}}>NOTES — {pk}</div><textarea value={pd.notes||''} onChange={e=>setPd({notes:e.target.value})} placeholder="Development notes, evidence, context…" style={{...SEL,width:'100%',minHeight:64,fontSize:14,lineHeight:1.5}}/></div>}
-        {H('Pay progression × KPI expectation','Each step raises the KPI relationship — from “I enter it correctly” to “I build the performance architecture.”'+(pk?' Click a row to set '+pk+'’s current level.':''))}
+        </>)}
+        {gxTab==='sys'&&(<>
+        {H('Pay progression × KPI expectation','Each step raises the KPI relationship — from “I enter it correctly” to “I build the performance architecture.”')}
         <table style={{borderCollapse:'collapse',fontSize:13,width:'100%'}}>
           <thead><tr>{['Pay','Role','Stage','KPI expectation'].map(h=><th key={h} style={{textAlign:'left',padding:'4px 10px',color:'var(--g-888)'}}>{h}</th>)}</tr></thead>
-          <tbody>{GX_PAY.map(([pay,stage,exp],i)=>{const cur=pd.payLevel===i;return(<tr key={i} onClick={()=>{if(pk)setPd({payLevel:cur?null:i});}} style={{borderTop:'1px solid var(--border)',background:cur?'rgba(202,232,193,.09)':(i%2?'transparent':'var(--stripe)'),cursor:pk?'pointer':'default'}}>
+          <tbody>{GX_PAY.map(([pay,stage,exp],i)=>{const cur=pd.payLevel===i;return(<tr key={i} style={{borderTop:'1px solid var(--border)',background:cur?'rgba(202,232,193,.09)':(i%2?'transparent':'var(--stripe)'),cursor:'default'}}>
             <td style={{padding:'8px 12px',fontWeight:800,color:cur?'var(--c-grn)':'var(--g-ddd)',whiteSpace:'nowrap'}}>{cur?'● ':''}{pay}</td>
             <td style={{padding:'8px 12px',color:'var(--c-blu2)',fontWeight:700,whiteSpace:'nowrap'}}>{GX_ROLEBYPAY[i]}</td>
             <td style={{padding:'8px 12px',color:'var(--g-ccc)',whiteSpace:'nowrap'}}>{stage}</td>
             <td style={{padding:'8px 12px',color:'var(--g-999)'}}>{exp}</td></tr>);})}</tbody>
         </table>
+        </>)}
       </div>)}
 
       {gxTab==='kpi'&&(<div>
