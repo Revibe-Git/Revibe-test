@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L101';
+window.__BUILD='build L102';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8441,7 +8441,7 @@ function GuestExperiencePage({staff}){
     let lt=0,lb=0;Object.entries(d.leads||{}).forEach(([sid,arr])=>{(arr||[]).forEach(l=>{const ad=l.date||evd[sid]||l.createdAt||'';if(String(ad).slice(0,7)!==mo)return;lt++;if(l.status==='Booked')lb++;});});
     setLive({mo,tc,tb,oc2,lt,lb});
   }catch(e){}},[]);
-  const[person,setPerson]=useState('');
+  const[person,setPerson]=useState('');const[showAllStaff,setShowAllStaff]=useState(false);
   const[openCat,setOpenCat]=useState('c10');
   const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);
   const names=(staff||[]).map(x=>x.name).filter(Boolean);
@@ -8449,8 +8449,8 @@ function GuestExperiencePage({staff}){
   const pd=(gx.people||{})[pk]||{};
   const setPd=(patch)=>{if(!pk)return;setGx(g=>({...g,people:{...(g.people||{}),[pk]:{...((g.people||{})[pk]||{}),...patch}}}));};
   const setKpi=(id,patch)=>setGx(g=>({...g,kpis:(g.kpis||[]).map(k=>k.id===id?{...k,...patch}:k)}));
-  const SEL={background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:12,padding:'4px 7px',outline:'none'};
-  const H=(t,sub)=>(<div style={{margin:'18px 0 8px'}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'1.5px',textTransform:'uppercase',color:'var(--g-ddd)',fontWeight:800}}>{t}</div>{sub&&<div style={{fontSize:11.5,color:'var(--g-777)'}}>{sub}</div>}</div>);
+  const SEL={background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:13,padding:'4px 7px',outline:'none'};
+  const H=(t,sub)=>(<div style={{margin:'30px 0 12px'}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:17,letterSpacing:'1.5px',textTransform:'uppercase',color:'var(--g-ddd)',fontWeight:800}}>{t}</div>{sub&&<div style={{fontSize:12.5,color:'var(--g-777)'}}>{sub}</div>}</div>);
   const kpiComp=(()=>{const c10=(pd.cats||{}).c10;const subs=pd.sub10||{};const vals=Object.values(subs).map(Number).filter(Boolean);if(vals.length)return (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);return c10||'—';})();
   const subsOf=(cid)=>cid==='c10'?GX_SUB10:(GX_SUBS[cid]||[]);
   const getSub=(cid,i)=>cid==='c10'?((pd.sub10||{})['s'+i]):(((pd.sub||{})[cid]||{})['s'+i]);
@@ -8465,78 +8465,85 @@ function GuestExperiencePage({staff}){
   const LvlSel=(val,on)=>(<select value={val||''} onChange={e=>on(e.target.value?+e.target.value:null)} style={SEL}><option value="">—</option>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select>);
   return(
     <div style={{padding:'26px 30px',maxWidth:1280}}>
-      <div style={{display:'flex',alignItems:'baseline',gap:14,flexWrap:'wrap',marginBottom:4}}>
-        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,letterSpacing:'1px',color:'var(--g-eee)'}}>🤝 GUEST EXPERIENCE — G&D</div>
-        <div style={{fontSize:12,color:'var(--g-888)'}}>LEARN → EXECUTE → IMPACT → MANAGE → LEAD → BUILD · Competency × Demonstration × Consistency × Responsibility × Results = Increased Value = Increased Compensation · time served ≠ raise — you get paid more because Revibe can trust you with more</div>
+      <div style={{marginBottom:8}}>
+        <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,letterSpacing:'1px',color:'var(--g-eee)'}}>🤝 GUEST EXPERIENCE — G&D</div>
+        <div style={{display:'flex',flexWrap:'wrap',alignItems:'center',margin:'12px 0 2px'}}>
+          {['LEARN','EXECUTE','IMPACT','MANAGE','LEAD','BUILD'].map((st,i)=>(<React.Fragment key={st}><span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:23,fontWeight:800,letterSpacing:'3px',color:i<2?'var(--c-grn)':i<4?'var(--c-lime2)':'var(--c-yel)'}}>{st}</span>{i<5&&<span style={{color:'var(--g-666)',fontSize:19,padding:'0 10px'}}>→</span>}</React.Fragment>))}
+        </div>
       </div>
-      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',margin:'10px 0 6px'}}>
-        {[['gd','🎓 G&D System'],['kpi','📈 KPI Scorecard']].map(([id,lb])=>(<button key={id} className={`btn btn-sm ${gxTab===id?'btn-go':'btn-ghost'}`} onClick={()=>setGxTab(id)}>{lb}</button>))}
-        <span style={{flex:1}}/>
-        <span style={{fontSize:12,color:'var(--g-888)'}}>Team member:</span>
-        <select value={person} onChange={e=>setPerson(e.target.value)} style={{...SEL,minWidth:180}}><option value="">— select GE staff —</option>{names.map(n=><option key={n} value={n}>{n}</option>)}</select>
-        {pk&&<span style={{fontSize:11.5,fontWeight:800,color:'var(--c-blu2)',border:'1px solid var(--c-blu2)',borderRadius:5,padding:'2px 8px'}} title="Average of the graded Category-10 sub-competencies (or the category level if no subs graded)">KPI literacy: {kpiComp}</span>}
+      <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',margin:'14px 0 6px'}}>
+        {[['gd','🎓 G&D System'],['kpi','📈 KPI Scorecard']].map(([id,lb])=>(<button key={id} className={`btn btn-sm ${gxTab===id?'btn-go':'btn-ghost'}`} style={{fontSize:14,padding:'8px 16px'}} onClick={()=>setGxTab(id)}>{lb}</button>))}
       </div>
-      <div style={{fontSize:11,color:'var(--g-666)',marginBottom:10}}>KPI competency progression runs through the whole career path: {GX_PROG}. Targets & ranges are configurable placeholders (TBD) until the final GE scorecard lands — the framework doesn't change when they do.</div>
+      {(()=>{const isGE=(p2)=>{try{return /guest experience|front desk|frontdesk|reception|concierge|guest services|ge lead/.test(JSON.stringify(p2).toLowerCase());}catch(e){return false;}};
+        const geStaff=(staff||[]).filter(isGE);const pool=(showAllStaff||geStaff.length===0)?(staff||[]):geStaff;
+        return(<div style={{display:'flex',gap:9,flexWrap:'wrap',alignItems:'center',margin:'8px 0 10px'}}>
+          <span style={{fontSize:12,fontWeight:800,letterSpacing:'.6px',textTransform:'uppercase',color:'var(--g-888)'}}>GE team</span>
+          {pool.map(p2=>{const nm=p2.name;const on=person===nm;return(<button key={nm} onClick={()=>setPerson(on?'':nm)} style={{cursor:'pointer',borderRadius:9,padding:'8px 16px',fontSize:14,fontWeight:700,border:'1px solid '+(on?'var(--go)':'var(--border)'),background:on?'rgba(202,232,193,.13)':'var(--surface2)',color:on?'var(--c-grn)':'var(--g-ccc)'}}>{nm}</button>);})}
+          {geStaff.length>0&&<button className="btn btn-ghost btn-xs" onClick={()=>setShowAllStaff(v=>!v)}>{showAllStaff?'GE only':'＋ other staff'}</button>}
+          {geStaff.length===0&&<span style={{fontSize:12.5,color:'var(--c-amb)'}}>No profiles are tagged Guest Experience yet — showing the whole roster. Tag GE roles on the Staff Profiles page and this filters automatically.</span>}
+          {pk&&<span style={{fontSize:12.5,fontWeight:800,color:'var(--c-blu2)',border:'1px solid var(--c-blu2)',borderRadius:7,padding:'4px 11px',marginLeft:4}} title="Average of the graded Category-10 sub-competencies (or the category level if no subs graded)">KPI literacy: {kpiComp}</span>}
+        </div>);})()}
+      <div style={{fontSize:12,color:'var(--g-666)',margin:'4px 0 20px'}}>KPI competency progression runs through the whole career path: {GX_PROG}. Targets & ranges are configurable placeholders (TBD) until the final GE scorecard lands — the framework doesn't change when they do.</div>
 
       {gxTab==='gd'&&(<div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:10,marginBottom:6}}>
-          {GX_SCALE.map(([t,d])=>(<div key={t} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 13px'}}><div style={{fontSize:12.5,fontWeight:800,color:'var(--c-grn)'}}>{t}</div><div style={{fontSize:12,color:'var(--g-aaa)',lineHeight:1.5}}>“{d}”</div></div>))}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:12,marginBottom:14}}>
+          {GX_SCALE.map(([t,d])=>(<div key={t} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'13px 16px'}}><div style={{fontSize:14,fontWeight:800,color:'var(--c-grn)'}}>{t}</div><div style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.5}}>“{d}”</div></div>))}
         </div>
         <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',margin:'2px 0 8px'}}>
-          {GX_ROLES.map(([code,role,payr,stage])=>(<span key={code} style={{fontSize:11.5,color:'var(--g-aaa)'}}><b style={{color:'var(--c-grn)'}}>{code}</b> {role} <span style={{color:'var(--g-666)'}}>{payr} · {stage}</span></span>))}
+          {GX_ROLES.map(([code,role,payr,stage])=>(<span key={code} style={{fontSize:13,color:'var(--g-aaa)',border:'1px solid var(--border)',borderRadius:9,padding:'7px 13px',background:'var(--surface2)'}}><b style={{color:'var(--c-grn)'}}>{code}</b> {role} <span style={{color:'var(--g-666)'}}>{payr} · {stage}</span></span>))}
         </div>
         <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',margin:'0 0 10px'}}>
-          {GX_GRADE.map(([n,d,m])=>(<span key={n} style={{fontSize:11.5,color:'var(--g-aaa)'}}><b style={{color:'var(--c-blu2)'}}>{n} {d}</b> <span style={{color:'var(--g-666)'}}>“{m}”</span></span>))}
+          {GX_GRADE.map(([n,d,m])=>(<span key={n} style={{fontSize:13,color:'var(--g-aaa)',border:'1px solid var(--border)',borderRadius:9,padding:'7px 13px',background:'var(--surface2)'}}><b style={{color:'var(--c-blu2)'}}>{n} {d}</b> <span style={{color:'var(--g-666)'}}>“{m}”</span></span>))}
         </div>
-        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:4,fontSize:12,color:'var(--g-aaa)',lineHeight:1.6}}><b style={{color:'var(--c-yel)'}}>Competency ≠ Performance.</b> Two separate questions: does the employee understand how to work with the metric, and is the metric within range? A good number doesn't equal high competency; a bad number doesn't equal poor competency. Grade what they could reasonably influence and how effectively they responded. <b style={{color:'var(--c-grn)'}}>Fairness guardrails:</b> every KPI carries an influence level — Direct control · Strong influence · Shared influence · Contextual — protecting staff from metrics moved by clinician availability, vacations, seasonality, marketing volume, staffing or demographics.</div>
+        <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'14px 18px',marginBottom:4,fontSize:13,color:'var(--g-aaa)',lineHeight:1.7}}><b style={{color:'var(--c-yel)'}}>Competency ≠ Performance.</b> Two separate questions: does the employee understand how to work with the metric, and is the metric within range? A good number doesn't equal high competency; a bad number doesn't equal poor competency. Grade what they could reasonably influence and how effectively they responded. <b style={{color:'var(--c-grn)'}}>Fairness guardrails:</b> every KPI carries an influence level — Direct control · Strong influence · Shared influence · Contextual — protecting staff from metrics moved by clinician availability, vacations, seasonality, marketing volume, staffing or demographics.</div>
         {H('The 10 master competency categories', pk?('Grading: '+pk+' — every change saves & syncs automatically'):'Select a team member above to grade')}
-        {pk&&(<div style={{background:'linear-gradient(135deg,var(--surface2),var(--surface3))',border:'1px solid var(--go)',borderRadius:11,padding:'14px 17px',marginBottom:12}}>
+        {pk&&(<div style={{background:'linear-gradient(135deg,var(--surface2),var(--surface3))',border:'1px solid var(--go)',borderRadius:11,padding:'18px 22px',marginBottom:12}}>
           <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',marginBottom:10}}>
-            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'var(--g-eee)'}}>{pk}</div>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'var(--g-eee)'}}>{pk}</div>
             {pd.payLevel!=null?(<>
-              <span style={{fontSize:12,color:'var(--g-aaa)'}}>Current: <b style={{color:'var(--c-grn)'}}>{GX_PAY[pd.payLevel][0]}</b> · {GX_ROLEBYPAY[pd.payLevel]} · {GX_PAY[pd.payLevel][1]}</span>
-              {nxtIdx!=null&&<span style={{fontSize:12,color:'var(--g-aaa)'}}>Next: <b style={{color:'var(--c-yel)'}}>{GX_PAY[nxtIdx][0]}</b> · {GX_PAY[nxtIdx][1]}</span>}
-            </>):(<span style={{fontSize:12,color:'var(--c-amb)'}}>Set the current pay level on the ladder below to unlock the progression roadmap</span>)}
+              <span style={{fontSize:13,color:'var(--g-aaa)'}}>Current: <b style={{color:'var(--c-grn)'}}>{GX_PAY[pd.payLevel][0]}</b> · {GX_ROLEBYPAY[pd.payLevel]} · {GX_PAY[pd.payLevel][1]}</span>
+              {nxtIdx!=null&&<span style={{fontSize:13,color:'var(--g-aaa)'}}>Next: <b style={{color:'var(--c-yel)'}}>{GX_PAY[nxtIdx][0]}</b> · {GX_PAY[nxtIdx][1]}</span>}
+            </>):(<span style={{fontSize:13,color:'var(--c-amb)'}}>Set the current pay level on the ladder below to unlock the progression roadmap</span>)}
             <span style={{flex:1}}/>
             <button className="btn btn-ghost btn-xs" title="Save a dated snapshot of all category scores + gate progress — builds the review-over-time history" onClick={()=>{const snap={date:new Date().toISOString().slice(0,10),avgs:Object.fromEntries(GX_CATS.map(([cid])=>[cid,catAvg(cid)?+catAvg(cid).toFixed(2):null])),gates:nxtIdx!=null?(gatesMet+'/'+gateRows.length):'—',pay:pd.payLevel!=null?GX_PAY[pd.payLevel][0]:'—'};setPd({history:[...(pd.history||[]),snap]});}}>📸 Snapshot review</button>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:'6px 16px',marginBottom:nxtIdx!=null?12:0}}>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:'8px 18px',marginBottom:nxtIdx!=null?12:0}}>
             {GX_CATS.map(([cid,cname])=>{const a=catAvg(cid);return(<div key={cid} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}} onClick={()=>setOpenCat(cid)} title={'Open '+cname}>
-              <span style={{fontSize:11,color:'var(--g-aaa)',width:118,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cid.replace('c','')}. {cname}</span>
+              <span style={{fontSize:12,color:'var(--g-aaa)',width:118,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cid.replace('c','')}. {cname}</span>
               <span style={{flex:1,height:7,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}><span style={{display:'block',height:'100%',width:(a?(a/5*100):0)+'%',background:barCol(a)}}/></span>
-              <span style={{fontSize:11.5,fontWeight:800,color:a?'var(--g-ddd)':'var(--g-666)',width:26,textAlign:'right'}}>{a?a.toFixed(1):'—'}</span>
+              <span style={{fontSize:12.5,fontWeight:800,color:a?'var(--g-ddd)':'var(--g-666)',width:26,textAlign:'right'}}>{a?a.toFixed(1):'—'}</span>
             </div>);})}
           </div>
           {nxtIdx!=null&&(<div>
             <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6,flexWrap:'wrap'}}>
-              <span style={{fontSize:12.5,fontWeight:800,color:'var(--g-eee)'}}>🎯 Road to {GX_PAY[nxtIdx][0]} — {GX_PAY[nxtIdx][1]}</span>
+              <span style={{fontSize:14,fontWeight:800,color:'var(--g-eee)'}}>🎯 Road to {GX_PAY[nxtIdx][0]} — {GX_PAY[nxtIdx][1]}</span>
               <span style={{flex:1,maxWidth:260,height:8,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}><span style={{display:'block',height:'100%',width:(gateRows.length?(gatesMet/gateRows.length*100):0)+'%',background:'var(--c-grn)'}}/></span>
-              <span style={{fontSize:12,fontWeight:800,color:'var(--c-grn)'}}>{gatesMet}/{gateRows.length} gates met</span>
+              <span style={{fontSize:13,fontWeight:800,color:'var(--c-grn)'}}>{gatesMet}/{gateRows.length} gates met</span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:'3px 18px'}}>
-              {gateRows.map((r,i)=>(<div key={i} style={{display:'flex',gap:8,fontSize:12,alignItems:'center',cursor:'pointer'}} onClick={()=>setOpenCat(r.c)} title={'Open category '+r.c.replace('c','')+' to grade this'}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:'7px 22px'}}>
+              {gateRows.map((r,i)=>(<div key={i} style={{display:'flex',gap:8,fontSize:13,alignItems:'center',cursor:'pointer'}} onClick={()=>setOpenCat(r.c)} title={'Open category '+r.c.replace('c','')+' to grade this'}>
                 <span style={{flex:1,color:'var(--g-ccc)'}}>{r.lb}</span>
                 <span style={{color:'var(--g-888)'}}>{r.cur==null?'—':r.cur} / {r.req}</span>
                 <span style={{fontWeight:800,color:r.st==='Met'?'var(--c-grn)':r.st==='Developing'?'var(--c-yel)':r.st==='Gap'?'var(--c-red)':'var(--g-666)',width:78}}>{r.st}</span>
               </div>))}
             </div>
-            {(()=>{const gaps=gateRows.filter(r=>r.st!=='Met');return gaps.length?(<div style={{marginTop:8,fontSize:12,color:'var(--g-aaa)'}}><b style={{color:'var(--c-amb)'}}>Priority development areas:</b> {gaps.slice(0,4).map(g=>g.lb).join(' · ')}{gaps.length>4?' · +'+(gaps.length-4)+' more':''} <span style={{color:'var(--g-666)'}}>· Met green · Developing = 1 away · Gap red · — not graded yet · click any gate to open its category</span></div>):(gateRows.length?<div style={{marginTop:8,fontSize:12,color:'var(--c-grn)',fontWeight:800}}>All gates met — demonstration + consistency review with manager sign-off is the remaining step.</div>:null);})()}
+            {(()=>{const gaps=gateRows.filter(r=>r.st!=='Met');return gaps.length?(<div style={{marginTop:8,fontSize:13,color:'var(--g-aaa)'}}><b style={{color:'var(--c-amb)'}}>Priority development areas:</b> {gaps.slice(0,4).map(g=>g.lb).join(' · ')}{gaps.length>4?' · +'+(gaps.length-4)+' more':''} <span style={{color:'var(--g-666)'}}>· Met green · Developing = 1 away · Gap red · — not graded yet · click any gate to open its category</span></div>):(gateRows.length?<div style={{marginTop:8,fontSize:13,color:'var(--c-grn)',fontWeight:800}}>All gates met — demonstration + consistency review with manager sign-off is the remaining step.</div>:null);})()}
           </div>)}
           {(pd.history||[]).length>0&&(<div style={{marginTop:10,borderTop:'1px solid var(--border)',paddingTop:6}}>
-            <div style={{fontSize:11,fontWeight:800,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.4px',marginBottom:3}}>Review history</div>
-            {(pd.history||[]).slice(-6).reverse().map((h,i)=>{const avgVals=Object.values(h.avgs||{}).filter(v=>v!=null);const ov=avgVals.length?(avgVals.reduce((a,b)=>a+b,0)/avgVals.length).toFixed(1):'—';return(<div key={i} style={{fontSize:11.5,color:'var(--g-aaa)'}}>{h.date} · pay {h.pay} · overall {ov} · gates {h.gates}</div>);})}
+            <div style={{fontSize:12,fontWeight:800,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.4px',marginBottom:3}}>Review history</div>
+            {(pd.history||[]).slice(-6).reverse().map((h,i)=>{const avgVals=Object.values(h.avgs||{}).filter(v=>v!=null);const ov=avgVals.length?(avgVals.reduce((a,b)=>a+b,0)/avgVals.length).toFixed(1):'—';return(<div key={i} style={{fontSize:12.5,color:'var(--g-aaa)'}}>{h.date} · pay {h.pay} · overall {ov} · gates {h.gates}</div>);})}
           </div>)}
         </div>)}
         {GX_CATS.map(([cid,cname])=>{const isOpen=openCat===cid;const lvl=(pd.cats||{})[cid];return(
-          <div key={cid} style={{background:'var(--surface2)',border:'1px solid '+(isOpen?'var(--go)':'var(--border)'),borderRadius:9,padding:'10px 14px',marginBottom:8}}>
+          <div key={cid} style={{background:'var(--surface2)',border:'1px solid '+(isOpen?'var(--go)':'var(--border)'),borderRadius:12,padding:'14px 18px',marginBottom:14}}>
             <div style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',flexWrap:'wrap'}} onClick={()=>setOpenCat(isOpen?null:cid)}>
-              <span style={{fontSize:13.5,fontWeight:800,color:'var(--g-eee)'}}>{cid.replace('c','')}. {cname}{cid==='c10'&&<span style={{marginLeft:8,fontSize:10.5,color:'var(--c-blu2)',fontWeight:800}}>KPI BRIDGE → 📈</span>}</span>
-              {gateByCat[cid]!=null&&<span style={{fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:4,border:'1px solid',borderColor:(gv2(cid,null)||0)>=gateByCat[cid]?'var(--c-grn)':'var(--c-amb)',color:(gv2(cid,null)||0)>=gateByCat[cid]?'var(--c-grn)':'var(--c-amb)'}} title="This whole category gates the next pay level">⭐ next pay: category ≥{gateByCat[cid]}</span>}
+              <span style={{fontSize:15,fontWeight:800,color:'var(--g-eee)'}}>{cid.replace('c','')}. {cname}{cid==='c10'&&<span style={{marginLeft:8,fontSize:11.5,color:'var(--c-blu2)',fontWeight:800}}>KPI BRIDGE → 📈</span>}</span>
+              {gateByCat[cid]!=null&&<span style={{fontSize:10.5,fontWeight:800,padding:'1px 6px',borderRadius:4,border:'1px solid',borderColor:(gv2(cid,null)||0)>=gateByCat[cid]?'var(--c-grn)':'var(--c-amb)',color:(gv2(cid,null)||0)>=gateByCat[cid]?'var(--c-grn)':'var(--c-amb)'}} title="This whole category gates the next pay level">⭐ next pay: category ≥{gateByCat[cid]}</span>}
               <span style={{flex:1}}/>
               {pk&&(()=>{const a=catAvg(cid);const subs2=subsOf(cid);const graded=subs2.map((_,i2)=>getSub(cid,i2)).filter(v=>v).length+((cid==='c2'&&(pd.sub2||{}).dda)?1:0);const tot=subs2.length+(cid==='c2'?1:0);return(<span style={{display:'inline-flex',alignItems:'center',gap:8}} onClick={e=>e.stopPropagation()}>
-                <span style={{fontSize:10.5,color:'var(--g-666)'}}>{graded}/{tot} graded</span>
+                <span style={{fontSize:11.5,color:'var(--g-666)'}}>{graded}/{tot} graded</span>
                 <span style={{width:90,height:7,background:'var(--surface3)',borderRadius:4,overflow:'hidden',display:'inline-block'}}><span style={{display:'block',height:'100%',width:(a?(a/5*100):0)+'%',background:barCol(a)}}/></span>
-                <span style={{fontSize:12,fontWeight:800,color:a?'var(--g-ddd)':'var(--g-666)',width:28}}>{a?a.toFixed(1):'—'}</span>
+                <span style={{fontSize:13,fontWeight:800,color:a?'var(--g-ddd)':'var(--g-666)',width:28}}>{a?a.toFixed(1):'—'}</span>
               </span>);})()}
               <span style={{color:'var(--g-666)'}}>{isOpen?'▾':'▸'}</span>
             </div>
@@ -8545,51 +8552,51 @@ function GuestExperiencePage({staff}){
               const setS=(i,v)=>{const st2={upd:{...(pd.upd||{}),[cid+'.s'+i]:new Date().toISOString().slice(0,10)}};if(cid==='c10')setPd({sub10:{...(pd.sub10||{}),['s'+i]:v},...st2});else setPd({sub:{...(pd.sub||{}),[cid]:{...((pd.sub||{})[cid]||{}),['s'+i]:v}},...st2});};
               return(<div style={{marginTop:10}}>
               {subs.map(([sn,lvls],si)=>{const sv2=getS(si);const ek=cid+'.s'+si;const ev=(pd.ev||{})[ek]||{};const eOpen=evOpen===ek;return(
-                <div key={si} style={{borderTop:'1px solid var(--border)',padding:'8px 0'}}>
+                <div key={si} style={{borderTop:'1px solid var(--border)',padding:'12px 2px'}}>
                   <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-                    <span style={{fontSize:12.5,fontWeight:800,color:'var(--g-ddd)'}}>{cid.replace('c','')}.{si+1} {sn}</span>
-                    {gateBySub[ek]!=null&&<span style={{fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:4,border:'1px solid',borderColor:(sv2||0)>=gateBySub[ek]?'var(--c-grn)':'var(--c-amb)',color:(sv2||0)>=gateBySub[ek]?'var(--c-grn)':'var(--c-amb)'}} title="This competency gates the next pay level">⭐ next pay: ≥{gateBySub[ek]}</span>}
+                    <span style={{fontSize:14,fontWeight:800,color:'var(--g-ddd)'}}>{cid.replace('c','')}.{si+1} {sn}</span>
+                    {gateBySub[ek]!=null&&<span style={{fontSize:10.5,fontWeight:800,padding:'1px 6px',borderRadius:4,border:'1px solid',borderColor:(sv2||0)>=gateBySub[ek]?'var(--c-grn)':'var(--c-amb)',color:(sv2||0)>=gateBySub[ek]?'var(--c-grn)':'var(--c-amb)'}} title="This competency gates the next pay level">⭐ next pay: ≥{gateBySub[ek]}</span>}
                     <span style={{flex:1}}/>
-                    {(pd.upd||{})[ek]&&<span style={{fontSize:10,color:'var(--g-666)'}}>updated {(pd.upd||{})[ek]}</span>}
+                    {(pd.upd||{})[ek]&&<span style={{fontSize:10.5,color:'var(--g-666)'}}>updated {(pd.upd||{})[ek]}</span>}
                     {pk&&<button className="btn btn-ghost btn-xs" title="Evidence-based grading: evidence · gap to next · development action · demonstration status" onClick={()=>setEvOpen(eOpen?null:ek)}>📝</button>}
                     <button className="btn btn-ghost btn-xs" title="Show all 5 level requirements" onClick={()=>setLvOpen(lvOpen===ek?null:ek)}>ⓘ</button>
-                    {pk&&<span style={{display:'inline-flex',gap:3}}>{[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setS(si,sv2===n?null:n)} title={'Level '+n+' — '+lvls[n-1]} style={{width:26,height:24,borderRadius:5,border:'1px solid '+(sv2===n?'var(--c-grn)':'var(--border)'),background:sv2===n?'rgba(122,196,144,.2)':(sv2&&n<sv2?'rgba(122,196,144,.08)':'var(--surface3)'),color:(sv2&&n<=sv2)?'var(--c-grn)':'var(--g-888)',fontWeight:800,fontSize:12,cursor:'pointer'}}>{n}</button>))}</span>}
+                    {pk&&<span style={{display:'inline-flex',gap:3}}>{[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setS(si,sv2===n?null:n)} title={'Level '+n+' — '+lvls[n-1]} style={{width:26,height:24,borderRadius:5,border:'1px solid '+(sv2===n?'var(--c-grn)':'var(--border)'),background:sv2===n?'rgba(122,196,144,.2)':(sv2&&n<sv2?'rgba(122,196,144,.08)':'var(--surface3)'),color:(sv2&&n<=sv2)?'var(--c-grn)':'var(--g-888)',fontWeight:800,fontSize:13,cursor:'pointer'}}>{n}</button>))}</span>}
                   </div>
-                  {sv2?<div style={{fontSize:11.5,color:'var(--g-aaa)',lineHeight:1.5,marginTop:4}}><b style={{color:'var(--c-grn)'}}>Level {sv2} · {GX_GRADE[sv2-1][1]}:</b> {lvls[sv2-1]}.{sv2<5&&<span style={{color:'var(--g-777)'}}> <b>To reach {sv2+1}:</b> {lvls[sv2]}.</span>}</div>
-                       :<div style={{fontSize:11.5,color:'var(--g-777)',lineHeight:1.5,marginTop:4}}>Not graded — click a level. <b>1:</b> {lvls[0]} … <b>5:</b> {lvls[4]}. (ⓘ for all levels)</div>}
-                  {lvOpen===ek&&<div style={{fontSize:11.5,lineHeight:1.7,marginTop:4,background:'var(--surface3)',borderRadius:7,padding:'7px 10px'}}>{lvls.map((d,i2)=><div key={i2} style={{color:sv2===i2+1?'var(--c-grn)':'var(--g-999)'}}><b>{i2+1} · {GX_GRADE[i2][1]}</b> — {d}.</div>)}</div>}
+                  {sv2?<div style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.6,marginTop:4}}><b style={{color:'var(--c-grn)'}}>Level {sv2} · {GX_GRADE[sv2-1][1]}:</b> {lvls[sv2-1]}.{sv2<5&&<span style={{color:'var(--g-777)'}}> <b>To reach {sv2+1}:</b> {lvls[sv2]}.</span>}</div>
+                       :<div style={{fontSize:12.5,color:'var(--g-777)',lineHeight:1.6,marginTop:4}}>Not graded — click a level. <b>1:</b> {lvls[0]} … <b>5:</b> {lvls[4]}. (ⓘ for all levels)</div>}
+                  {lvOpen===ek&&<div style={{fontSize:12.5,lineHeight:1.7,marginTop:4,background:'var(--surface3)',borderRadius:7,padding:'7px 10px'}}>{lvls.map((d,i2)=><div key={i2} style={{color:sv2===i2+1?'var(--c-grn)':'var(--g-999)'}}><b>{i2+1} · {GX_GRADE[i2][1]}</b> — {d}.</div>)}</div>}
                   {eOpen&&pk&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:8,marginTop:6,background:'var(--surface3)',borderRadius:7,padding:'8px 10px'}}>
-                    {[['e','Evidence — behaviour/results supporting the score'],['g','Gap to next level — what specifically prevents it'],['a','Development action — what to actually do']].map(([f,lb])=>(<div key={f}><div style={{fontSize:10.5,color:'var(--g-777)',marginBottom:2}}>{lb}</div><input value={ev[f]||''} onChange={x=>setPd({ev:{...(pd.ev||{}),[ek]:{...ev,[f]:x.target.value}}})} style={{...SEL,width:'100%'}}/></div>))}
-                    <div><div style={{fontSize:10.5,color:'var(--g-777)',marginBottom:2}}>Demonstration status — one-time ≠ competency</div><select value={ev.d||''} onChange={x=>setPd({ev:{...(pd.ev||{}),[ek]:{...ev,d:x.target.value}}})} style={SEL}><option value="">—</option>{['Not Demonstrated','Demonstrated With Support','Demonstrated Independently','Demonstrated Consistently'].map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+                    {[['e','Evidence — behaviour/results supporting the score'],['g','Gap to next level — what specifically prevents it'],['a','Development action — what to actually do']].map(([f,lb])=>(<div key={f}><div style={{fontSize:11.5,color:'var(--g-777)',marginBottom:2}}>{lb}</div><input value={ev[f]||''} onChange={x=>setPd({ev:{...(pd.ev||{}),[ek]:{...ev,[f]:x.target.value}}})} style={{...SEL,width:'100%'}}/></div>))}
+                    <div><div style={{fontSize:11.5,color:'var(--g-777)',marginBottom:2}}>Demonstration status — one-time ≠ competency</div><select value={ev.d||''} onChange={x=>setPd({ev:{...(pd.ev||{}),[ek]:{...ev,d:x.target.value}}})} style={SEL}><option value="">—</option>{['Not Demonstrated','Demonstrated With Support','Demonstrated Independently','Demonstrated Consistently'].map(o=><option key={o} value={o}>{o}</option>)}</select></div>
                   </div>}
                 </div>);})}
-              {cid==='c2'&&(<div style={{borderTop:'1px solid var(--border)',padding:'8px 0'}}>
-                <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:12.5,fontWeight:800,color:'var(--g-ddd)',flex:1}}>2.13 Data & Documentation Accuracy <span style={{fontWeight:400,color:'var(--g-777)'}}>· KPI bridge — bad input creates bad KPI data</span></span>{pk&&LvlSel((pd.sub2||{}).dda,(v)=>setPd({sub2:{...(pd.sub2||{}),dda:v}}))}</div>
-                <div style={{fontSize:11.5,color:'var(--g-999)',lineHeight:1.55,marginTop:3}}>{GX_DDA.map((d,i2)=><span key={i2} style={{marginRight:10,color:((pd.sub2||{}).dda)===i2+1?'var(--c-grn)':'var(--g-999)'}}><b>{i2+1}</b> {d}.</span>)}</div>
+              {cid==='c2'&&(<div style={{borderTop:'1px solid var(--border)',padding:'12px 2px'}}>
+                <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:14,fontWeight:800,color:'var(--g-ddd)',flex:1}}>2.13 Data & Documentation Accuracy <span style={{fontWeight:400,color:'var(--g-777)'}}>· KPI bridge — bad input creates bad KPI data</span></span>{pk&&LvlSel((pd.sub2||{}).dda,(v)=>setPd({sub2:{...(pd.sub2||{}),dda:v}}))}</div>
+                <div style={{fontSize:12.5,color:'var(--g-999)',lineHeight:1.65,marginTop:3}}>{GX_DDA.map((d,i2)=><span key={i2} style={{marginRight:10,color:((pd.sub2||{}).dda)===i2+1?'var(--c-grn)':'var(--g-999)'}}><b>{i2+1}</b> {d}.</span>)}</div>
               </div>)}
             </div>);})()}
           </div>);})}
-        {pk&&<div style={{marginBottom:10}}><div style={{fontSize:11.5,fontWeight:800,color:'var(--g-aaa)',marginBottom:4}}>NOTES — {pk}</div><textarea value={pd.notes||''} onChange={e=>setPd({notes:e.target.value})} placeholder="Development notes, evidence, context…" style={{...SEL,width:'100%',minHeight:64,fontSize:12.5,lineHeight:1.5}}/></div>}
+        {pk&&<div style={{marginBottom:10}}><div style={{fontSize:12.5,fontWeight:800,color:'var(--g-aaa)',marginBottom:4}}>NOTES — {pk}</div><textarea value={pd.notes||''} onChange={e=>setPd({notes:e.target.value})} placeholder="Development notes, evidence, context…" style={{...SEL,width:'100%',minHeight:64,fontSize:14,lineHeight:1.5}}/></div>}
         {H('Pay progression × KPI expectation','Each step raises the KPI relationship — from “I enter it correctly” to “I build the performance architecture.”'+(pk?' Click a row to set '+pk+'’s current level.':''))}
-        <table style={{borderCollapse:'collapse',fontSize:12,width:'100%'}}>
+        <table style={{borderCollapse:'collapse',fontSize:13,width:'100%'}}>
           <thead><tr>{['Pay','Role','Stage','KPI expectation'].map(h=><th key={h} style={{textAlign:'left',padding:'4px 10px',color:'var(--g-888)'}}>{h}</th>)}</tr></thead>
           <tbody>{GX_PAY.map(([pay,stage,exp],i)=>{const cur=pd.payLevel===i;return(<tr key={i} onClick={()=>{if(pk)setPd({payLevel:cur?null:i});}} style={{borderTop:'1px solid var(--border)',background:cur?'rgba(202,232,193,.09)':(i%2?'transparent':'var(--stripe)'),cursor:pk?'pointer':'default'}}>
-            <td style={{padding:'5px 10px',fontWeight:800,color:cur?'var(--c-grn)':'var(--g-ddd)',whiteSpace:'nowrap'}}>{cur?'● ':''}{pay}</td>
-            <td style={{padding:'5px 10px',color:'var(--c-blu2)',fontWeight:700,whiteSpace:'nowrap'}}>{GX_ROLEBYPAY[i]}</td>
-            <td style={{padding:'5px 10px',color:'var(--g-ccc)',whiteSpace:'nowrap'}}>{stage}</td>
-            <td style={{padding:'5px 10px',color:'var(--g-999)'}}>{exp}</td></tr>);})}</tbody>
+            <td style={{padding:'8px 12px',fontWeight:800,color:cur?'var(--c-grn)':'var(--g-ddd)',whiteSpace:'nowrap'}}>{cur?'● ':''}{pay}</td>
+            <td style={{padding:'8px 12px',color:'var(--c-blu2)',fontWeight:700,whiteSpace:'nowrap'}}>{GX_ROLEBYPAY[i]}</td>
+            <td style={{padding:'8px 12px',color:'var(--g-ccc)',whiteSpace:'nowrap'}}>{stage}</td>
+            <td style={{padding:'8px 12px',color:'var(--g-999)'}}>{exp}</td></tr>);})}</tbody>
         </table>
       </div>)}
 
       {gxTab==='kpi'&&(<div>
-        <div style={{background:'rgba(224,160,82,.08)',border:'1px solid rgba(224,160,82,.4)',borderRadius:9,padding:'9px 13px',fontSize:12,color:'var(--c-amb)',marginBottom:10}}>📞 This is the front-desk performance scorecard — specific measurable categories: call quality, lead conversion, call totals, rebooking, recovery and more. ⏳ The exact metric list and correct ranges are still being finalized — rows below are a placeholder skeleton (edit, add, remove freely; targets stay TBD until the real numbers land). Competency (does the person understand and work the metric?) is graded on the 🎓 tab; measured performance lives here.</div>
+        <div style={{background:'rgba(224,160,82,.08)',border:'1px solid rgba(224,160,82,.4)',borderRadius:12,padding:'12px 16px',fontSize:13,color:'var(--c-amb)',marginBottom:10}}>📞 This is the front-desk performance scorecard — specific measurable categories: call quality, lead conversion, call totals, rebooking, recovery and more. ⏳ The exact metric list and correct ranges are still being finalized — rows below are a placeholder skeleton (edit, add, remove freely; targets stay TBD until the real numbers land). Competency (does the person understand and work the metric?) is graded on the 🎓 tab; measured performance lives here.</div>
         {live&&(()=>{const pcx=(a,b)=>b?Math.round(a/b*100)+'%':'—';const tiles=[['Total calls handled',live.tc+live.oc2],['Treatment calls (new)',live.tc],['Call conversion',pcx(live.tb,live.tc)],['New leads',live.lt],['Lead conversion',pcx(live.lb,live.lt)]];return(<div style={{marginBottom:12}}>
-          <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--c-grn)',marginBottom:6}}>📡 Live now — {live.mo} · auto from Call History <span style={{color:'var(--g-666)',fontWeight:400,textTransform:'none'}}>· clinic-level (per-person attribution comes once your metric list & ranges land)</span></div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:8}}>{tiles.map(([lb2,v])=>(<div key={lb2} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'9px 12px'}}><div style={{fontSize:10.5,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.4px'}}>{lb2}</div><div style={{fontSize:20,fontWeight:800,color:'var(--g-eee)'}}>{v}</div><div style={{fontSize:10.5,color:'var(--c-amb)'}}>target: TBD</div></div>))}</div>
+          <div style={{fontSize:12.5,fontWeight:800,letterSpacing:'.5px',textTransform:'uppercase',color:'var(--c-grn)',marginBottom:6}}>📡 Live now — {live.mo} · auto from Call History <span style={{color:'var(--g-666)',fontWeight:400,textTransform:'none'}}>· clinic-level (per-person attribution comes once your metric list & ranges land)</span></div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:8}}>{tiles.map(([lb2,v])=>(<div key={lb2} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'12px 15px'}}><div style={{fontSize:11.5,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.4px'}}>{lb2}</div><div style={{fontSize:22,fontWeight:800,color:'var(--g-eee)'}}>{v}</div><div style={{fontSize:11.5,color:'var(--c-amb)'}}>target: TBD</div></div>))}</div>
         </div>);})()}
         {H('Front-desk KPI scorecard — '+(gx.kpis||[]).length+' placeholder metrics','Skeleton awaiting the final metric list & correct ranges — each row: name · category · target · ranges · influence · required competency level, with definition / calculation / source / owner under ✎')}
-        <div style={{display:'flex',gap:8,marginBottom:8}}><button className="btn btn-ghost btn-sm" onClick={()=>{const n=window.prompt('New KPI name:');if(!n)return;setGx(g=>({...g,kpis:[...(g.kpis||[]),{id:'k_'+Date.now().toString(36),name:n,cat:GX_CATS_ALL[0],target:'TBD',range:'TBD',warn:'TBD',crit:'TBD',infl:'Shared influence',req:3,freq:'Weekly',def:'',calc:'',src:'',owner:'',cur:'',trend:'—',act:''}]}));}}>＋ Add KPI</button></div>
-        <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',fontSize:12,minWidth:900,width:'100%'}}>
+        <div style={{display:'flex',gap:8,marginBottom:14}}><button className="btn btn-ghost btn-sm" onClick={()=>{const n=window.prompt('New KPI name:');if(!n)return;setGx(g=>({...g,kpis:[...(g.kpis||[]),{id:'k_'+Date.now().toString(36),name:n,cat:GX_CATS_ALL[0],target:'TBD',range:'TBD',warn:'TBD',crit:'TBD',infl:'Shared influence',req:3,freq:'Weekly',def:'',calc:'',src:'',owner:'',cur:'',trend:'—',act:''}]}));}}>＋ Add KPI</button></div>
+        <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',fontSize:13,minWidth:900,width:'100%'}}>
           <thead><tr>{['KPI','Category','Target','Accept','Warn','Crit','Influence','Req lvl',''].map(h=><th key={h} style={{textAlign:'left',padding:'4px 8px',color:'var(--g-888)'}}>{h}</th>)}</tr></thead>
           <tbody>{(gx.kpis||[]).map((k,i)=>(<React.Fragment key={k.id}>
             <tr style={{borderTop:'1px solid var(--border)',background:i%2?'transparent':'var(--stripe)'}}>
@@ -8602,9 +8609,9 @@ function GuestExperiencePage({staff}){
             </tr>
             {kOpen===k.id&&<tr><td colSpan={9} style={{padding:'6px 8px 12px',background:'var(--surface3)'}}>
               <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:8}}>
-                {[['def','Definition — exactly what it measures'],['calc','Calculation / formula'],['src','Data source'],['owner','Owner'],['cur','Current performance'],['act','Action required if outside range']].map(([f,lb])=>(<div key={f}><div style={{fontSize:10.5,color:'var(--g-777)',marginBottom:2}}>{lb}</div><input value={k[f]||''} onChange={e=>setKpi(k.id,{[f]:e.target.value})} style={{...SEL,width:'100%'}}/></div>))}
-                <div><div style={{fontSize:10.5,color:'var(--g-777)',marginBottom:2}}>Frequency</div><select value={k.freq} onChange={e=>setKpi(k.id,{freq:e.target.value})} style={SEL}>{['Daily','Weekly','Monthly','Rolling average'].map(o=><option key={o} value={o}>{o}</option>)}</select></div>
-                <div><div style={{fontSize:10.5,color:'var(--g-777)',marginBottom:2}}>Trend</div><select value={k.trend} onChange={e=>setKpi(k.id,{trend:e.target.value})} style={SEL}>{['—','Improving','Stable','Declining'].map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+                {[['def','Definition — exactly what it measures'],['calc','Calculation / formula'],['src','Data source'],['owner','Owner'],['cur','Current performance'],['act','Action required if outside range']].map(([f,lb])=>(<div key={f}><div style={{fontSize:11.5,color:'var(--g-777)',marginBottom:2}}>{lb}</div><input value={k[f]||''} onChange={e=>setKpi(k.id,{[f]:e.target.value})} style={{...SEL,width:'100%'}}/></div>))}
+                <div><div style={{fontSize:11.5,color:'var(--g-777)',marginBottom:2}}>Frequency</div><select value={k.freq} onChange={e=>setKpi(k.id,{freq:e.target.value})} style={SEL}>{['Daily','Weekly','Monthly','Rolling average'].map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+                <div><div style={{fontSize:11.5,color:'var(--g-777)',marginBottom:2}}>Trend</div><select value={k.trend} onChange={e=>setKpi(k.id,{trend:e.target.value})} style={SEL}>{['—','Improving','Stable','Declining'].map(o=><option key={o} value={o}>{o}</option>)}</select></div>
               </div></td></tr>}
           </React.Fragment>))}</tbody>
         </table></div>
@@ -8612,9 +8619,9 @@ function GuestExperiencePage({staff}){
         {pk&&(<div>
           {((pd.kpiRows)||[]).map((r,i)=>(<div key={i} style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',padding:'5px 0',borderBottom:'1px solid var(--border)'}}>
             <select value={r.kpi} onChange={e=>{const rows=[...pd.kpiRows];rows[i]={...r,kpi:e.target.value};setPd({kpiRows:rows});}} style={{...SEL,minWidth:200}}>{(gx.kpis||[]).map(k=><option key={k.id} value={k.id}>{k.name}</option>)}</select>
-            <span style={{fontSize:11,color:'var(--g-777)'}}>competency</span>{LvlSel(r.comp,(v)=>{const rows=[...pd.kpiRows];rows[i]={...r,comp:v};setPd({kpiRows:rows});})}
+            <span style={{fontSize:12,color:'var(--g-777)'}}>competency</span>{LvlSel(r.comp,(v)=>{const rows=[...pd.kpiRows];rows[i]={...r,comp:v};setPd({kpiRows:rows});})}
             <select value={r.own} onChange={e=>{const rows=[...pd.kpiRows];rows[i]={...r,own:e.target.value};setPd({kpiRows:rows});}} style={SEL}>{['Primary','Assigned','Shared','Support'].map(o=><option key={o} value={o}>{o}</option>)}</select>
-            <span style={{fontSize:11,color:'var(--c-amb)'}}>target/current: TBD</span>
+            <span style={{fontSize:12,color:'var(--c-amb)'}}>target/current: TBD</span>
             <button className="btn btn-ghost btn-xs" onClick={()=>{setPd({kpiRows:pd.kpiRows.filter((_,x)=>x!==i)});}}>×</button>
           </div>))}
           <button className="btn btn-ghost btn-sm" style={{marginTop:6}} onClick={()=>setPd({kpiRows:[...((pd.kpiRows)||[]),{kpi:(gx.kpis[0]||{}).id,comp:3,own:'Assigned'}]})}>＋ Assign a KPI</button>
