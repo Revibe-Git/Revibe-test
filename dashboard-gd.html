@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L100';
+window.__BUILD='build L101';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8443,7 +8443,7 @@ function GuestExperiencePage({staff}){
   }catch(e){}},[]);
   const[person,setPerson]=useState('');
   const[openCat,setOpenCat]=useState('c10');
-  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);
+  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);
   const names=(staff||[]).map(x=>x.name).filter(Boolean);
   const pk=person||'';
   const pd=(gx.people||{})[pk]||{};
@@ -8452,6 +8452,16 @@ function GuestExperiencePage({staff}){
   const SEL={background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:12,padding:'4px 7px',outline:'none'};
   const H=(t,sub)=>(<div style={{margin:'18px 0 8px'}}><div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'1.5px',textTransform:'uppercase',color:'var(--g-ddd)',fontWeight:800}}>{t}</div>{sub&&<div style={{fontSize:11.5,color:'var(--g-777)'}}>{sub}</div>}</div>);
   const kpiComp=(()=>{const c10=(pd.cats||{}).c10;const subs=pd.sub10||{};const vals=Object.values(subs).map(Number).filter(Boolean);if(vals.length)return (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);return c10||'—';})();
+  const subsOf=(cid)=>cid==='c10'?GX_SUB10:(GX_SUBS[cid]||[]);
+  const getSub=(cid,i)=>cid==='c10'?((pd.sub10||{})['s'+i]):(((pd.sub||{})[cid]||{})['s'+i]);
+  const catAvg=(cid)=>{const subs=subsOf(cid);const vals=subs.map((_,i)=>getSub(cid,i)).filter(v=>v);if(cid==='c2'&&(pd.sub2||{}).dda)vals.push((pd.sub2||{}).dda);return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:null;};
+  const barCol=(a)=>a?(a>=4?'var(--c-grn)':a>=3?'var(--c-lime2)':a>=2?'var(--c-yel)':'var(--c-amb)'):'transparent';
+  const nxtIdx=(pd.payLevel==null||pd.payLevel+1>=GX_PAY.length)?null:pd.payLevel+1;
+  const gates=nxtIdx==null?[]:(GX_GATES[nxtIdx]||[]);
+  const gateBySub={};const gateByCat={};gates.forEach(([c,su,req])=>{if(su==null)gateByCat[c]=req;else gateBySub[c+'.s'+su]=req;});
+  const gv2=(cat,sub)=>{if(sub==null){const m=(pd.cats||{})[cat];if(m)return m;const a=catAvg(cat);return a?Math.floor(a):null;}return getSub(cat,sub)||null;};
+  const gateRows=gates.map(([c,su,req,lb])=>{const cur=gv2(c,su);const st=cur==null?'—':(cur>=req?'Met':(cur===req-1?'Developing':'Gap'));return{lb,c,su,cur,req,st};});
+  const gatesMet=gateRows.filter(r=>r.st==='Met').length;
   const LvlSel=(val,on)=>(<select value={val||''} onChange={e=>on(e.target.value?+e.target.value:null)} style={SEL}><option value="">—</option>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select>);
   return(
     <div style={{padding:'26px 30px',maxWidth:1280}}>
@@ -8480,37 +8490,74 @@ function GuestExperiencePage({staff}){
         </div>
         <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'10px 14px',marginBottom:4,fontSize:12,color:'var(--g-aaa)',lineHeight:1.6}}><b style={{color:'var(--c-yel)'}}>Competency ≠ Performance.</b> Two separate questions: does the employee understand how to work with the metric, and is the metric within range? A good number doesn't equal high competency; a bad number doesn't equal poor competency. Grade what they could reasonably influence and how effectively they responded. <b style={{color:'var(--c-grn)'}}>Fairness guardrails:</b> every KPI carries an influence level — Direct control · Strong influence · Shared influence · Contextual — protecting staff from metrics moved by clinician availability, vacations, seasonality, marketing volume, staffing or demographics.</div>
         {H('The 10 master competency categories', pk?('Grading: '+pk+' — every change saves & syncs automatically'):'Select a team member above to grade')}
-        {pk&&(()=>{
-          const gv=(cat,sub)=>{if(sub==null)return (pd.cats||{})[cat]||null;if(cat==='c10')return ((pd.sub10||{})['s'+sub])||null;return (((pd.sub||{})[cat]||{})['s'+sub])||null;};
-          if(pd.payLevel==null)return(<div style={{background:'var(--surface2)',border:'1px dashed var(--border)',borderRadius:9,padding:'9px 13px',fontSize:12,color:'var(--g-888)',marginBottom:10}}>Set {pk}’s current pay level on the ladder below to unlock the next-pay progression view — the dashboard will show exactly which competencies gate the next raise, Met vs Gap. Progression is by competency gates, never a simple average.</div>);
-          const nxt=pd.payLevel+1;
-          if(nxt>=GX_PAY.length)return(<div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'9px 13px',fontSize:12,color:'var(--c-grn)',marginBottom:10}}>{pk} is at the top of the ladder — organizational / scalable operations.</div>);
-          const gates=GX_GATES[nxt]||[];
-          const rows=gates.map(([cat,sub,req,lb])=>{const cur=gv(cat,sub);const st=cur==null?'—':(cur>=req?'Met':'Gap');return{lb,cat,cur,req,st};});
-          const gaps=rows.filter(r=>r.st==='Gap');const ungraded=rows.filter(r=>r.st==='—');
-          return(<div style={{background:'var(--surface2)',border:'1px solid var(--go)',borderRadius:9,padding:'12px 15px',marginBottom:12}}>
-            <div style={{fontSize:12.5,fontWeight:800,color:'var(--g-eee)',marginBottom:6}}>🎯 Next-pay progression — {GX_PAY[pd.payLevel][0]} ({GX_PAY[pd.payLevel][1]}) → <span style={{color:'var(--c-grn)'}}>{GX_PAY[nxt][0]} ({GX_PAY[nxt][1]})</span></div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:'3px 18px'}}>
-              {rows.map((r,i)=>(<div key={i} style={{display:'flex',gap:8,fontSize:12,alignItems:'center'}}><span style={{flex:1,color:'var(--g-ccc)'}}>{r.lb}</span><span style={{color:'var(--g-888)'}}>{r.cur==null?'—':r.cur} / {r.req}</span><span style={{fontWeight:800,color:r.st==='Met'?'var(--c-grn)':r.st==='Gap'?'var(--c-red)':'var(--g-666)',width:36}}>{r.st}</span></div>))}
+        {pk&&(<div style={{background:'linear-gradient(135deg,var(--surface2),var(--surface3))',border:'1px solid var(--go)',borderRadius:11,padding:'14px 17px',marginBottom:12}}>
+          <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',marginBottom:10}}>
+            <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'var(--g-eee)'}}>{pk}</div>
+            {pd.payLevel!=null?(<>
+              <span style={{fontSize:12,color:'var(--g-aaa)'}}>Current: <b style={{color:'var(--c-grn)'}}>{GX_PAY[pd.payLevel][0]}</b> · {GX_ROLEBYPAY[pd.payLevel]} · {GX_PAY[pd.payLevel][1]}</span>
+              {nxtIdx!=null&&<span style={{fontSize:12,color:'var(--g-aaa)'}}>Next: <b style={{color:'var(--c-yel)'}}>{GX_PAY[nxtIdx][0]}</b> · {GX_PAY[nxtIdx][1]}</span>}
+            </>):(<span style={{fontSize:12,color:'var(--c-amb)'}}>Set the current pay level on the ladder below to unlock the progression roadmap</span>)}
+            <span style={{flex:1}}/>
+            <button className="btn btn-ghost btn-xs" title="Save a dated snapshot of all category scores + gate progress — builds the review-over-time history" onClick={()=>{const snap={date:new Date().toISOString().slice(0,10),avgs:Object.fromEntries(GX_CATS.map(([cid])=>[cid,catAvg(cid)?+catAvg(cid).toFixed(2):null])),gates:nxtIdx!=null?(gatesMet+'/'+gateRows.length):'—',pay:pd.payLevel!=null?GX_PAY[pd.payLevel][0]:'—'};setPd({history:[...(pd.history||[]),snap]});}}>📸 Snapshot review</button>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:'6px 16px',marginBottom:nxtIdx!=null?12:0}}>
+            {GX_CATS.map(([cid,cname])=>{const a=catAvg(cid);return(<div key={cid} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}} onClick={()=>setOpenCat(cid)} title={'Open '+cname}>
+              <span style={{fontSize:11,color:'var(--g-aaa)',width:118,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cid.replace('c','')}. {cname}</span>
+              <span style={{flex:1,height:7,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}><span style={{display:'block',height:'100%',width:(a?(a/5*100):0)+'%',background:barCol(a)}}/></span>
+              <span style={{fontSize:11.5,fontWeight:800,color:a?'var(--g-ddd)':'var(--g-666)',width:26,textAlign:'right'}}>{a?a.toFixed(1):'—'}</span>
+            </div>);})}
+          </div>
+          {nxtIdx!=null&&(<div>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6,flexWrap:'wrap'}}>
+              <span style={{fontSize:12.5,fontWeight:800,color:'var(--g-eee)'}}>🎯 Road to {GX_PAY[nxtIdx][0]} — {GX_PAY[nxtIdx][1]}</span>
+              <span style={{flex:1,maxWidth:260,height:8,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}><span style={{display:'block',height:'100%',width:(gateRows.length?(gatesMet/gateRows.length*100):0)+'%',background:'var(--c-grn)'}}/></span>
+              <span style={{fontSize:12,fontWeight:800,color:'var(--c-grn)'}}>{gatesMet}/{gateRows.length} gates met</span>
             </div>
-            {(gaps.length>0||ungraded.length>0)&&<div style={{marginTop:8,fontSize:12,color:'var(--g-aaa)'}}>{gaps.length>0&&<span><b style={{color:'var(--c-amb)'}}>Priority development areas:</b> {gaps.map(g=>g.lb).join(' · ')}. </span>}{ungraded.length>0&&<span style={{color:'var(--g-666)'}}>Not yet graded: {ungraded.map(g=>g.lb).join(' · ')}.</span>}</div>}
-            {gaps.length===0&&ungraded.length===0&&rows.length>0&&<div style={{marginTop:8,fontSize:12,color:'var(--c-grn)',fontWeight:800}}>All gates met — demonstration + consistency review with manager sign-off is the remaining step.</div>}
-          </div>);})()}
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:'3px 18px'}}>
+              {gateRows.map((r,i)=>(<div key={i} style={{display:'flex',gap:8,fontSize:12,alignItems:'center',cursor:'pointer'}} onClick={()=>setOpenCat(r.c)} title={'Open category '+r.c.replace('c','')+' to grade this'}>
+                <span style={{flex:1,color:'var(--g-ccc)'}}>{r.lb}</span>
+                <span style={{color:'var(--g-888)'}}>{r.cur==null?'—':r.cur} / {r.req}</span>
+                <span style={{fontWeight:800,color:r.st==='Met'?'var(--c-grn)':r.st==='Developing'?'var(--c-yel)':r.st==='Gap'?'var(--c-red)':'var(--g-666)',width:78}}>{r.st}</span>
+              </div>))}
+            </div>
+            {(()=>{const gaps=gateRows.filter(r=>r.st!=='Met');return gaps.length?(<div style={{marginTop:8,fontSize:12,color:'var(--g-aaa)'}}><b style={{color:'var(--c-amb)'}}>Priority development areas:</b> {gaps.slice(0,4).map(g=>g.lb).join(' · ')}{gaps.length>4?' · +'+(gaps.length-4)+' more':''} <span style={{color:'var(--g-666)'}}>· Met green · Developing = 1 away · Gap red · — not graded yet · click any gate to open its category</span></div>):(gateRows.length?<div style={{marginTop:8,fontSize:12,color:'var(--c-grn)',fontWeight:800}}>All gates met — demonstration + consistency review with manager sign-off is the remaining step.</div>:null);})()}
+          </div>)}
+          {(pd.history||[]).length>0&&(<div style={{marginTop:10,borderTop:'1px solid var(--border)',paddingTop:6}}>
+            <div style={{fontSize:11,fontWeight:800,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.4px',marginBottom:3}}>Review history</div>
+            {(pd.history||[]).slice(-6).reverse().map((h,i)=>{const avgVals=Object.values(h.avgs||{}).filter(v=>v!=null);const ov=avgVals.length?(avgVals.reduce((a,b)=>a+b,0)/avgVals.length).toFixed(1):'—';return(<div key={i} style={{fontSize:11.5,color:'var(--g-aaa)'}}>{h.date} · pay {h.pay} · overall {ov} · gates {h.gates}</div>);})}
+          </div>)}
+        </div>)}
         {GX_CATS.map(([cid,cname])=>{const isOpen=openCat===cid;const lvl=(pd.cats||{})[cid];return(
           <div key={cid} style={{background:'var(--surface2)',border:'1px solid '+(isOpen?'var(--go)':'var(--border)'),borderRadius:9,padding:'10px 14px',marginBottom:8}}>
-            <div style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer'}} onClick={()=>setOpenCat(isOpen?null:cid)}>
-              <span style={{fontSize:13.5,fontWeight:800,color:'var(--g-eee)',flex:1}}>{cid.replace('c','')}. {cname}{cid==='c10'&&<span style={{marginLeft:8,fontSize:10.5,color:'var(--c-blu2)',fontWeight:800}}>KPI BRIDGE → 📈</span>}</span>
-              {pk&&<span onClick={e=>e.stopPropagation()}>{LvlSel(lvl,(v)=>setPd({cats:{...(pd.cats||{}),[cid]:v}}))}</span>}
+            <div style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',flexWrap:'wrap'}} onClick={()=>setOpenCat(isOpen?null:cid)}>
+              <span style={{fontSize:13.5,fontWeight:800,color:'var(--g-eee)'}}>{cid.replace('c','')}. {cname}{cid==='c10'&&<span style={{marginLeft:8,fontSize:10.5,color:'var(--c-blu2)',fontWeight:800}}>KPI BRIDGE → 📈</span>}</span>
+              {gateByCat[cid]!=null&&<span style={{fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:4,border:'1px solid',borderColor:(gv2(cid,null)||0)>=gateByCat[cid]?'var(--c-grn)':'var(--c-amb)',color:(gv2(cid,null)||0)>=gateByCat[cid]?'var(--c-grn)':'var(--c-amb)'}} title="This whole category gates the next pay level">⭐ next pay: category ≥{gateByCat[cid]}</span>}
+              <span style={{flex:1}}/>
+              {pk&&(()=>{const a=catAvg(cid);const subs2=subsOf(cid);const graded=subs2.map((_,i2)=>getSub(cid,i2)).filter(v=>v).length+((cid==='c2'&&(pd.sub2||{}).dda)?1:0);const tot=subs2.length+(cid==='c2'?1:0);return(<span style={{display:'inline-flex',alignItems:'center',gap:8}} onClick={e=>e.stopPropagation()}>
+                <span style={{fontSize:10.5,color:'var(--g-666)'}}>{graded}/{tot} graded</span>
+                <span style={{width:90,height:7,background:'var(--surface3)',borderRadius:4,overflow:'hidden',display:'inline-block'}}><span style={{display:'block',height:'100%',width:(a?(a/5*100):0)+'%',background:barCol(a)}}/></span>
+                <span style={{fontSize:12,fontWeight:800,color:a?'var(--g-ddd)':'var(--g-666)',width:28}}>{a?a.toFixed(1):'—'}</span>
+              </span>);})()}
               <span style={{color:'var(--g-666)'}}>{isOpen?'▾':'▸'}</span>
             </div>
             {isOpen&&(()=>{const subs=cid==='c10'?GX_SUB10:(GX_SUBS[cid]||[]);
               const getS=(i)=>cid==='c10'?((pd.sub10||{})['s'+i]):(((pd.sub||{})[cid]||{})['s'+i]);
-              const setS=(i,v)=>{if(cid==='c10')setPd({sub10:{...(pd.sub10||{}),['s'+i]:v}});else setPd({sub:{...(pd.sub||{}),[cid]:{...((pd.sub||{})[cid]||{}),['s'+i]:v}}});};
+              const setS=(i,v)=>{const st2={upd:{...(pd.upd||{}),[cid+'.s'+i]:new Date().toISOString().slice(0,10)}};if(cid==='c10')setPd({sub10:{...(pd.sub10||{}),['s'+i]:v},...st2});else setPd({sub:{...(pd.sub||{}),[cid]:{...((pd.sub||{})[cid]||{}),['s'+i]:v}},...st2});};
               return(<div style={{marginTop:10}}>
               {subs.map(([sn,lvls],si)=>{const sv2=getS(si);const ek=cid+'.s'+si;const ev=(pd.ev||{})[ek]||{};const eOpen=evOpen===ek;return(
                 <div key={si} style={{borderTop:'1px solid var(--border)',padding:'8px 0'}}>
-                  <div style={{display:'flex',alignItems:'center',gap:10}}><span style={{fontSize:12.5,fontWeight:800,color:'var(--g-ddd)',flex:1}}>{cid.replace('c','')}.{si+1} {sn}</span>{pk&&<button className="btn btn-ghost btn-xs" title="Evidence-based grading: evidence · gap to next · development action · demonstration status" onClick={()=>setEvOpen(eOpen?null:ek)}>📝</button>}{pk&&LvlSel(sv2,(v)=>setS(si,v))}</div>
-                  <div style={{fontSize:11.5,color:'var(--g-999)',lineHeight:1.55,marginTop:3}}>{lvls.map((d,i2)=><span key={i2} style={{marginRight:10,color:sv2===i2+1?'var(--c-grn)':'var(--g-999)'}}><b>{i2+1}</b> {d}.</span>)}</div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                    <span style={{fontSize:12.5,fontWeight:800,color:'var(--g-ddd)'}}>{cid.replace('c','')}.{si+1} {sn}</span>
+                    {gateBySub[ek]!=null&&<span style={{fontSize:10,fontWeight:800,padding:'1px 6px',borderRadius:4,border:'1px solid',borderColor:(sv2||0)>=gateBySub[ek]?'var(--c-grn)':'var(--c-amb)',color:(sv2||0)>=gateBySub[ek]?'var(--c-grn)':'var(--c-amb)'}} title="This competency gates the next pay level">⭐ next pay: ≥{gateBySub[ek]}</span>}
+                    <span style={{flex:1}}/>
+                    {(pd.upd||{})[ek]&&<span style={{fontSize:10,color:'var(--g-666)'}}>updated {(pd.upd||{})[ek]}</span>}
+                    {pk&&<button className="btn btn-ghost btn-xs" title="Evidence-based grading: evidence · gap to next · development action · demonstration status" onClick={()=>setEvOpen(eOpen?null:ek)}>📝</button>}
+                    <button className="btn btn-ghost btn-xs" title="Show all 5 level requirements" onClick={()=>setLvOpen(lvOpen===ek?null:ek)}>ⓘ</button>
+                    {pk&&<span style={{display:'inline-flex',gap:3}}>{[1,2,3,4,5].map(n=>(<button key={n} onClick={()=>setS(si,sv2===n?null:n)} title={'Level '+n+' — '+lvls[n-1]} style={{width:26,height:24,borderRadius:5,border:'1px solid '+(sv2===n?'var(--c-grn)':'var(--border)'),background:sv2===n?'rgba(122,196,144,.2)':(sv2&&n<sv2?'rgba(122,196,144,.08)':'var(--surface3)'),color:(sv2&&n<=sv2)?'var(--c-grn)':'var(--g-888)',fontWeight:800,fontSize:12,cursor:'pointer'}}>{n}</button>))}</span>}
+                  </div>
+                  {sv2?<div style={{fontSize:11.5,color:'var(--g-aaa)',lineHeight:1.5,marginTop:4}}><b style={{color:'var(--c-grn)'}}>Level {sv2} · {GX_GRADE[sv2-1][1]}:</b> {lvls[sv2-1]}.{sv2<5&&<span style={{color:'var(--g-777)'}}> <b>To reach {sv2+1}:</b> {lvls[sv2]}.</span>}</div>
+                       :<div style={{fontSize:11.5,color:'var(--g-777)',lineHeight:1.5,marginTop:4}}>Not graded — click a level. <b>1:</b> {lvls[0]} … <b>5:</b> {lvls[4]}. (ⓘ for all levels)</div>}
+                  {lvOpen===ek&&<div style={{fontSize:11.5,lineHeight:1.7,marginTop:4,background:'var(--surface3)',borderRadius:7,padding:'7px 10px'}}>{lvls.map((d,i2)=><div key={i2} style={{color:sv2===i2+1?'var(--c-grn)':'var(--g-999)'}}><b>{i2+1} · {GX_GRADE[i2][1]}</b> — {d}.</div>)}</div>}
                   {eOpen&&pk&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:8,marginTop:6,background:'var(--surface3)',borderRadius:7,padding:'8px 10px'}}>
                     {[['e','Evidence — behaviour/results supporting the score'],['g','Gap to next level — what specifically prevents it'],['a','Development action — what to actually do']].map(([f,lb])=>(<div key={f}><div style={{fontSize:10.5,color:'var(--g-777)',marginBottom:2}}>{lb}</div><input value={ev[f]||''} onChange={x=>setPd({ev:{...(pd.ev||{}),[ek]:{...ev,[f]:x.target.value}}})} style={{...SEL,width:'100%'}}/></div>))}
                     <div><div style={{fontSize:10.5,color:'var(--g-777)',marginBottom:2}}>Demonstration status — one-time ≠ competency</div><select value={ev.d||''} onChange={x=>setPd({ev:{...(pd.ev||{}),[ek]:{...ev,d:x.target.value}}})} style={SEL}><option value="">—</option>{['Not Demonstrated','Demonstrated With Support','Demonstrated Independently','Demonstrated Consistently'].map(o=><option key={o} value={o}>{o}</option>)}</select></div>
