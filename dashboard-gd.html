@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L105';
+window.__BUILD='build L106';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8595,6 +8595,45 @@ function GuestExperiencePage({staff}){
               </div>))}
             </div>
             {(()=>{const gaps=gateRows.filter(r=>r.st!=='Met');return gaps.length?(<div style={{marginTop:8,fontSize:13,color:'var(--g-aaa)'}}><b style={{color:'var(--c-amb)'}}>Priority development areas:</b> {gaps.slice(0,4).map(g=>g.lb).join(' · ')}{gaps.length>4?' · +'+(gaps.length-4)+' more':''} <span style={{color:'var(--g-666)'}}>· Met green · Developing = 1 away · Gap red · — not graded yet · click any gate to open its category</span></div>):(gateRows.length?<div style={{marginTop:8,fontSize:13,color:'var(--c-grn)',fontWeight:800}}>All gates met — demonstration + consistency review with manager sign-off is the remaining step.</div>:null);})()}
+            {gateRows.length>0&&(()=>{
+              const tgt=String(nxtIdx);
+              const chkAll=((pd.chk||{})[tgt])||{};
+              const items=gateRows.map(r=>{
+                const qi=r.su==null?null:qOfSub(r.c,r.su);
+                const gk=r.c+'.'+(r.su==null?'cat':r.su);
+                const q=qi!=null?(GX_Q3[r.c]||[])[qi]:null;
+                const catName=(GX_CATS.find(x=>x[0]===r.c)||[])[1]||r.c;
+                let demo=q?('Demonstrate L'+r.req+' — '+q.lv[r.req-1]):('Category "'+catName+'" average must reach ≥'+r.req+' across its three questions');
+                if(/owned business area/i.test(r.lb))demo+=' · ownable areas: reactivations, cancellation recovery, waitlist, schedule gaps, outstanding balances, recovery utilization, membership/package opportunities — pick ONE and own it to ≥4';
+                const act=qi!=null?(((pd.ev||{})[r.c+'.q'+qi])||{}).a:'';
+                return{...r,gk,qi,q,demo,act,chk:chkAll[gk]||null};
+              });
+              const done=items.filter(i=>i.chk&&i.chk.done).length;
+              const setChk=(gk,patch)=>{const cur=chkAll[gk]||{};setPd({chk:{...(pd.chk||{}),[tgt]:{...chkAll,[gk]:{...cur,...patch}}}});};
+              return(<div style={{marginTop:14,borderTop:'1px dashed var(--border)',paddingTop:10}}>
+                <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:8}}>
+                  <span style={{fontSize:14,fontWeight:800,color:'var(--g-eee)'}}>📋 Progression checklist — go through each item together at the review</span>
+                  <span style={{flex:1}}/>
+                  <span style={{fontSize:12.5,fontWeight:800,color:done===items.length&&items.length>0?'var(--c-grn)':'var(--g-aaa)'}}>{done}/{items.length} reviewed & signed off</span>
+                </div>
+                {items.map((it,i)=>{const ck=it.chk||{};return(
+                  <div key={i} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'8px 0',borderTop:i?'1px solid var(--border)':'none'}}>
+                    <input type="checkbox" checked={!!ck.done} onChange={e=>setChk(it.gk,{done:e.target.checked,date:e.target.checked?new Date().toISOString().slice(0,10):null})} title="Check off once demonstrated, reviewed together and signed off by the manager" style={{marginTop:3,width:16,height:16,accentColor:'#7ac490',cursor:'pointer'}}/>
+                    <div style={{flex:1}}>
+                      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+                        <span style={{fontSize:13.5,fontWeight:800,color:ck.done?'var(--c-grn)':'var(--g-ddd)'}}>{it.lb}</span>
+                        <span style={{fontSize:12,color:'var(--g-888)'}}>{it.cur==null?'—':it.cur} / {it.req}</span>
+                        <span style={{fontSize:11,fontWeight:800,color:it.st==='Met'?'var(--c-grn)':it.st==='Developing'?'var(--c-yel)':it.st==='Gap'?'var(--c-red)':'var(--g-666)'}}>{it.st==='—'?'not graded':it.st}</span>
+                        {ck.done&&ck.date&&<span style={{fontSize:11,color:'var(--g-666)'}}>✓ signed off {ck.date}</span>}
+                        <button className="btn btn-ghost btn-xs" title="Open the category to grade this" onClick={()=>setOpenCat(it.c)}>open</button>
+                      </div>
+                      <div style={{fontSize:12.5,color:it.st==='Met'?'var(--g-777)':'var(--g-aaa)',lineHeight:1.55,marginTop:2}}>{it.st==='Met'?'Met on grades — confirm it is demonstrated CONSISTENTLY (not once), then sign off. ':''}{it.demo}</div>
+                      {it.act&&<div style={{fontSize:12.5,color:'var(--c-blu2)',marginTop:2}}>Planned action: {it.act}</div>}
+                      <input value={ck.note||''} onChange={e=>setChk(it.gk,{note:e.target.value})} placeholder="Review note — evidence seen / what was agreed / next step…" style={{...SEL,width:'100%',marginTop:5,fontSize:12.5}}/>
+                    </div>
+                  </div>);})}
+                <div style={{fontSize:11.5,color:'var(--g-666)',marginTop:6}}>This checklist belongs to the Road to {GX_PAY[nxtIdx][0]} — it starts fresh at each new pay target. All items checked + all gates Met = ready for the raise conversation.</div>
+              </div>);})()}
           </div>)}
           {(pd.history||[]).length>0&&(<div style={{marginTop:10,borderTop:'1px solid var(--border)',paddingTop:6}}>
             <div style={{fontSize:12,fontWeight:800,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.4px',marginBottom:3}}>Review history</div>
