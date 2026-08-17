@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L107';
+window.__BUILD='build L108';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8428,6 +8428,7 @@ const GX_GATES={1:[['c1',0,2,'Attendance'],['c1',1,2,'Punctuality'],['c1',5,2,'T
 15:[['c9',null,4,'Systems/Operations (category)'],['c8',null,4,'Leadership (category)'],['c9',5,5,'Multi-Location Thinking'],['c9',4,4,'Cost/Resource Awareness'],['c9',6,4,'Project/New-Location Execution']]};
 const GX_KPI_SLIM=[['Call & Phone Performance','Call totals — handled'],['Call & Phone Performance','Treatment-call conversion %'],['Call & Phone Performance','Call quality (definition pending)'],['Lead Performance','Lead conversion %'],['Lead Performance','Lead follow-up completion'],['Booking & Retention','Rebooking %'],['Booking & Retention','Cancellation recovery %'],['Booking & Retention','No-show rate'],['Booking & Retention','Reactivation conversion'],['Financial / Admin','Outstanding balance recovery'],['Operational','Opening / closing compliance'],['Guest Experience','Reviews & guest feedback']];
 const GX_CATS_ALL=['Call & Phone Performance','Lead Performance','Booking & Retention','Financial / Admin','Operational','Guest Experience'].concat(GX_KPI_CATALOG.map(([c])=>c));
+const GX_SHORT={c1:'Reliability',c2:'GE Execution',c3:'Guest Experience',c4:'Revibe Knowledge',c5:'Schedule & Revenue',c6:'Problem Solving',c7:'Management',c8:'Leadership',c9:'Systems',c10:'KPI & Performance'};
 const GX_HUE={c1:'#7ac490',c2:'#7db8d8',c3:'#d8a97d',c4:'#b89bd8',c5:'#d8d07d',c6:'#7dd8c3',c7:'#d87d9b',c8:'#9bd87d',c9:'#8f9bd8',c10:'#5aa7e8'};
 const GX_Q3={
 c1:[{t:'Attendance, Punctuality & Shift Readiness',src:[0,1,2],lv:['Attendance or lateness concerns; arrives with little picture of the day','Generally attends on time; reviews the schedule after arriving','Consistently present, READY at start, and begins the shift knowing the schedule, staffing, recovery bookings and open issues','Plans ahead — flags coverage risks, anticipates transition and opening needs, spots likely challenges before they develop','Sets the attendance, punctuality and readiness standard for the team and builds the systems and habits behind it']},
@@ -8475,7 +8476,7 @@ function GuestExperiencePage({staff}){
   }catch(e){}},[]);
   const[person,setPerson]=useState('');const[showAllStaff,setShowAllStaff]=useState(false);
   const[openCat,setOpenCat]=useState('c10');
-  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);const[revOpen,setRevOpen]=useState(null);
+  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);const[revOpen,setRevOpen]=useState(null);const[chkOpen,setChkOpen]=useState(null);
   const names=(staff||[]).map(x=>x.name).filter(Boolean);
   const pk=person||'';
   const pd=(gx.people||{})[pk]||{};
@@ -8526,6 +8527,13 @@ function GuestExperiencePage({staff}){
         .gx-seg button.on{background:linear-gradient(135deg,rgba(122,196,144,.35),rgba(122,196,144,.18));color:var(--c-grn);box-shadow:inset 0 0 0 1px var(--c-grn);}
         .gx-med{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;border:1px solid var(--border);font-weight:800;font-size:12px;flex-shrink:0;}
         .gx-med.on{border-color:var(--c-grn);color:var(--c-grn);background:rgba(122,196,144,.15);}
+        .gx-tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;}
+        @media (max-width:1100px){.gx-tiles{grid-template-columns:repeat(3,minmax(0,1fr));}}
+        .gx-tile{background:var(--surface3);border:1px solid var(--border);border-radius:10px;padding:9px 11px;cursor:pointer;transition:border-color .12s,transform .12s;}
+        .gx-tile:hover{border-color:var(--go);transform:translateY(-1px);}
+        .gx-pill{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;border:1px solid;white-space:nowrap;}
+        .gx-chk{padding:9px 2px;}
+        .gx-chk:hover{background:rgba(255,255,255,.02);}
       `}</style>
       <div style={{marginBottom:8}}>
         <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,letterSpacing:'1px',color:'var(--g-eee)'}}>🤝 GUEST EXPERIENCE — G&D</div>
@@ -8591,11 +8599,14 @@ function GuestExperiencePage({staff}){
               <button className="btn btn-go btn-xs" title="Record this review as performed today — captures all scores, gate progress and checklist state into the growth history" onClick={()=>completeReview(openRev)}>✓ Complete review</button>
             </span>):(<button className="btn btn-go btn-xs" title="Start a review session — captures today's scores, then logs everything you change while it's open" onClick={startReview}>📋 Start review — today</button>)}
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:'8px 18px',marginBottom:nxtIdx!=null?12:0}}>
-            {GX_CATS.map(([cid,cname])=>{const a=catAvg(cid);return(<div key={cid} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}} onClick={()=>setOpenCat(cid)} title={'Open '+cname}>
-              <span style={{fontSize:12,color:'var(--g-aaa)',width:118,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cid.replace('c','')}. {cname}</span>
-              <span style={{flex:1,height:7,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}><span style={{display:'block',height:'100%',width:(a?(a/5*100):0)+'%',background:barCol(a)}}/></span>
-              <span style={{fontSize:12.5,fontWeight:800,color:a?'var(--g-ddd)':'var(--g-666)',width:26,textAlign:'right'}}>{a?a.toFixed(1):'—'}</span>
+          <div className="gx-tiles" style={{marginBottom:nxtIdx!=null?16:0}}>
+            {GX_CATS.map(([cid,cname])=>{const a=catAvg(cid);return(<div key={cid} className="gx-tile" onClick={()=>setOpenCat(cid)} title={cname+' — click to grade'}>
+              <div style={{display:'flex',alignItems:'baseline',gap:5}}>
+                <span style={{fontSize:10.5,fontWeight:800,color:'var(--g-666)'}}>{cid.replace('c','')}</span>
+                <span style={{fontSize:19,fontWeight:800,lineHeight:1,color:a?barCol(a):'var(--g-666)'}}>{a?a.toFixed(1):'—'}</span>
+              </div>
+              <div style={{fontSize:11,color:'var(--g-999)',margin:'4px 0 5px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{GX_SHORT[cid]||cname}</div>
+              <div style={{height:5,background:'var(--surface3)',borderRadius:3,overflow:'hidden'}}><span style={{display:'block',height:'100%',width:(a?(a/5*100):0)+'%',background:barCol(a)}}/></div>
             </div>);})}
           </div>
           {nxtIdx!=null&&(<div>
@@ -8604,14 +8615,7 @@ function GuestExperiencePage({staff}){
               <span style={{flex:1,maxWidth:260,height:8,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}><span style={{display:'block',height:'100%',width:(gateRows.length?(gatesMet/gateRows.length*100):0)+'%',background:'var(--c-grn)'}}/></span>
               <span style={{fontSize:13,fontWeight:800,color:'var(--c-grn)'}}>{gatesMet}/{gateRows.length} gates met</span>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:'7px 22px'}}>
-              {gateRows.map((r,i)=>(<div key={i} style={{display:'flex',gap:8,fontSize:13,alignItems:'center',cursor:'pointer'}} onClick={()=>setOpenCat(r.c)} title={'Open category '+r.c.replace('c','')+' to grade this'}>
-                <span style={{flex:1,color:'var(--g-ccc)'}}>{r.lb}</span>
-                <span style={{color:'var(--g-888)'}}>{r.cur==null?'—':r.cur} / {r.req}</span>
-                <span style={{fontWeight:800,color:r.st==='Met'?'var(--c-grn)':r.st==='Developing'?'var(--c-yel)':r.st==='Gap'?'var(--c-red)':'var(--g-666)',width:78}}>{r.st}</span>
-              </div>))}
-            </div>
-            {(()=>{const gaps=gateRows.filter(r=>r.st!=='Met');return gaps.length?(<div style={{marginTop:8,fontSize:13,color:'var(--g-aaa)'}}><b style={{color:'var(--c-amb)'}}>Priority development areas:</b> {gaps.slice(0,4).map(g=>g.lb).join(' · ')}{gaps.length>4?' · +'+(gaps.length-4)+' more':''} <span style={{color:'var(--g-666)'}}>· Met green · Developing = 1 away · Gap red · — not graded yet · click any gate to open its category</span></div>):(gateRows.length?<div style={{marginTop:8,fontSize:13,color:'var(--c-grn)',fontWeight:800}}>All gates met — demonstration + consistency review with manager sign-off is the remaining step.</div>:null);})()}
+            {(()=>{const gaps=gateRows.filter(r=>r.st!=='Met');return gaps.length?(<div style={{fontSize:12.5,color:'var(--g-999)',marginBottom:2}}>Focus: <b style={{color:'var(--c-amb)'}}>{gaps.slice(0,3).map(g=>g.lb).join(' · ')}</b>{gaps.length>3?' + '+(gaps.length-3)+' more':''}</div>):(gateRows.length?<div style={{fontSize:12.5,color:'var(--c-grn)',fontWeight:800,marginBottom:2}}>All gates met — sign off the checklist and the raise conversation is on.</div>:null);})()}
             {gateRows.length>0&&(()=>{
               const tgt=String(nxtIdx);
               const chkAll=((pd.chk||{})[tgt])||{};
@@ -8629,27 +8633,31 @@ function GuestExperiencePage({staff}){
               const setChk=(gk,patch)=>{const cur=chkAll[gk]||{};setPd({chk:{...(pd.chk||{}),[tgt]:{...chkAll,[gk]:{...cur,...patch}}}});};
               return(<div style={{marginTop:14,borderTop:'1px dashed var(--border)',paddingTop:10}}>
                 <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:8}}>
-                  <span style={{fontSize:14,fontWeight:800,color:'var(--g-eee)'}}>📋 Progression checklist — go through each item together at the review</span>
+                  <span style={{fontSize:14,fontWeight:800,color:'var(--g-eee)'}}>📋 Progression checklist</span><span style={{fontSize:11.5,color:'var(--g-666)'}}>go through each item together, then sign off</span>
                   <span style={{flex:1}}/>
                   <span style={{fontSize:12.5,fontWeight:800,color:done===items.length&&items.length>0?'var(--c-grn)':'var(--g-aaa)'}}>{done}/{items.length} reviewed & signed off</span>
                 </div>
-                {items.map((it,i)=>{const ck=it.chk||{};return(
-                  <div key={i} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'8px 0',borderTop:i?'1px solid var(--border)':'none'}}>
-                    <input type="checkbox" checked={!!ck.done} onChange={e=>{const on=e.target.checked;setChk(it.gk,{done:on,date:on?new Date().toISOString().slice(0,10):null});const orv=(pd.reviews||[]).find(x=>!x.closed);if(orv)setRev(orv.id,{},[(on?'Signed off: ':'Un-checked: ')+it.lb]);}} title="Check off once demonstrated, reviewed together and signed off by the manager" style={{marginTop:3,width:16,height:16,accentColor:'#7ac490',cursor:'pointer'}}/>
-                    <div style={{flex:1}}>
-                      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-                        <span style={{fontSize:13.5,fontWeight:800,color:ck.done?'var(--c-grn)':'var(--g-ddd)'}}>{it.lb}</span>
-                        <span style={{fontSize:12,color:'var(--g-888)'}}>{it.cur==null?'—':it.cur} / {it.req}</span>
-                        <span style={{fontSize:11,fontWeight:800,color:it.st==='Met'?'var(--c-grn)':it.st==='Developing'?'var(--c-yel)':it.st==='Gap'?'var(--c-red)':'var(--g-666)'}}>{it.st==='—'?'not graded':it.st}</span>
-                        {ck.done&&ck.date&&<span style={{fontSize:11,color:'var(--g-666)'}}>✓ signed off {ck.date}</span>}
-                        <button className="btn btn-ghost btn-xs" title="Open the category to grade this" onClick={()=>setOpenCat(it.c)}>open</button>
-                      </div>
-                      <div style={{fontSize:12.5,color:it.st==='Met'?'var(--g-777)':'var(--g-aaa)',lineHeight:1.55,marginTop:2}}>{it.st==='Met'?'Met on grades — confirm it is demonstrated CONSISTENTLY (not once), then sign off. ':''}{it.demo}</div>
-                      {it.act&&<div style={{fontSize:12.5,color:'var(--c-blu2)',marginTop:2}}>Planned action: {it.act}</div>}
-                      <input value={ck.note||''} onChange={e=>setChk(it.gk,{note:e.target.value})} placeholder="Review note — evidence seen / what was agreed / next step…" style={{...SEL,width:'100%',marginTop:5,fontSize:12.5}}/>
+                {items.map((it,i)=>{const ck=it.chk||{};const ex=chkOpen===it.gk;const stC=it.st==='Met'?'var(--c-grn)':it.st==='Developing'?'var(--c-yel)':it.st==='Gap'?'var(--c-red)':'var(--g-666)';return(
+                  <div key={i} className="gx-chk" style={{borderTop:i?'1px solid var(--border)':'none'}}>
+                    <div style={{display:'flex',gap:11,alignItems:'center'}}>
+                      <input type="checkbox" checked={!!ck.done} onChange={e=>{const on=e.target.checked;setChk(it.gk,{done:on,date:on?new Date().toISOString().slice(0,10):null});const orv=(pd.reviews||[]).find(x=>!x.closed);if(orv)setRev(orv.id,{},[(on?'Signed off: ':'Un-checked: ')+it.lb]);}} title="Sign off once it's demonstrated consistently and reviewed together" style={{width:17,height:17,accentColor:'#7ac490',cursor:'pointer',flexShrink:0}}/>
+                      <span style={{flex:1,fontSize:13.5,fontWeight:700,color:ck.done?'var(--c-grn)':'var(--g-ddd)',textDecoration:ck.done?'line-through':'none',cursor:'pointer'}} onClick={()=>setChkOpen(ex?null:it.gk)}>{it.lb}</span>
+                      {ck.note&&!ex&&<span style={{fontSize:11,color:'var(--g-666)'}} title={ck.note}>📝</span>}
+                      {ck.done&&ck.date&&<span style={{fontSize:10.5,color:'var(--g-666)'}}>{ck.date}</span>}
+                      <span style={{fontSize:11.5,color:'var(--g-888)',fontVariantNumeric:'tabular-nums'}}>{it.cur==null?'—':it.cur}<span style={{color:'var(--g-666)'}}>/{it.req}</span></span>
+                      <span className="gx-pill" style={{color:stC,borderColor:stC}}>{it.st==='—'?'not graded':it.st}</span>
+                      <button className="btn btn-ghost btn-xs" title="Show what needs to be demonstrated" onClick={()=>setChkOpen(ex?null:it.gk)}>{ex?'▾':'▸'}</button>
                     </div>
+                    {ex&&(<div style={{margin:'8px 0 2px 28px'}}>
+                      <div style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.6}}>{it.st==='Met'?<span style={{color:'var(--c-grn)'}}>Met on grades — confirm it's demonstrated <b>consistently</b>, not once, then sign off. </span>:''}{it.demo}</div>
+                      {it.act&&<div style={{fontSize:12.5,color:'var(--c-blu2)',marginTop:3}}>Planned action: {it.act}</div>}
+                      <div style={{display:'flex',gap:8,alignItems:'center',marginTop:6}}>
+                        <input value={ck.note||''} onChange={e=>setChk(it.gk,{note:e.target.value})} placeholder="Review note — evidence seen / what was agreed / next step…" style={{...SEL,flex:1,fontSize:12.5}}/>
+                        <button className="btn btn-ghost btn-xs" title="Open the category to grade this" onClick={()=>setOpenCat(it.c)}>grade</button>
+                      </div>
+                    </div>)}
                   </div>);})}
-                <div style={{fontSize:11.5,color:'var(--g-666)',marginTop:6}}>This checklist belongs to the Road to {GX_PAY[nxtIdx][0]} — it starts fresh at each new pay target. All items checked + all gates Met = ready for the raise conversation.</div>
+                <div style={{fontSize:11.5,color:'var(--g-666)',marginTop:8}}>Click any row for what has to be demonstrated · Met green · Developing = one level away · Gap red · this checklist resets at the next pay target.</div>
               </div>);})()}
           </div>)}
           {(revs.length>0||(pd.history||[]).length>0)&&(<div style={{marginTop:14,borderTop:'1px solid var(--border)',paddingTop:10}}>
