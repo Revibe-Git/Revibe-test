@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L106';
+window.__BUILD='build L107';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8475,7 +8475,7 @@ function GuestExperiencePage({staff}){
   }catch(e){}},[]);
   const[person,setPerson]=useState('');const[showAllStaff,setShowAllStaff]=useState(false);
   const[openCat,setOpenCat]=useState('c10');
-  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);
+  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);const[revOpen,setRevOpen]=useState(null);
   const names=(staff||[]).map(x=>x.name).filter(Boolean);
   const pk=person||'';
   const pd=(gx.people||{})[pk]||{};
@@ -8497,6 +8497,20 @@ function GuestExperiencePage({staff}){
   const gv2=(cat,sub)=>{if(sub==null){const m=(pd.cats||{})[cat];if(m)return m;const a=catAvg(cat);return a?Math.floor(a):null;}const qi=qOfSub(cat,sub);return qi==null?null:getQ(cat,qi);};
   const gateRows=gates.map(([c,su,req,lb])=>{const cur=gv2(c,su);const st=cur==null?'—':(cur>=req?'Met':(cur===req-1?'Developing':'Gap'));return{lb,c,su,cur,req,st};});
   const gatesMet=gateRows.filter(r=>r.st==='Met').length;
+  const nowStamp=()=>{const d=new Date();return d.toISOString().slice(0,10)+' '+d.toTimeString().slice(0,5);};
+  const snapNow=()=>({avgs:Object.fromEntries(GX_CATS.map(([cid])=>[cid,catAvg(cid)?+catAvg(cid).toFixed(2):null])),qs:Object.fromEntries(GX_CATS.map(([cid])=>[cid,[0,1,2].map(qi=>getQ(cid,qi))])),gatesMet:nxtIdx!=null?gatesMet:null,gatesTot:nxtIdx!=null?gateRows.length:null,pay:pd.payLevel!=null?GX_PAY[pd.payLevel][0]:'—',payIdx:pd.payLevel??null});
+  const revs=pd.reviews||[];
+  const lastRev=revs.length?revs[revs.length-1]:null;
+  const openRev=revs.find(r=>!r.closed)||null;
+  const setRev=(id,patch,logLines)=>{setPd({reviews:(pd.reviews||[]).map(r=>r.id===id?{...r,...patch,log:[...(r.log||[]),...((logLines||[]).map(t=>({at:nowStamp(),t})))]}:r)});};
+  const startReview=()=>{const snap=snapNow();const id='rv_'+Date.now().toString(36);
+    setPd({reviews:[...(pd.reviews||[]),{id,date:new Date().toISOString().slice(0,10),opened:nowStamp(),closed:null,snap,summary:'',log:[{at:nowStamp(),t:'Review started — scores captured as of today'}]}]});setRevOpen(id);};
+  const completeReview=(r)=>{const snap=snapNow();const chg=[];GX_CATS.forEach(([cid,cn])=>{const a=(r.snap&&r.snap.avgs||{})[cid];const b=snap.avgs[cid];if((a||null)!==(b||null))chg.push(cn+': '+(a==null?'—':a.toFixed(1))+' → '+(b==null?'—':b.toFixed(1)));});
+    setRev(r.id,{closed:nowStamp(),snap},['Review completed & signed off'].concat(chg.length?['Scores changed during the review — '+chg.join(' · ')]:[]));setRevOpen(null);};
+  const reopenReview=(r)=>{setRev(r.id,{closed:null},['Reopened for changes']);setRevOpen(r.id);};
+  const saveAmend=(r)=>{const snap=snapNow();const chg=[];GX_CATS.forEach(([cid,cn])=>{const a=(r.snap&&r.snap.avgs||{})[cid];const b=snap.avgs[cid];if((a||null)!==(b||null))chg.push(cn+': '+(a==null?'—':a.toFixed(1))+' → '+(b==null?'—':b.toFixed(1)));});
+    const payChg=(r.snap&&r.snap.pay)!==snap.pay?['Pay level: '+(r.snap&&r.snap.pay)+' → '+snap.pay]:[];
+    setRev(r.id,{closed:nowStamp(),snap},(chg.length||payChg.length)?['Changes saved — '+chg.concat(payChg).join(' · ')]:['Changes saved — no score changes']);setRevOpen(null);};
   const LvlSel=(val,on)=>(<select value={val||''} onChange={e=>on(e.target.value?+e.target.value:null)} style={SEL}><option value="">—</option>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select>);
   return(
     <div style={{padding:'26px 30px',maxWidth:1280}}>
@@ -8572,7 +8586,10 @@ function GuestExperiencePage({staff}){
             </>):(<span style={{fontSize:13,color:'var(--c-amb)'}}>Choose the current pay level (dropdown on the right) to unlock the progression roadmap</span>)}
             <span style={{flex:1}}/>
             <span style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:13,color:'var(--g-aaa)'}}>Pay level:<select value={pd.payLevel??''} onChange={e=>setPd({payLevel:e.target.value===''?null:+e.target.value})} style={SEL}><option value="">—</option>{GX_PAY.map((pp,pi)=><option key={pi} value={pi}>{pp[0]} · {pp[1]}</option>)}</select></span>
-            <button className="btn btn-ghost btn-xs" title="Save a dated snapshot of all category scores + gate progress — builds the review-over-time history" onClick={()=>{const snap={date:new Date().toISOString().slice(0,10),avgs:Object.fromEntries(GX_CATS.map(([cid])=>[cid,catAvg(cid)?+catAvg(cid).toFixed(2):null])),gates:nxtIdx!=null?(gatesMet+'/'+gateRows.length):'—',pay:pd.payLevel!=null?GX_PAY[pd.payLevel][0]:'—'};setPd({history:[...(pd.history||[]),snap]});}}>📸 Snapshot review</button>
+            {openRev?(<span style={{display:'inline-flex',alignItems:'center',gap:7}}>
+              <span style={{fontSize:11.5,fontWeight:800,color:'var(--c-yel)',border:'1px solid var(--c-yel)',borderRadius:5,padding:'2px 8px'}} title={'Review opened '+openRev.opened+' — grade and check items off, then complete it'}>● Review in progress · {openRev.date}</span>
+              <button className="btn btn-go btn-xs" title="Record this review as performed today — captures all scores, gate progress and checklist state into the growth history" onClick={()=>completeReview(openRev)}>✓ Complete review</button>
+            </span>):(<button className="btn btn-go btn-xs" title="Start a review session — captures today's scores, then logs everything you change while it's open" onClick={startReview}>📋 Start review — today</button>)}
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(210px,1fr))',gap:'8px 18px',marginBottom:nxtIdx!=null?12:0}}>
             {GX_CATS.map(([cid,cname])=>{const a=catAvg(cid);return(<div key={cid} style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer'}} onClick={()=>setOpenCat(cid)} title={'Open '+cname}>
@@ -8618,7 +8635,7 @@ function GuestExperiencePage({staff}){
                 </div>
                 {items.map((it,i)=>{const ck=it.chk||{};return(
                   <div key={i} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'8px 0',borderTop:i?'1px solid var(--border)':'none'}}>
-                    <input type="checkbox" checked={!!ck.done} onChange={e=>setChk(it.gk,{done:e.target.checked,date:e.target.checked?new Date().toISOString().slice(0,10):null})} title="Check off once demonstrated, reviewed together and signed off by the manager" style={{marginTop:3,width:16,height:16,accentColor:'#7ac490',cursor:'pointer'}}/>
+                    <input type="checkbox" checked={!!ck.done} onChange={e=>{const on=e.target.checked;setChk(it.gk,{done:on,date:on?new Date().toISOString().slice(0,10):null});const orv=(pd.reviews||[]).find(x=>!x.closed);if(orv)setRev(orv.id,{},[(on?'Signed off: ':'Un-checked: ')+it.lb]);}} title="Check off once demonstrated, reviewed together and signed off by the manager" style={{marginTop:3,width:16,height:16,accentColor:'#7ac490',cursor:'pointer'}}/>
                     <div style={{flex:1}}>
                       <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                         <span style={{fontSize:13.5,fontWeight:800,color:ck.done?'var(--c-grn)':'var(--g-ddd)'}}>{it.lb}</span>
@@ -8635,9 +8652,46 @@ function GuestExperiencePage({staff}){
                 <div style={{fontSize:11.5,color:'var(--g-666)',marginTop:6}}>This checklist belongs to the Road to {GX_PAY[nxtIdx][0]} — it starts fresh at each new pay target. All items checked + all gates Met = ready for the raise conversation.</div>
               </div>);})()}
           </div>)}
-          {(pd.history||[]).length>0&&(<div style={{marginTop:10,borderTop:'1px solid var(--border)',paddingTop:6}}>
-            <div style={{fontSize:12,fontWeight:800,color:'var(--g-888)',textTransform:'uppercase',letterSpacing:'.4px',marginBottom:3}}>Review history</div>
-            {(pd.history||[]).slice(-6).reverse().map((h,i)=>{const avgVals=Object.values(h.avgs||{}).filter(v=>v!=null);const ov=avgVals.length?(avgVals.reduce((a,b)=>a+b,0)/avgVals.length).toFixed(1):'—';return(<div key={i} style={{fontSize:12.5,color:'var(--g-aaa)'}}>{h.date} · pay {h.pay} · overall {ov} · gates {h.gates}</div>);})}
+          {(revs.length>0||(pd.history||[]).length>0)&&(<div style={{marginTop:14,borderTop:'1px solid var(--border)',paddingTop:10}}>
+            <div style={{fontSize:13,fontWeight:800,color:'var(--g-ddd)',marginBottom:6}}>📈 Growth over time — {pk}</div>
+            {revs.length>1&&(()=>{const first=revs[0].snap||{};const last=(lastRev.snap)||{};const ovOf=(sn)=>{const v=Object.values(sn.avgs||{}).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};const o1=ovOf(first),o2=ovOf(last);
+              const movers=GX_CATS.map(([cid,cn])=>{const a=(first.avgs||{})[cid],b=(last.avgs||{})[cid];return(a!=null&&b!=null)?{cn,d:+(b-a).toFixed(1)}:null;}).filter(Boolean).filter(x=>x.d!==0).sort((x,y)=>y.d-x.d);
+              return(<div style={{fontSize:12.5,color:'var(--g-aaa)',marginBottom:8,lineHeight:1.6}}>
+                Since the first review ({revs[0].date}): overall <b style={{color:o2>=o1?'var(--c-grn)':'var(--c-amb)'}}>{o1!=null?o1.toFixed(1):'—'} → {o2!=null?o2.toFixed(1):'—'}</b> across {revs.length} reviews.
+                {movers.length>0&&<> Biggest gains: {movers.filter(m=>m.d>0).slice(0,3).map(m=>m.cn+' +'+m.d).join(' · ')||'none yet'}.{movers.some(m=>m.d<0)&&<span style={{color:'var(--c-amb)'}}> Slipped: {movers.filter(m=>m.d<0).map(m=>m.cn+' '+m.d).join(' · ')}.</span>}</>}
+              </div>);})()}
+            {revs.slice().reverse().map((r,i)=>{const sn=r.snap||{};const v=Object.values(sn.avgs||{}).filter(x=>x!=null);const ov=v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'—';
+              const prev=revs[revs.length-2-i];const pv=prev?Object.values((prev.snap||{}).avgs||{}).filter(x=>x!=null):[];const pov=pv.length?(pv.reduce((a,b)=>a+b,0)/pv.length):null;const dlt=(pov!=null&&v.length)?+(ov-pov).toFixed(1):null;
+              const isOpenRow=revOpen===r.id;
+              return(<div key={r.id} style={{borderTop:i?'1px solid var(--border)':'none',padding:'8px 0'}}>
+                <div style={{display:'flex',gap:9,alignItems:'center',flexWrap:'wrap',fontSize:12.5}}>
+                  <span style={{fontWeight:800,color:'var(--g-ddd)'}}>{r.date}</span>
+                  <span style={{color:r.closed?'var(--c-grn)':'var(--c-yel)',fontWeight:800,fontSize:11.5}}>{r.closed?'✓ completed '+r.closed:'● in progress'}</span>
+                  <span style={{color:'var(--g-aaa)'}}>pay {sn.pay||'—'} · overall <b style={{color:'var(--g-ddd)'}}>{ov}</b>{dlt!=null&&dlt!==0&&<span style={{color:dlt>0?'var(--c-grn)':'var(--c-amb)',fontWeight:800}}> {dlt>0?'▲ +':'▼ '}{dlt}</span>} · gates {sn.gatesMet!=null?(sn.gatesMet+'/'+sn.gatesTot):'—'}</span>
+                  <span style={{flex:1}}/>
+                  {(r.log||[]).length>1&&<span style={{fontSize:11,color:'var(--g-666)'}}>{(r.log||[]).length} log entries</span>}
+                  <button className="btn btn-ghost btn-xs" onClick={()=>setRevOpen(isOpenRow?null:r.id)}>{isOpenRow?'▾ hide':'▸ details'}</button>
+                  {r.closed?<button className="btn btn-ghost btn-xs" title="Reopen to make changes — every change is logged with its date" onClick={()=>reopenReview(r)}>✎ reopen</button>
+                           :<button className="btn btn-go btn-xs" title="Save the changes made since reopening — logs what changed and when" onClick={()=>saveAmend(r)}>✓ save changes</button>}
+                </div>
+                {isOpenRow&&(<div style={{marginTop:7,background:'var(--surface3)',borderRadius:9,padding:'10px 12px'}}>
+                  <div style={{fontSize:11.5,color:'var(--g-777)',marginBottom:3}}>Review summary — what was discussed and agreed</div>
+                  <textarea value={r.summary||''} onChange={e=>setPd({reviews:(pd.reviews||[]).map(x=>x.id===r.id?{...x,summary:e.target.value}:x)})} placeholder="Overall themes, strengths, agreed development priorities, next review date…" style={{...SEL,width:'100%',minHeight:56,fontSize:12.5,lineHeight:1.5}}/>
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:'3px 16px',margin:'8px 0 6px'}}>
+                    {GX_CATS.map(([cid,cn])=>{const a=(sn.avgs||{})[cid];const pa=prev?((prev.snap||{}).avgs||{})[cid]:null;const d=(a!=null&&pa!=null)?+(a-pa).toFixed(1):null;return(<div key={cid} style={{display:'flex',gap:6,fontSize:12,alignItems:'center'}}>
+                      <span style={{flex:1,color:'var(--g-999)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cn}</span>
+                      <span style={{fontWeight:800,color:'var(--g-ccc)'}}>{a!=null?a.toFixed(1):'—'}</span>
+                      {d!=null&&d!==0&&<span style={{fontWeight:800,color:d>0?'var(--c-grn)':'var(--c-amb)',width:34}}>{d>0?'+'+d:d}</span>}
+                    </div>);})}
+                  </div>
+                  <div style={{fontSize:11.5,color:'var(--g-777)',marginTop:6,marginBottom:2}}>Change log — every edit is stamped</div>
+                  {(r.log||[]).slice().reverse().map((l,li)=>(<div key={li} style={{fontSize:12,color:'var(--g-999)',lineHeight:1.55}}><span style={{color:'var(--g-666)'}}>{l.at}</span> — {l.t}</div>))}
+                </div>)}
+              </div>);})}
+            {(pd.history||[]).length>0&&(<div style={{marginTop:8,borderTop:'1px dashed var(--border)',paddingTop:5}}>
+              <div style={{fontSize:11,color:'var(--g-666)',marginBottom:2}}>Earlier snapshots</div>
+              {(pd.history||[]).slice(-6).reverse().map((h,i)=>{const av=Object.values(h.avgs||{}).filter(x=>x!=null);const ov=av.length?(av.reduce((a,b)=>a+b,0)/av.length).toFixed(1):'—';return(<div key={i} style={{fontSize:12,color:'var(--g-888)'}}>{h.date} · pay {h.pay} · overall {ov} · gates {h.gates}</div>);})}
+            </div>)}
           </div>)}
         </div>)}
         {GX_CATS.map(([cid,cname])=>{const isOpen=openCat===cid;return(
