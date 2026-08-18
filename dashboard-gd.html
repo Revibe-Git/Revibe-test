@@ -1883,7 +1883,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L122';
+window.__BUILD='build L123';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8462,10 +8462,10 @@ const GX_GATES={
 9:[['c7',null,4,'Management & Accountability — manages independently'],['c7',7,4,'KPI Management'],['c6',null,4,'Problem Solving & Ownership'],['c2',null,4,'GE Execution — catches what others miss'],['c5',null,4,'Schedule, Retention & Revenue']],
 10:[['c1',null,4,'Reliability & Professional Standards'],['c2',null,4,'GE Execution & Systems'],['c3',null,4,'Guest Experience & Communication'],['c4',null,4,'Revibe & Clinic Knowledge'],['c5',null,4,'Schedule, Retention & Revenue'],['c6',null,4,'Problem Solving & Ownership'],['c7',null,4,'Management & Accountability'],['c10',null,4,'KPI & Performance Management'],['c8',null,3,'Leadership & People Development — beginning'],['c9',null,3,'Systems & Operations Thinking — beginning']],
 11:[['c7',null,4,'Management & Accountability held at 4'],['c8',null,4,'Leadership & People Development — makes people better'],['c8',1,4,'Mentorship & Individual Growth'],['c9',null,3,'Systems & Operations Thinking']],
-12:[['c7',null,5,'Management & Accountability — now at 5, leading through others'],['c8',0,5,'Influence & Protecting Standards — sets the department standard'],['c8',null,4,'Leadership & People Development'],['c9',null,4,'Systems & Operations Thinking'],['c10',null,4,'KPI & Performance Management']],
-13:[['c7',null,5,'Management & Accountability held at 5'],['c8',6,5,'Creating Independence & Future Leaders — produces managers'],['c8',1,5,'Mentorship & Individual Growth'],['c8',null,4,'Leadership & People Development'],['c9',5,4,'Multi-Location Thinking']],
-14:[['c7',null,5,'Management & Accountability held at 5'],['c9',null,4,'Systems & Operations Thinking — improves beyond one team'],['c9',0,4,'SOP & Process Improvement'],['c9',6,4,'Multi-Location Thinking & Project Execution'],['c9',2,4,'Labour, Payroll & Cost Awareness'],['c8',null,4,'Leadership held at 4'],['c8',6,5,'Creating Future Leaders held at 5'],['c10',null,4,'KPI & Performance Management']],
-15:[['c7',null,5,'Management & Accountability held at 5'],['c9',0,5,'SOP & Process Improvement — builds scalable architecture'],['c9',6,5,'Multi-Location Thinking & Project Execution — leads launches'],['c9',null,4,'Systems & Operations Thinking'],['c8',6,5,'Creating Future Leaders'],['c8',null,4,'Leadership & People Development'],['c10',null,4,'KPI & Performance Management']]};
+12:[['c7',null,4.5,'Management & Accountability — averaging 4.5+ (still developing toward 5)'],['c8',0,5,'Influence & Protecting Standards — sets the department standard'],['c8',null,4,'Leadership & People Development'],['c9',null,4,'Systems & Operations Thinking'],['c10',null,4,'KPI & Performance Management']],
+13:[['c7',null,4.5,'Management & Accountability — averaging 4.5+'],['c8',6,5,'Creating Independence & Future Leaders — produces managers'],['c8',1,5,'Mentorship & Individual Growth'],['c8',null,4,'Leadership & People Development'],['c9',5,4,'Multi-Location Thinking']],
+14:[['c7',null,4.5,'Management & Accountability — averaging 4.5+'],['c9',null,4,'Systems & Operations Thinking — improves beyond one team'],['c9',0,4,'SOP & Process Improvement'],['c9',6,4,'Multi-Location Thinking & Project Execution'],['c9',2,4,'Labour, Payroll & Cost Awareness'],['c8',null,4,'Leadership held at 4'],['c8',6,5,'Creating Future Leaders held at 5'],['c10',null,4,'KPI & Performance Management']],
+15:[['c7',null,5,'Management & Accountability — complete at 5'],['c9',0,5,'SOP & Process Improvement — builds scalable architecture'],['c9',6,5,'Multi-Location Thinking & Project Execution — leads launches'],['c9',null,4,'Systems & Operations Thinking'],['c8',6,5,'Creating Future Leaders'],['c8',null,4,'Leadership & People Development'],['c10',null,4,'KPI & Performance Management']]};
 
 const GX_KPI_SLIM=[['Call & Phone Performance','Call totals — handled'],['Call & Phone Performance','Treatment-call conversion %'],['Call & Phone Performance','Call quality (definition pending)'],['Lead Performance','Lead conversion %'],['Lead Performance','Lead follow-up completion'],['Booking & Retention','Rebooking %'],['Booking & Retention','Cancellation recovery %'],['Booking & Retention','No-show rate'],['Booking & Retention','Reactivation conversion'],['Financial / Admin','Outstanding balance recovery'],['Operational','Opening / closing compliance'],['Guest Experience','Reviews & guest feedback']];
 const GX_CATS_ALL=['Call & Phone Performance','Lead Performance','Booking & Retention','Financial / Admin','Operational','Guest Experience'].concat(GX_KPI_CATALOG.map(([c])=>c));
@@ -8659,8 +8659,9 @@ function GuestExperiencePage({staff}){
   const gates=nxtIdx==null?[]:(GX_GATES[nxtIdx]||[]);
   const qOfSub=(c,su)=>{const qs=GX_Q3[c]||[];for(let qi=0;qi<qs.length;qi++){if(qs[qi].src.indexOf(su)>=0)return qi;}return null;};
   const gateByQ={};const gateByCat={};gates.forEach(([c,su,req])=>{if(su==null){gateByCat[c]=Math.max(gateByCat[c]||0,req);return;}const qi=qOfSub(c,su);if(qi!=null){const k=c+'.q'+qi;gateByQ[k]=Math.max(gateByQ[k]||0,req);}});
-  const gv2=(cat,sub)=>{if(sub==null){const m=(pd.cats||{})[cat];if(m)return m;const a=catAvg(cat);return a?Math.floor(a):null;}const qi=qOfSub(cat,sub);return qi==null?null:getQ(cat,qi);};
-  const gateRows=gates.map(([c,su,req,lb])=>{const cur=gv2(c,su);const st=cur==null?'—':(cur>=req?'Met':(cur===req-1?'Developing':'Gap'));return{lb,c,su,cur,req,st};});
+  const gfmt=(v)=>v==null?'—':(Math.round(v*10)/10+'');
+  const gv2=(cat,sub)=>{if(sub==null){const m=(pd.cats||{})[cat];if(m)return m;const a=catAvg(cat);return a?+a.toFixed(2):null;}const qi=qOfSub(cat,sub);return qi==null?null:getQ(cat,qi);};
+  const gateRows=gates.map(([c,su,req,lb])=>{const cur=gv2(c,su);const st=cur==null?'—':(cur>=req?'Met':(cur>=req-1?'Developing':'Gap'));return{lb,c,su,cur,req,st};});
   const gatesMet=gateRows.filter(r=>r.st==='Met').length;
   // CUMULATIVE placement: a step only counts if it AND every step beneath it is fully met (L116)
   const stepRows=(idx)=>(GX_GATES[idx]||[]).map(([c,su,req,lb])=>{const cur=gv2(c,su);return{lb,c,su,cur,req,met:cur!=null&&cur>=req};});
@@ -8947,7 +8948,7 @@ function GuestExperiencePage({staff}){
                       <span style={{flex:1,fontSize:13.5,fontWeight:700,color:ck.done?'var(--c-grn)':'var(--g-ddd)',textDecoration:ck.done?'line-through':'none',cursor:'pointer'}} onClick={()=>setChkOpen(ex?null:it.gk)}>{it.lb}</span>
                       {ck.note&&!ex&&<span style={{fontSize:11,color:'var(--g-666)'}} title={ck.note}>📝</span>}
                       {ck.done&&ck.date&&<span style={{fontSize:10.5,color:'var(--g-666)'}}>{ck.date}</span>}
-                      <span style={{fontSize:11.5,color:'var(--g-888)',fontVariantNumeric:'tabular-nums'}}>{it.cur==null?'—':it.cur}<span style={{color:'var(--g-666)'}}>/{it.req}</span></span>
+                      <span style={{fontSize:11.5,color:'var(--g-888)',fontVariantNumeric:'tabular-nums'}}>{gfmt(it.cur)}<span style={{color:'var(--g-666)'}}>/{it.req}</span></span>
                       <span className="gx-pill" style={{color:stC,borderColor:stC}}>{it.st==='—'?'not graded':it.st}</span>
                       <button className="btn btn-ghost btn-xs" title="Show what needs to be demonstrated" onClick={()=>setChkOpen(ex?null:it.gk)}>{ex?'▾':'▸'}</button>
                     </div>
@@ -8973,7 +8974,7 @@ function GuestExperiencePage({staff}){
                     {firstBlock!=null&&(()=>{const rs=stepRows(firstBlock).filter(r=>!r.met);const ung=rs.filter(r=>r.cur==null);
                       return(<div style={{marginTop:7,background:'var(--surface3)',borderRadius:9,padding:'9px 12px'}}>
                         <div style={{fontSize:12,fontWeight:800,color:'var(--g-777)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>Blocked at {GX_PAY[firstBlock][0]} · {GX_PAY[firstBlock][1]} — {rs.length} gate{rs.length>1?'s':''} short</div>
-                        {rs.map((r,i)=>(<div key={i} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.6}}>· {r.lb} — <b style={{color:r.cur==null?'var(--c-amb)':'var(--c-red)'}}>{r.cur==null?'not graded yet':'at '+r.cur}</b> / needs {r.req}</div>))}
+                        {rs.map((r,i)=>(<div key={i} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.6}}>· {r.lb} — <b style={{color:r.cur==null?'var(--c-amb)':'var(--c-red)'}}>{r.cur==null?'not graded yet':'at '+gfmt(r.cur)}</b> / needs {r.req}</div>))}
                         {ung.length>0&&<div style={{fontSize:12,color:'var(--c-amb)',marginTop:5}}>An ungraded competency can never satisfy a gate — grade {ung.length===1?'it':'these'} and the assessment moves.</div>}
                       </div>);})()}
                     {(()=>{const tot=GX_CATS.length*3;const gr=GX_CATS.reduce((a,[cid])=>a+[0,1,2].filter(qi=>getQ(cid,qi)).length,0);
@@ -9117,7 +9118,7 @@ function GuestExperiencePage({staff}){
                   const demo=q?q.lv[r.req-1]:('category average ≥'+r.req);
                   return(<div key={i} className="gxr-row" style={{fontSize:12.5,lineHeight:1.55,marginBottom:4,display:'flex',gap:9,padding:'6px 10px',borderRadius:7,background:ck.done?'rgba(11,110,84,.07)':(i%2?'transparent':'var(--stripe)')}}>
                     <span style={{width:14,flexShrink:0,color:ck.done?'var(--c-grn)':'var(--g-666)'}}>{ck.done?'☑':'☐'}</span>
-                    <span style={{flex:1,color:'var(--g-aaa)'}}><b style={{color:r.st==='Met'?'var(--c-grn)':'var(--g-ddd)'}}>{r.lb} — {r.cur==null?'not graded':'at '+r.cur} / needs {r.req}{r.st==='Met'?' · met':''}.</b> {r.st==='Met'?'Confirm it is demonstrated consistently, then sign off.':'Demonstrate: '+demo+'.'}{ck.note?<span style={{color:'var(--c-blu2)'}}> · Note: {ck.note}</span>:''}</span>
+                    <span style={{flex:1,color:'var(--g-aaa)'}}><b style={{color:r.st==='Met'?'var(--c-grn)':'var(--g-ddd)'}}>{r.lb} — {r.cur==null?'not graded':'at '+gfmt(r.cur)} / needs {r.req}{r.st==='Met'?' · met':''}.</b> {r.st==='Met'?'Confirm it is demonstrated consistently, then sign off.':'Demonstrate: '+demo+'.'}{ck.note?<span style={{color:'var(--c-blu2)'}}> · Note: {ck.note}</span>:''}</span>
                   </div>);})}
               </>)}
 
@@ -9221,7 +9222,7 @@ function GuestExperiencePage({staff}){
         </>)}
         {gxTab==='sys'&&(<>
         {H('⭐ The gate map — every requirement, every pay step','Progression is CUMULATIVE: a step is only earned when it and every step beneath it is fully met. Nobody reaches Operations with an unmet Leadership gate, however strong their systems scores are.')}
-        <div style={{fontSize:12.5,color:'var(--g-888)',marginBottom:10,lineHeight:1.7}}>{GX_PAY.length} pay steps · {Object.values(GX_GATES).reduce((a,b)=>a+b.length,0)} gates. Gates follow the arc: categories 1-4 carry LEARN and EXECUTE · 5-6 carry IMPACT · 7 (with 6 and 10) carries MANAGE · 8 carries LEAD · 9 carries BUILD. <b style={{color:'var(--g-ccc)'}}>$25 requires 4s across every category</b> — management is only complete when nothing is weak. <b style={{color:'var(--g-ccc)'}}>$26 still runs on 4s</b> — leadership begins while management is solid but not yet perfected. <b style={{color:'var(--g-ccc)'}}>From $27 up, Management must be at 5</b> and stays there through operations. <b style={{color:'var(--g-ccc)'}}>$28 requires 5s in leadership</b> (creating independence and future leaders). <b style={{color:'var(--g-ccc)'}}>$32+ requires 5s in operations</b> (scalable SOP architecture, launches) while leadership is held at 5. Category-level gates (⬗) test the category; the rest test one grading question.</div>
+        <div style={{fontSize:12.5,color:'var(--g-888)',marginBottom:10,lineHeight:1.7}}>{GX_PAY.length} pay steps · {Object.values(GX_GATES).reduce((a,b)=>a+b.length,0)} gates. Gates follow the arc: categories 1-4 carry LEARN and EXECUTE · 5-6 carry IMPACT · 7 (with 6 and 10) carries MANAGE · 8 carries LEAD · 9 carries BUILD. <b style={{color:'var(--g-ccc)'}}>$25 requires 4s across every category</b> — management is only complete when nothing is weak. <b style={{color:'var(--g-ccc)'}}>$26 still runs on 4s</b> — leadership begins while management is solid but still developing. <b style={{color:'var(--g-ccc)'}}>$27–$30 need Management averaging 4.5+</b> (two 5s and a 4 clears it), and <b style={{color:'var(--g-ccc)'}}>$32+ requires the full 5</b>. Category gates read the real average, so ≥4.5 is a genuine threshold, not a rounded one. <b style={{color:'var(--g-ccc)'}}>$28 requires 5s in leadership</b> (creating independence and future leaders). <b style={{color:'var(--g-ccc)'}}>$32+ requires 5s in operations</b> (scalable SOP architecture, launches) while leadership is held at 5. Category-level gates (⬗) test the category; the rest test one grading question.</div>
         {GX_PAY.map((pyr,pi)=>{const rows=(GX_GATES[pi]||[]);const band=GX_ROLEBYPAY[pi];const stg=GX_STAGE_OF[pi];const newStage=pi===0||GX_STAGE_OF[pi-1]!==stg;
           return(<React.Fragment key={pi}>
           {newStage&&(<div style={{display:'flex',alignItems:'center',gap:10,margin:'18px 0 8px'}}>
