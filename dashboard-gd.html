@@ -1872,7 +1872,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L108';
+window.__BUILD='build L110';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8428,6 +8428,54 @@ const GX_GATES={1:[['c1',0,2,'Attendance'],['c1',1,2,'Punctuality'],['c1',5,2,'T
 15:[['c9',null,4,'Systems/Operations (category)'],['c8',null,4,'Leadership (category)'],['c9',5,5,'Multi-Location Thinking'],['c9',4,4,'Cost/Resource Awareness'],['c9',6,4,'Project/New-Location Execution']]};
 const GX_KPI_SLIM=[['Call & Phone Performance','Call totals — handled'],['Call & Phone Performance','Treatment-call conversion %'],['Call & Phone Performance','Call quality (definition pending)'],['Lead Performance','Lead conversion %'],['Lead Performance','Lead follow-up completion'],['Booking & Retention','Rebooking %'],['Booking & Retention','Cancellation recovery %'],['Booking & Retention','No-show rate'],['Booking & Retention','Reactivation conversion'],['Financial / Admin','Outstanding balance recovery'],['Operational','Opening / closing compliance'],['Guest Experience','Reviews & guest feedback']];
 const GX_CATS_ALL=['Call & Phone Performance','Lead Performance','Booking & Retention','Financial / Admin','Operational','Guest Experience'].concat(GX_KPI_CATALOG.map(([c])=>c));
+const GX_MOD={
+c1:[{to:2,t:'Make the basics automatic',a:['Use the call-out procedure every time — manager AND the team channel, never just one','Set a departure alarm that puts you on site ten minutes before start','Write the shift’s three must-do tasks at clock-in; close them before you leave','Ask for the day’s schedule and staffing before the shift starts, not after'],e:'Four straight weeks with no preventable lateness and no missed call-out procedure.'},
+{to:3,t:'Be ready, not just present',a:['Ready to work at start time — logged in, float counted, coat off','Read schedule, staffing, recovery bookings and open follow-ups before the first guest','Keep ONE running task list; anything you commit to gets a date and gets closed','Own mistakes the same day, with the correction already made'],e:'A full month where nothing you committed to needed a reminder from a manager.'},
+{to:4,t:'Protect the standard around you',a:['Flag coverage risks a week out and bring the proposed fix, not just the problem','Build your own opening/closing checklist and use it to catch what gets missed','Take one recurring miss (unlogged cancellations, dropped follow-ups) and design the prevention','Set a top-three priority list each shift and defend it when the day gets busy'],e:'A specific coverage risk or recurring error you prevented before it landed.'},
+{to:5,t:'Build dependability into the team',a:['Track team attendance and punctuality patterns for a month; bring the picture to leadership','Coach one teammate through a readiness or follow-through habit','Write the shift-readiness standard the team is held to','Run the accountability conversation when a standard slips — direct, and psychologically safe'],e:'A teammate whose reliability measurably improved under your coaching.'}],
+c2:[{to:2,t:'Learn the tools hands-on',a:['Shadow a full open and a full close, writing your own version of the checklist','Practise ten bookings across different disciplines, durations and locations','Learn every payment type: packages, memberships, insurance, balances, refunds','Set up and reset each recovery service once with someone watching'],e:'Routine bookings and transactions completed without needing to ask.'},
+{to:3,t:'Run the desk alone',a:['Book correctly first time — right practitioner, service, duration, location, notes','Troubleshoot the five most common Jane errors without escalating','Complete a full open and close solo, to standard','Manage recovery guest flow end-to-end during a busy block'],e:'A run of shifts covered independently with no booking or payment corrections needed.'},
+{to:4,t:'Catch what others miss',a:['Audit a week of bookings against the standard and fix what you find','Handle the complex cases — insurance edge cases, package disputes, payment discrepancies','Forecast inventory two weeks out; prevent the stockout instead of reporting it','On every reschedule, protect schedule quality — no avoidable gaps created'],e:'An error pattern you found in the data and corrected at the source.'},
+{to:5,t:'Make the system teachable',a:['Write the booking or open/close SOP the team actually uses','Train a new hire on Jane start-to-finish and validate their competency','Run a monthly data-quality audit and report what it changed','Redesign one workflow and measure the time or error reduction'],e:'A documented standard in use by others, plus someone you trained to independence.'}],
+c3:[{to:2,t:'Move past transactional',a:['Learn twenty regulars by name and one thing about each','Greet guests before they reach the desk, every time','Practise reflective listening: confirm what they asked before answering','Notice which guests need more time and which want speed'],e:'Guests recognise you and greet you back by name.'},
+{to:3,t:'Own the interaction',a:['Consistently recall guest preferences and context without prompting','Resolve routine complaints yourself, then log what happened','Adjust tone and detail to the person — brief for some, thorough for others','Take one difficult conversation a week rather than escalating it'],e:'Routine complaints resolved at the desk without a manager stepping in.'},
+{to:4,t:'Recover and personalise',a:['Build your own service-recovery approach: acknowledge, fix, follow up, verify','On every complaint, name the underlying cause, not just the incident','Stay steady in emotionally charged situations — protect the standard AND the relationship','Use what you know about a guest to create one genuinely personal moment a shift'],e:'A guest who was upset and stayed with Revibe because of how you handled it.'},
+{to:5,t:'Scale the experience',a:['Coach one teammate on warmth, listening or difficult conversations','Analyse a month of complaints for patterns; propose the system fix','Build the guest-recognition practice so it survives without you','Set the tone standard for the desk and hold it'],e:'A complaint pattern you eliminated through a system or people change.'}],
+c4:[{to:2,t:'Learn what Revibe actually offers',a:['Learn what each discipline does and does not treat, in plain non-clinical language','Learn every practitioner’s discipline, schedule and specialties','Try or observe each recovery service so you can describe it honestly','Learn package and membership pricing cold'],e:'Basic questions answered without checking with someone.'},
+{to:3,t:'Guide without overstepping',a:['Explain each discipline confidently within non-clinical scope — practise the wording','Explain the Care Map and how the disciplines connect','Walk the guest journey out loud: initial → ongoing → rebooking → recovery/performance → reactivation','Explain the performance pathway and who it suits'],e:'Guests routinely leave the conversation with the right next step.'},
+{to:4,t:'Connect need to option',a:['Match guest needs to appropriate options without diagnosing — script the boundary','Spot transition opportunities: treatment → recovery, rehab → performance','Find one breakdown in the guest journey and document where people fall out','Communicate package value naturally when it genuinely fits'],e:'Internal service connections you generated, tracked and followed up.'},
+{to:5,t:'Teach the ecosystem',a:['Build the practitioner-knowledge reference the team uses','Train GE on recovery, performance and the Care Map','Bring journey improvements to leadership with evidence','Own how new offerings get taught to the desk'],e:'A knowledge system in use, plus staff who can explain Revibe as well as you.'}],
+c5:[{to:2,t:'See the schedule as the business',a:['Learn what a gap costs the clinic in real dollars','Add every appropriate guest to the waitlist, correctly tagged','Work assigned reactivation lists to completion','Learn where to see utilisation and what it means'],e:'Assigned schedule and outreach tasks completed without chasing.'},
+{to:3,t:'Work the schedule proactively',a:['Scan tomorrow’s schedule for gaps and fill them from the waitlist','Attempt recovery on every cancellation immediately, then follow up','Catch guests leaving without the expected rebook — before they walk out','Monitor outstanding balances weekly and follow up appropriately'],e:'Gaps you personally filled and cancellations you personally recovered, with numbers.'},
+{to:4,t:'Own one measurable area',a:['Pick ONE area — reactivations, cancellation recovery, waitlist, gaps, balances, recovery utilisation','Baseline it, then report contacted → responded → booked, not just activity','Test one change for four to six weeks and measure the difference','Bring the numbers to the leadership meeting yourself'],e:'A metric that moved, with your intervention identified as the cause.'},
+{to:5,t:'Build the retention engine',a:['Design the reactivation or recovery system: segmentation, cadence, ownership','Set targets with leadership and hold the team to them','Coach the desk on the behaviours that move retention','Report performance monthly and diagnose the misses'],e:'A system others run that keeps performing when you are away.'}],
+c6:[{to:2,t:'Start noticing',a:['Report problems the day you see them, not the week after','Bring one suggested option whenever you raise an issue','Learn which decisions are yours and which need approval — write the list','Ask why a task exists, not just how to do it'],e:'Problems surfaced by you before a manager noticed them.'},
+{to:3,t:'Decide and follow through',a:['Make routine decisions without confirming; report what you did afterwards','Never bring a problem without a proposed solution','Follow issues to resolution, not to hand-off','Keep a log of decisions you made and how they turned out'],e:'"This happened, here is what I did" replaces "what should I do?".'},
+{to:4,t:'Go after the cause',a:['When something recurs, investigate the cause rather than repeating the fix','Weigh two or three options and explain the trade-off you chose','Do the worthwhile work before being asked — pick it up and finish it','Check back four weeks later: did the fix actually hold?'],e:'A recurring problem that stopped recurring because of your change.'},
+{to:5,t:'Build problem-finding into the operation',a:['Create the check or report that surfaces problems automatically','Teach the team to bring solutions, not just problems','Coach decision-making — talk through judgement, not just answers','Hold outcome accountability across the team, not just task completion'],e:'A mechanism that catches issues without you looking for them.'}],
+c7:[{to:2,t:'Take first responsibility',a:['Assign simple tasks with a clear owner and finish time','Sit in on feedback and performance conversations with a senior manager','Read and report your assigned metrics weekly','Help build the schedule and understand the constraints'],e:'Small pieces of work delegated and completed on time.'},
+{to:3,t:'Manage the work through others',a:['Delegate with owner, expectation and deadline — every time, in writing','Address a missed expectation within 24 hours, directly and specifically','Onboard and train someone to standard end-to-end','Build and manage a functional schedule for a full cycle'],e:'A period where the team hit its standard with you managing the day.'},
+{to:4,t:'Manage performance, not just tasks',a:['Run performance conversations independently, including the uncomfortable ones','Build an improvement plan with milestones for someone underperforming','Diagnose why a KPI is off — cause, not symptom — and take corrective action','Handle a real interpersonal conflict to resolution'],e:'An underperformer who improved, or a conflict resolved without escalation.'},
+{to:5,t:'Develop other managers',a:['Coach a manager through their own difficult conversation instead of taking it over','Teach delegation and KPI ownership as skills, with practice','Build the accountability rhythm — one-on-ones, standards, follow-up','Create the training that makes new managers independent'],e:'A manager operating independently who learned it from you.'}],
+c8:[{to:2,t:'Build credibility first',a:['Be the person who answers questions accurately and follows through','Notice how different people work and what motivates them','Support a teammate through something hard without taking it over','Ask for feedback on your own influence and listen to it'],e:'Colleagues start coming to you before they go to a manager.'},
+{to:3,t:'Develop one person deliberately',a:['Pick one person and mentor them intentionally — regular time, real goals','Coach them to solve their own problems rather than solving it for them','Give clear, timely feedback that names the behaviour, not the person','Regulate your own reaction under pressure — the team reads you'],e:'One named person, one named area, and what measurably changed.'},
+{to:4,t:'Grow several, protect the standard',a:['Tailor responsibility to each person’s strengths and development edge','Protect a standard when it is uncomfortable or unpopular','Develop someone deliberately toward management readiness','Build buy-in for a change without using authority'],e:'Measurable growth in more than one person, plus a standard you held when it cost you.'},
+{to:5,t:'Create leaders',a:['Build the mentorship or development structure others use','Give away meaningful ownership and let people run it','Coach emotional and relational judgement in other leaders','Plan succession — who replaces you, and what are they missing?'],e:'A track record: people you developed who now lead others.'}],
+c9:[{to:2,t:'See the system',a:['Flag every SOP that is unclear, missing or wrong','Notice and note inefficiency — where the same work gets redone','Learn what coverage the clinic actually needs, hour by hour','Learn how timekeeping and payroll inputs work'],e:'A list of process problems worth fixing, written down.'},
+{to:3,t:'Improve a process',a:['Document or rewrite one process end-to-end','Implement a practical improvement and tell people it changed','Verify hours and payroll issues accurately every cycle','Learn what is different between Mississauga and Markham, and why'],e:'One process that is measurably better because you changed it.'},
+{to:4,t:'Design and optimise',a:['Build an SOP that survives without you explaining it','Optimise staffing against demand, capability and cost — bring the model','Weigh cost against operational and guest benefit in a real decision','Own a defined workstream for a project or a location'],e:'A staffing or process change with the before-and-after numbers.'},
+{to:5,t:'Build for scale',a:['Create SOP architecture that works across locations','Design the workforce model for the next location','Lead an operational launch: planning → opening → stabilisation','Make resource-allocation calls across the operation'],e:'A system in use at more than one location that you designed.'}],
+c10:[{to:2,t:'Know the numbers exist',a:['Learn every GE metric by name and definition','Learn the current target for each one','Report your numbers accurately without prompting','Learn where the dashboard lives and read it weekly'],e:'You can state your metrics and their targets from memory.'},
+{to:3,t:'Work the number',a:['Review your metrics every week, not when asked','Spot meaningful variance — and say so before someone points it out','Report activity AND outcome: contacted, responded, booked','Take the operational action the number calls for'],e:'A variance you caught first and acted on.'},
+{to:4,t:'Diagnose and correct',a:['When a KPI slips, find the cause across multiple data points','Write a corrective plan with owner, action and review date','Measure whether the intervention actually moved the metric','Explain metric + cause + implication + proposed action in one paragraph'],e:'A KPI you diagnosed and moved back into range, with evidence it was you.'},
+{to:5,t:'Own performance through others',a:['Build the reporting cadence the team runs on','Coach the team to improve the metric — do not do it for them','Set targets that are fair and grounded in influence level','Develop a manager who owns their KPIs independently'],e:'Metrics that improve through other people, sustained over a quarter.'}]};
+const GX_STAGES=[
+ ['GE 1','Guest Experience Associate','LEARN','$18–19','Can I do the job?','Reliability → Execution → Basic Guest Experience',['c1','c2','c3'],3],
+ ['GE 2','Guest Experience Specialist','EXECUTE','$19–20','Can I operate without being managed constantly?','Independence → Revibe Knowledge → Problem Solving',['c2','c4','c6'],3],
+ ['GE 3','Senior Guest Experience','IMPACT','$21–22.50','Can I positively affect clinic performance?','Business Awareness → Schedule / Retention → Ownership',['c5','c6'],3.5],
+ ['GE 4','Guest Experience Manager','MANAGE','$23–25','Can I create results through other people?','Delegation → Accountability → People Management → KPI Management',['c7','c10'],4],
+ ['GE 5','Guest Experience Lead','LEAD','$26–28','Can I make other people better?','Influence → Coaching → Development → Creating Independence → Creating Leaders',['c8'],4],
+ ['GE 6','Operations','BUILD','$30–32+','Can I make the organization better?','Systems → Multi-Location → Cost → Process → Scalability',['c9'],4.5]];
 const GX_SHORT={c1:'Reliability',c2:'GE Execution',c3:'Guest Experience',c4:'Revibe Knowledge',c5:'Schedule & Revenue',c6:'Problem Solving',c7:'Management',c8:'Leadership',c9:'Systems',c10:'KPI & Performance'};
 const GX_HUE={c1:'#7ac490',c2:'#7db8d8',c3:'#d8a97d',c4:'#b89bd8',c5:'#d8d07d',c6:'#7dd8c3',c7:'#d87d9b',c8:'#9bd87d',c9:'#8f9bd8',c10:'#5aa7e8'};
 const GX_Q3={
@@ -8476,7 +8524,7 @@ function GuestExperiencePage({staff}){
   }catch(e){}},[]);
   const[person,setPerson]=useState('');const[showAllStaff,setShowAllStaff]=useState(false);
   const[openCat,setOpenCat]=useState('c10');
-  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);const[revOpen,setRevOpen]=useState(null);const[chkOpen,setChkOpen]=useState(null);
+  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);const[revOpen,setRevOpen]=useState(null);const[chkOpen,setChkOpen]=useState(null);const[repOpen,setRepOpen]=useState(false);const[modOpen,setModOpen]=useState(null);
   const names=(staff||[]).map(x=>x.name).filter(Boolean);
   const pk=person||'';
   const pd=(gx.people||{})[pk]||{};
@@ -8498,6 +8546,17 @@ function GuestExperiencePage({staff}){
   const gv2=(cat,sub)=>{if(sub==null){const m=(pd.cats||{})[cat];if(m)return m;const a=catAvg(cat);return a?Math.floor(a):null;}const qi=qOfSub(cat,sub);return qi==null?null:getQ(cat,qi);};
   const gateRows=gates.map(([c,su,req,lb])=>{const cur=gv2(c,su);const st=cur==null?'—':(cur>=req?'Met':(cur===req-1?'Developing':'Gap'));return{lb,c,su,cur,req,st};});
   const gatesMet=gateRows.filter(r=>r.st==='Met').length;
+  const modBox=(cid,cur)=>{const list=GX_MOD[cid]||[];const nxt=Math.min(5,(cur||0)+1);
+    return(<div style={{marginTop:8,background:'var(--surface3)',borderRadius:10,padding:'12px 14px'}}>
+      <div style={{fontSize:12.5,color:'var(--g-999)',marginBottom:8}}>Growth modules — what actually moves this from one level to the next. {cur?<span>Current level <b style={{color:'var(--c-grn)'}}>{cur}</b> · your step is <b style={{color:'var(--c-yel)'}}>{cur} → {nxt}</b>.</span>:<span>Not graded yet — start at 1 → 2.</span>}</div>
+      {list.map(m=>{const isNow=(cur?cur+1:2)===m.to;const done=cur&&cur>=m.to;
+        return(<div key={m.to} style={{borderLeft:'3px solid '+(isNow?'var(--c-yel)':done?'var(--c-grn)':'var(--border)'),padding:'7px 0 7px 11px',marginBottom:7,opacity:done?.62:1}}>
+          <div style={{fontSize:13,fontWeight:800,color:isNow?'var(--c-yel)':done?'var(--c-grn)':'var(--g-ccc)'}}>Level {m.to-1} → {m.to} · {m.t}{isNow?' · YOUR NEXT STEP':done?' · cleared':''}</div>
+          <ul style={{margin:'4px 0 0',paddingLeft:18}}>{m.a.map((x,i)=><li key={i} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:2}}>{x}</li>)}</ul>
+          <div style={{fontSize:12,color:'var(--c-blu2)',marginTop:3}}>Evidence that it stuck: {m.e}</div>
+        </div>);})}
+      <div style={{fontSize:11.5,color:'var(--g-666)'}}>Level 4 = you make the area better · Level 5 = you make other people or the system better. Demonstrated once ≠ the grade moves; consistency does.</div>
+    </div>);};
   const nowStamp=()=>{const d=new Date();return d.toISOString().slice(0,10)+' '+d.toTimeString().slice(0,5);};
   const snapNow=()=>({avgs:Object.fromEntries(GX_CATS.map(([cid])=>[cid,catAvg(cid)?+catAvg(cid).toFixed(2):null])),qs:Object.fromEntries(GX_CATS.map(([cid])=>[cid,[0,1,2].map(qi=>getQ(cid,qi))])),gatesMet:nxtIdx!=null?gatesMet:null,gatesTot:nxtIdx!=null?gateRows.length:null,pay:pd.payLevel!=null?GX_PAY[pd.payLevel][0]:'—',payIdx:pd.payLevel??null});
   const revs=pd.reviews||[];
@@ -8594,6 +8653,7 @@ function GuestExperiencePage({staff}){
             </>):(<span style={{fontSize:13,color:'var(--c-amb)'}}>Choose the current pay level (dropdown on the right) to unlock the progression roadmap</span>)}
             <span style={{flex:1}}/>
             <span style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:13,color:'var(--g-aaa)'}}>Pay level:<select value={pd.payLevel??''} onChange={e=>setPd({payLevel:e.target.value===''?null:+e.target.value})} style={SEL}><option value="">—</option>{GX_PAY.map((pp,pi)=><option key={pi} value={pi}>{pp[0]} · {pp[1]}</option>)}</select></span>
+            <button className="btn btn-ghost btn-xs" title="Full development report — overview, strengths, gaps, next steps and the GE 1→6 career arc; print or save as PDF" onClick={()=>setRepOpen(v=>!v)}>{repOpen?'✕ Close report':'📄 Development report'}</button>
             {openRev?(<span style={{display:'inline-flex',alignItems:'center',gap:7}}>
               <span style={{fontSize:11.5,fontWeight:800,color:'var(--c-yel)',border:'1px solid var(--c-yel)',borderRadius:5,padding:'2px 8px'}} title={'Review opened '+openRev.opened+' — grade and check items off, then complete it'}>● Review in progress · {openRev.date}</span>
               <button className="btn btn-go btn-xs" title="Record this review as performed today — captures all scores, gate progress and checklist state into the growth history" onClick={()=>completeReview(openRev)}>✓ Complete review</button>
@@ -8702,7 +8762,117 @@ function GuestExperiencePage({staff}){
             </div>)}
           </div>)}
         </div>)}
-        {GX_CATS.map(([cid,cname])=>{const isOpen=openCat===cid;return(
+        {repOpen&&pk&&(()=>{
+          const bar=(v)=>{const n=Math.round(v||0);return '▰'.repeat(n)+'▱'.repeat(5-n);};
+          const ovVals=GX_CATS.map(([cid])=>catAvg(cid)).filter(v=>v!=null);
+          const ov=ovVals.length?(ovVals.reduce((a,b)=>a+b,0)/ovVals.length):null;
+          const qAll=[];GX_CATS.forEach(([cid,cn])=>{(GX_Q3[cid]||[]).forEach((q,qi)=>{qAll.push({cid,cn,qi,t:q.t,v:getQ(cid,qi),lv:q.lv,key:cid.replace('c','')+'.'+String.fromCharCode(65+qi)});});});
+          const graded=qAll.filter(x=>x.v);
+          const strengths=graded.filter(x=>x.v>=4).sort((a,b)=>b.v-a.v).slice(0,5);
+          const strList=strengths.length?strengths:graded.slice().sort((a,b)=>b.v-a.v).slice(0,3);
+          const gapsQ=graded.filter(x=>x.v<=2).sort((a,b)=>a.v-b.v).slice(0,6);
+          const gapList=gapsQ.length?gapsQ:graded.slice().sort((a,b)=>a.v-b.v).slice(0,3);
+          const ungraded=qAll.length-graded.length;
+          const curRole=pd.payLevel!=null?GX_ROLEBYPAY[pd.payLevel]:null;
+          const curStage=curRole?parseInt(String(curRole).replace(/[^0-9]/g,'').slice(0,1),10):null;
+          const stageAvg=(cids)=>{const v=cids.map(c=>catAvg(c)).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
+          const H2=(t)=>(<div className="evrpt-h" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,letterSpacing:'1.2px',textTransform:'uppercase',color:'var(--c-grn)',margin:'20px 0 7px',borderBottom:'1px solid var(--border)',paddingBottom:3}}>{t}</div>);
+          const openGates=gateRows.filter(r=>r.st!=='Met');
+          const tgt=String(nxtIdx);const chkAll=((pd.chk||{})[tgt])||{};
+          return(<div style={{marginBottom:16}}>
+            <div className="no-print" style={{display:'flex',gap:8,marginBottom:10}}>
+              <button className="btn btn-go btn-sm" title="Opens the print dialog — choose Save as PDF as the destination" onClick={()=>{document.body.classList.add('evrpt-print');const done=()=>{document.body.classList.remove('evrpt-print');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);setTimeout(()=>{window.print();setTimeout(done,900);},60);}}>🖨 Print / Save as PDF</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setRepOpen(false)}>✕ Close report</button>
+              <span style={{fontSize:11.5,color:'var(--g-666)',alignSelf:'center'}}>Prints as a clean light-theme document — hand it to {pk.split(' ')[0]} at the review.</span>
+            </div>
+            <div className="evrpt-print-area" style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'22px 26px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',borderBottom:'2px solid var(--c-grn)',paddingBottom:8}}>
+                <div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',color:'var(--g-888)'}}>REVIBE · GUEST EXPERIENCE</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:'var(--g-eee)',lineHeight:1.1}}>{pk} — Development Report</div>
+                  <div style={{fontSize:12.5,color:'var(--g-aaa)',marginTop:3}}>{pd.payLevel!=null?(GX_PAY[pd.payLevel][0]+' · '+curRole+' · '+GX_PAY[pd.payLevel][1]):'Pay level not set'}{nxtIdx!=null&&' · next step '+GX_PAY[nxtIdx][0]+' '+GX_PAY[nxtIdx][1]}</div>
+                </div>
+                <div style={{textAlign:'right',fontSize:12,color:'var(--g-888)'}}>
+                  <div>{new Date().toISOString().slice(0,10)}</div>
+                  <div>Overall <b style={{color:'var(--g-ddd)',fontSize:16}}>{ov?ov.toFixed(1):'—'}</b> / 5</div>
+                  {revs.length>0&&<div>{revs.length} review{revs.length>1?'s':''} on record</div>}
+                </div>
+              </div>
+              <div style={{fontSize:12.5,color:'var(--g-999)',lineHeight:1.6,marginTop:9}}>Progression is by demonstrated competency, never time served — competency × demonstration × consistency × responsibility × results. Grades reflect what has been demonstrated <i>consistently</i>, not once.</div>
+
+              {H2('The career arc — GE 1 → GE 6')}
+              <div style={{fontSize:12,color:'var(--g-888)',marginBottom:6}}>LEARN → EXECUTE → IMPACT → MANAGE → LEAD → BUILD. Each stage is unlocked by a different group of competencies — this is the whole road, not just the next raise.</div>
+              {GX_STAGES.map((st,si)=>{const [code,role,stage,payr,q,focus,cids,thr]=st;const a=stageAvg(cids);const n=si+1;
+                const status=curStage==null?'':(n<curStage?'Established':n===curStage?'Current stage':n===curStage+1?'Next stage':'Ahead');
+                const cur=n===curStage;const nx=n===curStage+1;
+                return(<div key={code} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'7px 9px',borderRadius:8,marginBottom:3,background:cur?'rgba(122,196,144,.10)':nx?'rgba(224,196,82,.07)':'transparent',border:'1px solid '+(cur?'var(--c-grn)':nx?'var(--c-yel)':'transparent')}}>
+                  <div style={{width:52,flexShrink:0}}><div style={{fontSize:13,fontWeight:800,color:cur?'var(--c-grn)':'var(--g-ccc)'}}>{code}</div><div style={{fontSize:10,color:'var(--g-666)'}}>{payr}</div></div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:13,fontWeight:800,color:'var(--g-ddd)'}}>{stage} — {role} {status&&<span style={{fontSize:10.5,fontWeight:800,color:cur?'var(--c-grn)':nx?'var(--c-yel)':'var(--g-666)'}}>· {status}</span>}</div>
+                    <div style={{fontSize:12,color:'var(--g-999)',lineHeight:1.5}}>“{q}” · Builds: {focus}</div>
+                  </div>
+                  <div style={{width:150,flexShrink:0,textAlign:'right',fontSize:12}}>
+                    <div style={{color:'var(--g-888)',letterSpacing:'1px'}}>{bar(a)}</div>
+                    <div style={{color:'var(--g-999)'}}>{a?a.toFixed(1):'—'} <span style={{color:'var(--g-666)'}}>· needs ≈{thr}</span></div>
+                  </div>
+                </div>);})}
+              {curStage!=null&&curStage<6&&(()=>{const nxt=GX_STAGES[curStage];const a=stageAvg(nxt[6]);const need=nxt[7];
+                return(<div style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.6,marginTop:7}}><b style={{color:'var(--c-yel)'}}>Looking past the next raise:</b> the jump to <b>{nxt[0]} — {nxt[1]} ({nxt[2]})</b> is won in {nxt[5]}. Those categories currently sit at <b>{a?a.toFixed(1):'not yet graded'}</b> against roughly <b>{need}</b> needed to hold that role. That is the multi-year arc — build it deliberately alongside the immediate gates below.</div>);})()}
+
+              {H2('Competency scorecard — all ten categories')}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'2px 26px'}}>
+                {GX_CATS.map(([cid,cname])=>{const a=catAvg(cid);return(<div key={cid} style={{display:'flex',gap:8,fontSize:12.5,alignItems:'center',padding:'2px 0'}}>
+                  <span style={{flex:1,color:'var(--g-ccc)'}}>{cid.replace('c','')}. {cname}</span>
+                  <span style={{color:'var(--g-888)',letterSpacing:'1px'}}>{bar(a)}</span>
+                  <span style={{fontWeight:800,color:'var(--g-ddd)',width:24,textAlign:'right'}}>{a?a.toFixed(1):'—'}</span>
+                </div>);})}
+              </div>
+              {ungraded>0&&<div style={{fontSize:11.5,color:'var(--g-666)',marginTop:5}}>{ungraded} of {qAll.length} grading questions not yet assessed — scores above reflect what has been graded.</div>}
+
+              {H2('Strengths — what to keep using')}
+              {strList.length?strList.map(x=>(<div key={x.cid+x.qi} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:5}}>
+                <b style={{color:'var(--c-grn)'}}>{x.key} {x.t} — Level {x.v} · {GX_GRADE[x.v-1][1]}.</b> {x.lv[x.v-1]}.
+              </div>)):<div style={{fontSize:12.5,color:'var(--g-777)'}}>Nothing graded yet — grade the questions to populate this section.</div>}
+              {strList.length>0&&<div style={{fontSize:12,color:'var(--g-999)',marginTop:4}}>Where a strength is at 4–5, the next move is using it for others: train, document, or own that area so the capability scales beyond one person.</div>}
+
+              {H2('Gaps — what is holding progression')}
+              {gapList.length?gapList.map(x=>(<div key={x.cid+x.qi} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:5}}>
+                <b style={{color:'var(--c-amb)'}}>{x.key} {x.t} — currently Level {x.v} · {GX_GRADE[x.v-1][1]}.</b> To reach Level {Math.min(5,x.v+1)}: {x.lv[Math.min(4,x.v)]}.
+              </div>)):<div style={{fontSize:12.5,color:'var(--g-777)'}}>No graded gaps recorded.</div>}
+
+              {nxtIdx!=null&&(<>
+                {H2('Immediate next steps — the gates for '+GX_PAY[nxtIdx][0]+' ('+GX_PAY[nxtIdx][1]+')')}
+                <div style={{fontSize:12,color:'var(--g-888)',marginBottom:5}}>{gatesMet} of {gateRows.length} gates met. Progression uses gates, never an average — a strength elsewhere cannot cover a gate that is not met.</div>
+                {gateRows.map((r,i)=>{const qi=r.su==null?null:qOfSub(r.c,r.su);const q=qi!=null?(GX_Q3[r.c]||[])[qi]:null;const gk=r.c+'.'+(r.su==null?'cat':r.su);const ck=chkAll[gk]||{};
+                  const demo=q?q.lv[r.req-1]:('category average ≥'+r.req);
+                  return(<div key={i} style={{fontSize:12.5,lineHeight:1.55,marginBottom:5,display:'flex',gap:9}}>
+                    <span style={{width:14,flexShrink:0,color:ck.done?'var(--c-grn)':'var(--g-666)'}}>{ck.done?'☑':'☐'}</span>
+                    <span style={{flex:1,color:'var(--g-aaa)'}}><b style={{color:r.st==='Met'?'var(--c-grn)':'var(--g-ddd)'}}>{r.lb} — {r.cur==null?'not graded':'at '+r.cur} / needs {r.req}{r.st==='Met'?' · met':''}.</b> {r.st==='Met'?'Confirm it is demonstrated consistently, then sign off.':'Demonstrate: '+demo+'.'}{ck.note?<span style={{color:'var(--c-blu2)'}}> · Note: {ck.note}</span>:''}</span>
+                  </div>);})}
+              </>)}
+
+              {H2('Development plan — two to four priorities until the next review')}
+              {(()=>{const pri=[];openGates.slice(0,3).forEach(r=>{const qi=r.su==null?null:qOfSub(r.c,r.su);const act=qi!=null?(((pd.ev||{})[r.c+'.q'+qi])||{}).a:'';pri.push({t:r.lb,c:r.c,lvl:r.req,d:act||('Move from '+(r.cur==null?'ungraded':r.cur)+' to '+r.req+' and hold it consistently.')});});
+                gapList.slice(0,2).forEach(g=>{if(pri.length<4&&!pri.some(x=>x.t===g.t))pri.push({t:g.key+' '+g.t,c:g.cid,lvl:Math.min(5,g.v+1),d:'Build toward Level '+Math.min(5,g.v+1)+': '+g.lv[Math.min(4,g.v)]+'.'});});
+                return pri.length?pri.map((x,i)=>(<div key={i} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.6,marginBottom:7}}><b style={{color:'var(--g-ddd)'}}>{i+1}. {x.t}.</b> {x.d}
+                  {(()=>{const m=(GX_MOD[x.c]||[]).find(z=>z.to===x.lvl);return m?(<div style={{marginTop:2,paddingLeft:12}}><div style={{fontSize:12,color:'var(--g-999)'}}><i>Module — {m.t}:</i> {m.a.slice(0,3).join(' · ')}.</div><div style={{fontSize:12,color:'var(--g-888)'}}>Evidence: {m.e}</div></div>):null;})()}
+                </div>)):<div style={{fontSize:12.5,color:'var(--g-777)'}}>Set a pay level and grade the questions to generate priorities.</div>;})()}
+              <div style={{fontSize:12,color:'var(--g-999)',marginTop:6,lineHeight:1.6}}>Demonstration standard: once = capable · independently = trusted · consistently = the grade moves. Opportunity to demonstrate is the clinic's responsibility — agree on where each priority will be practised before the next review.</div>
+
+              {revs.length>0&&(<>
+                {H2('Growth over time')}
+                {revs.slice().reverse().slice(0,8).map((r,i)=>{const sn=r.snap||{};const v=Object.values(sn.avgs||{}).filter(x=>x!=null);const o=v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'—';
+                  return(<div key={r.id} style={{fontSize:12.5,color:'var(--g-aaa)',padding:'2px 0'}}>{r.date} · pay {sn.pay||'—'} · overall <b style={{color:'var(--g-ddd)'}}>{o}</b> · gates {sn.gatesMet!=null?(sn.gatesMet+'/'+sn.gatesTot):'—'}{r.summary?' · '+r.summary:''}</div>);})}
+              </>)}
+
+              {pd.notes&&(<>{H2('Manager notes')}<div style={{fontSize:12.5,color:'var(--g-aaa)',whiteSpace:'pre-wrap',lineHeight:1.6}}>{pd.notes}</div></>)}
+
+              <div style={{display:'flex',gap:40,marginTop:26,paddingTop:10,borderTop:'1px solid var(--border)'}}>
+                {['Team member','Manager'].map(l=>(<div key={l} style={{flex:1}}><div style={{borderBottom:'1px solid var(--g-888)',height:26}}/><div style={{fontSize:11,color:'var(--g-888)',marginTop:3}}>{l} — signature & date</div></div>))}
+              </div>
+            </div>
+          </div>);})()}
+        {!repOpen&&GX_CATS.map(([cid,cname])=>{const isOpen=openCat===cid;return(
           <div key={cid} className="gx-cat" style={{'--gxc':GX_HUE[cid],background:'var(--surface2)',border:'1px solid '+(isOpen?'var(--go)':'var(--border)'),borderRadius:12,padding:'16px 20px 16px 24px',marginBottom:14}}>
             <div style={{display:'flex',alignItems:'center',gap:10,cursor:'pointer',flexWrap:'wrap'}} onClick={()=>setOpenCat(isOpen?null:cid)}>
               <span style={{fontSize:16,fontWeight:800,color:'var(--g-eee)'}}>{cid.replace('c','')}. {cname}{cid==='c10'&&<span style={{marginLeft:8,fontSize:11.5,color:'var(--c-blu2)',fontWeight:800}}>KPI BRIDGE → 📈</span>}</span>
@@ -8727,11 +8897,13 @@ function GuestExperiencePage({staff}){
                     {(pd.upd||{})[ek]&&<span style={{fontSize:10.5,color:'var(--g-666)'}}>updated {(pd.upd||{})[ek]}</span>}
                     {pk&&<button className="btn btn-ghost btn-xs" title="Evidence-based grading: evidence · gap to next · development action · demonstration status" onClick={()=>setEvOpen(eOpen?null:ek)}>📝</button>}
                     <button className="btn btn-ghost btn-xs" title="Show all 5 level requirements" onClick={()=>setLvOpen(lvOpen===ek?null:ek)}>ⓘ</button>
+                    <button className="btn btn-ghost btn-xs" title="Growth modules — concrete actions that move this competency up a level" onClick={()=>setModOpen(modOpen===ek?null:ek)}>🎓</button>
                     {pk&&<span className="gx-seg">{[1,2,3,4,5].map(n=>(<button key={n} className={qv===n?'on':(qv&&n<qv?'lt':'')} onClick={()=>setQ(qi,qv===n&&explicit?null:n)} title={'Level '+n+' · '+GX_GRADE[n-1][1]+' — '+q.lv[n-1]}>{n}</button>))}</span>}
                   </div>
                   <div style={{fontSize:12,color:'var(--g-666)',margin:'5px 0 0'}}>Covers: {q.src.map(i=>qName(cid,i)).join(' · ')}</div>
                   {qv?<div style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.6,marginTop:5}}>{!explicit&&<span style={{fontSize:10.5,fontWeight:800,color:'var(--c-blu2)',border:'1px solid var(--c-blu2)',borderRadius:4,padding:'0 5px',marginRight:7}} title="Starting value carried over from the earlier per-competency grades — click a level to confirm or change it">carried over</span>}<b style={{color:'var(--c-grn)'}}>Level {qv} · {GX_GRADE[qv-1][1]}:</b> {q.lv[qv-1]}.{qv<5&&<span style={{color:'var(--g-777)'}}> <b>To reach {qv+1}:</b> {q.lv[qv]}.</span>}</div>
                      :<div style={{fontSize:13,color:'var(--g-777)',lineHeight:1.6,marginTop:5}}>Not graded — click a level · ⓘ for the full level guide</div>}
+                  {modOpen===ek&&modBox(cid,qv)}
                   {lvOpen===ek&&<div style={{lineHeight:1.75,marginTop:7,background:'var(--surface3)',borderRadius:9,padding:'10px 12px'}}>{q.lv.map((d,i2)=><div key={i2} style={{display:'flex',gap:9,alignItems:'flex-start',padding:'3px 0',color:qv===i2+1?'var(--c-grn)':'var(--g-999)',fontSize:13}}><span className={'gx-med'+(qv===i2+1?' on':'')}>{i2+1}</span><span><b>{GX_GRADE[i2][1]}</b> — {d}.</span></div>)}<div style={{fontSize:11.5,color:'var(--g-666)',marginTop:6}}>Every individual competency's full 5-level rubric is in 📖 The System.</div></div>}
                   {eOpen&&pk&&<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:8,marginTop:8,background:'var(--surface3)',borderRadius:9,padding:'10px 12px'}}>
                     {[['e','Evidence — behaviour/results supporting the score'],['g','Gap to next level — what specifically prevents it'],['a','Development action — what to actually do']].map(([f,lb])=>(<div key={f}><div style={{fontSize:11.5,color:'var(--g-777)',marginBottom:2}}>{lb}</div><input value={ev[f]||''} onChange={x=>setPd({ev:{...(pd.ev||{}),[ek]:{...ev,[f]:x.target.value}}})} style={{...SEL,width:'100%'}}/></div>))}
@@ -8743,6 +8915,15 @@ function GuestExperiencePage({staff}){
         {pk&&<div style={{marginBottom:10}}><div style={{fontSize:12.5,fontWeight:800,color:'var(--g-aaa)',marginBottom:4}}>NOTES — {pk}</div><textarea value={pd.notes||''} onChange={e=>setPd({notes:e.target.value})} placeholder="Development notes, evidence, context…" style={{...SEL,width:'100%',minHeight:64,fontSize:14,lineHeight:1.5}}/></div>}
         </>)}
         {gxTab==='sys'&&(<>
+        {H('🎓 Growth modules — how to move up, level by level','Each category has four steps. Every step lists the concrete actions that build it and the evidence that proves it stuck — this is the "what do I actually DO?" layer under the rubric.')}
+        {GX_CATS.map(([cid,cname])=>(<details key={cid} className="gx-cat" style={{'--gxc':GX_HUE[cid],background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'12px 16px 12px 20px',marginBottom:10}}>
+          <summary style={{cursor:'pointer',fontSize:15,fontWeight:800,color:'var(--g-eee)'}}>{cid.replace('c','')}. {cname} <span style={{fontSize:12,fontWeight:400,color:'var(--g-666)'}}>— 4 level-up modules</span></summary>
+          {(GX_MOD[cid]||[]).map(m=>(<div key={m.to} style={{borderLeft:'3px solid var(--gxc,var(--border))',padding:'8px 0 8px 12px',marginTop:8}}>
+            <div style={{fontSize:13.5,fontWeight:800,color:'var(--g-ddd)'}}>Level {m.to-1} → {m.to} · {m.t}</div>
+            <ul style={{margin:'4px 0 0',paddingLeft:18}}>{m.a.map((x,i)=><li key={i} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.6,marginBottom:2}}>{x}</li>)}</ul>
+            <div style={{fontSize:12,color:'var(--c-blu2)',marginTop:3}}>Evidence that it stuck: {m.e}</div>
+          </div>))}
+        </details>))}
         {H('Pay progression × KPI expectation','Each step raises the KPI relationship — from “I enter it correctly” to “I build the performance architecture.”')}
         <table style={{borderCollapse:'collapse',fontSize:13,width:'100%'}}>
           <thead><tr>{['Pay','Role','Stage','KPI expectation'].map(h=><th key={h} style={{textAlign:'left',padding:'4px 10px',color:'var(--g-888)'}}>{h}</th>)}</tr></thead>
