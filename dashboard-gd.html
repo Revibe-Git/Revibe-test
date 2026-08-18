@@ -1883,7 +1883,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L113';
+window.__BUILD='build L114';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8439,6 +8439,78 @@ const GX_GATES={1:[['c1',0,2,'Attendance'],['c1',1,2,'Punctuality'],['c1',5,2,'T
 15:[['c9',null,4,'Systems/Operations (category)'],['c8',null,4,'Leadership (category)'],['c9',5,5,'Multi-Location Thinking'],['c9',4,4,'Cost/Resource Awareness'],['c9',6,4,'Project/New-Location Execution']]};
 const GX_KPI_SLIM=[['Call & Phone Performance','Call totals — handled'],['Call & Phone Performance','Treatment-call conversion %'],['Call & Phone Performance','Call quality (definition pending)'],['Lead Performance','Lead conversion %'],['Lead Performance','Lead follow-up completion'],['Booking & Retention','Rebooking %'],['Booking & Retention','Cancellation recovery %'],['Booking & Retention','No-show rate'],['Booking & Retention','Reactivation conversion'],['Financial / Admin','Outstanding balance recovery'],['Operational','Opening / closing compliance'],['Guest Experience','Reviews & guest feedback']];
 const GX_CATS_ALL=['Call & Phone Performance','Lead Performance','Booking & Retention','Financial / Admin','Operational','Guest Experience'].concat(GX_KPI_CATALOG.map(([c])=>c));
+const GX_SOP=[
+{id:'s0',t:'Before you start',sub:'What this walkthrough is and how to use it',
+ read:['This is a guided walkthrough, not a manual to skim. Work through it once before you run your first Guest Experience review — about 15 minutes. Each step ends with something for you to think through or answer; your answers save automatically and stay here for next time.','By the end you will have: a person chosen, your opening line written, a practice grade under your belt, and your first review booked.'],
+ reflect:[{id:'who',q:'Who is the first GE team member you will run a review with?',ph:'Name…'},{id:'when',q:'Roughly when?',ph:'e.g. week of Sept 8',}]},
+
+{id:'s1',t:'The one rule everything hangs on',sub:'Why we grade at all',
+ read:['Revibe does not pay for time served. We pay because we can trust someone with more — more independence, more judgement, more ownership, more impact on other people.','Time creates the opportunity to develop. It does not create value by itself. That is why every raise here is tied to demonstrated competency, not to a date on a calendar.'],
+ quiz:{q:'Someone has been on the front desk for two years. They are reliable, well liked, and run a clean shift — but they have not taken on anything beyond their own tasks. What does the system say?',
+  opts:['Two years is a reasonable point for a raise','No raise — reliability at their current level is what they are already paid for','Give a small raise to keep them happy'],
+  correct:1,
+  why:'Running your own shift well is exactly what the current rate buys. The next rate buys something different — solving problems without a manager, owning an outcome, or making other people better. That is the conversation to have with them, not a token raise.'}},
+
+{id:'s2',t:'What the five levels actually mean',sub:'The scale you will be using all session',
+ grades:true,
+ read:['Three is the pivot: it means trusted to do this alone. Four means they make the area better, not just run it. Five means they make other people or the system better.','The mistake almost everyone makes is grading a very good level-3 performer as a 5. Excellence at doing it yourself is a 4 at most. Five requires that capability now exists in someone else.'],
+ quiz:{q:'A front-desk lead personally recovers almost every cancellation, and her numbers are the best in the clinic. She has not shown anyone else how she does it. Where does she sit on Cancellation Recovery?',
+  opts:['Level 3 — she is doing her job','Level 4 — she owns the outcome and improves it','Level 5 — the numbers are the best in the clinic'],
+  correct:1,
+  why:'She is a clear 4: measurable personal impact on the area. Level 5 would mean the team recovers cancellations well because of what she built or taught — not because she personally makes the calls.'}},
+
+{id:'s3',t:'Mock grading — try one',sub:'Read the evidence, pick the level',
+ read:['Here is real-shaped evidence for 7.A Delegation & Staff Scheduling. Read it, then choose the level you would enter. There is a right answer, and an explanation either way.'],
+ scenario:'Over the last quarter, Prince has handed out the opening tasks each morning and they get done. When he asks someone to follow up on a waitlist, he usually tells them what to do but not by when, and he checks back only if he remembers. He has built one week of the schedule with help from the manager. Twice, a task he assigned was missed and he did it himself rather than raising it.',
+ quiz:{q:'What level is that?',
+  opts:['Level 1 — Learning','Level 2 — Capable','Level 3 — Independent','Level 4 — Owner'],
+  correct:1,
+  why:'Level 2. He assigns simple tasks and can assist with a schedule — that is the Level 2 description almost word for word. Level 3 needs a clear owner, expectation AND deadline every time, with follow-up, plus managing a functional schedule on his own. Doing the missed task himself instead of addressing it is the tell.'},
+ reflect:[{id:'m1',q:'What is the single behaviour you would ask him to change first?',ph:'In one sentence…',big:true}]},
+
+{id:'s4',t:'Prepare — 20 minutes, the day before',sub:'Never grade cold',
+ todo:['Open ✍️ Grading and select the person (if they are missing, fix their Staff Profile role)','Check their pay level is correct on the profile card — it drives every gate','Press 📋 Start review — today so the session is timestamped and logged','Draft your grades from evidence you already have; leave anything uncertain ungraded','Skim the 📋 Progression checklist so you know which gates are close'],
+ read:['Walking in with a draft changes the conversation from negotiation to calibration. Anything you leave ungraded becomes a genuine question you ask them — that is a feature, not a gap.'],
+ reflect:[{id:'ev',q:'What evidence do you already hold for this person? (numbers you have seen, moments you remember, what other staff say)',ph:'List what you have…',big:true}]},
+
+{id:'s5',t:'Run the session — 45 to 60 minutes',sub:'Their view first, yours second, agreement last',
+ read:['Sit beside them with the screen visible. This is a shared document, not a verdict being read out.','Open with the map (5 min) → go category by category (30 min) → work the checklist (10 min) → agree priorities (10 min).','For each question, ask them first. It tells you how accurately they see themselves, which is its own piece of information.'],
+ script:'“Where do you think you are on this — and what would you point to as evidence?”',
+ reflect:[{id:'open',q:'Write that opening question in your own words — the way you would actually say it.',ph:'Your version…',big:true}]},
+
+{id:'s6',t:'Grade fairly — the guardrails',sub:'Same standard for everyone, every quarter',
+ list:['Grade the behaviour, not the person — pick the written level that matches what they do most days','Once means capable · independently means trusted · only consistently moves the grade','Do not inflate to be kind: an inflated 3 removes their roadmap and delays a raise they could have earned honestly','Do not average away a weakness — progression uses gates','Grade only what they could influence','Ungraded is a legitimate answer when you have not seen it'],
+ quiz:{q:'Rebooking numbers fell last quarter. Digging in, two clinicians were away for five weeks and the schedule was thin. Your GE lead worked the waitlist hard the whole time. What happens to her Rebooking grade?',
+  opts:['It drops — the number dropped','It holds, and the context is noted','It rises because she tried hard'],
+  correct:1,
+  why:'Competency is not the same as performance. She could not influence clinician absence; she did influence how she responded, and that response was strong. Note the context in the evidence field so the grade makes sense to anyone reading it later.'}},
+
+{id:'s7',t:'Gates, not averages',sub:'How progression is actually decided',
+ read:['Each pay step has named competencies at named levels — the gates. The profile card shows them as the Road to $X, with Met / Developing (one level away) / Gap / not graded.','All gates met AND every checklist item signed off = ready for the pay conversation. Bring it with the report attached.'],
+ quiz:{q:'Someone scores 4s and 5s across guest experience and reliability, but Delegation and Accountability of Others are both 1. Their overall average looks strong. Are they ready for Emerging Manager pay?',
+  opts:['Yes — the average is well above the requirement','No — the management gates are not met, and an average cannot cover them','Yes, with a plan to fix delegation later'],
+  correct:1,
+  why:'This is exactly the case the gate system exists to prevent. A serious management weakness cannot be averaged away by strength somewhere else. They are outstanding at their current level — and that is the honest thing to tell them, along with the two gates standing between them and the next one.'}},
+
+{id:'s8',t:'Evidence and demonstration status',sub:'A grade with no evidence is an opinion',
+ read:['Every grade should carry four things, captured with the 📝 button on the row: the evidence, the gap to the next level, the development action, and the demonstration status.','Demonstration status is the anti-fluke rule: Not demonstrated → With support → Independently → Consistently. Only the last one moves a grade.'],
+ quiz:{q:'She ran one difficult complaint beautifully last month — the first time you have seen her do it. What status?',
+  opts:['Demonstrated consistently','Demonstrated independently','Demonstrated with support'],
+  correct:1,
+  why:'She did it alone, so it is Demonstrated independently — real and worth naming. It becomes consistently when it is simply how she handles complaints, across several of them. Say that out loud in the session: it turns “not yet” into a clear, fair finish line.'}},
+
+{id:'s9',t:'Agree two to four priorities',sub:'Never more than four',
+ read:['Nobody improves ten things at once. Pick the gates that matter most, open the 🎓 module on that category for the concrete actions, and agree where each will be practised.','The clinic owes them the opportunity: we cannot require someone to demonstrate management while never letting them manage. If you cannot name where a priority gets practised, it is not a priority yet.'],
+ reflect:[{id:'pri',q:'For the person you named at the start — what are the two or three priorities you expect to land on?',ph:'One per line…',big:true},{id:'opp',q:'Where will each be practised? (a shift, a project, a KPI to own, someone to train)',ph:'Match each priority to an opportunity…',big:true}]},
+
+{id:'s10',t:'Close it out properly',sub:'Fifteen minutes that make the next review easy',
+ todo:['Write the Review summary in the review’s ▸ details','Press ✓ Complete review — it stamps the date and logs what changed','Open 📄 Development report, save as PDF, give them a copy','Book the halfway check-in now','Put the practice opportunities into the schedule'],
+ read:['Coming back later is fine and expected: ✎ reopen any completed review, make the change, save — the amendment is logged with its own date. Nothing is ever silently overwritten.','Cadence: a full review each quarter, a 20-minute check-in halfway between, and re-grade only what changed.'],
+ reflect:[{id:'date',q:'Date you will run this first review',ph:'YYYY-MM-DD'},{id:'check',q:'Date of the halfway check-in',ph:'YYYY-MM-DD'}]},
+
+{id:'s11',t:'Where people go wrong',sub:'Last thing — the six failure modes',
+ list:['Grading from scratch in the room — slow, and it invites negotiation','Ten priorities — nobody improves ten things at once','Vague actions like “be more proactive” — the 🎓 modules exist so this never has to happen','Recency bias — grade the quarter, not last Tuesday','Silent expectations — a gate never explained cannot hold back a raise','No opportunity given — that failure is ours, not theirs'],
+ read:['If a review feels like it went badly, it is almost always one of these six. Come back to this list afterwards and check.']}];
 const GX_MOD={
 c1:[{to:2,t:'Make the basics automatic',a:['Use the call-out procedure every time — manager AND the team channel, never just one','Set a departure alarm that puts you on site ten minutes before start','Write the shift’s three must-do tasks at clock-in; close them before you leave','Ask for the day’s schedule and staffing before the shift starts, not after'],e:'Four straight weeks with no preventable lateness and no missed call-out procedure.'},
 {to:3,t:'Be ready, not just present',a:['Ready to work at start time — logged in, float counted, coat off','Read schedule, staffing, recovery bookings and open follow-ups before the first guest','Keep ONE running task list; anything you commit to gets a date and gets closed','Own mistakes the same day, with the correction already made'],e:'A full month where nothing you committed to needed a reminder from a manager.'},
@@ -8535,7 +8607,7 @@ function GuestExperiencePage({staff}){
   }catch(e){}},[]);
   const[person,setPerson]=useState('');const[showAllStaff,setShowAllStaff]=useState(false);
   const[openCat,setOpenCat]=useState('c10');
-  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);const[revOpen,setRevOpen]=useState(null);const[chkOpen,setChkOpen]=useState(null);const[repOpen,setRepOpen]=useState(false);const[repDark,setRepDark]=useState(true);const[modOpen,setModOpen]=useState(null);
+  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);const[revOpen,setRevOpen]=useState(null);const[chkOpen,setChkOpen]=useState(null);const[repOpen,setRepOpen]=useState(false);const[repDark,setRepDark]=useState(true);const[modOpen,setModOpen]=useState(null);const[sopStep,setSopStep]=useState(0);
   const names=(staff||[]).map(x=>x.name).filter(Boolean);
   const pk=person||'';
   const pd=(gx.people||{})[pk]||{};
@@ -8627,110 +8699,82 @@ function GuestExperiencePage({staff}){
 
       {gxTab!=='kpi'&&(<div>
         {gxTab==='sop'&&(()=>{
-          const SEC=(n,t,sub,body)=>(<div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'16px 20px',marginBottom:12}}>
-            <div style={{display:'flex',gap:12,alignItems:'baseline'}}>
-              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'var(--g-666)',minWidth:26}}>{n}</span>
-              <div style={{flex:1}}>
-                <div style={{fontSize:16,fontWeight:800,color:'var(--g-eee)'}}>{t}</div>
-                {sub&&<div style={{fontSize:12.5,color:'var(--g-888)',marginTop:1}}>{sub}</div>}
-              </div>
-            </div>
-            <div style={{marginTop:9,paddingLeft:38}}>{body}</div>
-          </div>);
-          const UL=(items)=>(<ul style={{margin:0,paddingLeft:18}}>{items.map((x,i)=><li key={i} style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.65,marginBottom:3}}>{x}</li>)}</ul>);
-          const SAY=(t)=>(<div style={{fontSize:13,color:'var(--g-ccc)',fontStyle:'italic',borderLeft:'2px solid var(--go)',paddingLeft:11,margin:'7px 0'}}>{t}</div>);
-          return(<div style={{maxWidth:900}}>
-            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'18px 22px',marginBottom:14}}>
-              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,color:'var(--g-eee)'}}>How to run a Guest Experience G&amp;D review</div>
-              <div style={{fontSize:13.5,color:'var(--g-aaa)',lineHeight:1.7,marginTop:6}}>The operating manual for whoever runs the session. Read it once end-to-end before your first review. The short version: <b style={{color:'var(--g-ddd)'}}>we do not pay for time served — we pay for demonstrated competency.</b> Your job is to establish what the person can currently do <i>consistently</i>, agree what they will demonstrate next, and make sure they get the opportunity to demonstrate it.</div>
-              <div style={{fontSize:13,color:'var(--g-888)',marginTop:8}}>Cadence: a full review each quarter · a 20-minute check-in halfway between · re-grade only what changed.</div>
+          const sop=gx.sop||{ans:{},quiz:{},done:null};
+          const setSop=(patch)=>setGx(g=>({...g,sop:{...(g.sop||{ans:{},quiz:{}}),...patch}}));
+          const setAns=(k,v)=>setSop({ans:{...(sop.ans||{}),[k]:v}});
+          const setQuiz=(k,v)=>setSop({quiz:{...(sop.quiz||{}),[k]:v}});
+          const i=Math.min(sopStep,GX_SOP.length-1);const st=GX_SOP[i];
+          const pick=(sop.quiz||{})[st.id];
+          const answered=pick!=null;
+          const done=Object.keys(sop.quiz||{}).length;
+          return(<div style={{maxWidth:820}}>
+            <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12,flexWrap:'wrap'}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,fontWeight:800,color:'var(--g-eee)'}}>📘 Running a review — guided walkthrough</div>
+              <span style={{flex:1,minWidth:120,height:6,background:'var(--surface3)',borderRadius:4,overflow:'hidden'}}><span style={{display:'block',height:'100%',width:((i+1)/GX_SOP.length*100)+'%',background:'var(--c-grn)',transition:'width .25s'}}/></span>
+              <span style={{fontSize:12.5,color:'var(--g-888)'}}>Step {i+1} of {GX_SOP.length}</span>
             </div>
 
-            {SEC('01','Before the session — 20 minutes of prep','Never grade cold. Walk in with a draft.',<div>
-              {UL([
-                <>Open <b>✍️ Grading</b> and select the person. If they are not in the chips, their Staff Profile role needs to say Guest Experience — fix that first, or use “＋ other staff”.</>,
-                <>Check their <b>pay level</b> on the profile card. Everything downstream — gates, checklist, report — is driven by it.</>,
-                <>Press <b>📋 Start review — today</b>. That timestamps the session and logs every change you make from here.</>,
-                <>Draft your grades <i>before</i> the meeting from evidence you already hold: what you have seen, what the numbers say, what the team reports. Leave anything you are unsure about ungraded — it becomes a question in the room.</>,
-                <>Skim the <b>📋 Progression checklist</b> so you know which gates are close. Those are the conversation.</>
-              ])}
-            </div>)}
+            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderLeft:'5px solid var(--c-grn)',borderRadius:12,padding:'20px 24px'}}>
+              <div style={{fontSize:19,fontWeight:800,color:'var(--g-eee)'}}>{st.t}</div>
+              {st.sub&&<div style={{fontSize:13,color:'var(--g-888)',marginTop:2}}>{st.sub}</div>}
 
-            {SEC('02','Running the session — 45 to 60 minutes','Their view first, yours second, agreement last.',<div>
-              <div style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.7,marginBottom:6}}>Sit beside them with the screen visible. This is a shared document, not a verdict being read out.</div>
-              {UL([
-                <><b>Open with the map (5 min).</b> Show the ten categories and where they sit. Explain the scale: 3 = trusted to do it alone, 4 = you make the area better, 5 = you make other people better.</>,
-                <><b>Go category by category (30 min).</b> Three questions each. Ask them first, then give your read.</>
-              ])}
-              {SAY('“Where do you think you are on this — and what would you point to as evidence?”')}
-              {UL([
-                <><b>Grade together, but you own the number.</b> Click the level, then say why. If you disagree, name the specific behaviour that is missing — that gap becomes the development action.</>,
-                <><b>Capture evidence as you go</b> with 📝: evidence, gap to next, development action, demonstration status. A grade with no evidence is just an opinion.</>,
-                <><b>Work the checklist (10 min).</b> Item by item on the gates for their next pay level. Sign off only what is demonstrated <i>consistently</i>, and write the review note on each.</>,
-                <><b>Agree two to four priorities (10 min)</b> — never more. Use the 🎓 module for the exact actions, and agree <i>where</i> each will be practised and by when.</>
-              ])}
-            </div>)}
+              {(st.read||[]).map((r,ri)=>(<div key={ri} style={{fontSize:14,color:'var(--g-aaa)',lineHeight:1.75,marginTop:11}}>{r}</div>))}
 
-            {SEC('03','How to grade — the rules that keep it fair','Same standard for everyone, every quarter.',<div>
-              {UL([
-                <><b>Grade the behaviour, not the person.</b> Every level has a written description — pick the one that matches what they actually do most days.</>,
-                <><b>Once ≠ competent.</b> Once means capable. Independently means trusted. Only <i>consistently</i> moves the grade.</>,
-                <><b>Do not inflate to be kind.</b> An inflated 3 removes their roadmap and delays the raise they could have earned honestly.</>,
-                <><b>Do not average away a weakness.</b> Progression uses gates — a 5 in guest warmth cannot cover a 2 in delegation.</>,
-                <><b>Grade only what they can influence.</b> If clinician availability, staffing or seasonality drove the number, that is context, not competency.</>,
-                <><b>Ungraded is a legitimate answer.</b> If you have not seen it, leave it blank and create the opportunity to see it before the next review.</>
-              ])}
-            </div>)}
+              {st.grades&&(<div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))',gap:8,marginTop:12}}>
+                {GX_GRADE.map(([n2,d2,m2])=>(<div key={n2} style={{border:'1px solid var(--border)',borderRadius:9,padding:'8px 11px'}}>
+                  <div style={{fontSize:13,fontWeight:800,color:'var(--g-ddd)'}}>{n2} · {d2}</div>
+                  <div style={{fontSize:12,color:'var(--g-999)',lineHeight:1.45}}>“{m2}”</div></div>))}
+              </div>)}
 
-            {SEC('04','What the levels mean in practice','The one-line test for each.',<div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:8}}>
-                {GX_GRADE.map(([n2,d,m2])=>(<div key={n2} style={{border:'1px solid var(--border)',borderRadius:9,padding:'9px 12px'}}>
-                  <div style={{fontSize:13.5,fontWeight:800,color:'var(--g-ddd)'}}>{n2} · {d}</div>
-                  <div style={{fontSize:12.5,color:'var(--g-999)',lineHeight:1.5}}>“{m2}”</div>
-                </div>))}
-              </div>
-              <div style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.7,marginTop:8}}>The two transitions people get wrong: <b style={{color:'var(--g-ddd)'}}>3 → 4</b> is where personal competency becomes measurable impact — they make the area better, not just run it. <b style={{color:'var(--g-ddd)'}}>4 → 5</b> is where impact becomes other people — capability built in someone else or in a system. A brilliant individual performer is a 4, not a 5.</div>
-            </div>)}
+              {st.scenario&&(<div style={{marginTop:13,background:'var(--surface3)',borderRadius:10,padding:'13px 16px',fontSize:13.5,color:'var(--g-ccc)',lineHeight:1.7}}>
+                <div style={{fontSize:11,fontWeight:800,letterSpacing:'.7px',color:'var(--g-777)',textTransform:'uppercase',marginBottom:4}}>The evidence</div>{st.scenario}</div>)}
 
-            {SEC('05','How progression actually works','Gates, not averages — and pay follows the gates.',<div>
-              {UL([
-                <>Every pay step has specific <b>gates</b>: named competencies at named levels, shown on the profile card as the “Road to $X”.</>,
-                <><b>Met</b> = at or above the requirement · <b>Developing</b> = one level away · <b>Gap</b> = further out · <b>not graded</b> = you owe them an assessment.</>,
-                <>All gates met <i>and</i> every checklist item signed off = ready for the pay conversation. Bring it to Dave with the report attached.</>,
-                <>Role and pay are separate: pay reflects demonstrated value, role reflects responsibility and scope. Someone can earn more inside the same title.</>
-              ])}
-            </div>)}
+              {st.script&&(<div style={{marginTop:12,fontSize:15,color:'var(--g-ddd)',fontStyle:'italic',borderLeft:'3px solid var(--go)',paddingLeft:13,lineHeight:1.6}}>{st.script}</div>)}
 
-            {SEC('06','After the session — close it properly','Fifteen minutes that make the next review easy.',<div>
-              {UL([
-                <>Write the <b>Review summary</b> in the review’s ▸ details: themes, what was agreed, anything you promised.</>,
-                <>Press <b>✓ Complete review</b> — it stamps the date and logs every score that changed during the session.</>,
-                <>Open <b>📄 Development report</b>, print or save as PDF, and give them a copy: strengths, gaps, priorities and the proof required.</>,
-                <>Book the halfway check-in <i>now</i>, and put the practice opportunities into the schedule — a development action with no scheduled opportunity is a broken promise.</>,
-                <>Coming back later is fine: <b>✎ reopen</b> any completed review, make the change, save — the amendment is logged with its own date.</>
-              ])}
-            </div>)}
+              {st.list&&(<ul style={{margin:'11px 0 0',paddingLeft:20}}>{st.list.map((x,li)=><li key={li} style={{fontSize:13.5,color:'var(--g-aaa)',lineHeight:1.7,marginBottom:3}}>{x}</li>)}</ul>)}
 
-            {SEC('07','Common mistakes','If a review goes sideways, it is usually one of these.',<div>
-              {UL([
-                <><b>Grading from scratch in the room.</b> Slow, and it invites negotiation. Draft first.</>,
-                <><b>Ten priorities.</b> Nobody improves ten things at once. Two to four.</>,
-                <><b>Vague actions.</b> “Be more proactive” is not an action — the 🎓 modules exist so it never has to be.</>,
-                <><b>Recency bias.</b> Grade the quarter, not last Tuesday.</>,
-                <><b>Silent expectations.</b> A gate that was never explained cannot hold back a raise. Show them the road every time.</>,
-                <><b>No opportunity given.</b> We cannot require someone to demonstrate management while never letting them manage — that is on us, not them.</>
-              ])}
-            </div>)}
+              {st.todo&&(<div style={{marginTop:12}}>{st.todo.map((x,ti)=>{const k=st.id+'_t'+ti;const on=!!(sop.ans||{})[k];return(
+                <label key={ti} style={{display:'flex',gap:10,alignItems:'flex-start',padding:'6px 0',cursor:'pointer'}}>
+                  <input type="checkbox" checked={on} onChange={e=>setAns(k,e.target.checked)} style={{marginTop:2,width:16,height:16,accentColor:'#7ac490',cursor:'pointer'}}/>
+                  <span style={{fontSize:13.5,color:on?'var(--g-777)':'var(--g-ccc)',textDecoration:on?'line-through':'none',lineHeight:1.6}}>{x}</span>
+                </label>);})}</div>)}
 
-            {SEC('08','Quick answers','What comes up in the first few sessions.',<div>
-              {UL([
-                <><b>They disagree with a grade.</b> Ask what evidence they would point to. If it is real and consistent, change it in the room — the log records that you did. If not, name exactly what you would need to see.</>,
-                <><b>Strong everywhere but one gate.</b> That gate is the entire conversation; everything else is maintenance.</>,
-                <><b>They are brand new.</b> Grade what exists, leave the rest ungraded, work only the $18–19 gates.</>,
-                <><b>Nothing changed this quarter.</b> That is a finding. Ask what got in the way — and whether the opportunity was actually there.</>,
-                <><b>Where do KPIs fit?</b> Competency is the 🎓 side (can they work the metric); performance is the 📈 side (is the metric in range). Never read a bad number as poor competency until you know what they could influence.</>
-              ])}
-            </div>)}
+              {st.quiz&&(<div style={{marginTop:15,border:'1px solid var(--border)',borderRadius:10,padding:'14px 16px'}}>
+                <div style={{fontSize:11,fontWeight:800,letterSpacing:'.7px',color:'var(--c-yel)',textTransform:'uppercase',marginBottom:6}}>Think it through</div>
+                <div style={{fontSize:14,color:'var(--g-ddd)',lineHeight:1.65,marginBottom:9}}>{st.quiz.q}</div>
+                {st.quiz.opts.map((o,oi)=>{const chosen=pick===oi;const right=oi===st.quiz.correct;
+                  const bg=!answered?'var(--surface3)':(right?'rgba(122,196,144,.16)':(chosen?'rgba(214,106,96,.14)':'var(--surface3)'));
+                  const bd=!answered?'var(--border)':(right?'var(--c-grn)':(chosen?'var(--c-red)':'var(--border)'));
+                  return(<button key={oi} onClick={()=>{if(!answered)setQuiz(st.id,oi);}} style={{display:'block',width:'100%',textAlign:'left',marginBottom:7,padding:'10px 13px',borderRadius:9,border:'1px solid '+bd,background:bg,color:'var(--g-ccc)',fontSize:13.5,lineHeight:1.5,cursor:answered?'default':'pointer'}}>
+                    {answered&&right?'✓ ':answered&&chosen?'✕ ':''}{o}
+                  </button>);})}
+                {answered&&(<div style={{marginTop:6,fontSize:13.5,color:'var(--g-aaa)',lineHeight:1.7}}>
+                  <b style={{color:pick===st.quiz.correct?'var(--c-grn)':'var(--c-yel)'}}>{pick===st.quiz.correct?'That’s it. ':'Not quite. '}</b>{st.quiz.why}
+                  <button className="btn btn-ghost btn-xs" style={{marginLeft:8}} onClick={()=>setQuiz(st.id,null)}>try again</button>
+                </div>)}
+              </div>)}
+
+              {(st.reflect||[]).map(r=>{const k=st.id+'_'+r.id;const v=(sop.ans||{})[k]||'';return(
+                <div key={r.id} style={{marginTop:13}}>
+                  <div style={{fontSize:13,fontWeight:700,color:'var(--g-ccc)',marginBottom:4}}>{r.q}</div>
+                  {r.big?<textarea value={v} onChange={e=>setAns(k,e.target.value)} placeholder={r.ph} style={{...SEL,width:'100%',minHeight:62,fontSize:13.5,lineHeight:1.6}}/>
+                        :<input value={v} onChange={e=>setAns(k,e.target.value)} placeholder={r.ph} style={{...SEL,width:'100%',maxWidth:340,fontSize:13.5}}/>}
+                </div>);})}
+            </div>
+
+            <div style={{display:'flex',alignItems:'center',gap:10,marginTop:14,flexWrap:'wrap'}}>
+              <button className="btn btn-ghost btn-sm" disabled={i===0} style={{opacity:i===0?.4:1}} onClick={()=>setSopStep(Math.max(0,i-1))}>← Back</button>
+              {i<GX_SOP.length-1
+                ?<button className="btn btn-go btn-sm" onClick={()=>setSopStep(i+1)}>Next step →</button>
+                :<button className="btn btn-go btn-sm" onClick={()=>{setSop({done:new Date().toISOString().slice(0,10)});setSopStep(0);}}>✓ Finish walkthrough</button>}
+              <span style={{flex:1}}/>
+              {sop.done&&<span style={{fontSize:12,color:'var(--c-grn)'}}>✓ Completed {sop.done}</span>}
+              <button className="btn btn-ghost btn-xs" title="Clear the answers and quiz results and start over" onClick={()=>{if(window.confirm('Clear your walkthrough answers and start again?')){setGx(g=>({...g,sop:{ans:{},quiz:{},done:null}}));setSopStep(0);}}}>↺ Reset</button>
+            </div>
+            <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:10}}>
+              {GX_SOP.map((x,xi)=>(<button key={x.id} title={x.t} onClick={()=>setSopStep(xi)} style={{width:26,height:26,borderRadius:7,border:'1px solid '+(xi===i?'var(--c-grn)':'var(--border)'),background:xi===i?'rgba(122,196,144,.18)':((sop.quiz||{})[x.id]!=null?'rgba(122,196,144,.07)':'var(--surface3)'),color:xi===i?'var(--c-grn)':'var(--g-888)',fontSize:11.5,fontWeight:800,cursor:'pointer'}}>{xi+1}</button>))}
+              <span style={{fontSize:11.5,color:'var(--g-666)',alignSelf:'center',marginLeft:6}}>{done} of {GX_SOP.filter(x=>x.quiz).length} checks answered · answers save and sync automatically</span>
+            </div>
           </div>);})()}
         {gxTab==='sys'&&(<>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:12,marginBottom:14}}>
