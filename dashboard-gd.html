@@ -562,9 +562,15 @@ textarea{resize:vertical;min-height:60px;}
   body.evrpt-print .evrpt-print-area,body.evrpt-print .evrpt-print-area *{visibility:visible!important;}
   body.evrpt-print .evrpt-print-area{position:absolute!important;left:0;top:0;width:100%!important;padding:0!important;border:none!important;background:#fff!important;}
   body.evrpt-print .evrpt-print-area.evrpt-dark{background:var(--surface,#10160f)!important;padding:18px 22px!important;border-radius:0!important;}
-  body.evrpt-print .evrpt-print-area:not(.evrpt-dark) *{color:#243029!important;background:transparent!important;border-color:#d3ded7!important;}
-  body.evrpt-print .evrpt-print-area:not(.evrpt-dark) b,body.evrpt-print .evrpt-print-area:not(.evrpt-dark) .evrpt-h{color:#0B6E54!important;}
-  body.evrpt-print .evrpt-print-area:not(.evrpt-dark) table{border-top:1px solid #d3ded7!important;}
+  body.evrpt-print .evrpt-print-area:not(.evrpt-dark):not(.gxrpt) *{color:#243029!important;background:transparent!important;border-color:#d3ded7!important;}
+  body.evrpt-print .evrpt-print-area:not(.evrpt-dark):not(.gxrpt) b,body.evrpt-print .evrpt-print-area:not(.evrpt-dark):not(.gxrpt) .evrpt-h{color:#0B6E54!important;}
+  body.evrpt-print .evrpt-print-area:not(.evrpt-dark):not(.gxrpt) table{border-top:1px solid #d3ded7!important;}
+  /* GX development report — keeps its colour in print via a light palette remap of the theme vars (L111) */
+  body.evrpt-print .evrpt-print-area.gxrpt{--g-eee:#12271f;--g-ddd:#1c3529;--g-ccc:#2d4739;--g-aaa:#41594c;--g-999:#5b7266;--g-888:#6f8579;--g-777:#7f9489;--g-666:#93a69b;--surface:#ffffff;--surface2:#ffffff;--surface3:#f3f8f4;--stripe:#f7faf8;--border:#d8e3dc;--go:#0B6E54;--c-grn:#0B6E54;--c-lime2:#3f8f43;--c-yel:#9a7512;--c-amb:#b4650f;--c-red:#b3342b;--c-blu2:#1d5fa8;background:#fff!important;padding:0!important;}
+  body.evrpt-print .evrpt-print-area.gxrpt .gxr-band{background:#0B6E54!important;color:#fff!important;}
+  body.evrpt-print .evrpt-print-area.gxrpt .gxr-band *{color:#fff!important;}
+  body.evrpt-print .evrpt-print-area.gxrpt .gxr-sec{break-inside:avoid;page-break-inside:avoid;}
+  body.evrpt-print .evrpt-print-area.gxrpt .gxr-row{break-inside:avoid;page-break-inside:avoid;}
   body.evrpt-print .evrpt-print-area .evrpt-only{display:block!important;}
   body.evrpt-print .no-print{display:none!important;}
   body.evrpt-print,body.evrpt-print #root,body.evrpt-print #root>div,body.evrpt-print .main,body.evrpt-print .scroll{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;}
@@ -1872,7 +1878,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L110';
+window.__BUILD='build L112';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8766,7 +8772,7 @@ function GuestExperiencePage({staff}){
           const bar=(v)=>{const n=Math.round(v||0);return '▰'.repeat(n)+'▱'.repeat(5-n);};
           const ovVals=GX_CATS.map(([cid])=>catAvg(cid)).filter(v=>v!=null);
           const ov=ovVals.length?(ovVals.reduce((a,b)=>a+b,0)/ovVals.length):null;
-          const qAll=[];GX_CATS.forEach(([cid,cn])=>{(GX_Q3[cid]||[]).forEach((q,qi)=>{qAll.push({cid,cn,qi,t:q.t,v:getQ(cid,qi),lv:q.lv,key:cid.replace('c','')+'.'+String.fromCharCode(65+qi)});});});
+          const qAll=[];GX_CATS.forEach(([cid,cn])=>{(GX_Q3[cid]||[]).forEach((q,qi)=>{qAll.push({cid,cn,qi,t:q.t,v:getQ(cid,qi),lv:q.lv,key:cid.replace('c','')+'.'+String.fromCharCode(65+qi)});});});// qi carries into the development-plan grouping
           const graded=qAll.filter(x=>x.v);
           const strengths=graded.filter(x=>x.v>=4).sort((a,b)=>b.v-a.v).slice(0,5);
           const strList=strengths.length?strengths:graded.slice().sort((a,b)=>b.v-a.v).slice(0,3);
@@ -8776,7 +8782,8 @@ function GuestExperiencePage({staff}){
           const curRole=pd.payLevel!=null?GX_ROLEBYPAY[pd.payLevel]:null;
           const curStage=curRole?parseInt(String(curRole).replace(/[^0-9]/g,'').slice(0,1),10):null;
           const stageAvg=(cids)=>{const v=cids.map(c=>catAvg(c)).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
-          const H2=(t)=>(<div className="evrpt-h" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,fontWeight:800,letterSpacing:'1.2px',textTransform:'uppercase',color:'var(--c-grn)',margin:'20px 0 7px',borderBottom:'1px solid var(--border)',paddingBottom:3}}>{t}</div>);
+          const H2=(t)=>(<div className="evrpt-h" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,letterSpacing:'1.3px',textTransform:'uppercase',color:'var(--c-grn)',margin:'22px 0 9px',paddingLeft:10,borderLeft:'4px solid var(--c-grn)'}}>{t}</div>);
+          const chip=(v)=>({display:'inline-block',minWidth:34,textAlign:'center',fontWeight:800,color:'#fff',background:v?(v>=4?'#0B6E54':v>=3?'#3f8f43':v>=2?'#9a7512':'#b4650f'):'#93a69b',borderRadius:6,padding:'1px 7px'});
           const openGates=gateRows.filter(r=>r.st!=='Met');
           const tgt=String(nxtIdx);const chkAll=((pd.chk||{})[tgt])||{};
           return(<div style={{marginBottom:16}}>
@@ -8785,17 +8792,18 @@ function GuestExperiencePage({staff}){
               <button className="btn btn-ghost btn-sm" onClick={()=>setRepOpen(false)}>✕ Close report</button>
               <span style={{fontSize:11.5,color:'var(--g-666)',alignSelf:'center'}}>Prints as a clean light-theme document — hand it to {pk.split(' ')[0]} at the review.</span>
             </div>
-            <div className="evrpt-print-area" style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'22px 26px'}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',borderBottom:'2px solid var(--c-grn)',paddingBottom:8}}>
+            <div className="evrpt-print-area gxrpt" style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'22px 26px'}}>
+              <div className="gxr-band gxr-sec" style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',background:'linear-gradient(120deg,rgba(11,110,84,.22),rgba(11,110,84,.06))',borderLeft:'5px solid var(--c-grn)',borderRadius:10,padding:'16px 20px',marginBottom:4}}>
                 <div>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2px',color:'var(--g-888)'}}>REVIBE · GUEST EXPERIENCE</div>
-                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:'var(--g-eee)',lineHeight:1.1}}>{pk} — Development Report</div>
-                  <div style={{fontSize:12.5,color:'var(--g-aaa)',marginTop:3}}>{pd.payLevel!=null?(GX_PAY[pd.payLevel][0]+' · '+curRole+' · '+GX_PAY[pd.payLevel][1]):'Pay level not set'}{nxtIdx!=null&&' · next step '+GX_PAY[nxtIdx][0]+' '+GX_PAY[nxtIdx][1]}</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2.4px',color:'var(--g-888)'}}>REVIBE · GUEST EXPERIENCE · GROWTH &amp; DEVELOPMENT</div>
+                  <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:30,fontWeight:800,color:'var(--g-eee)',lineHeight:1.05}}>{pk}</div>
+                  <div style={{fontSize:13,color:'var(--g-aaa)',marginTop:2}}>{pd.payLevel!=null?(GX_PAY[pd.payLevel][0]+' · '+curRole+' · '+GX_PAY[pd.payLevel][1]):'Pay level not set'}{nxtIdx!=null&&' → next step '+GX_PAY[nxtIdx][0]+' '+GX_PAY[nxtIdx][1]}</div>
                 </div>
                 <div style={{textAlign:'right',fontSize:12,color:'var(--g-888)'}}>
-                  <div>{new Date().toISOString().slice(0,10)}</div>
-                  <div>Overall <b style={{color:'var(--g-ddd)',fontSize:16}}>{ov?ov.toFixed(1):'—'}</b> / 5</div>
-                  {revs.length>0&&<div>{revs.length} review{revs.length>1?'s':''} on record</div>}
+                  <div style={{fontSize:11,letterSpacing:'1.5px'}}>DEVELOPMENT REPORT</div>
+                  <div style={{fontSize:34,fontWeight:800,color:'var(--c-grn)',lineHeight:1}}>{ov?ov.toFixed(1):'—'}</div>
+                  <div style={{fontSize:11}}>overall of 5 · {new Date().toISOString().slice(0,10)}</div>
+                  {revs.length>0&&<div style={{fontSize:11}}>{revs.length} review{revs.length>1?'s':''} on record</div>}
                 </div>
               </div>
               <div style={{fontSize:12.5,color:'var(--g-999)',lineHeight:1.6,marginTop:9}}>Progression is by demonstrated competency, never time served — competency × demonstration × consistency × responsibility × results. Grades reflect what has been demonstrated <i>consistently</i>, not once.</div>
@@ -8805,7 +8813,7 @@ function GuestExperiencePage({staff}){
               {GX_STAGES.map((st,si)=>{const [code,role,stage,payr,q,focus,cids,thr]=st;const a=stageAvg(cids);const n=si+1;
                 const status=curStage==null?'':(n<curStage?'Established':n===curStage?'Current stage':n===curStage+1?'Next stage':'Ahead');
                 const cur=n===curStage;const nx=n===curStage+1;
-                return(<div key={code} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'7px 9px',borderRadius:8,marginBottom:3,background:cur?'rgba(122,196,144,.10)':nx?'rgba(224,196,82,.07)':'transparent',border:'1px solid '+(cur?'var(--c-grn)':nx?'var(--c-yel)':'transparent')}}>
+                return(<div key={code} className="gxr-row" style={{display:'flex',gap:12,alignItems:'flex-start',padding:'8px 11px',borderRadius:8,marginBottom:4,background:cur?'rgba(11,110,84,.12)':nx?'rgba(154,117,18,.10)':(si%2?'transparent':'var(--stripe)'),borderLeft:'4px solid '+(cur?'var(--c-grn)':nx?'var(--c-yel)':'var(--border)')}}>
                   <div style={{width:52,flexShrink:0}}><div style={{fontSize:13,fontWeight:800,color:cur?'var(--c-grn)':'var(--g-ccc)'}}>{code}</div><div style={{fontSize:10,color:'var(--g-666)'}}>{payr}</div></div>
                   <div style={{flex:1}}>
                     <div style={{fontSize:13,fontWeight:800,color:'var(--g-ddd)'}}>{stage} — {role} {status&&<span style={{fontSize:10.5,fontWeight:800,color:cur?'var(--c-grn)':nx?'var(--c-yel)':'var(--g-666)'}}>· {status}</span>}</div>
@@ -8820,23 +8828,24 @@ function GuestExperiencePage({staff}){
                 return(<div style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.6,marginTop:7}}><b style={{color:'var(--c-yel)'}}>Looking past the next raise:</b> the jump to <b>{nxt[0]} — {nxt[1]} ({nxt[2]})</b> is won in {nxt[5]}. Those categories currently sit at <b>{a?a.toFixed(1):'not yet graded'}</b> against roughly <b>{need}</b> needed to hold that role. That is the multi-year arc — build it deliberately alongside the immediate gates below.</div>);})()}
 
               {H2('Competency scorecard — all ten categories')}
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'2px 26px'}}>
-                {GX_CATS.map(([cid,cname])=>{const a=catAvg(cid);return(<div key={cid} style={{display:'flex',gap:8,fontSize:12.5,alignItems:'center',padding:'2px 0'}}>
+              <div className="gxr-sec" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 26px'}}>
+                {GX_CATS.map(([cid,cname],ci)=>{const a=catAvg(cid);return(<div key={cid} style={{display:'flex',gap:9,fontSize:12.5,alignItems:'center',padding:'5px 8px',background:ci%2?'transparent':'var(--stripe)',borderRadius:6}}>
+                  <span style={{width:16,height:16,borderRadius:4,background:GX_HUE[cid],opacity:.85,flexShrink:0}}/>
                   <span style={{flex:1,color:'var(--g-ccc)'}}>{cid.replace('c','')}. {cname}</span>
-                  <span style={{color:'var(--g-888)',letterSpacing:'1px'}}>{bar(a)}</span>
-                  <span style={{fontWeight:800,color:'var(--g-ddd)',width:24,textAlign:'right'}}>{a?a.toFixed(1):'—'}</span>
+                  <span style={{color:'var(--g-777)',letterSpacing:'.5px'}}>{bar(a)}</span>
+                  <span style={chip(a)}>{a?a.toFixed(1):'—'}</span>
                 </div>);})}
               </div>
               {ungraded>0&&<div style={{fontSize:11.5,color:'var(--g-666)',marginTop:5}}>{ungraded} of {qAll.length} grading questions not yet assessed — scores above reflect what has been graded.</div>}
 
               {H2('Strengths — what to keep using')}
-              {strList.length?strList.map(x=>(<div key={x.cid+x.qi} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:5}}>
+              {strList.length?strList.map(x=>(<div key={x.cid+x.qi} className="gxr-row" style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:5,padding:'7px 11px',borderLeft:'4px solid var(--c-grn)',background:'rgba(11,110,84,.07)',borderRadius:'0 8px 8px 0'}}>
                 <b style={{color:'var(--c-grn)'}}>{x.key} {x.t} — Level {x.v} · {GX_GRADE[x.v-1][1]}.</b> {x.lv[x.v-1]}.
               </div>)):<div style={{fontSize:12.5,color:'var(--g-777)'}}>Nothing graded yet — grade the questions to populate this section.</div>}
               {strList.length>0&&<div style={{fontSize:12,color:'var(--g-999)',marginTop:4}}>Where a strength is at 4–5, the next move is using it for others: train, document, or own that area so the capability scales beyond one person.</div>}
 
               {H2('Gaps — what is holding progression')}
-              {gapList.length?gapList.map(x=>(<div key={x.cid+x.qi} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:5}}>
+              {gapList.length?gapList.map(x=>(<div key={x.cid+x.qi} className="gxr-row" style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:5,padding:'7px 11px',borderLeft:'4px solid var(--c-amb)',background:'rgba(180,101,15,.07)',borderRadius:'0 8px 8px 0'}}>
                 <b style={{color:'var(--c-amb)'}}>{x.key} {x.t} — currently Level {x.v} · {GX_GRADE[x.v-1][1]}.</b> To reach Level {Math.min(5,x.v+1)}: {x.lv[Math.min(4,x.v)]}.
               </div>)):<div style={{fontSize:12.5,color:'var(--g-777)'}}>No graded gaps recorded.</div>}
 
@@ -8845,18 +8854,53 @@ function GuestExperiencePage({staff}){
                 <div style={{fontSize:12,color:'var(--g-888)',marginBottom:5}}>{gatesMet} of {gateRows.length} gates met. Progression uses gates, never an average — a strength elsewhere cannot cover a gate that is not met.</div>
                 {gateRows.map((r,i)=>{const qi=r.su==null?null:qOfSub(r.c,r.su);const q=qi!=null?(GX_Q3[r.c]||[])[qi]:null;const gk=r.c+'.'+(r.su==null?'cat':r.su);const ck=chkAll[gk]||{};
                   const demo=q?q.lv[r.req-1]:('category average ≥'+r.req);
-                  return(<div key={i} style={{fontSize:12.5,lineHeight:1.55,marginBottom:5,display:'flex',gap:9}}>
+                  return(<div key={i} className="gxr-row" style={{fontSize:12.5,lineHeight:1.55,marginBottom:4,display:'flex',gap:9,padding:'6px 10px',borderRadius:7,background:ck.done?'rgba(11,110,84,.07)':(i%2?'transparent':'var(--stripe)')}}>
                     <span style={{width:14,flexShrink:0,color:ck.done?'var(--c-grn)':'var(--g-666)'}}>{ck.done?'☑':'☐'}</span>
                     <span style={{flex:1,color:'var(--g-aaa)'}}><b style={{color:r.st==='Met'?'var(--c-grn)':'var(--g-ddd)'}}>{r.lb} — {r.cur==null?'not graded':'at '+r.cur} / needs {r.req}{r.st==='Met'?' · met':''}.</b> {r.st==='Met'?'Confirm it is demonstrated consistently, then sign off.':'Demonstrate: '+demo+'.'}{ck.note?<span style={{color:'var(--c-blu2)'}}> · Note: {ck.note}</span>:''}</span>
                   </div>);})}
               </>)}
 
-              {H2('Development plan — two to four priorities until the next review')}
-              {(()=>{const pri=[];openGates.slice(0,3).forEach(r=>{const qi=r.su==null?null:qOfSub(r.c,r.su);const act=qi!=null?(((pd.ev||{})[r.c+'.q'+qi])||{}).a:'';pri.push({t:r.lb,c:r.c,lvl:r.req,d:act||('Move from '+(r.cur==null?'ungraded':r.cur)+' to '+r.req+' and hold it consistently.')});});
-                gapList.slice(0,2).forEach(g=>{if(pri.length<4&&!pri.some(x=>x.t===g.t))pri.push({t:g.key+' '+g.t,c:g.cid,lvl:Math.min(5,g.v+1),d:'Build toward Level '+Math.min(5,g.v+1)+': '+g.lv[Math.min(4,g.v)]+'.'});});
-                return pri.length?pri.map((x,i)=>(<div key={i} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.6,marginBottom:7}}><b style={{color:'var(--g-ddd)'}}>{i+1}. {x.t}.</b> {x.d}
-                  {(()=>{const m=(GX_MOD[x.c]||[]).find(z=>z.to===x.lvl);return m?(<div style={{marginTop:2,paddingLeft:12}}><div style={{fontSize:12,color:'var(--g-999)'}}><i>Module — {m.t}:</i> {m.a.slice(0,3).join(' · ')}.</div><div style={{fontSize:12,color:'var(--g-888)'}}>Evidence: {m.e}</div></div>):null;})()}
-                </div>)):<div style={{fontSize:12.5,color:'var(--g-777)'}}>Set a pay level and grade the questions to generate priorities.</div>;})()}
+              {H2('Development plan — what to work on before the next review')}
+              <div style={{fontSize:12.5,color:'var(--g-999)',marginBottom:9,lineHeight:1.6}}>Two to four priorities, no more. Each one names the level to reach, the exact behaviour that counts as reaching it, the actions that build it, and the proof required. Fill in where it will be practised and the check-in date together.</div>
+              {(()=>{
+                // GROUP by category so four gates in one category become ONE clear priority (not four copies of the same module)
+                const groups={};
+                openGates.forEach(r=>{const g=groups[r.c]||(groups[r.c]={c:r.c,lvl:0,gates:[],qs:{}});g.lvl=Math.max(g.lvl,r.req);g.gates.push(r.lb);const qi=r.su==null?null:qOfSub(r.c,r.su);if(qi!=null)g.qs[qi]=Math.max(g.qs[qi]||0,r.req);});
+                gapList.forEach(x=>{const g=groups[x.cid]||(groups[x.cid]={c:x.cid,lvl:0,gates:[],qs:{}});const want=Math.min(5,x.v+1);g.lvl=Math.max(g.lvl,want);g.qs[x.qi]=Math.max(g.qs[x.qi]||0,want);});
+                const pri=Object.values(groups).sort((a,b)=>b.gates.length-a.gates.length).slice(0,4);
+                if(!pri.length)return(<div style={{fontSize:12.5,color:'var(--g-777)'}}>Set a pay level and grade the questions to generate priorities.</div>);
+                return(<>
+                {pri.map((x,i)=>{
+                  const cname=(GX_CATS.find(z=>z[0]===x.c)||[])[1]||x.c;
+                  const cur=catAvg(x.c);
+                  const mod=(GX_MOD[x.c]||[]).find(z=>z.to===x.lvl)||(GX_MOD[x.c]||[])[Math.max(0,x.lvl-2)];
+                  const acts=(()=>{const plan=[];Object.keys(x.qs).forEach(qi=>{const q=(GX_Q3[x.c]||[])[qi];if(q)plan.push({q:q.t,lv:q.lv[x.qs[qi]-1],req:x.qs[qi]});});return plan;})();
+                  const own=Object.keys(x.qs).map(qi=>(((pd.ev||{})[x.c+'.q'+qi])||{}).a).filter(Boolean);
+                  return(<div key={i} className="gxr-sec" style={{marginBottom:12,border:'1px solid var(--border)',borderLeft:'5px solid var(--c-grn)',borderRadius:10,overflow:'hidden'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',padding:'9px 13px',background:'rgba(11,110,84,.10)'}}>
+                      <span style={{display:'inline-block',minWidth:22,height:22,lineHeight:'22px',textAlign:'center',borderRadius:'50%',background:'var(--c-grn)',color:'#fff',fontSize:12.5,fontWeight:800}}>{i+1}</span>
+                      <b style={{fontSize:14,color:'var(--g-eee)'}}>{cname}</b>
+                      <span style={{fontSize:11.5,fontWeight:800,color:'#fff',background:'var(--c-amb)',borderRadius:999,padding:'2px 9px'}}>Level {cur?cur.toFixed(1):'—'} → {x.lvl}</span>
+                      {nxtIdx!=null&&<span style={{fontSize:11.5,color:'var(--g-777)'}}>unlocks {GX_PAY[nxtIdx][0]} · {GX_PAY[nxtIdx][1]}</span>}
+                    </div>
+                    <div style={{padding:'10px 14px'}}>
+                      <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.6px',color:'var(--g-777)',textTransform:'uppercase',marginBottom:3}}>What has to be true</div>
+                      {acts.map((a,ai)=>(<div key={ai} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:3}}><b style={{color:'var(--g-ddd)'}}>{a.q} at Level {a.req}:</b> {a.lv}.</div>))}
+                      {x.gates.length>0&&<div style={{fontSize:11.5,color:'var(--g-888)',marginTop:2}}>Clears these gates: {Array.from(new Set(x.gates)).join(' · ')}.</div>}
+                      <div style={{fontSize:11.5,fontWeight:800,letterSpacing:'.6px',color:'var(--g-777)',textTransform:'uppercase',margin:'9px 0 3px'}}>Do this — {mod?mod.t.toLowerCase():'action plan'}</div>
+                      <ol style={{margin:0,paddingLeft:20}}>{(mod?mod.a:[]).map((a,ai)=>(<li key={ai} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:2}}>{a}</li>))}</ol>
+                      {own.length>0&&<div style={{fontSize:12.5,color:'var(--c-blu2)',marginTop:4}}>Agreed in the review: {own.join(' · ')}</div>}
+                      <div style={{display:'flex',gap:16,flexWrap:'wrap',marginTop:9,paddingTop:7,borderTop:'1px dashed var(--border)',fontSize:12}}>
+                        <span style={{color:'var(--g-888)'}}><b style={{color:'var(--g-777)'}}>Proof required:</b> {mod?mod.e:'demonstrated consistently, not once.'}</span>
+                      </div>
+                      <div style={{display:'flex',gap:22,flexWrap:'wrap',marginTop:6,fontSize:12,color:'var(--g-888)'}}>
+                        <span style={{flex:1,minWidth:180}}>Practised where / when: <span style={{display:'inline-block',minWidth:120,borderBottom:'1px solid var(--g-888)'}}>&nbsp;</span></span>
+                        <span style={{flex:1,minWidth:170}}>Check-in date: <span style={{display:'inline-block',minWidth:110,borderBottom:'1px solid var(--g-888)'}}>&nbsp;</span></span>
+                        <span style={{minWidth:90}}>Done ☐</span>
+                      </div>
+                    </div>
+                  </div>);})}
+                </>);})()}
               <div style={{fontSize:12,color:'var(--g-999)',marginTop:6,lineHeight:1.6}}>Demonstration standard: once = capable · independently = trusted · consistently = the grade moves. Opportunity to demonstrate is the clinic's responsibility — agree on where each priority will be practised before the next review.</div>
 
               {revs.length>0&&(<>
