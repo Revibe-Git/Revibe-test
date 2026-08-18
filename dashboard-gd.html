@@ -1883,7 +1883,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L119';
+window.__BUILD='build L120';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8908,7 +8908,7 @@ function GuestExperiencePage({staff}){
                 <span style={{fontSize:10.5,fontWeight:800,color:'var(--g-666)'}}>{cid.replace('c','')}</span>
                 <span style={{fontSize:19,fontWeight:800,lineHeight:1,color:a?barCol(a):'var(--g-666)'}}>{a?a.toFixed(1):'—'}</span>
               </div>
-              <div style={{fontSize:11,color:'var(--g-999)',margin:'4px 0 5px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{GX_SHORT[cid]||cname}</div>
+              <div style={{fontSize:11,color:'var(--g-999)',margin:'4px 0 5px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{GX_SHORT[cid]||cname}{(()=>{const g=[0,1,2].filter(qi=>getQ(cid,qi)).length;return g>0&&g<3?<span style={{color:'var(--c-amb)'}}> · {g}/3</span>:null;})()}</div>
               <div style={{height:5,background:'var(--surface3)',borderRadius:3,overflow:'hidden'}}><span style={{display:'block',height:'100%',width:(a?(a/5*100):0)+'%',background:barCol(a)}}/></div>
             </div>);})}
           </div>
@@ -8969,7 +8969,15 @@ function GuestExperiencePage({staff}){
                       {ahead&&<button className="btn btn-go btn-xs" title={'Move '+pk+' to '+GX_PAY[earnedIdx][0]+' — the current rate is kept in the review history'} onClick={()=>{const from=GX_PAY[cur][0];setPd({payLevel:earnedIdx,payHist:[...(pd.payHist||[]),{date:new Date().toISOString().slice(0,10),from,to:GX_PAY[earnedIdx][0]}]});const orv=(pd.reviews||[]).find(x=>!x.closed);if(orv)setRev(orv.id,{},['Pay level moved '+from+' → '+GX_PAY[earnedIdx][0]+' (all gates met cumulatively)']);}}>↑ Move to {GX_PAY[earnedIdx][0]}</button>}
                     </div>
                     {ahead&&<div style={{fontSize:12.5,color:'var(--c-grn)',marginTop:5,lineHeight:1.6}}>Every gate up to and including {GX_PAY[earnedIdx][0]} is met — {pk.split(' ')[0]} is being paid {earnedIdx-cur} step{earnedIdx-cur>1?'s':''} below the assessment. Confirm each is demonstrated consistently, then move them.</div>}
-                    {behind&&<div style={{fontSize:12.5,color:'var(--c-amb)',marginTop:5,lineHeight:1.6}}>Paid above the current assessment. That is not automatically wrong — grades may be pending, or the rate was set for another reason — but the gap should be a deliberate decision, not a surprise. First unmet step: {GX_PAY[firstBlock][0]} · {GX_PAY[firstBlock][1]}.</div>}
+                    {behind&&<div style={{fontSize:12.5,color:'var(--c-amb)',marginTop:5,lineHeight:1.6}}>Paid above the current assessment. That is not automatically wrong — grades may be pending, or the rate was set for another reason — but the gap should be a deliberate decision, not a surprise.</div>}
+                    {firstBlock!=null&&(()=>{const rs=stepRows(firstBlock).filter(r=>!r.met);const ung=rs.filter(r=>r.cur==null);
+                      return(<div style={{marginTop:7,background:'var(--surface3)',borderRadius:9,padding:'9px 12px'}}>
+                        <div style={{fontSize:12,fontWeight:800,color:'var(--g-777)',textTransform:'uppercase',letterSpacing:'.5px',marginBottom:4}}>Blocked at {GX_PAY[firstBlock][0]} · {GX_PAY[firstBlock][1]} — {rs.length} gate{rs.length>1?'s':''} short</div>
+                        {rs.map((r,i)=>(<div key={i} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.6}}>· {r.lb} — <b style={{color:r.cur==null?'var(--c-amb)':'var(--c-red)'}}>{r.cur==null?'not graded yet':'at '+r.cur}</b> / needs {r.req}</div>))}
+                        {ung.length>0&&<div style={{fontSize:12,color:'var(--c-amb)',marginTop:5}}>An ungraded competency can never satisfy a gate — grade {ung.length===1?'it':'these'} and the assessment moves.</div>}
+                      </div>);})()}
+                    {(()=>{const tot=GX_CATS.length*3;const gr=GX_CATS.reduce((a,[cid])=>a+[0,1,2].filter(qi=>getQ(cid,qi)).length,0);
+                      return gr<tot?(<div style={{fontSize:12,color:'var(--g-777)',marginTop:6}}>⚠ {tot-gr} of {tot} grading questions are not graded yet — category scores only average what has been graded, so a high number can still hide an ungraded gate.</div>):null;})()}
                     {!ahead&&!behind&&<div style={{fontSize:12.5,color:'var(--g-777)',marginTop:5}}>Pay and assessment agree. Next step up: {nxtIdx!=null?GX_PAY[nxtIdx][0]+' · '+GX_PAY[nxtIdx][1]:'top of the ladder'}.</div>}
                     {(pd.payHist||[]).length>0&&<div style={{fontSize:11.5,color:'var(--g-666)',marginTop:5}}>Pay history: {(pd.payHist||[]).map(h=>h.date+' '+h.from+'→'+h.to).join(' · ')}</div>}
                   </div>);})()}
@@ -9176,9 +9184,9 @@ function GuestExperiencePage({staff}){
               {gateByCat[cid]!=null&&<span style={{fontSize:10.5,fontWeight:800,padding:'1px 6px',borderRadius:4,border:'1px solid',borderColor:(gv2(cid,null)||0)>=gateByCat[cid]?'var(--c-grn)':'var(--c-amb)',color:(gv2(cid,null)||0)>=gateByCat[cid]?'var(--c-grn)':'var(--c-amb)'}} title="This whole category gates the next pay level">⭐ next pay: category ≥{gateByCat[cid]}</span>}
               <span style={{flex:1}}/>
               {pk&&(()=>{const a=catAvg(cid);const graded=[0,1,2].map(qi=>getQ(cid,qi)).filter(v=>v).length;return(<span style={{display:'inline-flex',alignItems:'center',gap:8}} onClick={e=>e.stopPropagation()}>
-                <span style={{fontSize:11.5,color:'var(--g-666)'}}>{graded}/3 graded</span>
-                <span style={{width:90,height:8,background:'var(--surface3)',borderRadius:5,overflow:'hidden',display:'inline-block'}}><span style={{display:'block',height:'100%',width:(a?(a/5*100):0)+'%',background:barCol(a)}}/></span>
-                <span style={{fontSize:13.5,fontWeight:800,color:a?'var(--g-ddd)':'var(--g-666)',width:30}}>{a?a.toFixed(1):'—'}</span>
+                <span style={{fontSize:11.5,fontWeight:graded<3?800:400,color:graded<3?'var(--c-amb)':'var(--g-666)'}} title={graded<3?'Partly graded — the score below averages only the graded questions':''}>{graded}/3 graded</span>
+                <span style={{width:90,height:8,background:'var(--surface3)',borderRadius:5,overflow:'hidden',display:'inline-block'}}><span style={{display:'block',height:'100%',width:(a?(a/5*100):0)+'%',background:barCol(a),opacity:graded<3?.45:1}}/></span>
+                <span style={{fontSize:13.5,fontWeight:800,color:a?(graded<3?'var(--c-amb)':'var(--g-ddd)'):'var(--g-666)',width:34}} title={graded<3?'Partial — '+graded+' of 3 questions graded':''}>{a?a.toFixed(1):'—'}{graded>0&&graded<3?'*':''}</span>
               </span>);})()}
               <span style={{color:'var(--g-666)'}}>{isOpen?'▾':'▸'}</span>
             </div>
