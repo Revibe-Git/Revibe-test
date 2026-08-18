@@ -1883,7 +1883,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L117';
+window.__BUILD='build L119';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -1955,7 +1955,28 @@ const avColor=n=>{const p=['var(--c-lime2)','#6B9FD4','var(--c-yel)','var(--c-pu
 const fmt=d=>d?new Date(d).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):'—';
 const fmtSz=b=>b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFixed(1)+'MB';
 const ld=(k,fb)=>{try{const v=localStorage.getItem('rvgd3_'+k);return v?JSON.parse(v):fb;}catch{return fb;}};
-const sv=(k,v)=>{try{localStorage.setItem('rvgd3_'+k,JSON.stringify(v));}catch(e){}
+// GD_KEYOF / GD_MERGE / tombstones (L118) — record-level merge so two devices can never overwrite each other's roster or grades
+const GD_KEYOF=(r)=>r&&(r.id!=null?String(r.id):String((r.name||'')).trim().toLowerCase());
+const GD_TOMB=()=>{try{return JSON.parse(localStorage.getItem('rvgd3__tomb')||'{}');}catch(e){return {};}};
+const GD_TOMB_ADD=(k,ids)=>{if(!ids.length)return;try{const t=GD_TOMB();t[k]=Array.from(new Set([...(t[k]||[]),...ids]));t._t=Date.now();localStorage.setItem('rvgd3__tomb',JSON.stringify(t));
+  if(window.__SB&&window.__GDSYNC&&window.__GDSYNC.ready)window.__SB.from('gd_store').upsert({id:'__tomb',data:{v:t,t:Date.now()}}).then(()=>{},()=>{});}catch(e){}};
+const GD_RICH=(a,b)=>{const ta=+(a&&a._t)||0,tb=+(b&&b._t)||0;if(ta!==tb)return ta>tb?a:b;
+  try{return JSON.stringify(a).length>=JSON.stringify(b).length?a:b;}catch(e){return a;}};
+const GD_MERGE_ARR=(loc,srv,tomb)=>{const by={};const put=(r)=>{const kk=GD_KEYOF(r);if(!kk)return;by[kk]=by[kk]?GD_RICH(by[kk],r):r;};
+  (Array.isArray(srv)?srv:[]).forEach(put);(Array.isArray(loc)?loc:[]).forEach(put);
+  (tomb||[]).forEach(id=>{delete by[String(id)];});return Object.values(by);};
+const GD_MERGE_GX=(loc,srv)=>{const L=loc||{},S=srv||{};const people={};
+  const score=(x)=>{if(!x)return -1;let n=(x.reviews||[]).length*1000+Object.keys(x.g3||{}).length*10;try{n+=JSON.stringify(x).length/1000;}catch(e){}return n;};
+  Object.keys(S.people||{}).forEach(n=>{people[n]=S.people[n];});
+  Object.keys(L.people||{}).forEach(n=>{people[n]=people[n]?(score(L.people[n])>=score(people[n])?L.people[n]:people[n]):L.people[n];});
+  const kby={};(S.kpis||[]).forEach(x=>{if(x&&x.id)kby[x.id]=x;});(L.kpis||[]).forEach(x=>{if(x&&x.id)kby[x.id]=kby[x.id]?GD_RICH(kby[x.id],x):x;});
+  const sopA=L.sop,sopB=S.sop;const sop=(!sopA||!sopB)?(sopA||sopB):(Object.keys((sopA.res)||{}).length>=Object.keys((sopB.res)||{}).length?sopA:sopB);
+  return{...S,...L,people,kpis:Object.values(kby),sop};};
+const sv=(k,v)=>{try{
+    if(k==='staff'||k==='evals'||k==='sessions'){const prev=(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_'+k)||'null');}catch(e){return null;}})();
+      if(Array.isArray(prev)&&Array.isArray(v)&&prev.length>v.length){const now=new Set(v.map(GD_KEYOF));const gone=prev.map(GD_KEYOF).filter(x=>x&&!now.has(x));GD_TOMB_ADD(k,gone);}}
+  }catch(e){}
+  try{localStorage.setItem('rvgd3_'+k,JSON.stringify(v));}catch(e){}
   try{const m=JSON.parse(localStorage.getItem('rvgd3__ts')||'{}');m[k]=Date.now();localStorage.setItem('rvgd3__ts',JSON.stringify(m));}catch(e){}
   try{if(window.__SB&&window.__GDSYNC&&window.__GDSYNC.ready){sv._t=sv._t||{};clearTimeout(sv._t[k]);sv._t[k]=setTimeout(()=>{window.__SB.from('gd_store').upsert({id:k,data:{v:v,t:Date.now()}}).then(r=>{window.__SYNC={ok:!r.error,at:Date.now(),msg:r.error?r.error.message:''};},()=>{});},600);}}catch(e){}};
 const calcScore=(scores,rubricId)=>{
@@ -2038,27 +2059,29 @@ function App(){
       let ts={};try{ts=JSON.parse(localStorage.getItem('rvgd3__ts')||'{}');}catch(e){}
       const srv={};(rows||[]).forEach(r=>{if(r&&r.data)srv[r.id]={v:r.data.v,t:+r.data.t||0};});
       const setters={staff:setStaff,evals:setEvals,sessions:setSessions};
+      // tombstones: union local + server so a deletion on one device sticks everywhere
+      let tomb=GD_TOMB();const sTomb=(srv['__tomb']||{}).v||{};
+      ['staff','evals','sessions'].forEach(k=>{tomb[k]=Array.from(new Set([...(tomb[k]||[]),...((sTomb[k]||[]))]));});
+      try{localStorage.setItem('rvgd3__tomb',JSON.stringify(tomb));}catch(e){}
+      if(JSON.stringify(sTomb)!==JSON.stringify(tomb))SB.from('gd_store').upsert({id:'__tomb',data:{v:tomb,t:Date.now()}}).then(()=>{},()=>{});
       ['staff','evals','sessions','gx'].forEach(k=>{
-        const lt=+ts[k]||0;const sRow=srv[k];
+        const sRow=srv[k];
         let localV=null;try{const raw=localStorage.getItem('rvgd3_'+k);localV=raw?JSON.parse(raw):null;}catch(e){}
-        if(sRow&&sRow.v!=null&&sRow.t>lt){
-          let v=sRow.v;
-          if(k==='staff'&&Array.isArray(localV)&&localV.length&&Array.isArray(v)&&!localStorage.getItem('rvgd3__staffunion')){
-            const kid=(pp)=>pp&&(pp.id!=null?String(pp.id):String(pp.name||''));
-            const by={};v.forEach(pp=>{const kk=kid(pp);if(kk)by[kk]=pp;});localV.forEach(pp=>{const kk=kid(pp);if(kk&&!by[kk])by[kk]=pp;});
-            const un=Object.values(by);try{localStorage.setItem('rvgd3__staffunion','1');}catch(e){}
-            if(un.length!==v.length){v=un;SB.from('gd_store').upsert({id:k,data:{v:un,t:Date.now()}}).then(()=>{},()=>{});}
-          }
-          try{localStorage.setItem('rvgd3_'+k,JSON.stringify(v));}catch(e){}
-          ts[k]=sRow.t;if(setters[k])setters[k](v);
-        }else if(localV!=null&&(!sRow||lt>sRow.t)){
-          SB.from('gd_store').upsert({id:k,data:{v:localV,t:lt||Date.now()}}).then(()=>{},()=>{});
-        }
+        if(!sRow&&localV==null)return;
+        // PROTECTIVE MERGE — never let one device's blob replace another's (the L88 lesson, now applied to the roster)
+        const merged=(k==='gx')?GD_MERGE_GX(localV,sRow?sRow.v:null)
+                    :GD_MERGE_ARR(localV,sRow?sRow.v:null,tomb[k]);
+        const before=JSON.stringify(localV),after=JSON.stringify(merged);
+        if(after!==before){try{localStorage.setItem('rvgd3_'+k,JSON.stringify(merged));}catch(e){}if(setters[k])setters[k](merged);}
+        if(!sRow||after!==JSON.stringify(sRow.v)){ts[k]=Date.now();SB.from('gd_store').upsert({id:k,data:{v:merged,t:ts[k]}}).then(()=>{},()=>{});}
       });
       try{localStorage.setItem('rvgd3__ts',JSON.stringify(ts));}catch(e){}
     }catch(e){}
     window.__GDSYNC={ready:true};
-  };go();return()=>{c=true;};},[]);// eslint-disable-line — gd_store sync: staff/evals/sessions
+  };go();
+    let last=Date.now();const onFocus=()=>{if(Date.now()-last<20000)return;last=Date.now();go();};
+    window.addEventListener('focus',onFocus);
+    return()=>{c=true;window.removeEventListener('focus',onFocus);};},[]);// eslint-disable-line — gd_store sync: staff/evals/sessions/gx, record-level merge
 
   // ── Supabase sync helpers ──────────────────────────────────────
   const SB=()=>window.__SB;
@@ -8438,11 +8461,11 @@ const GX_GATES={
 8:[['c7',null,3,'Management & Accountability — responsible for others’ execution'],['c6',null,4,'Problem Solving & Ownership'],['c1',null,4,'Reliability — models the standard'],['c10',null,3,'KPI & Performance']],
 9:[['c7',null,4,'Management & Accountability — manages independently'],['c7',7,4,'KPI Management'],['c6',null,4,'Problem Solving & Ownership'],['c2',null,4,'GE Execution — catches what others miss'],['c5',null,4,'Schedule, Retention & Revenue']],
 10:[['c1',null,4,'Reliability & Professional Standards'],['c2',null,4,'GE Execution & Systems'],['c3',null,4,'Guest Experience & Communication'],['c4',null,4,'Revibe & Clinic Knowledge'],['c5',null,4,'Schedule, Retention & Revenue'],['c6',null,4,'Problem Solving & Ownership'],['c7',null,4,'Management & Accountability'],['c10',null,4,'KPI & Performance Management'],['c8',null,3,'Leadership & People Development — beginning'],['c9',null,3,'Systems & Operations Thinking — beginning']],
-11:[['c8',null,4,'Leadership & People Development — makes people better'],['c8',1,4,'Mentorship & Individual Growth'],['c7',null,4,'Management held at 4'],['c9',null,3,'Systems & Operations Thinking']],
-12:[['c8',0,5,'Influence & Protecting Standards — sets the department standard'],['c8',null,4,'Leadership & People Development'],['c9',null,4,'Systems & Operations Thinking'],['c10',null,4,'KPI & Performance Management'],['c7',null,4,'Management held at 4']],
-13:[['c8',6,5,'Creating Independence & Future Leaders — produces managers'],['c8',1,5,'Mentorship & Individual Growth'],['c8',null,4,'Leadership & People Development'],['c9',5,4,'Multi-Location Thinking'],['c7',null,4,'Management held at 4']],
-14:[['c9',null,4,'Systems & Operations Thinking — improves beyond one team'],['c9',0,4,'SOP & Process Improvement'],['c9',6,4,'Multi-Location Thinking & Project Execution'],['c9',2,4,'Labour, Payroll & Cost Awareness'],['c8',null,4,'Leadership held at 4'],['c8',6,5,'Creating Future Leaders held at 5'],['c10',null,4,'KPI & Performance Management']],
-15:[['c9',0,5,'SOP & Process Improvement — builds scalable architecture'],['c9',6,5,'Multi-Location Thinking & Project Execution — leads launches'],['c9',null,4,'Systems & Operations Thinking'],['c8',6,5,'Creating Future Leaders'],['c8',null,4,'Leadership & People Development'],['c10',null,4,'KPI & Performance Management']]};
+11:[['c7',null,5,'Management & Accountability — complete at 5 before leading'],['c8',null,4,'Leadership & People Development — makes people better'],['c8',1,4,'Mentorship & Individual Growth'],['c9',null,3,'Systems & Operations Thinking']],
+12:[['c7',null,5,'Management & Accountability held at 5'],['c8',0,5,'Influence & Protecting Standards — sets the department standard'],['c8',null,4,'Leadership & People Development'],['c9',null,4,'Systems & Operations Thinking'],['c10',null,4,'KPI & Performance Management']],
+13:[['c7',null,5,'Management & Accountability held at 5'],['c8',6,5,'Creating Independence & Future Leaders — produces managers'],['c8',1,5,'Mentorship & Individual Growth'],['c8',null,4,'Leadership & People Development'],['c9',5,4,'Multi-Location Thinking']],
+14:[['c7',null,5,'Management & Accountability held at 5'],['c9',null,4,'Systems & Operations Thinking — improves beyond one team'],['c9',0,4,'SOP & Process Improvement'],['c9',6,4,'Multi-Location Thinking & Project Execution'],['c9',2,4,'Labour, Payroll & Cost Awareness'],['c8',null,4,'Leadership held at 4'],['c8',6,5,'Creating Future Leaders held at 5'],['c10',null,4,'KPI & Performance Management']],
+15:[['c7',null,5,'Management & Accountability held at 5'],['c9',0,5,'SOP & Process Improvement — builds scalable architecture'],['c9',6,5,'Multi-Location Thinking & Project Execution — leads launches'],['c9',null,4,'Systems & Operations Thinking'],['c8',6,5,'Creating Future Leaders'],['c8',null,4,'Leadership & People Development'],['c10',null,4,'KPI & Performance Management']]};
 
 const GX_KPI_SLIM=[['Call & Phone Performance','Call totals — handled'],['Call & Phone Performance','Treatment-call conversion %'],['Call & Phone Performance','Call quality (definition pending)'],['Lead Performance','Lead conversion %'],['Lead Performance','Lead follow-up completion'],['Booking & Retention','Rebooking %'],['Booking & Retention','Cancellation recovery %'],['Booking & Retention','No-show rate'],['Booking & Retention','Reactivation conversion'],['Financial / Admin','Outstanding balance recovery'],['Operational','Opening / closing compliance'],['Guest Experience','Reviews & guest feedback']];
 const GX_CATS_ALL=['Call & Phone Performance','Lead Performance','Booking & Retention','Financial / Admin','Operational','Guest Experience'].concat(GX_KPI_CATALOG.map(([c])=>c));
@@ -9190,7 +9213,7 @@ function GuestExperiencePage({staff}){
         </>)}
         {gxTab==='sys'&&(<>
         {H('⭐ The gate map — every requirement, every pay step','Progression is CUMULATIVE: a step is only earned when it and every step beneath it is fully met. Nobody reaches Operations with an unmet Leadership gate, however strong their systems scores are.')}
-        <div style={{fontSize:12.5,color:'var(--g-888)',marginBottom:10,lineHeight:1.7}}>{GX_PAY.length} pay steps · {Object.values(GX_GATES).reduce((a,b)=>a+b.length,0)} gates. Gates follow the arc: categories 1-4 carry LEARN and EXECUTE · 5-6 carry IMPACT · 7 (with 6 and 10) carries MANAGE · 8 carries LEAD · 9 carries BUILD. <b style={{color:'var(--g-ccc)'}}>$25 requires 4s across every category</b> — management is only complete when nothing is weak. <b style={{color:'var(--g-ccc)'}}>$28 requires 5s in leadership</b> (creating independence and future leaders). <b style={{color:'var(--g-ccc)'}}>$32+ requires 5s in operations</b> (scalable SOP architecture, launches) while leadership is held at 5. Category-level gates (⬗) test the category; the rest test one grading question.</div>
+        <div style={{fontSize:12.5,color:'var(--g-888)',marginBottom:10,lineHeight:1.7}}>{GX_PAY.length} pay steps · {Object.values(GX_GATES).reduce((a,b)=>a+b.length,0)} gates. Gates follow the arc: categories 1-4 carry LEARN and EXECUTE · 5-6 carry IMPACT · 7 (with 6 and 10) carries MANAGE · 8 carries LEAD · 9 carries BUILD. <b style={{color:'var(--g-ccc)'}}>$25 requires 4s across every category</b> — management is only complete when nothing is weak. <b style={{color:'var(--g-ccc)'}}>From $26 up, Management must be complete at 5</b> — you cannot lead or build on an unfinished management foundation. <b style={{color:'var(--g-ccc)'}}>$28 requires 5s in leadership</b> (creating independence and future leaders). <b style={{color:'var(--g-ccc)'}}>$32+ requires 5s in operations</b> (scalable SOP architecture, launches) while leadership is held at 5. Category-level gates (⬗) test the category; the rest test one grading question.</div>
         {GX_PAY.map((pyr,pi)=>{const rows=(GX_GATES[pi]||[]);const band=GX_ROLEBYPAY[pi];const stg=GX_STAGE_OF[pi];const newStage=pi===0||GX_STAGE_OF[pi-1]!==stg;
           return(<React.Fragment key={pi}>
           {newStage&&(<div style={{display:'flex',alignItems:'center',gap:10,margin:'18px 0 8px'}}>
