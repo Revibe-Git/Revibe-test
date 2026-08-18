@@ -570,6 +570,11 @@ textarea{resize:vertical;min-height:60px;}
   body.evrpt-print .evrpt-print-area.gxrpt .gxr-band{background:#0B6E54!important;color:#fff!important;}
   body.evrpt-print .evrpt-print-area.gxrpt .gxr-band *{color:#fff!important;}
   body.evrpt-print .evrpt-print-area.gxrpt .gxr-sec{break-inside:avoid;page-break-inside:avoid;}
+  /* GX report printed to MATCH THE SITE (L113) — dark surface, colours untouched */
+  body.evrpt-print .evrpt-print-area.gxdark{background:var(--surface,#10160f)!important;padding:16px 20px!important;border:none!important;border-radius:0!important;}
+  body.evrpt-print .evrpt-print-area.gxdark .gxr-sec,body.evrpt-print .evrpt-print-area.gxdark .gxr-row{break-inside:avoid;page-break-inside:avoid;}
+  body.evrpt-print .evrpt-print-area.gxdark .gxr-band{background:linear-gradient(120deg,rgba(122,196,144,.22),rgba(122,196,144,.05))!important;}
+  @page{margin:10mm;}
   body.evrpt-print .evrpt-print-area.gxrpt .gxr-row{break-inside:avoid;page-break-inside:avoid;}
   body.evrpt-print .evrpt-print-area .evrpt-only{display:block!important;}
   body.evrpt-print .no-print{display:none!important;}
@@ -1878,7 +1883,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L112';
+window.__BUILD='build L113';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8530,7 +8535,7 @@ function GuestExperiencePage({staff}){
   }catch(e){}},[]);
   const[person,setPerson]=useState('');const[showAllStaff,setShowAllStaff]=useState(false);
   const[openCat,setOpenCat]=useState('c10');
-  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);const[revOpen,setRevOpen]=useState(null);const[chkOpen,setChkOpen]=useState(null);const[repOpen,setRepOpen]=useState(false);const[modOpen,setModOpen]=useState(null);
+  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);const[revOpen,setRevOpen]=useState(null);const[chkOpen,setChkOpen]=useState(null);const[repOpen,setRepOpen]=useState(false);const[repDark,setRepDark]=useState(true);const[modOpen,setModOpen]=useState(null);
   const names=(staff||[]).map(x=>x.name).filter(Boolean);
   const pk=person||'';
   const pd=(gx.people||{})[pk]||{};
@@ -8607,7 +8612,7 @@ function GuestExperiencePage({staff}){
         </div>
       </div>
       <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',margin:'14px 0 6px'}}>
-        {[['grade','✍️ Grading'],['sys','📖 The System'],['kpi','📈 KPI Scorecard']].map(([id,lb])=>(<button key={id} className={`btn btn-sm ${gxTab===id?'btn-go':'btn-ghost'}`} style={{fontSize:14,padding:'8px 16px'}} onClick={()=>setGxTab(id)}>{lb}</button>))}
+        {[['grade','✍️ Grading'],['sop','📘 How to Run a Review'],['sys','📖 The System'],['kpi','📈 KPI Scorecard']].map(([id,lb])=>(<button key={id} className={`btn btn-sm ${gxTab===id?'btn-go':'btn-ghost'}`} style={{fontSize:14,padding:'8px 16px'}} onClick={()=>setGxTab(id)}>{lb}</button>))}
       </div>
       {gxTab!=='sys'&&(()=>{const isGE=(p2)=>{try{const f=[(p2||{}).role,(p2||{}).title,(p2||{}).discipline].filter(Boolean).join(' · ').toLowerCase();return /guest experience|front ?desk|reception|concierge|guest services|\bgx\b|\bge\b/.test(f);}catch(e){return false;}}; // role fields ONLY — notes must never drive the roster
         const geStaff=(staff||[]).filter(isGE);const pool=(showAllStaff||geStaff.length===0)?(staff||[]):geStaff;
@@ -8621,6 +8626,112 @@ function GuestExperiencePage({staff}){
       <div style={{fontSize:12,color:'var(--g-666)',margin:'4px 0 20px'}}>KPI competency progression runs through the whole career path: {GX_PROG}. Targets & ranges are configurable placeholders (TBD) until the final GE scorecard lands — the framework doesn't change when they do.</div>
 
       {gxTab!=='kpi'&&(<div>
+        {gxTab==='sop'&&(()=>{
+          const SEC=(n,t,sub,body)=>(<div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'16px 20px',marginBottom:12}}>
+            <div style={{display:'flex',gap:12,alignItems:'baseline'}}>
+              <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:22,fontWeight:800,color:'var(--g-666)',minWidth:26}}>{n}</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:16,fontWeight:800,color:'var(--g-eee)'}}>{t}</div>
+                {sub&&<div style={{fontSize:12.5,color:'var(--g-888)',marginTop:1}}>{sub}</div>}
+              </div>
+            </div>
+            <div style={{marginTop:9,paddingLeft:38}}>{body}</div>
+          </div>);
+          const UL=(items)=>(<ul style={{margin:0,paddingLeft:18}}>{items.map((x,i)=><li key={i} style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.65,marginBottom:3}}>{x}</li>)}</ul>);
+          const SAY=(t)=>(<div style={{fontSize:13,color:'var(--g-ccc)',fontStyle:'italic',borderLeft:'2px solid var(--go)',paddingLeft:11,margin:'7px 0'}}>{t}</div>);
+          return(<div style={{maxWidth:900}}>
+            <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'18px 22px',marginBottom:14}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:24,fontWeight:800,color:'var(--g-eee)'}}>How to run a Guest Experience G&amp;D review</div>
+              <div style={{fontSize:13.5,color:'var(--g-aaa)',lineHeight:1.7,marginTop:6}}>The operating manual for whoever runs the session. Read it once end-to-end before your first review. The short version: <b style={{color:'var(--g-ddd)'}}>we do not pay for time served — we pay for demonstrated competency.</b> Your job is to establish what the person can currently do <i>consistently</i>, agree what they will demonstrate next, and make sure they get the opportunity to demonstrate it.</div>
+              <div style={{fontSize:13,color:'var(--g-888)',marginTop:8}}>Cadence: a full review each quarter · a 20-minute check-in halfway between · re-grade only what changed.</div>
+            </div>
+
+            {SEC('01','Before the session — 20 minutes of prep','Never grade cold. Walk in with a draft.',<div>
+              {UL([
+                <>Open <b>✍️ Grading</b> and select the person. If they are not in the chips, their Staff Profile role needs to say Guest Experience — fix that first, or use “＋ other staff”.</>,
+                <>Check their <b>pay level</b> on the profile card. Everything downstream — gates, checklist, report — is driven by it.</>,
+                <>Press <b>📋 Start review — today</b>. That timestamps the session and logs every change you make from here.</>,
+                <>Draft your grades <i>before</i> the meeting from evidence you already hold: what you have seen, what the numbers say, what the team reports. Leave anything you are unsure about ungraded — it becomes a question in the room.</>,
+                <>Skim the <b>📋 Progression checklist</b> so you know which gates are close. Those are the conversation.</>
+              ])}
+            </div>)}
+
+            {SEC('02','Running the session — 45 to 60 minutes','Their view first, yours second, agreement last.',<div>
+              <div style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.7,marginBottom:6}}>Sit beside them with the screen visible. This is a shared document, not a verdict being read out.</div>
+              {UL([
+                <><b>Open with the map (5 min).</b> Show the ten categories and where they sit. Explain the scale: 3 = trusted to do it alone, 4 = you make the area better, 5 = you make other people better.</>,
+                <><b>Go category by category (30 min).</b> Three questions each. Ask them first, then give your read.</>
+              ])}
+              {SAY('“Where do you think you are on this — and what would you point to as evidence?”')}
+              {UL([
+                <><b>Grade together, but you own the number.</b> Click the level, then say why. If you disagree, name the specific behaviour that is missing — that gap becomes the development action.</>,
+                <><b>Capture evidence as you go</b> with 📝: evidence, gap to next, development action, demonstration status. A grade with no evidence is just an opinion.</>,
+                <><b>Work the checklist (10 min).</b> Item by item on the gates for their next pay level. Sign off only what is demonstrated <i>consistently</i>, and write the review note on each.</>,
+                <><b>Agree two to four priorities (10 min)</b> — never more. Use the 🎓 module for the exact actions, and agree <i>where</i> each will be practised and by when.</>
+              ])}
+            </div>)}
+
+            {SEC('03','How to grade — the rules that keep it fair','Same standard for everyone, every quarter.',<div>
+              {UL([
+                <><b>Grade the behaviour, not the person.</b> Every level has a written description — pick the one that matches what they actually do most days.</>,
+                <><b>Once ≠ competent.</b> Once means capable. Independently means trusted. Only <i>consistently</i> moves the grade.</>,
+                <><b>Do not inflate to be kind.</b> An inflated 3 removes their roadmap and delays the raise they could have earned honestly.</>,
+                <><b>Do not average away a weakness.</b> Progression uses gates — a 5 in guest warmth cannot cover a 2 in delegation.</>,
+                <><b>Grade only what they can influence.</b> If clinician availability, staffing or seasonality drove the number, that is context, not competency.</>,
+                <><b>Ungraded is a legitimate answer.</b> If you have not seen it, leave it blank and create the opportunity to see it before the next review.</>
+              ])}
+            </div>)}
+
+            {SEC('04','What the levels mean in practice','The one-line test for each.',<div>
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:8}}>
+                {GX_GRADE.map(([n2,d,m2])=>(<div key={n2} style={{border:'1px solid var(--border)',borderRadius:9,padding:'9px 12px'}}>
+                  <div style={{fontSize:13.5,fontWeight:800,color:'var(--g-ddd)'}}>{n2} · {d}</div>
+                  <div style={{fontSize:12.5,color:'var(--g-999)',lineHeight:1.5}}>“{m2}”</div>
+                </div>))}
+              </div>
+              <div style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.7,marginTop:8}}>The two transitions people get wrong: <b style={{color:'var(--g-ddd)'}}>3 → 4</b> is where personal competency becomes measurable impact — they make the area better, not just run it. <b style={{color:'var(--g-ddd)'}}>4 → 5</b> is where impact becomes other people — capability built in someone else or in a system. A brilliant individual performer is a 4, not a 5.</div>
+            </div>)}
+
+            {SEC('05','How progression actually works','Gates, not averages — and pay follows the gates.',<div>
+              {UL([
+                <>Every pay step has specific <b>gates</b>: named competencies at named levels, shown on the profile card as the “Road to $X”.</>,
+                <><b>Met</b> = at or above the requirement · <b>Developing</b> = one level away · <b>Gap</b> = further out · <b>not graded</b> = you owe them an assessment.</>,
+                <>All gates met <i>and</i> every checklist item signed off = ready for the pay conversation. Bring it to Dave with the report attached.</>,
+                <>Role and pay are separate: pay reflects demonstrated value, role reflects responsibility and scope. Someone can earn more inside the same title.</>
+              ])}
+            </div>)}
+
+            {SEC('06','After the session — close it properly','Fifteen minutes that make the next review easy.',<div>
+              {UL([
+                <>Write the <b>Review summary</b> in the review’s ▸ details: themes, what was agreed, anything you promised.</>,
+                <>Press <b>✓ Complete review</b> — it stamps the date and logs every score that changed during the session.</>,
+                <>Open <b>📄 Development report</b>, print or save as PDF, and give them a copy: strengths, gaps, priorities and the proof required.</>,
+                <>Book the halfway check-in <i>now</i>, and put the practice opportunities into the schedule — a development action with no scheduled opportunity is a broken promise.</>,
+                <>Coming back later is fine: <b>✎ reopen</b> any completed review, make the change, save — the amendment is logged with its own date.</>
+              ])}
+            </div>)}
+
+            {SEC('07','Common mistakes','If a review goes sideways, it is usually one of these.',<div>
+              {UL([
+                <><b>Grading from scratch in the room.</b> Slow, and it invites negotiation. Draft first.</>,
+                <><b>Ten priorities.</b> Nobody improves ten things at once. Two to four.</>,
+                <><b>Vague actions.</b> “Be more proactive” is not an action — the 🎓 modules exist so it never has to be.</>,
+                <><b>Recency bias.</b> Grade the quarter, not last Tuesday.</>,
+                <><b>Silent expectations.</b> A gate that was never explained cannot hold back a raise. Show them the road every time.</>,
+                <><b>No opportunity given.</b> We cannot require someone to demonstrate management while never letting them manage — that is on us, not them.</>
+              ])}
+            </div>)}
+
+            {SEC('08','Quick answers','What comes up in the first few sessions.',<div>
+              {UL([
+                <><b>They disagree with a grade.</b> Ask what evidence they would point to. If it is real and consistent, change it in the room — the log records that you did. If not, name exactly what you would need to see.</>,
+                <><b>Strong everywhere but one gate.</b> That gate is the entire conversation; everything else is maintenance.</>,
+                <><b>They are brand new.</b> Grade what exists, leave the rest ungraded, work only the $18–19 gates.</>,
+                <><b>Nothing changed this quarter.</b> That is a finding. Ask what got in the way — and whether the opportunity was actually there.</>,
+                <><b>Where do KPIs fit?</b> Competency is the 🎓 side (can they work the metric); performance is the 📈 side (is the metric in range). Never read a bad number as poor competency until you know what they could influence.</>
+              ])}
+            </div>)}
+          </div>);})()}
         {gxTab==='sys'&&(<>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:12,marginBottom:14}}>
           {GX_SCALE.map(([t,d])=>(<div key={t} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'13px 16px'}}><div style={{fontSize:14,fontWeight:800,color:'var(--c-grn)'}}>{t}</div><div style={{fontSize:13,color:'var(--g-aaa)',lineHeight:1.5}}>“{d}”</div></div>))}
@@ -8783,16 +8894,20 @@ function GuestExperiencePage({staff}){
           const curStage=curRole?parseInt(String(curRole).replace(/[^0-9]/g,'').slice(0,1),10):null;
           const stageAvg=(cids)=>{const v=cids.map(c=>catAvg(c)).filter(x=>x!=null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
           const H2=(t)=>(<div className="evrpt-h" style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,letterSpacing:'1.3px',textTransform:'uppercase',color:'var(--c-grn)',margin:'22px 0 9px',paddingLeft:10,borderLeft:'4px solid var(--c-grn)'}}>{t}</div>);
-          const chip=(v)=>({display:'inline-block',minWidth:34,textAlign:'center',fontWeight:800,color:'#fff',background:v?(v>=4?'#0B6E54':v>=3?'#3f8f43':v>=2?'#9a7512':'#b4650f'):'#93a69b',borderRadius:6,padding:'1px 7px'});
+          const chip=(v)=>({display:'inline-block',minWidth:30,textAlign:'right',fontWeight:800,color:v?(v>=4?'var(--c-grn)':v>=3?'var(--c-lime2)':v>=2?'var(--c-yel)':'var(--c-amb)'):'var(--g-666)'});
           const openGates=gateRows.filter(r=>r.st!=='Met');
           const tgt=String(nxtIdx);const chkAll=((pd.chk||{})[tgt])||{};
           return(<div style={{marginBottom:16}}>
             <div className="no-print" style={{display:'flex',gap:8,marginBottom:10}}>
               <button className="btn btn-go btn-sm" title="Opens the print dialog — choose Save as PDF as the destination" onClick={()=>{document.body.classList.add('evrpt-print');const done=()=>{document.body.classList.remove('evrpt-print');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);setTimeout(()=>{window.print();setTimeout(done,900);},60);}}>🖨 Print / Save as PDF</button>
               <button className="btn btn-ghost btn-sm" onClick={()=>setRepOpen(false)}>✕ Close report</button>
-              <span style={{fontSize:11.5,color:'var(--g-666)',alignSelf:'center'}}>Prints as a clean light-theme document — hand it to {pk.split(' ')[0]} at the review.</span>
+              <span style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:12,color:'var(--g-888)'}}>Print style:
+                <button className={'btn btn-xs '+(repDark?'btn-go':'btn-ghost')} title="Prints exactly as it looks here — dark background, full colour. Needs a colour printer or Save as PDF." onClick={()=>setRepDark(true)}>Match the site</button>
+                <button className={'btn btn-xs '+(!repDark?'btn-go':'btn-ghost')} title="Light background, colour accents kept — better for a mono office printer and less ink." onClick={()=>setRepDark(false)}>Light paper</button>
+              </span>
+              <span style={{fontSize:11.5,color:'var(--g-666)',alignSelf:'center'}}>Save as PDF keeps full colour · a mono laser prints grey either way.</span>
             </div>
-            <div className="evrpt-print-area gxrpt" style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'22px 26px'}}>
+            <div className={'evrpt-print-area '+(repDark?'evrpt-dark gxdark':'gxrpt')} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'22px 26px'}}>
               <div className="gxr-band gxr-sec" style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end',background:'linear-gradient(120deg,rgba(11,110,84,.22),rgba(11,110,84,.06))',borderLeft:'5px solid var(--c-grn)',borderRadius:10,padding:'16px 20px',marginBottom:4}}>
                 <div>
                   <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2.4px',color:'var(--g-888)'}}>REVIBE · GUEST EXPERIENCE · GROWTH &amp; DEVELOPMENT</div>
@@ -8830,7 +8945,7 @@ function GuestExperiencePage({staff}){
               {H2('Competency scorecard — all ten categories')}
               <div className="gxr-sec" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 26px'}}>
                 {GX_CATS.map(([cid,cname],ci)=>{const a=catAvg(cid);return(<div key={cid} style={{display:'flex',gap:9,fontSize:12.5,alignItems:'center',padding:'5px 8px',background:ci%2?'transparent':'var(--stripe)',borderRadius:6}}>
-                  <span style={{width:16,height:16,borderRadius:4,background:GX_HUE[cid],opacity:.85,flexShrink:0}}/>
+                  <span style={{width:8,height:8,borderRadius:2,background:GX_HUE[cid],opacity:.7,flexShrink:0}}/>
                   <span style={{flex:1,color:'var(--g-ccc)'}}>{cid.replace('c','')}. {cname}</span>
                   <span style={{color:'var(--g-777)',letterSpacing:'.5px'}}>{bar(a)}</span>
                   <span style={chip(a)}>{a?a.toFixed(1):'—'}</span>
@@ -8839,14 +8954,14 @@ function GuestExperiencePage({staff}){
               {ungraded>0&&<div style={{fontSize:11.5,color:'var(--g-666)',marginTop:5}}>{ungraded} of {qAll.length} grading questions not yet assessed — scores above reflect what has been graded.</div>}
 
               {H2('Strengths — what to keep using')}
-              {strList.length?strList.map(x=>(<div key={x.cid+x.qi} className="gxr-row" style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:5,padding:'7px 11px',borderLeft:'4px solid var(--c-grn)',background:'rgba(11,110,84,.07)',borderRadius:'0 8px 8px 0'}}>
-                <b style={{color:'var(--c-grn)'}}>{x.key} {x.t} — Level {x.v} · {GX_GRADE[x.v-1][1]}.</b> {x.lv[x.v-1]}.
+              {strList.length?strList.map(x=>(<div key={x.cid+x.qi} className="gxr-row" style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:4,padding:'4px 0 4px 12px',borderLeft:'2px solid var(--c-grn)'}}>
+                <b style={{color:'var(--g-ddd)'}}>{x.key} {x.t} — <span style={{color:'var(--c-grn)'}}>Level {x.v} · {GX_GRADE[x.v-1][1]}</span>.</b> {x.lv[x.v-1]}.
               </div>)):<div style={{fontSize:12.5,color:'var(--g-777)'}}>Nothing graded yet — grade the questions to populate this section.</div>}
               {strList.length>0&&<div style={{fontSize:12,color:'var(--g-999)',marginTop:4}}>Where a strength is at 4–5, the next move is using it for others: train, document, or own that area so the capability scales beyond one person.</div>}
 
               {H2('Gaps — what is holding progression')}
-              {gapList.length?gapList.map(x=>(<div key={x.cid+x.qi} className="gxr-row" style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:5,padding:'7px 11px',borderLeft:'4px solid var(--c-amb)',background:'rgba(180,101,15,.07)',borderRadius:'0 8px 8px 0'}}>
-                <b style={{color:'var(--c-amb)'}}>{x.key} {x.t} — currently Level {x.v} · {GX_GRADE[x.v-1][1]}.</b> To reach Level {Math.min(5,x.v+1)}: {x.lv[Math.min(4,x.v)]}.
+              {gapList.length?gapList.map(x=>(<div key={x.cid+x.qi} className="gxr-row" style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55,marginBottom:4,padding:'4px 0 4px 12px',borderLeft:'2px solid var(--c-amb)'}}>
+                <b style={{color:'var(--g-ddd)'}}>{x.key} {x.t} — <span style={{color:'var(--c-amb)'}}>currently Level {x.v} · {GX_GRADE[x.v-1][1]}</span>.</b> To reach Level {Math.min(5,x.v+1)}: {x.lv[Math.min(4,x.v)]}.
               </div>)):<div style={{fontSize:12.5,color:'var(--g-777)'}}>No graded gaps recorded.</div>}
 
               {nxtIdx!=null&&(<>
