@@ -1883,7 +1883,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L125';
+window.__BUILD='build L127';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8913,6 +8913,28 @@ function GuestExperiencePage({staff,setStaff,addNotif}){
               <div style={{height:5,background:'var(--surface3)',borderRadius:3,overflow:'hidden'}}><span style={{display:'block',height:'100%',width:(a?(a/5*100):0)+'%',background:barCol(a)}}/></div>
             </div>);})}
           </div>
+          {(()=>{const sRec=(staff||[]).find(x=>x&&x.name===pk)||{};const ct=pd.contract;
+                      const ren=sRec.contractRenewal;const dleft=ren?Math.round((new Date(ren)-new Date())/86400000):null;
+                      if(!ct&&!ren)return(<div style={{fontSize:12,color:'var(--g-666)',marginTop:10,borderTop:'1px dashed var(--border)',paddingTop:8}}>📄 No contract renewal date on file for {pk} — add it on their Staff Profile (Edit → Contract Renewal Date).</div>);
+                      return(<div style={{marginTop:9,border:'1px solid '+(ct&&ct.status==='pending'?'var(--c-amb)':'var(--border)'),borderRadius:10,padding:'10px 13px',background:ct&&ct.status==='pending'?'rgba(180,101,15,.08)':'var(--surface3)'}}>
+                        <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                          <span style={{fontSize:12.5,fontWeight:800,color:'var(--g-ddd)'}}>📄 Contract</span>
+                          {ren&&<span style={{fontSize:12.5,color:dleft<0?'var(--c-red)':dleft<=60?'var(--c-amb)':'var(--g-888)'}}>Renews {ren}{dleft!=null?(dleft<0?' · overdue by '+Math.abs(dleft)+' days':' · in '+dleft+' days'):''}</span>}
+                          {sRec.contractSigned&&<span style={{fontSize:12,color:'var(--g-666)'}}>last signed {sRec.contractSigned}</span>}
+                        </div>
+                        {ct&&ct.status==='pending'&&(<div style={{marginTop:7}}>
+                          <div style={{fontSize:12.5,color:'var(--c-amb)',fontWeight:800}}>⚠ Amendment pending signature — {ct.from} → {ct.to} ({ct.role} · {ct.step}), raised {ct.raised}</div>
+                          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:7}}>
+                            <span style={{fontSize:12,color:'var(--g-888)'}}>Effective</span>
+                            <input type="date" value={ct.effective||''} onChange={e=>setPd({contract:{...ct,effective:e.target.value}})} style={SEL}/>
+                            <button className="btn btn-go btn-xs" title="Open the signable amendment letter — print or save as PDF" onClick={()=>setConOpen(true)}>📄 Generate amendment</button>
+                            <button className="btn btn-ghost btn-xs" title="Record that the amendment has been signed" onClick={()=>{const d=new Date().toISOString().slice(0,10);setPd({contract:{...ct,status:'signed',signed:d}});
+                              const orv=(pd.reviews||[]).find(x=>!x.closed);if(orv)setRev(orv.id,{},['Contract amendment signed '+d+' ('+ct.from+' → '+ct.to+')']);
+                              if(sRec&&sRec.id!=null&&typeof setStaff==='function')setStaff(prev=>(prev||[]).map(x=>x.id===sRec.id?{...x,rate:ct.to+'/hr',contractSigned:d}:x));}}>✓ Mark signed</button>
+                          </div>
+                        </div>)}
+                        {ct&&ct.status==='signed'&&<div style={{fontSize:12.5,color:'var(--c-grn)',marginTop:5}}>✓ Amendment signed {ct.signed} — {ct.from} → {ct.to}. Rate updated on their profile.</div>}
+                      </div>);})()}
           {nxtIdx!=null&&(<div>
             <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6,flexWrap:'wrap'}}>
               <span style={{fontSize:14,fontWeight:800,color:'var(--g-eee)'}}>🎯 Road to {GX_PAY[nxtIdx][0]} — {GX_PAY[nxtIdx][1]}</span>
@@ -8985,28 +9007,7 @@ function GuestExperiencePage({staff,setStaff,addNotif}){
                       return gr<tot?(<div style={{fontSize:12,color:'var(--g-777)',marginTop:6}}>⚠ {tot-gr} of {tot} grading questions are not graded yet — category scores only average what has been graded, so a high number can still hide an ungraded gate.</div>):null;})()}
                     {!ahead&&!behind&&<div style={{fontSize:12.5,color:'var(--g-777)',marginTop:5}}>Pay and assessment agree. Next step up: {nxtIdx!=null?GX_PAY[nxtIdx][0]+' · '+GX_PAY[nxtIdx][1]:'top of the ladder'}.</div>}
                     {(pd.payHist||[]).length>0&&<div style={{fontSize:11.5,color:'var(--g-666)',marginTop:5}}>Pay history: {(pd.payHist||[]).map(h=>h.date+' '+h.from+'→'+h.to).join(' · ')}</div>}
-                    {(()=>{const sRec=(staff||[]).find(x=>x&&x.name===pk)||{};const ct=pd.contract;
-                      const ren=sRec.contractRenewal;const dleft=ren?Math.round((new Date(ren)-new Date())/86400000):null;
-                      if(!ct&&!ren)return(<div style={{fontSize:11.5,color:'var(--g-666)',marginTop:6}}>No contract renewal date on file — add it on their Staff Profile.</div>);
-                      return(<div style={{marginTop:9,border:'1px solid '+(ct&&ct.status==='pending'?'var(--c-amb)':'var(--border)'),borderRadius:10,padding:'10px 13px',background:ct&&ct.status==='pending'?'rgba(180,101,15,.08)':'var(--surface3)'}}>
-                        <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-                          <span style={{fontSize:12.5,fontWeight:800,color:'var(--g-ddd)'}}>📄 Contract</span>
-                          {ren&&<span style={{fontSize:12.5,color:dleft<0?'var(--c-red)':dleft<=60?'var(--c-amb)':'var(--g-888)'}}>Renews {ren}{dleft!=null?(dleft<0?' · overdue by '+Math.abs(dleft)+' days':' · in '+dleft+' days'):''}</span>}
-                          {sRec.contractSigned&&<span style={{fontSize:12,color:'var(--g-666)'}}>last signed {sRec.contractSigned}</span>}
-                        </div>
-                        {ct&&ct.status==='pending'&&(<div style={{marginTop:7}}>
-                          <div style={{fontSize:12.5,color:'var(--c-amb)',fontWeight:800}}>⚠ Amendment pending signature — {ct.from} → {ct.to} ({ct.role} · {ct.step}), raised {ct.raised}</div>
-                          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:7}}>
-                            <span style={{fontSize:12,color:'var(--g-888)'}}>Effective</span>
-                            <input type="date" value={ct.effective||''} onChange={e=>setPd({contract:{...ct,effective:e.target.value}})} style={SEL}/>
-                            <button className="btn btn-go btn-xs" title="Open the signable amendment letter — print or save as PDF" onClick={()=>setConOpen(true)}>📄 Generate amendment</button>
-                            <button className="btn btn-ghost btn-xs" title="Record that the amendment has been signed" onClick={()=>{const d=new Date().toISOString().slice(0,10);setPd({contract:{...ct,status:'signed',signed:d}});
-                              const orv=(pd.reviews||[]).find(x=>!x.closed);if(orv)setRev(orv.id,{},['Contract amendment signed '+d+' ('+ct.from+' → '+ct.to+')']);
-                              if(sRec&&sRec.id!=null&&typeof setStaff==='function')setStaff(prev=>(prev||[]).map(x=>x.id===sRec.id?{...x,rate:ct.to+'/hr',contractSigned:d}:x));}}>✓ Mark signed</button>
-                          </div>
-                        </div>)}
-                        {ct&&ct.status==='signed'&&<div style={{fontSize:12.5,color:'var(--c-grn)',marginTop:5}}>✓ Amendment signed {ct.signed} — {ct.from} → {ct.to}. Rate updated on their profile.</div>}
-                      </div>);})()}
+
                   </div>);})()}
               </div>);})()}
           </div>)}
@@ -11992,13 +11993,21 @@ function getBandLabel(v){
   if(n>=5)return{label:'Transactional',cls:'band-transact'};
   return{label:'Surface',cls:'band-surface'};
 }function ProfileEditTab({staff,setStaff,perfData,onClose}){
-  const[editing,setEditing]=useState(false);
+  const[editing,setEditing]=useState(false);const[conPrint,setConPrint]=useState(false);
   const[f,setF]=useState({name:staff.name||'',email:staff.email||'',discipline:staff.discipline||'pt',role:staff.role||'',site:staff.site||'Markham',roadmap:staff.roadmap||'',archetype:staff.archetype||'',notes:staff.notes||'',reflection:staff.reflection||'',tracks:staff.tracks||[],match_profile:mpFor(staff)});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const setMP=(k,v)=>setF(p=>({...p,match_profile:{...(p.match_profile||{}),[k]:v}}));
   const toggleTrack=t=>setF(p=>({...p,tracks:p.tracks.includes(t)?p.tracks.filter(x=>x!==t):[...p.tracks,t]}));
   const save=()=>{
-    const updated={...staff,...f};
+    let updated={...staff,...f};
+    // A split-% move is a compensation change — raise the same contract amendment the GE pay ladder does (L126)
+    const oldSplit=(staff.split==null||staff.split==='')?null:String(staff.split);
+    const newSplit=(f.split==null||f.split==='')?null:String(f.split);
+    if(newSplit&&oldSplit!==newSplit){
+      const today=new Date().toISOString().slice(0,10);
+      updated={...updated,contract:{status:'pending',kind:'split',raised:today,from:oldSplit?oldSplit+'%':'—',to:newSplit+'%',role:f.role||staff.role||'',step:'Split % change',effective:'',signed:''}};
+      try{if(window.__ADDNOTIF)window.__ADDNOTIF({type:'contract',from:'G&D',to:updated.name,preview:'Split moved '+(oldSplit?oldSplit+'%':'—')+' → '+newSplit+'% — contract amendment needs generating and signing.',resourceTitle:'Contract amendment · '+updated.name});}catch(e){}
+    }
     setStaff(prev=>prev.map(s=>s.id===staff.id?updated:s));
     saveMP(staff.id,f.match_profile);
     setEditing(false);
@@ -12050,6 +12059,52 @@ function getBandLabel(v){
             <span style={{fontSize:14,color:'var(--text)'}}>{v}</span>
           </div>
         ))}
+        {(()=>{const ct=staff.contract;const ren=staff.contractRenewal;const dleft=ren?Math.round((new Date(ren)-new Date())/86400000):null;
+          if(!ct&&!ren)return null;
+          return(<div style={{marginTop:12,border:'1px solid '+(ct&&ct.status==='pending'?'var(--c-amb)':'var(--border)'),borderRadius:8,padding:'12px 15px',background:ct&&ct.status==='pending'?'rgba(180,101,15,.08)':'var(--surface2)'}}>
+            <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+              <span style={{fontSize:15,fontWeight:800,color:'var(--text)'}}>📄 Contract</span>
+              {ren&&<span style={{fontSize:14,color:dleft<0?'var(--c-red)':dleft<=60?'var(--c-amb)':'var(--g-999)'}}>Renews {ren}{dleft!=null?(dleft<0?' · overdue by '+Math.abs(dleft)+' days':' · in '+dleft+' days'):''}</span>}
+            </div>
+            {ct&&ct.status==='pending'&&(<div style={{marginTop:8}}>
+              <div style={{fontSize:14,color:'var(--c-amb)',fontWeight:800,lineHeight:1.6}}>⚠ Amendment pending signature — {ct.kind==='split'?'split ':''}{ct.from} → {ct.to}{ct.step?' ('+ct.step+')':''}, raised {ct.raised}</div>
+              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:8}}>
+                <span style={{fontSize:13,color:'var(--g-999)'}}>Effective</span>
+                <input type="date" value={ct.effective||''} onChange={e=>{const nx={...ct,effective:e.target.value};setStaff(prev=>prev.map(x=>x.id===staff.id?{...x,contract:nx}:x));}} style={{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:13,padding:'4px 7px'}}/>
+                <button className="btn btn-lime btn-sm" onClick={()=>setConPrint(true)}>📄 Generate amendment</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{const d=new Date().toISOString().slice(0,10);
+                  setStaff(prev=>prev.map(x=>x.id===staff.id?{...x,contract:{...ct,status:'signed',signed:d},contractSigned:d,...(ct.kind==='split'?{}:{rate:ct.to+'/hr'})}:x));}}>✓ Mark signed</button>
+              </div>
+            </div>)}
+            {ct&&ct.status==='signed'&&<div style={{fontSize:14,color:'var(--lime)',marginTop:6}}>✓ Amendment signed {ct.signed} — {ct.from} → {ct.to}.</div>}
+            {conPrint&&ct&&(<div style={{marginTop:12}}>
+              <div className="no-print" style={{display:'flex',gap:8,marginBottom:8}}>
+                <button className="btn btn-lime btn-sm" onClick={()=>{document.body.classList.add('evrpt-print');const done=()=>{document.body.classList.remove('evrpt-print');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);setTimeout(()=>{window.print();setTimeout(done,900);},60);}}>🖨 Print / Save as PDF</button>
+                <button className="btn btn-ghost btn-sm" onClick={()=>setConPrint(false)}>✕ Close</button>
+              </div>
+              <div className="evrpt-print-area evrpt-dark gxdark" style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'22px 26px'}}>
+                <div className="gxr-band gxr-sec" style={{background:'linear-gradient(120deg,rgba(122,196,144,.22),rgba(122,196,144,.05))',borderLeft:'5px solid var(--lime)',borderRadius:9,padding:'14px 18px',marginBottom:12}}>
+                  <div style={{fontSize:12,letterSpacing:'2.2px',color:'var(--g-888)'}}>REVIBE · EMPLOYMENT AGREEMENT AMENDMENT</div>
+                  <div style={{fontSize:24,fontWeight:800,color:'var(--text)',lineHeight:1.15}}>{staff.name}</div>
+                  <div style={{fontSize:13,color:'var(--g-999)'}}>{staff.role||''} · issued {ct.raised}</div>
+                </div>
+                <div style={{fontSize:14,color:'var(--g-aaa)',lineHeight:1.85}}>
+                  <p>This amendment modifies the existing employment agreement between <b style={{color:'var(--text)'}}>Revibe</b> and <b style={{color:'var(--text)'}}>{staff.name}</b>. All other terms remain unchanged and in force.</p>
+                  <div className="gxr-sec" style={{margin:'12px 0',padding:'13px 16px',background:'var(--surface3)',borderRadius:9}}>
+                    {[[ct.kind==='split'?'Previous split':'Previous rate',ct.from],[ct.kind==='split'?'New split':'New rate',ct.to],['Role',staff.role||'—'],['Change',ct.step||'—'],['Effective date',ct.effective||new Date().toISOString().slice(0,10)]].map(([k2,v2])=>(
+                      <div key={k2} style={{display:'flex',gap:12,fontSize:13.5,padding:'3px 0'}}><span style={{width:170,color:'var(--g-888)'}}>{k2}</span><b style={{color:'var(--text)'}}>{v2}</b></div>))}
+                  </div>
+                  <p>{ct.kind==='split'?'This change reflects demonstrated growth assessed through the Revibe clinician Growth & Development framework and the agreed compensation model.':'This increase reflects demonstrated competency assessed through the Revibe Growth & Development framework, with every competency gate for this step met and signed off.'}</p>
+                  <p style={{fontSize:13,color:'var(--g-999)'}}>Changes take effect on the first full pay period on or after the effective date above.</p>
+                </div>
+                <div style={{display:'flex',gap:36,marginTop:26,paddingTop:10,borderTop:'1px solid var(--border)'}}>
+                  {[[staff.name,'Employee'],['','Revibe — on behalf of the company']].map(([nm,lb],i2)=>(<div key={i2} style={{flex:1}}>
+                    <div style={{borderBottom:'1px solid var(--g-888)',height:28}}/>
+                    <div style={{fontSize:11.5,color:'var(--g-888)',marginTop:3}}>{lb}{nm?' · '+nm:''} — signature &amp; date</div></div>))}
+                </div>
+              </div>
+            </div>)}
+          </div>);})()}
         <div style={{display:'flex',alignItems:'center',padding:'6px 0'}}>
           <span style={{fontSize:14,color:'var(--g-999)',minWidth:100}}>Tracks</span>
           <div className="flex aic g5">{(staff.tracks||[]).map(t=><span key={t} className={`track-pill tp-${t} active`}>{TRACK_META[t]?.label}</span>)}</div>
@@ -14232,6 +14287,7 @@ function useNotifications(){
   });
   useEffect(()=>{try{localStorage.setItem('rvgd3_notifs',JSON.stringify(notifs));}catch(e){}},[notifs]);
   const addNotif=(n)=>setNotifs(p=>[{...n,id:'n'+Date.now()+Math.random(),ts:new Date().toISOString(),read:false},...p].slice(0,100));
+  useEffect(()=>{window.__ADDNOTIF=addNotif;},[]);// eslint-disable-line — lets the profile editor raise contract notifications
   const markRead=(id)=>setNotifs(p=>p.map(n=>n.id===id?{...n,read:true}:n));
   const markAllRead=()=>setNotifs(p=>p.map(n=>({...n,read:true})));
   return{notifs,addNotif,markRead,markAllRead};
