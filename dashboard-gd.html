@@ -1883,7 +1883,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L123';
+window.__BUILD='build L125';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -8626,7 +8626,7 @@ c10:[{t:'KPI Awareness, Literacy & Targets',src:[0,1,4],lv:['Limited exposure to
 {t:'KPI Execution, Monitoring & Measurement',src:[2,3,5,8],lv:['Requires direction; does not independently review; completes activity without measuring result','Completes assigned KPI tasks; reviews when prompted; recognizes obvious misses; reports basic activity','Executes expected workflows independently, monitors assigned metrics regularly, identifies meaningful variance, reports activity AND outcome','Improves workflows, proactively spots emerging trends, determines likely reasons for variance, measures whether interventions changed the KPI','Designs scalable workflows, monitoring cadence, variance-surfacing systems and a testing culture where interventions are evaluated']},
 {t:'KPI Diagnosis, Action & Leading Through Others',src:[6,7,9,10,11],lv:['Sees the number only; waits for direction; sees KPIs as management’s job; limited ability to explain numbers','Identifies the obvious explanation, performs assigned corrective actions, understands personal contribution, can report the number','Identifies likely contributing behaviours, takes appropriate action independently, owns assigned performance areas, explains performance clearly, manages team execution against a metric','Root-cause analysis across data points, builds improvement plans, holds the team accountable, communicates metric + cause + implication + action, coaches the team to improve the KPI','Teaches managers to diagnose rather than react, builds repeatable corrective-action systems, creates healthy accountability across locations, develops managers who independently improve performance']}]};
 const gxSeed=()=>{const kpis=GX_KPI_SLIM.map(([cat,n],i)=>({id:'fd_'+i,name:n,cat,target:'TBD',range:'TBD',warn:'TBD',crit:'TBD',infl:'Shared influence',req:3,freq:'Weekly',def:'',calc:'',src:'',owner:'',cur:'',trend:'—',act:''}));return{people:{},kpis};};
-function GuestExperiencePage({staff}){
+function GuestExperiencePage({staff,setStaff,addNotif}){
   const[gx,setGx]=useState(()=>{const g=ld('gx',null);if(g&&g.kpis){const untouched=g.kpis.length>=35&&g.kpis.every(k=>k.target==='TBD'&&!k.def&&!k.cur);if(untouched)return{...g,kpis:gxSeed().kpis};return g;}return gxSeed();});
   useEffect(()=>sv('gx',gx),[gx]);
   const[gxTab,setGxTab]=useState('grade');
@@ -8640,7 +8640,7 @@ function GuestExperiencePage({staff}){
   }catch(e){}},[]);
   const[person,setPerson]=useState('');const[showAllStaff,setShowAllStaff]=useState(false);
   const[openCat,setOpenCat]=useState('c10');
-  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);const[revOpen,setRevOpen]=useState(null);const[chkOpen,setChkOpen]=useState(null);const[repOpen,setRepOpen]=useState(false);const[repDark,setRepDark]=useState(true);const[modOpen,setModOpen]=useState(null);const[sopStep,setSopStep]=useState(0);
+  const[kOpen,setKOpen]=useState(null);const[evOpen,setEvOpen]=useState(null);const[lvOpen,setLvOpen]=useState(null);const[revOpen,setRevOpen]=useState(null);const[chkOpen,setChkOpen]=useState(null);const[repOpen,setRepOpen]=useState(false);const[repDark,setRepDark]=useState(true);const[conOpen,setConOpen]=useState(false);const[modOpen,setModOpen]=useState(null);const[sopStep,setSopStep]=useState(0);
   const names=(staff||[]).map(x=>x.name).filter(Boolean);
   const pk=person||'';
   const pd=(gx.people||{})[pk]||{};
@@ -8967,7 +8967,11 @@ function GuestExperiencePage({staff}){
                     <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
                       <span style={{fontSize:12.5,color:'var(--g-888)'}}>Currently paid <b style={{color:'var(--g-ddd)'}}>{GX_PAY[cur][0]}/hr</b> <span style={{color:'var(--g-666)'}}>({GX_ROLEBYPAY[cur]} · {GX_PAY[cur][1]} step)</span></span>
                       <span style={{fontSize:12.5,color:'var(--g-888)'}}>Highest pay step fully earned: <b style={{color:ahead?'var(--c-grn)':behind?'var(--c-amb)':'var(--g-ddd)'}}>{GX_PAY[earnedIdx][0]}/hr</b> <span style={{color:'var(--g-666)'}}>({GX_ROLEBYPAY[earnedIdx]} · {GX_PAY[earnedIdx][1]} step)</span></span>
-                      {ahead&&<button className="btn btn-go btn-xs" title={'Move '+pk+' to '+GX_PAY[earnedIdx][0]+' — the current rate is kept in the review history'} onClick={()=>{const from=GX_PAY[cur][0];setPd({payLevel:earnedIdx,payHist:[...(pd.payHist||[]),{date:new Date().toISOString().slice(0,10),from,to:GX_PAY[earnedIdx][0]}]});const orv=(pd.reviews||[]).find(x=>!x.closed);if(orv)setRev(orv.id,{},['Pay level moved '+from+' → '+GX_PAY[earnedIdx][0]+' (all gates met cumulatively)']);}}>↑ Move to {GX_PAY[earnedIdx][0]}</button>}
+                      {ahead&&<button className="btn btn-go btn-xs" title={'Move '+pk+' to '+GX_PAY[earnedIdx][0]+' — the current rate is kept in the review history'} onClick={()=>{const from=GX_PAY[cur][0];const today=new Date().toISOString().slice(0,10);
+                        setPd({payLevel:earnedIdx,payHist:[...(pd.payHist||[]),{date:today,from,to:GX_PAY[earnedIdx][0]}],
+                          contract:{status:'pending',raised:today,from,to:GX_PAY[earnedIdx][0],role:GX_ROLEBYPAY[earnedIdx],step:GX_PAY[earnedIdx][1],effective:'',signed:''}});
+                        const orv=(pd.reviews||[]).find(x=>!x.closed);if(orv)setRev(orv.id,{},['Pay level moved '+from+' → '+GX_PAY[earnedIdx][0]+' (all gates met cumulatively)','📄 Contract amendment raised — awaiting signature']);
+                        try{if(typeof addNotif==='function')addNotif({type:'contract',from:'G&D',to:pk,preview:'Pay move '+from+' → '+GX_PAY[earnedIdx][0]+' approved on gates — contract amendment needs generating and signing.',resourceTitle:'Contract amendment · '+pk});}catch(e){}}}>↑ Move to {GX_PAY[earnedIdx][0]}</button>}
                     </div>
                     {ahead&&<div style={{fontSize:12.5,color:'var(--c-grn)',marginTop:5,lineHeight:1.6}}>Every gate up to and including {GX_PAY[earnedIdx][0]} is met — {pk.split(' ')[0]} is being paid {earnedIdx-cur} step{earnedIdx-cur>1?'s':''} below the assessment. Confirm each is demonstrated consistently, then move them.</div>}
                     {behind&&<div style={{fontSize:12.5,color:'var(--c-amb)',marginTop:5,lineHeight:1.6}}>Paid above the current assessment. That is not automatically wrong — grades may be pending, or the rate was set for another reason — but the gap should be a deliberate decision, not a surprise.</div>}
@@ -8981,6 +8985,28 @@ function GuestExperiencePage({staff}){
                       return gr<tot?(<div style={{fontSize:12,color:'var(--g-777)',marginTop:6}}>⚠ {tot-gr} of {tot} grading questions are not graded yet — category scores only average what has been graded, so a high number can still hide an ungraded gate.</div>):null;})()}
                     {!ahead&&!behind&&<div style={{fontSize:12.5,color:'var(--g-777)',marginTop:5}}>Pay and assessment agree. Next step up: {nxtIdx!=null?GX_PAY[nxtIdx][0]+' · '+GX_PAY[nxtIdx][1]:'top of the ladder'}.</div>}
                     {(pd.payHist||[]).length>0&&<div style={{fontSize:11.5,color:'var(--g-666)',marginTop:5}}>Pay history: {(pd.payHist||[]).map(h=>h.date+' '+h.from+'→'+h.to).join(' · ')}</div>}
+                    {(()=>{const sRec=(staff||[]).find(x=>x&&x.name===pk)||{};const ct=pd.contract;
+                      const ren=sRec.contractRenewal;const dleft=ren?Math.round((new Date(ren)-new Date())/86400000):null;
+                      if(!ct&&!ren)return(<div style={{fontSize:11.5,color:'var(--g-666)',marginTop:6}}>No contract renewal date on file — add it on their Staff Profile.</div>);
+                      return(<div style={{marginTop:9,border:'1px solid '+(ct&&ct.status==='pending'?'var(--c-amb)':'var(--border)'),borderRadius:10,padding:'10px 13px',background:ct&&ct.status==='pending'?'rgba(180,101,15,.08)':'var(--surface3)'}}>
+                        <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                          <span style={{fontSize:12.5,fontWeight:800,color:'var(--g-ddd)'}}>📄 Contract</span>
+                          {ren&&<span style={{fontSize:12.5,color:dleft<0?'var(--c-red)':dleft<=60?'var(--c-amb)':'var(--g-888)'}}>Renews {ren}{dleft!=null?(dleft<0?' · overdue by '+Math.abs(dleft)+' days':' · in '+dleft+' days'):''}</span>}
+                          {sRec.contractSigned&&<span style={{fontSize:12,color:'var(--g-666)'}}>last signed {sRec.contractSigned}</span>}
+                        </div>
+                        {ct&&ct.status==='pending'&&(<div style={{marginTop:7}}>
+                          <div style={{fontSize:12.5,color:'var(--c-amb)',fontWeight:800}}>⚠ Amendment pending signature — {ct.from} → {ct.to} ({ct.role} · {ct.step}), raised {ct.raised}</div>
+                          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:7}}>
+                            <span style={{fontSize:12,color:'var(--g-888)'}}>Effective</span>
+                            <input type="date" value={ct.effective||''} onChange={e=>setPd({contract:{...ct,effective:e.target.value}})} style={SEL}/>
+                            <button className="btn btn-go btn-xs" title="Open the signable amendment letter — print or save as PDF" onClick={()=>setConOpen(true)}>📄 Generate amendment</button>
+                            <button className="btn btn-ghost btn-xs" title="Record that the amendment has been signed" onClick={()=>{const d=new Date().toISOString().slice(0,10);setPd({contract:{...ct,status:'signed',signed:d}});
+                              const orv=(pd.reviews||[]).find(x=>!x.closed);if(orv)setRev(orv.id,{},['Contract amendment signed '+d+' ('+ct.from+' → '+ct.to+')']);
+                              if(sRec&&sRec.id!=null&&typeof setStaff==='function')setStaff(prev=>(prev||[]).map(x=>x.id===sRec.id?{...x,rate:ct.to+'/hr',contractSigned:d}:x));}}>✓ Mark signed</button>
+                          </div>
+                        </div>)}
+                        {ct&&ct.status==='signed'&&<div style={{fontSize:12.5,color:'var(--c-grn)',marginTop:5}}>✓ Amendment signed {ct.signed} — {ct.from} → {ct.to}. Rate updated on their profile.</div>}
+                      </div>);})()}
                   </div>);})()}
               </div>);})()}
           </div>)}
@@ -9026,6 +9052,38 @@ function GuestExperiencePage({staff}){
             </div>)}
           </div>)}
         </div>)}
+        {conOpen&&pk&&(()=>{const ct=pd.contract||{};const sRec=(staff||[]).find(x=>x&&x.name===pk)||{};
+          const eff=ct.effective||new Date().toISOString().slice(0,10);
+          return(<div style={{marginBottom:16}}>
+            <div className="no-print" style={{display:'flex',gap:8,marginBottom:10,flexWrap:'wrap'}}>
+              <button className="btn btn-go btn-sm" onClick={()=>{document.body.classList.add('evrpt-print');const done=()=>{document.body.classList.remove('evrpt-print');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);setTimeout(()=>{window.print();setTimeout(done,900);},60);}}>🖨 Print / Save as PDF</button>
+              <button className="btn btn-ghost btn-sm" onClick={()=>setConOpen(false)}>✕ Close</button>
+              <span style={{fontSize:11.5,color:'var(--g-666)',alignSelf:'center'}}>Draft amendment — review the wording before sending. Effective date comes from the field above.</span>
+            </div>
+            <div className={'evrpt-print-area '+(repDark?'evrpt-dark gxdark':'gxrpt')} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'26px 30px'}}>
+              <div className="gxr-band gxr-sec" style={{background:'linear-gradient(120deg,rgba(122,196,144,.22),rgba(122,196,144,.05))',borderLeft:'5px solid var(--c-grn)',borderRadius:10,padding:'16px 20px',marginBottom:14}}>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,letterSpacing:'2.4px',color:'var(--g-888)'}}>REVIBE · EMPLOYMENT AGREEMENT AMENDMENT</div>
+                <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:26,fontWeight:800,color:'var(--g-eee)',lineHeight:1.1}}>{pk}</div>
+                <div style={{fontSize:13,color:'var(--g-aaa)',marginTop:2}}>Guest Experience · {ct.role||''} · issued {ct.raised||new Date().toISOString().slice(0,10)}</div>
+              </div>
+              <div style={{fontSize:14,color:'var(--g-aaa)',lineHeight:1.85}}>
+                <p>This amendment modifies the existing employment agreement between <b style={{color:'var(--g-ddd)'}}>Revibe</b> and <b style={{color:'var(--g-ddd)'}}>{pk}</b>. All other terms of the existing agreement remain unchanged and in force.</p>
+                <div className="gxr-sec" style={{margin:'14px 0',padding:'14px 18px',background:'var(--surface3)',borderRadius:10}}>
+                  {[['Previous rate',ct.from?ct.from+'/hr':'—'],['New rate',ct.to?ct.to+'/hr':'—'],['Role band',ct.role||'—'],['Progression step',ct.step||'—'],['Effective date',eff],['Annualized (40h × 52w)',ct.to?('$'+(Math.round(parseFloat(String(ct.to).replace(/[^0-9.]/g,''))*2080)).toLocaleString()):'—']].map(([k,v])=>(
+                    <div key={k} style={{display:'flex',gap:12,fontSize:13.5,padding:'3px 0'}}><span style={{width:190,color:'var(--g-888)'}}>{k}</span><b style={{color:'var(--g-ddd)'}}>{v}</b></div>))}
+                </div>
+                <p>This increase reflects <b style={{color:'var(--g-ddd)'}}>demonstrated competency</b> assessed through the Revibe Guest Experience Growth &amp; Development framework. Every competency gate for this step has been met and signed off, and the assessment is recorded in the employee's development history.</p>
+                <p style={{fontSize:13,color:'var(--g-999)'}}>Annualized figures assume 40 hours per week across 52 weeks and represent a full-time equivalent only; they are not a guarantee of hours. Rate changes take effect on the first full pay period on or after the effective date above.</p>
+              </div>
+              <div style={{display:'flex',gap:40,marginTop:30,paddingTop:12,borderTop:'1px solid var(--border)'}}>
+                {[[pk,'Employee'],['','Revibe — on behalf of the company']].map(([nm,lb],i)=>(<div key={i} style={{flex:1}}>
+                  <div style={{borderBottom:'1px solid var(--g-888)',height:30}}/>
+                  <div style={{fontSize:11.5,color:'var(--g-888)',marginTop:4}}>{lb}{nm?' · '+nm:''} — signature &amp; date</div>
+                </div>))}
+              </div>
+              {sRec.contractRenewal&&<div style={{fontSize:12,color:'var(--g-777)',marginTop:14}}>Existing agreement renewal date on file: {sRec.contractRenewal}.</div>}
+            </div>
+          </div>);})()}
         {repOpen&&pk&&(()=>{
           const bar=(v)=>{const n=Math.round(v||0);return '▰'.repeat(n)+'▱'.repeat(5-n);};
           const ovVals=GX_CATS.map(([cid])=>catAvg(cid)).filter(v=>v!=null);
@@ -11986,7 +12044,7 @@ function getBandLabel(v){
         </div>
       );})()}
       <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:5,padding:'12px 16px'}}>
-        {[['Name',staff.name],['Email',staff.email||'—'],['Discipline',DISC.find(d=>d.id===staff.discipline)?.label||staff.discipline],['Role',staff.role||'—'],['Site',staff.site||'—'],['Roadmap',staff.roadmap||'—'],['Archetype',staff.archetype||'—'],['Split %',staff.split?(staff.split+'%'):'—'],['Stipend',staff.stipend?'Yes':'No'],...((staff.specializations||[]).length>0?[['Specializations',(staff.specializations||[]).map(sid=>SPECIALIZATIONS.find(s=>s.id===sid)?.label).filter(Boolean).join(', ')]]:[]),['GVA',(()=>{const pd=perfData||{};const gv=(pd.gva||{})[staff.id];return gv?gv+' visits / active guest (365-day)':'Not set — log in Performance tab'})()]].map(([k,v])=>(
+        {[['Name',staff.name],['Email',staff.email||'—'],['Discipline',DISC.find(d=>d.id===staff.discipline)?.label||staff.discipline],['Role',staff.role||'—'],['Site',staff.site||'—'],['Roadmap',staff.roadmap||'—'],['Archetype',staff.archetype||'—'],['Split %',staff.split?(staff.split+'%'):'—'],['Stipend',staff.stipend?'Yes':'No'],['Rate',staff.rate||'—'],['Contract renewal',(()=>{if(!staff.contractRenewal)return 'Not set';const d=Math.round((new Date(staff.contractRenewal)-new Date())/86400000);return staff.contractRenewal+(d<0?' · OVERDUE by '+Math.abs(d)+'d':d<=60?' · in '+d+' days':'');})()],['Contract signed',staff.contractSigned||'—'],...((staff.specializations||[]).length>0?[['Specializations',(staff.specializations||[]).map(sid=>SPECIALIZATIONS.find(s=>s.id===sid)?.label).filter(Boolean).join(', ')]]:[]),['GVA',(()=>{const pd=perfData||{};const gv=(pd.gva||{})[staff.id];return gv?gv+' visits / active guest (365-day)':'Not set — log in Performance tab'})()]].map(([k,v])=>(
           <div key={k} style={{display:'flex',alignItems:'center',padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
             <span style={{fontSize:14,color:'var(--g-999)',minWidth:100}}>{k}</span>
             <span style={{fontSize:14,color:'var(--text)'}}>{v}</span>
@@ -12053,6 +12111,9 @@ function getBandLabel(v){
         <div className="fg"><label>Site(s)</label><SiteMultiSelect value={f.site} onChange={v=>set('site',v)}/></div>
         <div className="fg"><label>Roadmap Phase</label><select value={f.roadmap} onChange={e=>set('roadmap',e.target.value)}><option value="">—</option><option>L1→L2</option><option>L2→L3</option><option>L3→L4</option></select></div>
         <div className="fg"><label>Archetype</label><input value={f.archetype} onChange={e=>set('archetype',e.target.value)} placeholder="Anchor / Builder / Mentor…"/></div>
+        <div className="fg"><label>Contract Renewal Date</label><input type="date" value={f.contractRenewal||''} onChange={e=>set('contractRenewal',e.target.value)}/></div>
+        <div className="fg"><label>Contract Last Signed</label><input type="date" value={f.contractSigned||''} onChange={e=>set('contractSigned',e.target.value)}/></div>
+        <div className="fg"><label>Current Rate <span style={{fontSize:15,fontWeight:400,color:'var(--g-777)',letterSpacing:0,textTransform:'none'}}> — as per signed contract</span></label><input value={f.rate||''} onChange={e=>set('rate',e.target.value)} placeholder="e.g. $22.50/hr"/></div>
         <div className="fg"><label>Split %<span style={{fontSize:15,fontWeight:400,color:'var(--g-777)',letterSpacing:0,textTransform:'none'}}> — set at yearly G&D</span></label><input value={f.split||''} onChange={e=>set('split',e.target.value)} placeholder="e.g. 45" type="number" min="0" max="100"/></div>
         <div className="fg"><label>Monthly Stipend</label><label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginTop:5,fontSize:14,color:'var(--g-aaa)',fontFamily:'Barlow,sans-serif',letterSpacing:'normal',textTransform:'none'}}><input type="checkbox" checked={!!f.stipend} onChange={e=>set('stipend',e.target.checked)} style={{accentColor:'var(--go)'}}/> Receives monthly stipend</label></div>
         <div className="fg full"><label>Rubric Tracks</label>
