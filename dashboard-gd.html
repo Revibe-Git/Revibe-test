@@ -1883,7 +1883,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L127';
+window.__BUILD='build L129';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -1957,12 +1957,26 @@ const fmtSz=b=>b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFix
 const ld=(k,fb)=>{try{const v=localStorage.getItem('rvgd3_'+k);return v?JSON.parse(v):fb;}catch{return fb;}};
 // GD_KEYOF / GD_MERGE / tombstones (L118) — record-level merge so two devices can never overwrite each other's roster or grades
 const GD_KEYOF=(r)=>r&&(r.id!=null?String(r.id):String((r.name||'')).trim().toLowerCase());
+// COMPENSATION LEDGER (L128) — effective-dated rows the payroll app reads. Written once, on sign-off.
+const COMP_ADD=(row)=>{try{
+  const cur=(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_comp')||'[]');}catch(e){return [];}})();
+  const rec={id:'c_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),createdAt:new Date().toISOString(),status:'approved',...row};
+  const next=[rec,...(Array.isArray(cur)?cur:[])].slice(0,500);
+  localStorage.setItem('rvgd3_comp',JSON.stringify(next));
+  try{const m=JSON.parse(localStorage.getItem('rvgd3__ts')||'{}');m['comp']=Date.now();localStorage.setItem('rvgd3__ts',JSON.stringify(m));}catch(e){}
+  if(window.__SB&&window.__GDSYNC&&window.__GDSYNC.ready){
+    window.__SB.from('gd_store').upsert({id:'comp',data:{v:next,t:Date.now()}}).then(()=>{},()=>{});
+    // dedicated table so the payroll dashboard can query it directly (ignored if the table isn't created yet)
+    window.__SB.from('comp_changes').upsert({id:rec.id,staff_id:rec.staffId||null,name:rec.name,kind:rec.kind,from_value:rec.from,to_value:rec.to,effective:rec.effective||null,signed_at:rec.signedAt||null,source:rec.source||'gd',status:rec.status}).then(()=>{},()=>{});
+  }
+  return rec;}catch(e){return null;}};
 const GD_TOMB=()=>{try{return JSON.parse(localStorage.getItem('rvgd3__tomb')||'{}');}catch(e){return {};}};
 const GD_TOMB_ADD=(k,ids)=>{if(!ids.length)return;try{const t=GD_TOMB();t[k]=Array.from(new Set([...(t[k]||[]),...ids]));t._t=Date.now();localStorage.setItem('rvgd3__tomb',JSON.stringify(t));
   if(window.__SB&&window.__GDSYNC&&window.__GDSYNC.ready)window.__SB.from('gd_store').upsert({id:'__tomb',data:{v:t,t:Date.now()}}).then(()=>{},()=>{});}catch(e){}};
 const GD_RICH=(a,b)=>{const ta=+(a&&a._t)||0,tb=+(b&&b._t)||0;if(ta!==tb)return ta>tb?a:b;
   try{return JSON.stringify(a).length>=JSON.stringify(b).length?a:b;}catch(e){return a;}};
-const GD_MERGE_ARR=(loc,srv,tomb)=>{const by={};const put=(r)=>{const kk=GD_KEYOF(r);if(!kk)return;by[kk]=by[kk]?GD_RICH(by[kk],r):r;};
+const GD_MERGE_ARR=(loc,srv,tomb)=>{ // also used for the comp ledger (union by id)
+const by={};const put=(r)=>{const kk=GD_KEYOF(r);if(!kk)return;by[kk]=by[kk]?GD_RICH(by[kk],r):r;};
   (Array.isArray(srv)?srv:[]).forEach(put);(Array.isArray(loc)?loc:[]).forEach(put);
   (tomb||[]).forEach(id=>{delete by[String(id)];});return Object.values(by);};
 const GD_MERGE_GX=(loc,srv)=>{const L=loc||{},S=srv||{};const people={};
@@ -2064,7 +2078,7 @@ function App(){
       ['staff','evals','sessions'].forEach(k=>{tomb[k]=Array.from(new Set([...(tomb[k]||[]),...((sTomb[k]||[]))]));});
       try{localStorage.setItem('rvgd3__tomb',JSON.stringify(tomb));}catch(e){}
       if(JSON.stringify(sTomb)!==JSON.stringify(tomb))SB.from('gd_store').upsert({id:'__tomb',data:{v:tomb,t:Date.now()}}).then(()=>{},()=>{});
-      ['staff','evals','sessions','gx'].forEach(k=>{
+      ['staff','evals','sessions','gx','comp'].forEach(k=>{
         const sRow=srv[k];
         let localV=null;try{const raw=localStorage.getItem('rvgd3_'+k);localV=raw?JSON.parse(raw):null;}catch(e){}
         if(!sRow&&localV==null)return;
@@ -8067,7 +8081,29 @@ function Overview({staff,evals,sessions,setPage,openProfile}){
   );
 }
 function StaffPage({staff,openProfile,setModal}){
-  const[fDisc,setFDisc]=useState('all');
+  const[comp,setComp]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_comp')||'[]');}catch(e){return [];}});
+  useEffect(()=>{const t=setInterval(()=>{try{const v=JSON.parse(localStorage.getItem('rvgd3_comp')||'[]');setComp(p=>JSON.stringify(p)===JSON.stringify(v)?p:v);}catch(e){}},4000);return()=>clearInterval(t);},[]);
+
+      {(comp||[]).length>0&&(()=>{const pend=(comp||[]).filter(c=>c.status!=='exported');
+        const csv=()=>{const rows=[['Name','Type','From','To','Effective','Signed','Source'],...(comp||[]).map(c=>[c.name,c.kind,c.from,c.to,c.effective||'',c.signedAt||'',c.source||''])];
+          const blob=new Blob([rows.map(r=>r.map(x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'});
+          const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='revibe-comp-changes.csv';a.click();};
+        return(<div style={{background:'var(--surface2)',border:'1px solid '+(pend.length?'var(--c-amb)':'var(--border)'),borderRadius:10,padding:'13px 16px',marginBottom:14}}>
+          <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+            <span style={{fontSize:15,fontWeight:800,color:'var(--text)'}}>💼 Compensation changes for payroll</span>
+            <span style={{fontSize:13,color:pend.length?'var(--c-amb)':'var(--g-999)'}}>{pend.length} awaiting payroll · {(comp||[]).length} total</span>
+            <span style={{flex:1}}/>
+            <button className="btn btn-ghost btn-sm" onClick={csv}>⬇ CSV for payroll</button>
+          </div>
+          <div style={{marginTop:8}}>{(comp||[]).slice(0,8).map(c=>(
+            <div key={c.id} style={{display:'flex',gap:12,fontSize:13.5,padding:'4px 0',borderTop:'1px solid var(--border)',flexWrap:'wrap'}}>
+              <span style={{minWidth:150,color:'var(--text)',fontWeight:700}}>{c.name}</span>
+              <span style={{color:'var(--g-999)'}}>{c.kind==='split'?'Split':'Rate'} {c.from} → <b style={{color:'var(--lime)'}}>{c.to}</b></span>
+              <span style={{color:'var(--g-888)'}}>effective {c.effective||'—'}</span>
+              <span style={{color:'var(--g-888)'}}>signed {c.signedAt||'—'}</span>
+            </div>))}</div>
+          <div style={{fontSize:12,color:'var(--g-888)',marginTop:7}}>Written the moment an amendment is marked signed. The payroll dashboard reads the same Supabase project — see the comp_changes table (or export the CSV above until that's wired).</div>
+        </div>);})()}  const[fDisc,setFDisc]=useState('all');
   const[fSite,setFSite]=useState('all');
   const[fTrack,setFTrack]=useState('all');
   const[search,setSearch]=useState('');
@@ -8930,7 +8966,8 @@ function GuestExperiencePage({staff,setStaff,addNotif}){
                             <button className="btn btn-go btn-xs" title="Open the signable amendment letter — print or save as PDF" onClick={()=>setConOpen(true)}>📄 Generate amendment</button>
                             <button className="btn btn-ghost btn-xs" title="Record that the amendment has been signed" onClick={()=>{const d=new Date().toISOString().slice(0,10);setPd({contract:{...ct,status:'signed',signed:d}});
                               const orv=(pd.reviews||[]).find(x=>!x.closed);if(orv)setRev(orv.id,{},['Contract amendment signed '+d+' ('+ct.from+' → '+ct.to+')']);
-                              if(sRec&&sRec.id!=null&&typeof setStaff==='function')setStaff(prev=>(prev||[]).map(x=>x.id===sRec.id?{...x,rate:ct.to+'/hr',contractSigned:d}:x));}}>✓ Mark signed</button>
+                              if(sRec&&sRec.id!=null&&typeof setStaff==='function')setStaff(prev=>(prev||[]).map(x=>x.id===sRec.id?{...x,rate:ct.to+'/hr',contractSigned:d,contract:{...ct,status:'signed',signed:d}}:x));
+                              COMP_ADD({staffId:sRec&&sRec.id,name:pk,kind:'rate',from:ct.from,to:ct.to,effective:ct.effective||d,signedAt:d,source:'gd-gx'});}}>✓ Mark signed</button>
                           </div>
                         </div>)}
                         {ct&&ct.status==='signed'&&<div style={{fontSize:12.5,color:'var(--c-grn)',marginTop:5}}>✓ Amendment signed {ct.signed} — {ct.from} → {ct.to}. Rate updated on their profile.</div>}
@@ -11993,7 +12030,33 @@ function getBandLabel(v){
   if(n>=5)return{label:'Transactional',cls:'band-transact'};
   return{label:'Surface',cls:'band-surface'};
 }function ProfileEditTab({staff,setStaff,perfData,onClose}){
-  const[editing,setEditing]=useState(false);const[conPrint,setConPrint]=useState(false);
+  const[editing,setEditing]=useState(false);const[conPrint,setConPrint]=useState(false);const[conBusy,setConBusy]=useState(false);const[conEdit,setConEdit]=useState(false);
+  // ✍️ AI contract drafting — reuses the SAME ai-summary Edge Function the meeting summaries use (L129)
+  const draftContract=async(mode)=>{
+    if(conBusy)return;const ct=staff.contract;if(!ct)return;setConBusy(true);
+    try{
+      const gx=(()=>{try{const g=JSON.parse(localStorage.getItem('rvgd3_gx')||'{}');return((g.people||{})[staff.name])||null;}catch(e){return null;}})();
+      const gates=gx&&gx.reviews&&gx.reviews.length?('Latest review log: '+((gx.reviews[gx.reviews.length-1].log||[]).map(l=>l.t).join(' | ').slice(0,900))):'';
+      const facts={company:'Revibe',employee:staff.name,role:staff.role||'',discipline:staff.discipline||'',sites:staff.site||'',
+        changeType:ct.kind==='split'?'revenue split percentage':'hourly rate',previous:ct.from,updated:ct.to,
+        effectiveDate:ct.effective||new Date().toISOString().slice(0,10),raised:ct.raised,
+        renewalOnFile:staff.contractRenewal||'none recorded',lastSigned:staff.contractSigned||'none recorded',basis:gates};
+      const prompt='You are drafting an employment document for Revibe, a multi-location wellness and performance clinic in Ontario, Canada. Write in clear, plain, professional Canadian-English business language — warm but precise, no legalese padding, no American spellings.\n\n'
+        +(mode==='full'
+          ? 'Draft a COMPLETE employment agreement covering: parties and effective date; position and reporting; compensation (using the updated figure below); hours and scheduling expectations; the Revibe Growth & Development progression framework as the basis for future compensation changes; confidentiality; professional conduct and standards; termination with notice per Ontario ESS minimums; and a signature block. Use clear numbered sections with short headings.'
+          : 'Draft a SHORT AMENDMENT to an existing employment agreement — 4 to 6 tight paragraphs plus a signature block. It should state what is changing, the effective date, that all other terms remain in force, and that the change reflects demonstrated competency assessed through the Revibe Growth & Development framework.')
+        +'\n\nRULES: use ONLY the facts provided — never invent dates, dollar figures, hours, benefits or clauses that are not given. Where a real agreement would need a detail you do not have, write a clearly marked placeholder in square brackets like [START DATE] or [NOTICE PERIOD] so a human fills it in. Do not claim legal review. Output plain text with simple headings, no markdown symbols.\n\nFACTS:\n'
+        +JSON.stringify(facts,null,1);
+      const SB=window.__SB;const su=((SB&&SB.supabaseUrl)||'https://ekjzbdvvxvylembmrphv.supabase.co').replace(/\/$/,'');const sk=(SB&&SB.supabaseKey)||'';
+      const r=await fetch(su+'/functions/v1/ai-summary',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+sk,'apikey':sk},body:JSON.stringify({prompt,max_tokens:mode==='full'?3000:1400})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok||j.error)throw new Error((j&&j.error)||('HTTP '+r.status+' — is the ai-summary Edge Function deployed?'));
+      const text=String(j.text||'').trim();
+      setStaff(prev=>prev.map(x=>x.id===staff.id?{...x,contract:{...ct,draft:text,draftMode:mode,draftAt:new Date().toISOString()}}:x));
+      setConPrint(true);
+    }catch(e){window.alert('Contract draft failed: '+((e&&e.message)||'unknown'));}
+    setConBusy(false);
+  };
   const[f,setF]=useState({name:staff.name||'',email:staff.email||'',discipline:staff.discipline||'pt',role:staff.role||'',site:staff.site||'Markham',roadmap:staff.roadmap||'',archetype:staff.archetype||'',notes:staff.notes||'',reflection:staff.reflection||'',tracks:staff.tracks||[],match_profile:mpFor(staff)});
   const set=(k,v)=>setF(p=>({...p,[k]:v}));
   const setMP=(k,v)=>setF(p=>({...p,match_profile:{...(p.match_profile||{}),[k]:v}}));
@@ -12072,8 +12135,11 @@ function getBandLabel(v){
                 <span style={{fontSize:13,color:'var(--g-999)'}}>Effective</span>
                 <input type="date" value={ct.effective||''} onChange={e=>{const nx={...ct,effective:e.target.value};setStaff(prev=>prev.map(x=>x.id===staff.id?{...x,contract:nx}:x));}} style={{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:13,padding:'4px 7px'}}/>
                 <button className="btn btn-lime btn-sm" onClick={()=>setConPrint(true)}>📄 Generate amendment</button>
+                <button className="btn btn-ghost btn-sm" disabled={conBusy} title="Claude drafts the amendment wording from this person's actual review record — counts against the AI budget" onClick={()=>draftContract('amend')}>{conBusy?'✍️ drafting…':'✍️ AI draft amendment'}</button>
+                <button className="btn btn-ghost btn-sm" disabled={conBusy} title="Claude drafts a COMPLETE employment agreement with placeholders for anything it doesn't know" onClick={()=>draftContract('full')}>{conBusy?'…':'📜 AI full contract'}</button>
                 <button className="btn btn-ghost btn-sm" onClick={()=>{const d=new Date().toISOString().slice(0,10);
-                  setStaff(prev=>prev.map(x=>x.id===staff.id?{...x,contract:{...ct,status:'signed',signed:d},contractSigned:d,...(ct.kind==='split'?{}:{rate:ct.to+'/hr'})}:x));}}>✓ Mark signed</button>
+                  setStaff(prev=>prev.map(x=>x.id===staff.id?{...x,contract:{...ct,status:'signed',signed:d},contractSigned:d,...(ct.kind==='split'?{split:String(ct.to).replace('%','')}:{rate:ct.to+'/hr'})}:x));
+                  COMP_ADD({staffId:staff.id,name:staff.name,kind:ct.kind==='split'?'split':'rate',from:ct.from,to:ct.to,effective:ct.effective||d,signedAt:d,source:'profile'});}}>✓ Mark signed</button>
               </div>
             </div>)}
             {ct&&ct.status==='signed'&&<div style={{fontSize:14,color:'var(--lime)',marginTop:6}}>✓ Amendment signed {ct.signed} — {ct.from} → {ct.to}.</div>}
@@ -12088,6 +12154,14 @@ function getBandLabel(v){
                   <div style={{fontSize:24,fontWeight:800,color:'var(--text)',lineHeight:1.15}}>{staff.name}</div>
                   <div style={{fontSize:13,color:'var(--g-999)'}}>{staff.role||''} · issued {ct.raised}</div>
                 </div>
+                {ct.draft&&(<div className="no-print" style={{display:'flex',gap:8,alignItems:'center',marginBottom:8,flexWrap:'wrap'}}>
+                  <span style={{fontSize:12,color:'var(--lime)'}}>✍️ AI draft ({ct.draftMode==='full'?'full agreement':'amendment'}) · {(ct.draftAt||'').slice(0,10)}</span>
+                  <button className="btn btn-ghost btn-xs" onClick={()=>setConEdit(v=>!v)}>{conEdit?'done editing':'✎ edit wording'}</button>
+                  <button className="btn btn-ghost btn-xs" onClick={()=>setStaff(prev=>prev.map(x=>x.id===staff.id?{...x,contract:{...ct,draft:null}}:x))}>↺ back to standard wording</button>
+                  <span style={{fontSize:11.5,color:'var(--c-amb)'}}>Review every line before sending — placeholders in [BRACKETS] need filling.</span>
+                </div>)}
+                {ct.draft&&conEdit&&<textarea className="no-print" value={ct.draft} onChange={e=>setStaff(prev=>prev.map(x=>x.id===staff.id?{...x,contract:{...ct,draft:e.target.value}}:x))} style={{width:'100%',minHeight:280,background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:13,lineHeight:1.6,padding:10,marginBottom:10,fontFamily:'inherit'}}/>}
+                {ct.draft?(<div style={{fontSize:14,color:'var(--g-aaa)',lineHeight:1.85,whiteSpace:'pre-wrap'}}>{ct.draft}</div>):(
                 <div style={{fontSize:14,color:'var(--g-aaa)',lineHeight:1.85}}>
                   <p>This amendment modifies the existing employment agreement between <b style={{color:'var(--text)'}}>Revibe</b> and <b style={{color:'var(--text)'}}>{staff.name}</b>. All other terms remain unchanged and in force.</p>
                   <div className="gxr-sec" style={{margin:'12px 0',padding:'13px 16px',background:'var(--surface3)',borderRadius:9}}>
@@ -12096,7 +12170,7 @@ function getBandLabel(v){
                   </div>
                   <p>{ct.kind==='split'?'This change reflects demonstrated growth assessed through the Revibe clinician Growth & Development framework and the agreed compensation model.':'This increase reflects demonstrated competency assessed through the Revibe Growth & Development framework, with every competency gate for this step met and signed off.'}</p>
                   <p style={{fontSize:13,color:'var(--g-999)'}}>Changes take effect on the first full pay period on or after the effective date above.</p>
-                </div>
+                </div>)}
                 <div style={{display:'flex',gap:36,marginTop:26,paddingTop:10,borderTop:'1px solid var(--border)'}}>
                   {[[staff.name,'Employee'],['','Revibe — on behalf of the company']].map(([nm,lb],i2)=>(<div key={i2} style={{flex:1}}>
                     <div style={{borderBottom:'1px solid var(--g-888)',height:28}}/>
