@@ -1883,7 +1883,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L133';
+window.__BUILD='build L134';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -13281,15 +13281,15 @@ function AddLtProfileModal({onClose,onAdd}){
 // target, action, measurement and review date; every competency score is dated and
 // never overwritten; KPI figures come from PERF_STAT so they match every other page.
 const LD_LEADS=[
- {id:'jmac',name:'Jennifer Macpherson',short:'Jmac',area:'RMT',match:['rmt','massage'],
+ {id:'jmac',name:'Jennifer MacPherson',short:'Jmac',area:'RMT',match:['rmt','massage'],self:['jennifer macpherson','jennifer macphearson','jmac'],
   mandate:'Build an RMT group that is clinically strong, communicates well, integrates with the rest of Revibe and develops sustainable caseloads.'},
- {id:'anesto',name:'Anesto',short:'Anesto',area:'Osteo + Naturopathic',match:['osteo','naturopath','nd'],
+ {id:'anesto',name:'Anesto',short:'Anesto',area:'Osteo + Naturopathic',match:['osteo','naturopath','nd'],self:['anesto'],
   mandate:'Develop Osteo and ND clinicians while making their role inside Revibe clearer and better integrated.'},
- {id:'zee',name:'Zeeruk',short:'Zee',area:'Performance',match:['performance','trainer','kinesio','strength'],
+ {id:'zee',name:'Zeeruk',short:'Zee',area:'Performance',match:['performance','trainer','kinesio','strength'],self:['zeeruk','zee'],
   mandate:'Build a scalable Revibe Performance system that other practitioners can deliver.'},
- {id:'scott',name:'Scott',short:'Scott',area:'Physio + Clinical Growth',match:['physio','physical therapy'],
+ {id:'scott',name:'Scott',short:'Scott',area:'Physio + Clinical Growth',match:['physio','physical therapy'],self:['scott'],
   mandate:'Raise physiotherapy standards while strengthening clinical development across all of Revibe.'},
- {id:'mike',name:'Mike Ross',short:'Mike',area:'Clinical Director Development — Oakville',kind:'director',match:[],
+ {id:'mike',name:'Mike Ross',short:'Mike',area:'Clinical Director Development — Oakville',kind:'director',match:[],self:['mike ross'],
   mandate:'Develop from strong physiotherapist into Oakville Clinical Director — owning the health of a clinic, not just its clinical function.'}];
 const LD_TYPES=[['behaviour','Behaviour','Are they actually doing it?'],['activity','Activity','How often is it happening?'],['outcome','Outcome','Did results actually change?']];
 const LD_SCALE=['Not demonstrated','Developing','Consistent','Independent','Can teach / develop others'];
@@ -13327,8 +13327,12 @@ function LeadDevTab({staff,perfData}){
   const setPlan=(id,patch)=>save({...db,plans:{...(db.plans||{}),[id]:{...planOf(id),...patch}}});
   const today=()=>new Date().toISOString().slice(0,10);
   const daysSince=(d)=>d?Math.round((new Date()-new Date(d))/86400000):null;
+  const norm=(x)=>String(x||'').toLowerCase().replace(/[^a-z ]/g,'').trim();
+  const isALead=(p)=>LD_LEADS.some(l=>(l.self||[]).some(n=>norm(n)===norm(p.name)));
   const teamOf=(lead)=>{const ov=(db.assign||{});
-    return (staff||[]).filter(p=>{ if(ov[p.id])return ov[p.id]===lead.id;
+    return (staff||[]).filter(p=>{
+      if(isALead(p))return false;                       // a lead is never their own mentee
+      if(ov[p.id])return ov[p.id]===lead.id;
       if(!lead.match.length)return false;
       const d=((p.discipline||'')+' '+(p.role||'')).toLowerCase();
       return lead.match.some(m=>d.indexOf(m)>=0);});};
@@ -13343,18 +13347,22 @@ function LeadDevTab({staff,perfData}){
       acts+=openActions(p.id).length;od+=overdueActions(p.id).length;});
     return{pct:Math.round(((plans/team.length)*0.4+(fresh/team.length)*0.35+(prio?ok/prio:0)*0.25)*100),
       team:team.length,plans,fresh,onTrack:prio?Math.round(ok/prio*100):null,acts,od};};
+  // ONE row per person. Reasons collapse into chips so nobody appears twice.
   const alerts=()=>{const out=[];const ack=(db.ack||{});
     LD_LEADS.forEach(l=>teamOf(l).forEach(p=>{
+      if(ack[p.id])return;
       const pl=planOf(p.id);const act=(pl.priorities||[]).filter(x=>x.status!=='done');
       const last=(pl.checkins||[])[0];const ds=last?daysSince(last.date):null;
-      const push=(sev,t)=>{const k=p.id+'|'+t;if(!ack[k])out.push({sev,who:p.name,lead:l.short,t,id:p.id,lid:l.id,k});};
-      if(!act.length)push('amber','No active development priority');
-      if(ds==null)push('amber','Never checked in');else if(ds>45)push('red','No check-in in '+ds+' days');
-      overdueActions(p.id).forEach(a=>push('red','Action overdue — '+a.t));
-      act.forEach(x=>{if(x.review&&new Date(x.review)<new Date())push('red','Review overdue — '+x.area);
-        if(x.status==='attention')push('red','Needs attention — '+x.area);
-        if(x.status==='watch')push('amber','Watch — '+x.area);});}));
-    return out.sort((a,b)=>(a.sev==='red'?0:1)-(b.sev==='red'?0:1));};
+      const tags=[];let sev='amber';
+      if(!act.length)tags.push('no plan');
+      if(ds==null)tags.push('never checked in');
+      else if(ds>45){tags.push(ds+'d since check-in');sev='red';}
+      const od=overdueActions(p.id).length;if(od){tags.push(od+' overdue action'+(od>1?'s':''));sev='red';}
+      act.forEach(x=>{if(x.review&&new Date(x.review)<new Date()){tags.push('review overdue');sev='red';}
+        if(x.status==='attention'){tags.push(x.area+' needs attention');sev='red';}
+        else if(x.status==='watch')tags.push(x.area+' on watch');});
+      if(tags.length)out.push({sev,who:p.name,lead:l.short,tags,id:p.id,lid:l.id,k:p.id});}));
+    return out.sort((a,b)=>(a.sev==='red'?0:1)-(b.sev==='red'?0:1)||a.who.localeCompare(b.who));};
 
   const C={background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'15px 18px'};
   const lbl={fontSize:12,letterSpacing:'1.4px',textTransform:'uppercase',color:'var(--g-888)',fontFamily:"'Barlow Condensed',sans-serif"};
@@ -13416,7 +13424,7 @@ function LeadDevTab({staff,perfData}){
           <div><div style={lbl}>Next check-in</div><span style={{fontSize:12.5,color:'var(--g-ccc)'}}>{last&&last.next?last.next:'—'}</span></div>
           <div><div style={lbl}>Open actions</div><span style={{fontSize:12.5,color:overdueActions(id).length?'var(--c-red)':'var(--g-ccc)'}}>{openActions(id).length}{overdueActions(id).length?' · '+overdueActions(id).length+' overdue':''}</span></div>
         </div>
-        {rev.lastMonth&&<div style={{fontSize:11.5,color:'var(--g-666)',marginTop:8}}>Numbers from the Jane import through {rev.lastMonth} — the same source as this person's Numbers tab and Performance &amp; Revenue.</div>}
+        {rev.lastMonth&&<div style={{fontSize:11,color:'var(--g-666)',marginTop:8}}>Jane import through {rev.lastMonth} · same source as Numbers &amp; Performance</div>}
       </div>
 
       {openActions(id).length>0&&(<div style={{...C,marginTop:12}}>
@@ -13434,11 +13442,11 @@ function LeadDevTab({staff,perfData}){
       <div style={{...C,marginTop:12}}>
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
           <span style={{fontSize:16,fontWeight:800,color:'var(--text)'}}>Development priorities</span>
-          <span style={{fontSize:12.5,color:'var(--g-888)'}}>maximum three at a time</span>
+          <span style={{fontSize:12,color:'var(--g-666)'}}>max 3</span>
           <span style={{flex:1}}/>
           <button className="btn btn-ghost btn-sm" onClick={addPrio}>＋ Add priority</button>
         </div>
-        {!(pl.priorities||[]).length&&<div style={{fontSize:13.5,color:'var(--g-888)'}}>Nothing set. A priority needs a gap, a baseline, a target, an action, a measurement and a review date — that is what makes progress provable.</div>}
+        {!(pl.priorities||[]).length&&<div style={{fontSize:13.5,color:'var(--g-888)'}}>Nothing set yet. <b style={{color:'var(--g-ccc)'}}>Add one</b> — it takes about a minute.</div>}
         {(pl.priorities||[]).map(x=>{const evs=(pl.evidence||[]).filter(e=>e.prio===x.id);
           return(<div key={x.id} style={{borderTop:'1px solid var(--border)',padding:'11px 0',opacity:x.status==='done'?.55:1}}>
             <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
@@ -13462,7 +13470,7 @@ function LeadDevTab({staff,perfData}){
 
       <div style={{...C,marginTop:12}}>
         <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:4}}>Competencies</div>
-        <div style={{fontSize:12.5,color:'var(--g-888)',marginBottom:8}}>Every score is dated and kept — nothing is overwritten. Click to score with evidence.</div>
+        <div style={{fontSize:12,color:'var(--g-666)',marginBottom:8}}>Click any area to score it. History is kept.</div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'6px 16px'}}>
           {LD_AREAS.map(a=>{const key=a.toLowerCase().replace(/[^a-z]/g,'');const h=(pl.comp||{})[key]||[];const cur=h[0];const prev=h[1];
             return(<div key={a} onClick={()=>scoreComp(key,a)} style={{display:'flex',gap:8,alignItems:'center',cursor:'pointer',padding:'3px 0'}} title={h.length?h.map(x=>x.date+' → '+x.v+(x.why?' · '+x.why:'')).join('\n'):'not scored'}>
@@ -13485,7 +13493,7 @@ function LeadDevTab({staff,perfData}){
             ...(pl.checkins||[]).map(c=>({date:c.date,by:c.by,_t:'checkin',t:'Check-in — '+(c.wins||'')+(c.chal?' · Challenges: '+c.chal:'')})),
             ...Object.keys(pl.comp||{}).reduce((a,k)=>a.concat((pl.comp[k]||[]).map(x=>({date:x.date,by:x.by,_t:'comp',t:'Competency → '+x.v+(x.why?' · '+x.why:'')}))),[])]
             .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-          if(!rows.length)return <div style={{fontSize:13.5,color:'var(--g-888)'}}>Empty. This log is what answers "why did this person progress?" a year from now.</div>;
+          if(!rows.length)return <div style={{fontSize:13.5,color:'var(--g-888)'}}>Nothing logged yet.</div>;
           return rows.slice(0,30).map((e,i)=>(
             <div key={i} style={{display:'flex',gap:12,padding:'6px 0',borderTop:i?'1px solid var(--border)':'none',fontSize:13.5,lineHeight:1.6}}>
               <span style={{color:'var(--g-666)',minWidth:88}}>{e.date}</span>
@@ -13534,12 +13542,12 @@ function LeadDevTab({staff,perfData}){
               background:i<stage?'rgba(122,196,144,.14)':i===stage?'rgba(29,95,168,.18)':'transparent',
               color:i===stage?'var(--c-blu2)':i<stage?'var(--c-grn)':'var(--g-777)',fontWeight:i===stage?800:400}}>{i<stage?'✓ ':''}{st}</button>))}
         </div>
-        <div style={{fontSize:11.5,color:'var(--g-666)',marginTop:7}}>Stage is set by evidence, never by time elapsed. Click a stage to move him when the evidence supports it.</div>
+        <div style={{fontSize:11.5,color:'var(--g-666)',marginTop:7}}>Stage moves on evidence, not time.</div>
       </div>
 
       <div style={{...C,marginTop:12}}>
         <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:3}}>Oakville readiness — 13 dimensions</div>
-        <div style={{fontSize:12.5,color:'var(--g-888)',marginBottom:9}}>Click any row to score it with evidence. Previous score, trend and evidence date are kept.</div>
+        <div style={{fontSize:12,color:'var(--g-666)',marginBottom:9}}>Click a row to score it. Evidence required; history kept.</div>
         {LD_READY.map(([k,label,desc],i)=>{const h=(pl.comp||{})[k]||[];const cur=h[0],prev=h[1];
           const dir=cur&&prev?(cur.v>prev.v?'↑':cur.v<prev.v?'↓':'→'):null;
           return(<div key={k} onClick={()=>scoreDim(k,label,desc)} style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap',padding:'9px 0',borderTop:i?'1px solid var(--border)':'none',cursor:'pointer'}}>
@@ -13567,7 +13575,7 @@ function LeadDevTab({staff,perfData}){
 
       <div style={{...C,marginTop:12}}>
         <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:6}}>Clinicians Mike is mentoring · {mentees.length}</div>
-        {!mentees.length&&<div style={{fontSize:13.5,color:'var(--g-888)'}}>None assigned yet. The measure that matters is not whether Mike mentored someone — it is whether they got better because of it.</div>}
+        {!mentees.length&&<div style={{fontSize:13.5,color:'var(--g-888)'}}>None assigned yet.</div>}
         {mentees.map((p,i)=>(
           <div key={p.id} onClick={()=>setView({lead:'mike',person:p.id})} style={{display:'flex',gap:12,alignItems:'center',padding:'8px 0',borderTop:i?'1px solid var(--border)':'none',cursor:'pointer'}}>
             <span style={{fontSize:14.5,fontWeight:700,color:'var(--text)',flex:1}}>{p.name}</span>
@@ -13592,11 +13600,15 @@ function LeadDevTab({staff,perfData}){
           <span style={{fontSize:26,fontWeight:800,color:h.pct>=80?'var(--c-grn)':h.pct>=60?'var(--c-yel)':h.pct==null?'var(--g-666)':'var(--c-red)'}}>{h.pct==null?'—':h.pct+'%'}</span>
         </div>
         <div style={{fontSize:13.5,color:'var(--g-aaa)',lineHeight:1.7,marginTop:6}}>{lead.mandate}</div>
-        <div style={{fontSize:12.5,color:'var(--g-888)',marginTop:7}}>{h.plans}/{h.team} have an active plan (40%) · {h.fresh}/{h.team} checked in within 45 days (35%) · {h.onTrack==null?'—':h.onTrack+'% of priorities on track'} (25%) · {h.acts} open actions{h.od?' · '+h.od+' overdue':''}</div>
+        <div style={{display:'flex',gap:20,flexWrap:'wrap',marginTop:11}}>
+          {[['Plans',h.plans+'/'+h.team],['Checked in',h.fresh+'/'+h.team],['On track',h.onTrack==null?'—':h.onTrack+'%'],['Open actions',h.acts+(h.od?' · '+h.od+' late':'')]].map(([k,v])=>(
+            <div key={k}><div style={{fontSize:11,letterSpacing:'1.2px',textTransform:'uppercase',color:'var(--g-666)'}}>{k}</div>
+            <div style={{fontSize:15,fontWeight:700,color:k==='Open actions'&&h.od?'var(--c-red)':'var(--g-ddd)',marginTop:2}}>{v}</div></div>))}
+        </div>
       </div>
       <div style={{...C,marginTop:12}}>
         <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:8}}>Their people · {team.length}</div>
-        {!team.length&&<div style={{fontSize:13.5,color:'var(--g-888)'}}>Nobody matched this discipline yet — people are matched from the discipline on their Staff Profile.</div>}
+        {!team.length&&<div style={{fontSize:13.5,color:'var(--g-888)'}}>Nobody matched this discipline — check the discipline field on their Staff Profile.</div>}
         {team.map((p,i)=>{const pp=planOf(p.id);const act=(pp.priorities||[]).filter(x=>x.status!=='done');
           const lastc=(pp.checkins||[])[0];const ds=lastc?daysSince(lastc.date):null;const od=overdueActions(p.id).length;
           return(<div key={p.id} onClick={()=>setView({lead:lead.id,person:p.id})} style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap',padding:'10px 0',borderTop:i?'1px solid var(--border)':'none',cursor:'pointer'}}>
@@ -13617,53 +13629,83 @@ function LeadDevTab({staff,perfData}){
   const ackAll=(k)=>save({...db,ack:{...(db.ack||{}),[k]:today()}});
   const mikePl=planOf('mike');const mikeScored=LD_READY.filter(([k])=>((mikePl.comp||{})[k]||[]).length);
   const mikeAvg=mikeScored.length?(mikeScored.reduce((a,[k])=>a+((mikePl.comp||{})[k][0].v),0)/mikeScored.length):null;
-  return(<div style={{maxWidth:1020}}>
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(224px,1fr))',gap:12}}>
-      {LD_LEADS.filter(l=>l.kind!=='director').map(l=>{const h=health(l);
-        return(<div key={l.id} onClick={()=>setView({lead:l.id,person:null})} style={{...C,cursor:'pointer',borderLeft:'4px solid '+(h.pct==null?'var(--border)':h.pct>=80?'var(--c-grn)':h.pct>=60?'var(--c-yel)':'var(--c-red)')}}>
-          <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-            <span style={{fontSize:17,fontWeight:800,color:'var(--text)'}}>{l.short}</span>
+  const totals=LD_LEADS.filter(l=>l.kind!=='director').reduce((a,l)=>{const h=health(l);
+    return{team:a.team+h.team,plans:a.plans+h.plans,fresh:a.fresh+h.fresh};},{team:0,plans:0,fresh:0});
+  const started=totals.plans>0||totals.fresh>0;
+  return(<div style={{maxWidth:980}}>
+    <style>{`
+      .ldv{--ring:var(--border)}
+      .ldv-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;transition:transform .12s,border-color .12s,background .12s;cursor:pointer}
+      .ldv-card:hover{transform:translateY(-2px);border-color:var(--go);background:var(--surface3)}
+      .ldv-row{display:flex;gap:12px;align-items:center;padding:9px 10px;border-radius:9px;transition:background .12s;cursor:pointer}
+      .ldv-row:hover{background:var(--surface3)}
+      .ldv-tag{font-size:11.5px;padding:2px 8px;border-radius:20px;border:1px solid var(--border);color:var(--g-999);white-space:nowrap}
+      .ldv-tag.red{border-color:rgba(214,106,96,.5);color:var(--c-red)}
+      .ldv-bar{height:4px;border-radius:3px;background:var(--surface3);overflow:hidden}
+      .ldv-bar>i{display:block;height:100%;border-radius:3px}
+      .ldv-quiet{font-size:12px;color:var(--g-666)}
+    `}</style>
+
+    {!started&&(<div style={{background:'var(--surface2)',border:'1px dashed var(--border)',borderRadius:12,padding:'16px 18px',marginBottom:14}}>
+      <div style={{fontSize:16,fontWeight:800,color:'var(--text)'}}>Nothing tracked yet</div>
+      <div style={{fontSize:13.5,color:'var(--g-999)',lineHeight:1.7,marginTop:4}}>
+        Pick one lead, open one clinician, and set a single priority. Five minutes. The percentages fill in from there — they are not scores to chase, they are a picture of whether development is actually happening.
+      </div>
+    </div>)}
+
+    <div className="ldv" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(196px,1fr))',gap:10}}>
+      {LD_LEADS.filter(l=>l.kind!=='director').map(l=>{const h=health(l);const none=!h.plans&&!h.fresh;
+        const col=none?'var(--g-666)':h.pct>=80?'var(--c-grn)':h.pct>=60?'var(--c-yel)':'var(--c-red)';
+        return(<div key={l.id} className="ldv-card" onClick={()=>setView({lead:l.id,person:null})}>
+          <div style={{display:'flex',alignItems:'center',gap:8}}>
+            <span style={{fontSize:16,fontWeight:800,color:'var(--text)'}}>{l.short}</span>
             <span style={{flex:1}}/>
-            <span style={{fontSize:22,fontWeight:800,color:h.pct==null?'var(--g-666)':h.pct>=80?'var(--c-grn)':h.pct>=60?'var(--c-yel)':'var(--c-red)'}}>{h.pct==null?'—':h.pct+'%'}</span>
+            <span style={{fontSize:18,fontWeight:800,color:col}}>{none?'—':h.pct+'%'}</span>
           </div>
-          <div style={{fontSize:12.5,color:'var(--g-999)'}}>{l.area}</div>
-          <div style={{fontSize:12.5,color:'var(--g-888)',marginTop:8,lineHeight:1.6}}>{h.team} clinicians · {h.plans} with a plan<br/>{h.fresh} checked in recently{h.od?' · '+h.od+' overdue actions':''}</div>
+          <div className="ldv-quiet" style={{marginBottom:9}}>{l.area}</div>
+          <div className="ldv-bar"><i style={{width:(none?0:h.pct)+'%',background:col}}/></div>
+          <div className="ldv-quiet" style={{marginTop:7}}>{h.team} {h.team===1?'clinician':'clinicians'} · {h.plans} with a plan{h.od?' · '+h.od+' overdue':''}</div>
         </div>);})}
-      <div onClick={()=>setView({lead:'mike',person:null})} style={{...C,cursor:'pointer',borderLeft:'4px solid var(--c-blu2)'}}>
-        <div style={{display:'flex',alignItems:'baseline',gap:8}}>
-          <span style={{fontSize:17,fontWeight:800,color:'var(--text)'}}>Mike Ross</span>
+      <div className="ldv-card" style={{borderLeft:'3px solid var(--c-blu2)'}} onClick={()=>setView({lead:'mike',person:null})}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:16,fontWeight:800,color:'var(--text)'}}>Mike Ross</span>
           <span style={{flex:1}}/>
-          <span style={{fontSize:22,fontWeight:800,color:mikeAvg==null?'var(--g-666)':mikeAvg>=4?'var(--c-grn)':mikeAvg>=3?'var(--c-lime2)':'var(--c-yel)'}}>{mikeAvg==null?'—':mikeAvg.toFixed(1)}</span>
+          <span style={{fontSize:18,fontWeight:800,color:mikeAvg==null?'var(--g-666)':mikeAvg>=4?'var(--c-grn)':mikeAvg>=3?'var(--c-lime2)':'var(--c-yel)'}}>{mikeAvg==null?'—':mikeAvg.toFixed(1)}</span>
         </div>
-        <div style={{fontSize:12.5,color:'var(--c-blu2)'}}>Clinical Director Development</div>
-        <div style={{fontSize:12.5,color:'var(--g-888)',marginTop:8,lineHeight:1.6}}>Stage: {LD_STAGES[db.mikeStage!=null?db.mikeStage:2]}<br/>{mikeScored.length}/13 readiness areas scored</div>
+        <div className="ldv-quiet" style={{color:'var(--c-blu2)',marginBottom:9}}>Director track · Oakville</div>
+        <div className="ldv-bar"><i style={{width:(mikeScored.length/13*100)+'%',background:'var(--c-blu2)'}}/></div>
+        <div className="ldv-quiet" style={{marginTop:7}}>{LD_STAGES[db.mikeStage!=null?db.mikeStage:2]} · {mikeScored.length}/13 scored</div>
       </div>
     </div>
 
-    <div style={{...C,marginTop:14}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,flexWrap:'wrap'}}>
-        <span style={{fontSize:16,fontWeight:800,color:'var(--text)'}}>Needs attention</span>
-        <span style={{fontSize:12.5,color:'var(--g-888)'}}>this list is the only thing you should have to read</span>
+    <div style={{...C,marginTop:14,padding:'14px 16px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6,flexWrap:'wrap'}}>
+        <span style={{fontSize:15.5,fontWeight:800,color:'var(--text)'}}>Needs attention</span>
         <span style={{flex:1}}/>
-        {al.length>0&&<span style={{fontSize:12.5,color:'var(--g-888)'}}>{al.filter(a=>a.sev==='red').length} urgent · {al.length} total</span>}
+        {al.length>0&&<span className="ldv-quiet">{al.filter(a=>a.sev==='red').length} urgent · {al.length} people</span>}
       </div>
-      {!al.length&&<div style={{fontSize:13.5,color:'var(--c-grn)'}}>✓ Nothing outstanding — everyone tracked has an active plan, a recent check-in and no overdue actions.</div>}
-      {al.slice(0,14).map((a,i)=>(
-        <div key={i} style={{display:'flex',gap:12,alignItems:'center',padding:'7px 0',borderTop:i?'1px solid var(--border)':'none',fontSize:13.5}}>
-          <span style={dot(a.sev==='red'?'var(--c-red)':'var(--c-yel)')}/>
-          <span onClick={()=>setView({lead:a.lid,person:a.id})} style={{color:'var(--text)',fontWeight:700,minWidth:155,cursor:'pointer'}}>{a.who}</span>
-          <span onClick={()=>setView({lead:a.lid,person:a.id})} style={{color:'var(--g-aaa)',flex:1,cursor:'pointer'}}>{a.t}</span>
-          <span style={{color:'var(--g-666)'}}>{a.lead}</span>
-          <button className="btn btn-ghost btn-xs" title="Acknowledge — hides this until it recurs" onClick={()=>ackAll(a.k)}>✓</button>
+      {!al.length&&<div style={{fontSize:13.5,color:'var(--c-grn)'}}>✓ Everyone tracked has a plan, a recent check-in and no overdue actions.</div>}
+      {al.slice(0,(db.showAll?al.length:8)).map((a,i)=>(
+        <div key={a.id} className="ldv-row" onClick={()=>setView({lead:a.lid,person:a.id})}>
+          <span style={{width:7,height:7,borderRadius:7,background:a.sev==='red'?'var(--c-red)':'var(--c-yel)',flexShrink:0}}/>
+          <span style={{fontSize:14,fontWeight:700,color:'var(--text)',minWidth:150}}>{a.who}</span>
+          <span style={{display:'flex',gap:5,flexWrap:'wrap',flex:1}}>
+            {a.tags.slice(0,3).map((t,ti)=><span key={ti} className={'ldv-tag'+(a.sev==='red'&&ti===0?' red':'')}>{t}</span>)}
+            {a.tags.length>3&&<span className="ldv-tag">+{a.tags.length-3}</span>}
+          </span>
+          <span className="ldv-quiet">{a.lead}</span>
+          <button className="btn btn-ghost btn-xs" title="Acknowledge — hide until something changes" onClick={e=>{e.stopPropagation();ackAll(a.k);}}>✓</button>
         </div>))}
+      {al.length>8&&<button className="btn btn-ghost btn-xs" style={{marginTop:6}} onClick={()=>save({...db,showAll:!db.showAll})}>{db.showAll?'show fewer':'show all '+al.length}</button>}
     </div>
 
-    <div style={{...C,marginTop:12}}>
-      <div style={{fontSize:13.5,color:'var(--g-aaa)',lineHeight:1.8}}>
-        <b style={{color:'var(--text)'}}>How this works.</b> You develop the leads; the leads develop their clinicians. Every priority carries a gap, baseline, target, action, measurement and review date, and cannot be completed without evidence. Competency scores are dated and never overwritten, so you can see June 2 → August 3 → October 4 and the evidence behind each change.
-        <br/><b style={{color:'var(--text)'}}>Development health</b> = active plans (40%) + check-ins within 45 days (35%) + priorities on track (25%). Revenue and visits come from the same Jane import as Performance &amp; Revenue, shown as a 3-month average against the previous three.
+    <details style={{marginTop:12}}>
+      <summary style={{cursor:'pointer',fontSize:13,color:'var(--g-888)',padding:'6px 0'}}>How this works</summary>
+      <div style={{fontSize:13,color:'var(--g-999)',lineHeight:1.75,padding:'4px 2px 0'}}>
+        You develop the leads; the leads develop their clinicians. A priority needs a gap, baseline, target, action, measurement and review date — and can't be completed without evidence. Competency scores are dated and never overwritten, so you can see 2 → 3 → 4 and why.
+        <br/>Health = active plans (40%) · check-ins within 45 days (35%) · priorities on track (25%). Revenue and visits come from the same Jane import as Performance &amp; Revenue, as a 3-month average against the previous three.
       </div>
-    </div>
+    </details>
   </div>);
 }
 function LeadershipPage({staff,perfData}){
