@@ -14,8 +14,31 @@
   const SUPABASE_KEY='sb_publishable_2NpHtgiPTvrqi3bkQiejNw_Ob5dsATN';
   window.__SB=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
   // Shared cross-user sync helpers (per-row JSONB tables: columns id text PK, data jsonb)
-  window.sbRowUpsert=async(table,id,data)=>{const sb=window.__SB;if(!sb||!id)return;try{await sb.from(table).upsert({id,data});}catch(e){}};
-  window.sbRowDelete=async(table,id)=>{const sb=window.__SB;if(!sb||!id)return;try{await sb.from(table).delete().eq('id',id);}catch(e){}};
+  // L138: these used to swallow every error. supabase-js RESOLVES with {error} rather than
+  // throwing, so the old try/catch was dead code and a failed save looked identical to a good
+  // one. Now the error is read, reported to the sync chip, and returned to the caller.
+  window.__sbFail=(table,msg)=>{window.__SYNC={ok:false,at:Date.now(),msg:table+' — '+(msg||'save failed')};console.warn('[sync] '+table+':',msg);};
+  window.sbRowUpsert=async(table,id,data)=>{const sb=window.__SB;if(!sb||!id)return false;
+    try{const{error}=await sb.from(table).upsert({id,data});
+      if(error){window.__sbFail(table,error.message);return false;}
+      return true;
+    }catch(e){window.__sbFail(table,e&&e.message);return false;}};
+  window.sbRowDelete=async(table,id)=>{const sb=window.__SB;if(!sb||!id)return false;
+    try{const{error}=await sb.from(table).delete().eq('id',id);
+      if(error){window.__sbFail(table,error.message);return false;}
+      return true;
+    }catch(e){window.__sbFail(table,e&&e.message);return false;}};
+  // L138: singleton-blob save. Four call sites used to write
+  //   `if(SB) SB.from(t).upsert({id:'singleton',data:d});`
+  // with no await and no .then(). supabase-js builders are LAZY — the request only fires when
+  // the builder is awaited or thened — so those four writes were never sent at all, while the
+  // UI reported success. match_profiles, session_log, retention_summaries and revenue_basis
+  // were all silently device-local because of it.
+  window.sbSingleton=async(table,data)=>{const sb=window.__SB;if(!sb)return false;
+    try{const{error}=await sb.from(table).upsert({id:'singleton',data});
+      if(error){window.__sbFail(table,error.message);return false;}
+      return true;
+    }catch(e){window.__sbFail(table,e&&e.message);return false;}};
   window.sbRowLoad=async(table)=>{const sb=window.__SB;if(!sb)return null;try{const{data,error}=await sb.from(table).select('*');if(error)return null;return data;}catch(e){return null;}};
 })();
 </script>
@@ -1883,7 +1906,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L137';
+window.__BUILD='build L138';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -1899,7 +1922,7 @@ const SEED_MATCH={"Winson Cheong": {"expertise": "Basketball/football/soccer/gol
 const _normName=(n)=>String(n||'').toLowerCase().replace(/^dr\.?\s+/,'').replace(/[^a-z\s]/g,'').replace(/\s+/g,' ').trim();const _nameAlias={mike:'michael',mick:'michael',zee:'zeeruk',nes:'anesto',liz:'lisbeth',beth:'lisbeth',jmac:'jennifer'};const seedMatchFor=(name)=>{if(typeof SEED_MATCH==='undefined')return null;const t=_normName(name);if(!t)return null;const keys=Object.keys(SEED_MATCH);let k=keys.find(x=>_normName(x)===t);if(!k){const tt=t.split(' ').map(w=>_nameAlias[w]||w);const tF=tt[0],tL=tt[tt.length-1];let best=null,bs=0;keys.forEach(key=>{const kk=_normName(key).split(' ').map(w=>_nameAlias[w]||w);const kF=kk[0],kL=kk[kk.length-1];const fM=kF===tF||kF.startsWith(tF)||tF.startsWith(kF);const lM=(kk.length>1&&tt.length>1)?(kL===tL):true;let sc=0;if(fM&&lM)sc=(kL===tL?3:0)+(kF===tF?2:1);if(sc>bs){bs=sc;best=key;}});k=best;}if(!k)return null;const s=SEED_MATCH[k];const o={};Object.keys(s).forEach(kk=>o[kk]=s[kk]);return o;};
 const _hasMP=(mp)=>!!(mp&&typeof mp==='object'&&Object.keys(mp).some(k=>{const v=mp[k];return Array.isArray(v)?v.length:(v&&String(v).trim());}));
 try{if(typeof window!=='undefined'&&!window.__MP){window.__MP=JSON.parse(localStorage.getItem('rvgd3_match_profiles')||'{}');}}catch(e){if(typeof window!=='undefined')window.__MP={};}
-const saveMP=(id,profile)=>{if(!id)return;try{window.__MP={...(window.__MP||{}),[id]:profile};}catch(e){}try{localStorage.setItem('rvgd3_match_profiles',JSON.stringify(window.__MP));}catch(e){}try{const SB=window.__SB;if(SB)SB.from('match_profiles').upsert({id:'singleton',data:window.__MP});}catch(e){}};
+const saveMP=(id,profile)=>{if(!id)return;try{window.__MP={...(window.__MP||{}),[id]:profile};}catch(e){}try{localStorage.setItem('rvgd3_match_profiles',JSON.stringify(window.__MP));}catch(e){}window.sbSingleton('match_profiles',window.__MP);};
 const mpFor=(staff)=>{if(!staff)return{};const ov=(typeof window!=='undefined'&&window.__MP)?window.__MP[staff.id]:null;if(_hasMP(ov))return ov;return _hasMP(staff.match_profile)?staff.match_profile:(seedMatchFor(staff.name)||{});};
 function SiteMultiSelect({value,onChange}){
   const sel=String(value||'').split(',').map(x=>x.trim()).filter(Boolean);
@@ -2022,10 +2045,41 @@ const GD_MERGE_GX=(loc,srv)=>{const L=loc||{},S=srv||{};const people={};
   const kby={};(S.kpis||[]).forEach(x=>{if(x&&x.id)kby[x.id]=x;});(L.kpis||[]).forEach(x=>{if(x&&x.id)kby[x.id]=kby[x.id]?GD_RICH(kby[x.id],x):x;});
   const sopA=L.sop,sopB=S.sop;const sop=(!sopA||!sopB)?(sopA||sopB):(Object.keys((sopA.res)||{}).length>=Object.keys((sopB.res)||{}).length?sopA:sopB);
   return{...S,...L,people,kpis:Object.values(kby),sop};};
-const sv=(k,v)=>{try{
-    if(k==='staff'||k==='evals'||k==='sessions'){const prev=(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_'+k)||'null');}catch(e){return null;}})();
-      if(Array.isArray(prev)&&Array.isArray(v)&&prev.length>v.length){const now=new Set(v.map(GD_KEYOF));const gone=prev.map(GD_KEYOF).filter(x=>x&&!now.has(x));GD_TOMB_ADD(k,gone);}}
-  }catch(e){}
+// L138: stamp _t on every record whose content actually changed. Nothing set this before, so
+// GD_RICH's timestamp branch was dead and every merge conflict fell through to "longer JSON
+// wins" — which meant any edit that SHORTENED a record (trimming notes, removing a wrong
+// certification) lost to a stale longer copy on another device.
+const GD_STAMP=(prev,next)=>{
+  if(!Array.isArray(next))return next;
+  const p={};(Array.isArray(prev)?prev:[]).forEach(r=>{const key=GD_KEYOF(r);if(key)p[key]=r;});
+  const now=Date.now();
+  const bare=(o)=>{const c={...o};delete c._t;return JSON.stringify(c);};
+  return next.map(r=>{
+    if(!r||typeof r!=='object'||Array.isArray(r))return r;
+    const key=GD_KEYOF(r),old=key?p[key]:null;
+    if(!old)return{...r,_t:r._t||now};
+    return bare(r)===bare(old)?{...r,_t:old._t||r._t||now}:{...r,_t:now};
+  });
+};
+// L138: one-shot flag set by the loaders immediately before they replace state from the server.
+// Without it, a server response shorter than local state was read as "the user deleted these"
+// and mass-tombstoned real records to every device. Tombstones now come only from real deletes.
+const GD_SKIP_TOMB=(k)=>{sv._skip=sv._skip||{};sv._skip[k]=true;};
+const sv=(k,v)=>{
+  let out=v;
+  try{
+    if(k==='staff'||k==='evals'||k==='sessions'){
+      const prev=(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_'+k)||'null');}catch(e){return null;}})();
+      sv._skip=sv._skip||{};
+      const fromLoad=!!sv._skip[k];
+      if(fromLoad)delete sv._skip[k];
+      if(!fromLoad&&Array.isArray(prev)&&Array.isArray(v)&&prev.length>v.length){
+        const now=new Set(v.map(GD_KEYOF));const gone=prev.map(GD_KEYOF).filter(x=>x&&!now.has(x));GD_TOMB_ADD(k,gone);
+      }
+      out=GD_STAMP(prev,v);
+    }
+  }catch(e){out=v;}
+  v=out;
   try{localStorage.setItem('rvgd3_'+k,JSON.stringify(v));}catch(e){}
   try{const m=JSON.parse(localStorage.getItem('rvgd3__ts')||'{}');m[k]=Date.now();localStorage.setItem('rvgd3__ts',JSON.stringify(m));}catch(e){}
   try{if(window.__SB&&window.__GDSYNC&&window.__GDSYNC.ready){sv._t=sv._t||{};clearTimeout(sv._t[k]);sv._t[k]=setTimeout(()=>{window.__SB.from('gd_store').upsert({id:k,data:{v:v,t:Date.now()}}).then(r=>{window.__SYNC={ok:!r.error,at:Date.now(),msg:r.error?r.error.message:''};},()=>{});},600);}}catch(e){}};
@@ -2083,6 +2137,21 @@ class PageBoundary extends React.Component{
     return this.props.children;
   }
 }
+// L138: PageBoundary only ever wrapped the page. The sidebar, top bar, sync chip, notification
+// bell and all four global modals sat OUTSIDE it, so a render error in any of them took the
+// whole app down to a white screen. ChromeBoundary fails small — the broken widget disappears
+// and everything else keeps working.
+class ChromeBoundary extends React.Component{
+  constructor(p){super(p);this.state={err:null};}
+  static getDerivedStateFromError(err){return{err};}
+  componentDidCatch(err){try{console.error('Chrome error ['+(this.props.name||'?')+']:',err);}catch(e){}}
+  render(){
+    if(this.state.err)return this.props.quiet?null:(
+      <span title={String((this.state.err&&this.state.err.message)||'')} style={{fontSize:12,color:'var(--c-amb)',opacity:.8,cursor:'help'}}>⚠</span>
+    );
+    return this.props.children;
+  }
+}
 function App(){
   const[page,setPage]=useState('overview');
   const[navOpen,setNavOpen]=useState(false);
@@ -2094,9 +2163,23 @@ function App(){
   const{notifs,addNotif,markRead,markAllRead}=useNotifications();
   const[meetings,setMeetings]=useState(()=>{try{const s=localStorage.getItem('rvgd3_meetings');if(s)return JSON.parse(s);}catch(e){}return [];});
   const _mtLoaded=React.useRef(false);
-  useEffect(()=>{let c=false,tries=0;const ld=()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}SB.from('meetings').select('data').eq('id','singleton').maybeSingle().then(({data,error})=>{if(c)return;_mtLoaded.current=true;if(!error&&data&&Array.isArray(data.data)){if(data.data.length)setMeetings(data.data);else if(meetings.length)SB.from('meetings').upsert({id:'singleton',data:meetings}).then(()=>{},()=>{});}else if(!error&&meetings.length)SB.from('meetings').upsert({id:'singleton',data:meetings}).then(()=>{},()=>{});},()=>{_mtLoaded.current=true;});};ld();return()=>{c=true;};},[]);// eslint-disable-line
+  // L138: the singleton loader that used to live here is gone. This table had TWO incompatible
+  // writers — a whole-array 'singleton' row and one-row-per-meeting — and once both shapes
+  // existed the row loader read the singleton's array in as a single "meeting", which the
+  // singleton effect then wrote back, nesting deeper on every reload. Per-row is now the only
+  // schema; the loader below migrates and removes any legacy singleton row it finds.
   const[perfData,setPerfData]=useState(()=>{try{const s=localStorage.getItem('rvgd3_perf3');return s?JSON.parse(s):{snapshots:[],gva:{},retention:{},lastImport:null};}catch{return{snapshots:[],gva:{},retention:{},lastImport:null};}});
-  useEffect(()=>{try{localStorage.setItem('rvgd3_meetings',JSON.stringify(meetings));}catch(e){}const SB=window.__SB;if(SB&&_mtLoaded.current)SB.from('meetings').upsert({id:'singleton',data:meetings}).then(()=>{},()=>{});},[meetings]);
+  const _mtPrev=React.useRef(null);
+  useEffect(()=>{
+    try{localStorage.setItem('rvgd3_meetings',JSON.stringify(meetings));}catch(e){}
+    if(!_mtLoaded.current){_mtPrev.current=meetings;return;}
+    const prev=_mtPrev.current;_mtPrev.current=meetings;
+    if(prev===null)return;
+    const was={};(Array.isArray(prev)?prev:[]).forEach(m=>{if(m&&m.id)was[m.id]=m;});
+    const now=new Set((meetings||[]).map(m=>m&&m.id).filter(Boolean));
+    (meetings||[]).forEach(m=>{if(m&&m.id&&JSON.stringify(was[m.id])!==JSON.stringify(m))window.sbRowUpsert('meetings',m.id,m);});
+    Object.keys(was).forEach(id=>{if(!now.has(id))window.sbRowDelete('meetings',id);});
+  },[meetings]);
 
   useEffect(()=>sv('staff',staff),[staff]);
   useEffect(()=>sv('evals',evals),[evals]);
@@ -2127,7 +2210,7 @@ function App(){
                         return{...S,...L,plans,assign:{...(S.assign||{}),...(L.assign||{})}};})()
                     :GD_MERGE_ARR(localV,sRow?sRow.v:null,tomb[k]);
         const before=JSON.stringify(localV),after=JSON.stringify(merged);
-        if(after!==before){try{localStorage.setItem('rvgd3_'+k,JSON.stringify(merged));}catch(e){}if(setters[k])setters[k](merged);}
+        if(after!==before){try{localStorage.setItem('rvgd3_'+k,JSON.stringify(merged));}catch(e){}if(setters[k]){GD_SKIP_TOMB(k);setters[k](merged);}}
         if(!sRow||after!==JSON.stringify(sRow.v)){ts[k]=Date.now();SB.from('gd_store').upsert({id:k,data:{v:merged,t:ts[k]}}).then(()=>{},()=>{});}
       });
       try{localStorage.setItem('rvgd3__ts',JSON.stringify(ts));}catch(e){}
@@ -2142,14 +2225,10 @@ function App(){
   const SB=()=>window.__SB;
 
   // Generic upsert for simple JSONB tables
-  const sbUpsert=async(table,id,data)=>{
-    const sb=SB();if(!sb)return;
-    try{await sb.from(table).upsert({id,data});}catch(e){console.warn(`SB upsert ${table}:`,e);}
-  };
-  const sbDelete=async(table,id)=>{
-    const sb=SB();if(!sb)return;
-    try{await sb.from(table).delete().eq('id',id);}catch(e){console.warn(`SB delete ${table}:`,e);}
-  };
+  // L138: route through the shared helpers so failures reach the sync chip instead of a
+  // console line nobody reads. These used to catch an exception supabase-js never throws.
+  const sbUpsert=(table,id,data)=>window.sbRowUpsert(table,id,data);
+  const sbDelete=(table,id)=>window.sbRowDelete(table,id);
   const sbLoad=async(table)=>{
     const sb=SB();if(!sb)return null;
     try{const{data,error}=await sb.from(table).select('*');if(error)return null;return data;}
@@ -2190,7 +2269,10 @@ function App(){
       try{
         const rows=await sbLoad('evaluations');
         if(!cancelled){
-          if(rows&&rows.length>0){const d=rows.map(r=>r.data);setEvals(d);sv('evals',d);}
+          // L138: flag, then let the [evals] effect persist. Previously this called sv()
+          // directly AND the effect fired, and whichever ran with a shorter server list
+          // tombstoned the difference as if the user had deleted it.
+          if(rows&&rows.length>0){const d=rows.map(r=>r.data);GD_SKIP_TOMB('evals');setEvals(d);}
           // If Supabase empty but localStorage has data, push up
           else{const local=ld('evals',[]);if(local.length>0)local.forEach(e=>{if(e.id)sbUpsert('evaluations',e.id,e);});}
         }
@@ -2199,7 +2281,7 @@ function App(){
       try{
         const rows=await sbLoad('education_sessions');
         if(!cancelled){
-          if(rows&&rows.length>0){const d=rows.map(r=>r.data);setSessions(d);sv('sessions',d);}
+          if(rows&&rows.length>0){const d=rows.map(r=>r.data);GD_SKIP_TOMB('sessions');setSessions(d);}
           else{const local=ld('sessions',[]);if(local.length>0)local.forEach(s=>{if(s.id)sbUpsert('education_sessions',s.id,s);});}
         }
       }catch(e){}
@@ -2207,8 +2289,21 @@ function App(){
       try{
         const rows=await sbLoad('meetings');
         if(!cancelled){
-          if(rows&&rows.length>0){const d=rows.map(r=>r.data);setMeetings(d);localStorage.setItem('rvgd3_meetings',JSON.stringify(d));}
-          else{try{const local=JSON.parse(localStorage.getItem('rvgd3_meetings')||'[]');if(local.length>0)local.forEach(m=>{if(m.id)sbUpsert('meetings',m.id,m);});}catch(e){}}
+          // L138: split out any legacy 'singleton' row (whose .data is a whole array) so it is
+          // never read in as one meeting. Its contents are migrated to real rows, then it is
+          // deleted so the two schemas can never coexist again.
+          const legacy=(rows||[]).filter(r=>r&&r.id==='singleton');
+          const perRow=(rows||[]).filter(r=>r&&r.id!=='singleton'&&r.data&&!Array.isArray(r.data));
+          let d=perRow.map(r=>r.data);
+          if(legacy.length){
+            const inner=[];legacy.forEach(r=>{if(Array.isArray(r.data))r.data.forEach(m=>{if(m&&m.id)inner.push(m);});});
+            const have=new Set(d.map(m=>m&&m.id));
+            inner.forEach(m=>{if(!have.has(m.id)){d.push(m);have.add(m.id);sbUpsert('meetings',m.id,m);}});
+            sbDelete('meetings','singleton');
+          }
+          _mtLoaded.current=true;
+          if(d.length){setMeetings(d);try{localStorage.setItem('rvgd3_meetings',JSON.stringify(d));}catch(e){}}
+          else{try{const local=JSON.parse(localStorage.getItem('rvgd3_meetings')||'[]');if(local.length>0)local.forEach(m=>{if(m&&m.id)sbUpsert('meetings',m.id,m);});}catch(e){}}
         }
       }catch(e){}
       if(!cancelled)setSbLoaded(true);
@@ -2273,7 +2368,7 @@ function App(){
           <div className="nav-item" onClick={()=>{setModal('addEval');setNavOpen(false);}}><span className="nav-icon">+</span>Log Evaluation</div>
           <div className="nav-item" onClick={()=>{setModal('addSess');setNavOpen(false);}}><span className="nav-icon">+</span>Log Edu Session</div>
           <div style={{margin:'10px 14px 12px',padding:'6px 10px',fontSize:12,fontWeight:800,letterSpacing:'.5px',color:'#0e1512',background:'var(--c-grn)',borderRadius:6,textAlign:'center',textTransform:'uppercase'}} title="The version actually running right now. If a change seems missing, check this first: if it doesn't match the latest build sent, the deploy didn't take or your browser cached the old file — hard-refresh (Cmd+Shift+R) or add ?v=NEW to the URL.">{window.__BUILD||'build ?'}</div>
-          <SyncChip/>
+          <ChromeBoundary name="SyncChip" quiet><SyncChip/></ChromeBoundary>
         </div>
         <div className="sidebar-foot">
           <div className="foot-card">
@@ -2294,7 +2389,7 @@ function App(){
             <span className="crumb">Revibe — G&amp;D Portal</span>
           
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
-          <NotificationBell notifs={notifs} markRead={markRead} markAllRead={markAllRead} setPage={setPage}/>
+          <ChromeBoundary name="NotificationBell"><NotificationBell notifs={notifs} markRead={markRead} markAllRead={markAllRead} setPage={setPage}/></ChromeBoundary>
         </div>
       </div>
           <div className="topbar-r">
@@ -2312,10 +2407,13 @@ function App(){
         </div>
       </div>
 
+      {/* L138: modals were outside every boundary — a render error in one white-screened the app */}
+      <PageBoundary key={'modal-'+(modal||'none')}>
       {modal==='profile'&&activeStaff&&<ProfileModal staff={activeStaff} onClose={()=>setModal(null)} evals={evals} setEvals={setEvals} sessions={sessions} setStaff={setStaff} allStaff={staff} perfData={perfData}/>}
       {modal==='addStaff'&&<AddStaffModal onClose={()=>setModal(null)} onSave={d=>setStaff(p=>[...p,{...d,id:'s'+Date.now(),files:[],tracks:d.tracks||[],scores:{}}])}/>}
       {modal==='addEval'&&<AddEvalModal onClose={()=>setModal(null)} onSave={d=>setEvals(p=>[...p,{...d,id:'e'+Date.now()}])} staff={staff} mentors={MENTORS}/>}
       {modal==='addSess'&&<AddSessModal onClose={()=>setModal(null)} onSave={d=>setSessions(p=>[...p,{...d,id:'se'+Date.now()}])} staff={staff} mentors={MENTORS}/>}
+      </PageBoundary>
     </div>
   );
 }
@@ -4158,7 +4256,7 @@ function SessionsLog({defaultMonth,readOnly}){
   const CATS=[{id:'membership',label:'Membership Sessions',color:'var(--c-pur)'},{id:'training',label:'Performance Training',color:'var(--c-yel)'}];
   const money=(n)=>'$'+Math.round(n||0).toLocaleString();
   const[log,setLog]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_sessions_log')||'{}');}catch(e){return{};}});
-  const persist=(n)=>{setLog(n);try{localStorage.setItem('rvgd3_sessions_log',JSON.stringify(n));}catch(e){}try{const SB=window.__SB;if(SB)SB.from('session_log').upsert({id:'singleton',data:n});}catch(e){}};
+  const persist=(n)=>{setLog(n);try{localStorage.setItem('rvgd3_sessions_log',JSON.stringify(n));}catch(e){}window.sbSingleton('session_log',n);};
   useEffect(()=>{let c=false,tries=0;const ld=async()=>{const SB=window.__SB;if(!SB){if(tries++<12&&!c)setTimeout(ld,400);return;}try{const{data}=await SB.from('session_log').select('data').eq('id','singleton').maybeSingle();if(!c&&data&&data.data&&typeof data.data==='object'){setLog(data.data);try{localStorage.setItem('rvgd3_sessions_log',JSON.stringify(data.data));}catch(e){}}}catch(e){}};ld();return()=>{c=true;};},[]);// eslint-disable-line
   const[m,setM]=useState(defaultMonth||new Date().toISOString().slice(0,7));
   const blank=()=>({membership:{sessions:'',dollars:''},training:{sessions:'',dollars:''}});
@@ -5089,7 +5187,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
   useEffect(()=>{
     if(!dailyRevenue||!dailyRevenue.length)return;
     const d={};dailyRevenue.forEach(r=>{const m=(r.date||'').slice(0,7);if(m.length!==7)return;d[m]=(d[m]||0)+(parseFloat(r.revenue)||0);});
-    setRevBasis(prev=>{let changed=false;const n={...prev};Object.keys(d).forEach(m=>{const b=Math.round(d[m]*100)/100;const cur=n[m]||{};if(Math.abs((cur.billed||0)-b)>0.5){n[m]={billed:b,collected:cur.collected||0};changed=true;}});if(changed){try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(n));}catch(e){}try{const SB=window.__SB;if(SB)SB.from('revenue_basis').upsert({id:'singleton',data:n});}catch(e){}}return changed?n:prev;});
+    setRevBasis(prev=>{let changed=false;const n={...prev};Object.keys(d).forEach(m=>{const b=Math.round(d[m]*100)/100;const cur=n[m]||{};if(Math.abs((cur.billed||0)-b)>0.5){n[m]={billed:b,collected:cur.collected||0};changed=true;}});if(changed){try{localStorage.setItem('rvgd3_rev_basis',JSON.stringify(n));}catch(e){}window.sbSingleton('revenue_basis',n);}return changed?n:prev;});
   },[dailyRevenue]);// eslint-disable-line
   useEffect(()=>{dailyApptsRef.current=dailyAppts;},[dailyAppts]);
   useEffect(()=>{dailyRevRef.current=dailyRevenue;},[dailyRevenue]);
@@ -5667,14 +5765,22 @@ function PerformancePage({staff,perfData,setPerfData,page}){
     const periodLabel=new Date(month+'-01T12:00').toLocaleDateString('en-CA',{month:'long',year:'numeric'});
     const monthEnd=new Date(parseInt(month.slice(0,4)),parseInt(month.slice(5,7)),0).toISOString().slice(0,10);
     summary.period=month;summary.periodLabel=periodLabel;
-    setRetentionSummaries(prev=>{const next={...prev,[month]:summary};try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(next));}catch(e){}try{const SB=window.__SB;if(SB)SB.from('retention_summaries').upsert({id:'singleton',data:next});}catch(e){}return next;});
+    // L138: build the next state, persist locally, then AWAIT the cloud write so the message
+    // below can tell the truth. This whole path used to fire a lazy builder that never sent a
+    // request, then report "✓ imported" — the summaries were device-local and nobody knew.
+    const _nextSummaries={...retentionSummaries,[month]:summary};
+    setRetentionSummaries(_nextSummaries);
+    try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(_nextSummaries));}catch(e){}
+    const _sumSynced=await window.sbSingleton('retention_summaries',_nextSummaries);
     setRetViewMonth(month);
     const nr={...(data.retention||{})};let filled=0;
     for(const p of summary.practitioners){if(p.staffId&&p.pctReturning!=null){nr[p.staffId]=p.pctReturning;filled++;}}
     save({...data,retention:nr});
     if(window.__SB){for(const p of summary.practitioners){if(p.staffId&&p.pctReturning!=null)await saveRetentionToSB(p.staffId,p.pctReturning,'jane-import',monthEnd);}}
     const cw=summary.clinic.pctReturning!=null?` Clinic-wide returning ${summary.clinic.pctReturning}%.`:'';
-    setImportMsg({type:'success',msg:`✓ Member Retention imported for ${periodLabel}.${cw} ${filled} practitioner${filled!==1?'s':''}, ${summary.locations.length} location${summary.locations.length!==1?'s':''} matched.`});
+    setImportMsg(_sumSynced
+      ?{type:'success',msg:`✓ Member Retention imported for ${periodLabel}.${cw} ${filled} practitioner${filled!==1?'s':''}, ${summary.locations.length} location${summary.locations.length!==1?'s':''} matched.`}
+      :{type:'warn',msg:`⚠ Member Retention imported for ${periodLabel} on THIS DEVICE ONLY — the cloud save failed, so it will not appear on your other machines. ${cw} ${filled} practitioner${filled!==1?'s':''} matched. Check the sync chip in the sidebar, then re-import.`});
   };
 
   // Import an undated shift report for a chosen month (called from the confirm popup)
@@ -7638,7 +7744,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                   <span className="perf-slot-title" style={{color:'var(--c-pur)'}}>Clinic &amp; Location Retention{retentionSummary.periodLabel?` — ${retentionSummary.periodLabel}`:''}</span>
                   <div style={{display:'flex',alignItems:'center',gap:10}}>
                     <span style={{fontSize:13,color:'var(--g-777)'}}>{retentionSummary.importedAt?'Imported '+new Date(retentionSummary.importedAt).toLocaleDateString('en-CA',{month:'short',day:'numeric',year:'numeric'}):''}</span>
-                    <button className="btn btn-ghost btn-xs" style={{color:'var(--c-red)',fontSize:14}} onClick={()=>{if(confirm('Clear retention for '+(retentionSummary.periodLabel||retActiveMonth)+'?')){setRetentionSummaries(prev=>{const next={...prev};delete next[retActiveMonth];try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(next));}catch(e){}try{const SB=window.__SB;if(SB)SB.from('retention_summaries').upsert({id:'singleton',data:next});}catch(e){}return next;});setRetViewMonth('');}}}>Clear</button>
+                    <button className="btn btn-ghost btn-xs" style={{color:'var(--c-red)',fontSize:14}} onClick={()=>{if(confirm('Clear retention for '+(retentionSummary.periodLabel||retActiveMonth)+'?')){setRetentionSummaries(prev=>{const next={...prev};delete next[retActiveMonth];try{localStorage.setItem('rvgd3_retention_summaries',JSON.stringify(next));}catch(e){}window.sbSingleton('retention_summaries',next);return next;});setRetViewMonth('');}}}>Clear</button>
                   </div>
                 </div>
                 <div className="perf-slot-body">
@@ -7950,7 +8056,7 @@ function PerformancePage({staff,perfData,setPerfData,page}){
                 onClick={async()=>{
                   if(!window.confirm(`Purge all ${type} data?`))return;
                   const SB=window.__SB;let err=null;
-                  if(type==='retention'){if(SB){const r1=await SB.from('retention_entries').delete().neq('staff_id','_none_');if(r1.error)err=r1.error.message;try{await SB.from('retention_summaries').upsert({id:'singleton',data:{}});}catch(e){}}setRetentionSummaries({});try{localStorage.removeItem('rvgd3_retention_summaries');localStorage.removeItem('rvgd3_retention_summary');}catch(e){}save({...data,retention:{}});}
+                  if(type==='retention'){if(SB){const r1=await SB.from('retention_entries').delete().neq('staff_id','_none_');if(r1.error)err=r1.error.message;await window.sbSingleton('retention_summaries',{});}setRetentionSummaries({});try{localStorage.removeItem('rvgd3_retention_summaries');localStorage.removeItem('rvgd3_retention_summary');}catch(e){}save({...data,retention:{}});}
                   else{const remaining=data.snapshots.filter(s=>s.type!==type);if(SB){const toDel=data.snapshots.filter(s=>s.type===type);for(const s of toDel){const r=await SB.from('performance_snapshots').delete().eq('id',s.id);if(r.error)err=r.error.message;}if(type==='appointments'){const r=await SB.from('daily_appointments').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyAppts([]);try{localStorage.removeItem('rvgd3_daily_appts');}catch(e){}}if(type==='sales'){const r=await SB.from('daily_revenue').delete().neq('staff_id','_none_');if(r.error)err=r.error.message;setDailyRevenue([]);try{localStorage.removeItem('rvgd3_daily_rev');}catch(e){}}if(type==='shift'){try{await SB.from('shift_daily').upsert({id:'singleton',data:[]});}catch(e){}setDailyShift([]);try{localStorage.removeItem('rvgd3_daily_shift');}catch(e){}}}save({...data,snapshots:remaining});}
                   if(err){setImportMsg({type:'error',msg:`Purge error: ${err}`});return;}
                   setImportMsg({type:'success',msg:`✓ ${type} purged. Reloading…`});setTimeout(()=>window.location.reload(),800);
@@ -7973,9 +8079,9 @@ function PerformancePage({staff,perfData,setPerfData,page}){
 
           {importMsg&&(
             <div style={{marginTop:10,padding:'10px 14px',borderRadius:5,fontSize:14,lineHeight:1.6,
-              background:importMsg.type==='success'?'rgba(68,204,170,.08)':importMsg.type==='info'?'rgba(202,232,193,.06)':'rgba(224,82,82,.08)',
-              border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':importMsg.type==='info'?'rgba(202,232,193,.18)':'rgba(224,82,82,.2)'}`,
-              color:importMsg.type==='success'?'var(--c-grn)':importMsg.type==='info'?'var(--g-aaa)':'var(--c-red)'}}>
+              background:importMsg.type==='success'?'rgba(68,204,170,.08)':importMsg.type==='info'?'rgba(202,232,193,.06)':importMsg.type==='warn'?'rgba(216,169,125,.10)':'rgba(224,82,82,.08)',
+              border:`1px solid ${importMsg.type==='success'?'rgba(68,204,170,.2)':importMsg.type==='info'?'rgba(202,232,193,.18)':importMsg.type==='warn'?'rgba(216,169,125,.28)':'rgba(224,82,82,.2)'}`,
+              color:importMsg.type==='success'?'var(--c-grn)':importMsg.type==='info'?'var(--g-aaa)':importMsg.type==='warn'?'var(--c-amb)':'var(--c-red)'}}>
               {importMsg.msg}
             </div>
           )}
@@ -10871,18 +10977,67 @@ function FormsPage({staff, evals}){
 
 /* ── FORM FILLER ── */
 function FormFiller({formDef, staff, onSubmit, onBack}){
-  const[data, setData] = useState(()=>{
+  // L138: DRAFT AUTOSAVE. The quarterly form is 46 fields across a conversation your own copy
+  // describes as 60-90 minutes, and every answer lived in memory only — a closed tab, a slept
+  // iPad or a reclaimed front-desk machine destroyed the lot. A form that does that once never
+  // gets filled in willingly again. Answers are now mirrored to localStorage on every change
+  // and restored on mount; the draft is cleared on submit and on an explicit discard.
+  const DRAFT_KEY='rvgd3_formdraft_'+formDef.id;
+  const blank=()=>{
     const init={};
     formDef.sections.forEach(s=>{
       init[s.id]={};
-      s.fields.forEach(f=>{
-        init[s.id][f.id] = f.type==='checkboxes'?[]:''
-      });
+      s.fields.forEach(f=>{ init[s.id][f.id] = f.type==='checkboxes'?[]:'' });
     });
     return init;
+  };
+  const[restored,setRestored]=useState(null);
+  const[data, setData] = useState(()=>{
+    const init=blank();
+    try{
+      const raw=localStorage.getItem(DRAFT_KEY);
+      if(raw){
+        const d=JSON.parse(raw);
+        if(d&&d.data&&typeof d.data==='object'){
+          // merge onto the blank shape so a form whose sections changed still loads
+          Object.keys(init).forEach(sid=>{
+            if(d.data[sid]&&typeof d.data[sid]==='object')Object.keys(init[sid]).forEach(fid=>{
+              if(d.data[sid][fid]!==undefined)init[sid][fid]=d.data[sid][fid];
+            });
+          });
+        }
+      }
+    }catch(e){}
+    return init;
   });
+  useEffect(()=>{
+    try{
+      const raw=localStorage.getItem(DRAFT_KEY);
+      if(raw){const d=JSON.parse(raw);if(d&&d.savedAt)setRestored(d.savedAt);}
+    }catch(e){}
+  },[]);// eslint-disable-line
   const[currentSection, setCurrentSection] = useState(0);
   const[submitted, setSubmitted] = useState(false);
+
+  const _draftT=React.useRef(null);
+  useEffect(()=>{
+    if(submitted)return;
+    clearTimeout(_draftT.current);
+    _draftT.current=setTimeout(()=>{
+      try{
+        const any=Object.keys(data).some(sid=>Object.keys(data[sid]||{}).some(fid=>{
+          const v=data[sid][fid];return Array.isArray(v)?v.length>0:String(v||'').trim()!=='';
+        }));
+        if(any)localStorage.setItem(DRAFT_KEY,JSON.stringify({savedAt:new Date().toISOString(),data}));
+      }catch(e){}
+    },500);
+    return()=>clearTimeout(_draftT.current);
+  },[data,submitted]);// eslint-disable-line
+  const clearDraft=()=>{try{localStorage.removeItem(DRAFT_KEY);}catch(e){}setRestored(null);};
+  const discardDraft=()=>{
+    if(!window.confirm('Discard the saved draft and start this form again? This cannot be undone.'))return;
+    clearDraft();setData(blank());setCurrentSection(0);
+  };
 
   const setField=(sectionId,fieldId,val)=>{
     setData(prev=>({...prev,[sectionId]:{...prev[sectionId],[fieldId]:val}}));
@@ -10963,6 +11118,7 @@ function FormFiller({formDef, staff, onSubmit, onBack}){
   };
 
   const handleFinalSubmit = () => {
+    clearDraft();
     onSubmit({formType:formDef.id, data});
     setSubmitted(true);
   };
@@ -10985,6 +11141,19 @@ function FormFiller({formDef, staff, onSubmit, onBack}){
     <div className="form-shell">
       {/* Back */}
       <button className="btn btn-ghost btn-sm mb18" style={{marginBottom:16}} onClick={onBack}>← Back</button>
+
+      {/* L138: tell the user their answers are being kept, and that a draft was picked up */}
+      {restored&&(
+        <div style={{marginBottom:16,padding:'11px 15px',border:'1px solid var(--border)',borderLeft:'3px solid var(--c-grn)',borderRadius:6,background:'var(--surface2)',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+          <span style={{fontSize:14,color:'var(--g-bbb)',flex:1,minWidth:220}}>
+            Picked up where you left off — saved {(()=>{try{const d=new Date(restored);const mins=Math.round((Date.now()-d.getTime())/60000);
+              if(mins<1)return'a moment ago';if(mins<60)return mins+' min ago';
+              if(mins<1440)return Math.round(mins/60)+'h ago';
+              return d.toLocaleDateString(undefined,{month:'short',day:'numeric'});}catch(e){return'earlier';}})()}.
+          </span>
+          <button className="btn btn-ghost btn-xs" onClick={discardDraft}>Start over</button>
+        </div>
+      )}
 
       {/* Form header */}
       <div className="form-card" style={{marginBottom:16}}>
@@ -12542,6 +12711,9 @@ function EvalDetailModal({ev, staff, onClose, evals, setEvals}){
 
   const deleteEval=()=>{
     setEvals(prev=>prev.filter(e=>e.id!==ev.id));
+    // L138: the row was only removed from local state, so the next load pulled it back from
+    // the evaluations table and the deletion appeared to undo itself.
+    if(ev.id)window.sbRowDelete('evaluations',ev.id);
     onClose();
   };
 
@@ -13934,7 +14106,9 @@ function LeadershipPage({staff,perfData}){
   };
   const updatePerson=(id,updates)=>{const updated=ltData.map(p=>p.id===id?{...p,...updates}:p);save(updated);if(selectedPerson?.id===id)setSelectedPerson(updated.find(p=>p.id===id));};
   const addPerson=p=>save([...ltData,p]);
-  const removePerson=id=>{save(ltData.filter(p=>p.id!==id));setSelectedPerson(null);};
+  // L138: save() only upserts survivors, so a removed person stayed in leadership_entries
+  // and reappeared on every device at the next load. Delete the row explicitly.
+  const removePerson=id=>{save(ltData.filter(p=>p.id!==id));if(id)window.sbRowDelete('leadership_entries',id);setSelectedPerson(null);};
   const computed=ltData.map(p=>({...p,r:calcReadiness(p)}));
   const counts={};computed.forEach(p=>{counts[p.r.status]=(counts[p.r.status]||0)+1;});
   const locations=[...new Set(ltData.map(p=>p.primaryLoc))].sort();
@@ -14759,7 +14933,7 @@ function ClinResourcesPage({staff, addNotif, currentUser}){
   const pinned = filtered.filter(r=>r.pinned);
   const rest   = filtered.filter(r=>!r.pinned);
 
-  const deleteRes = (id)=>{const updated=resources.filter(r=>r.id!==id);saveResources(updated);setConfirmDel(null);};
+  const deleteRes = (id)=>{const updated=resources.filter(r=>r.id!==id);saveResources(updated);if(id)window.sbRowDelete('resources',id);setConfirmDel(null);};
   const togglePin = (id)=>{const updated=resources.map(r=>r.id===id?{...r,pinned:!r.pinned}:r);saveResources(updated);};
 
   const typeInfo = (t)=>RESOURCE_TYPES.find(x=>x.id===t)||RESOURCE_TYPES[1];
@@ -15187,7 +15361,11 @@ function AddResourceModal({onClose, onSave, existing, staff}){
 // ── Notification store ───────────────────────────────────────────────────────
 function useNotifications(){
   const[notifs,setNotifs]=useState(()=>{
-    try{const s=localStorage.getItem('rvgd3_notifs');return s?JSON.parse(s):[];}catch{return[];}
+    // L138: was `return s?JSON.parse(s):[]`. Any non-array in this key (an older build's
+    // format, an interrupted write, another tab) made notifs.filter() throw during render —
+    // and because the bell sits in the top bar, OUTSIDE PageBoundary, that white-screened the
+    // entire app with no error UI and no way back except clearing site data.
+    try{const s=localStorage.getItem('rvgd3_notifs');if(!s)return[];const p=JSON.parse(s);return Array.isArray(p)?p.filter(x=>x&&typeof x==='object'):[];}catch{return[];}
   });
   useEffect(()=>{try{localStorage.setItem('rvgd3_notifs',JSON.stringify(notifs));}catch(e){}},[notifs]);
   const addNotif=(n)=>setNotifs(p=>[{...n,id:'n'+Date.now()+Math.random(),ts:new Date().toISOString(),read:false},...p].slice(0,100));
@@ -16423,7 +16601,7 @@ function SystematicPage({staff=[]}){
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:15,letterSpacing:'2px',textTransform:'uppercase',color:'var(--g-999)',marginBottom:8}}>Concepts Introduced</div>
           <div style={{fontSize:14,color:'var(--g-888)'}}>{active.concepts}</div>
         </div>)}
-        <button className="btn btn-red btn-xs" style={{alignSelf:'flex-start'}} onClick={()=>{if(confirm('Delete this session?')){save(sessions.filter(s=>s.id!==active.id),undefined);setView('home');}}}>Delete Session</button>
+        <button className="btn btn-red btn-xs" style={{alignSelf:'flex-start'}} onClick={()=>{if(confirm('Delete this session?')){const _id=active.id;save(sessions.filter(s=>s.id!==_id),undefined);if(_id)window.sbRowDelete('systematic_sessions',_id);setView('home');}}}>Delete Session</button>
       </div>
     </div>
   );
