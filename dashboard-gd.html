@@ -1883,7 +1883,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L129';
+window.__BUILD='build L133';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -1957,6 +1957,42 @@ const fmtSz=b=>b<1024?b+'B':b<1048576?(b/1024).toFixed(1)+'KB':(b/1048576).toFix
 const ld=(k,fb)=>{try{const v=localStorage.getItem('rvgd3_'+k);return v?JSON.parse(v):fb;}catch{return fb;}};
 // GD_KEYOF / GD_MERGE / tombstones (L118) — record-level merge so two devices can never overwrite each other's roster or grades
 const GD_KEYOF=(r)=>r&&(r.id!=null?String(r.id):String((r.name||'')).trim().toLowerCase());
+// ===== CANONICAL PERFORMANCE READER (L132) =========================================
+// ONE function that turns raw Jane imports into the numbers every page shows.
+// De-dupes stacked imports (monthly vs shift buckets, most-complete wins) and, for any
+// month covered by fresh daily revenue, overrides that person's revenue with the
+// daily-derived figure. Profile Numbers, Leadership Development and anything added later
+// MUST call this — so a number can never differ between two tabs.
+const PERF_CANON=(perfData,staffId)=>{
+  const pd=perfData||{};const best={};
+  (pd.snapshots||[]).forEach(sn=>{
+    const k=(sn.date||'').slice(0,7)+'|'+((sn.type||'sales')==='shift'?'shift':'monthly');
+    const w=(sn.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0)+(parseFloat(r.completed)||0)+(parseFloat(r.appointments)||0)+(parseFloat(r.appointmentHours)||0),0)+(sn.rows||[]).length*0.001;
+    if(!best[k]||w>best[k]._w)best[k]={snap:sn,_w:w};
+  });
+  let snaps=Object.values(best).map(x=>x.snap).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  let daily=[];try{daily=JSON.parse(localStorage.getItem('rvgd3_daily_rev')||'[]');}catch(e){}
+  if(daily.length&&staffId!=null){
+    const byM={};let mMin=null,mMax=null;
+    daily.forEach(r=>{const m=(r.date||'').slice(0,7);if(!m)return;if(!mMin||m<mMin)mMin=m;if(!mMax||m>mMax)mMax=m;if(r.staff_id===staffId)byM[m]=(byM[m]||0)+(r.revenue||0);});
+    snaps=snaps.map(sn=>{const m=(sn.date||'').slice(0,7);
+      if((sn.type||'sales')==='shift'||!(mMin&&m>=mMin&&m<=mMax))return sn;
+      return{...sn,rows:(sn.rows||[]).map(r=>r.staffId===staffId?{...r,revenue:Math.round((byM[m]||0)*100)/100}:r)};});
+  }
+  return snaps;
+};
+// Current · 3-month average · previous 3-month average · direction — the trend shape Dave
+// asked for, so nobody is judged on a single month.
+const PERF_STAT=(perfData,staffId,metric)=>{
+  const snaps=PERF_CANON(perfData,staffId).filter(sn=>(sn.type||'sales')!=='shift');
+  const series=snaps.map(sn=>({m:(sn.date||'').slice(0,7),v:(()=>{const r=(sn.rows||[]).find(x=>x.staffId===staffId);const n=r?parseFloat(r[metric]):NaN;return isNaN(n)?null:n;})()})).filter(x=>x.v!=null);
+  if(!series.length)return{cur:null,avg3:null,prev3:null,dir:null,n:0,series:[],lastMonth:null};
+  const vals=series.map(x=>x.v);
+  const mean=(a)=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+  const avg3=mean(vals.slice(-3)),prev3=mean(vals.slice(-6,-3));
+  const dir=(avg3!=null&&prev3!=null)?(avg3>prev3*1.02?'up':avg3<prev3*0.98?'down':'flat'):null;
+  return{cur:vals[vals.length-1],avg3,prev3,dir,n:vals.length,series,lastMonth:series[series.length-1].m};
+};
 // COMPENSATION LEDGER (L128) — effective-dated rows the payroll app reads. Written once, on sign-off.
 const COMP_ADD=(row)=>{try{
   const cur=(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_comp')||'[]');}catch(e){return [];}})();
@@ -2078,12 +2114,17 @@ function App(){
       ['staff','evals','sessions'].forEach(k=>{tomb[k]=Array.from(new Set([...(tomb[k]||[]),...((sTomb[k]||[]))]));});
       try{localStorage.setItem('rvgd3__tomb',JSON.stringify(tomb));}catch(e){}
       if(JSON.stringify(sTomb)!==JSON.stringify(tomb))SB.from('gd_store').upsert({id:'__tomb',data:{v:tomb,t:Date.now()}}).then(()=>{},()=>{});
-      ['staff','evals','sessions','gx','comp'].forEach(k=>{
+      ['staff','evals','sessions','gx','comp','leaddev'].forEach(k=>{
         const sRow=srv[k];
         let localV=null;try{const raw=localStorage.getItem('rvgd3_'+k);localV=raw?JSON.parse(raw):null;}catch(e){}
         if(!sRow&&localV==null)return;
         // PROTECTIVE MERGE — never let one device's blob replace another's (the L88 lesson, now applied to the roster)
         const merged=(k==='gx')?GD_MERGE_GX(localV,sRow?sRow.v:null)
+                    :(k==='leaddev')?(()=>{const L=localV||{},S=(sRow?sRow.v:null)||{};const plans={...(S.plans||{})};
+                        Object.keys(L.plans||{}).forEach(id=>{const a=L.plans[id],b=plans[id];
+                          const w=(x)=>x?((x.priorities||[]).length*100+(x.evidence||[]).length*10+(x.checkins||[]).length):-1;
+                          plans[id]=w(a)>=w(b)?a:b;});
+                        return{...S,...L,plans,assign:{...(S.assign||{}),...(L.assign||{})}};})()
                     :GD_MERGE_ARR(localV,sRow?sRow.v:null,tomb[k]);
         const before=JSON.stringify(localV),after=JSON.stringify(merged);
         if(after!==before){try{localStorage.setItem('rvgd3_'+k,JSON.stringify(merged));}catch(e){}if(setters[k])setters[k](merged);}
@@ -9670,7 +9711,7 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff,p
   const lv=getLevel(trackTotal);
 
   const getTabs=()=>{
-    const base=['profile','numbers','evaluations','education','bird','files'];
+    const base=['profile','numbers','evaluations','education','contracts','bird','files'];
     if(tracks.length>0)base.splice(2,0,'scores','catdefs','roadmap');
     return base;
   };
@@ -9729,7 +9770,7 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff,p
           <div className="tabs">
             {getTabs().map(t=>(
               <button key={t} className={`tab${tab===t?' active':''}`} onClick={()=>setTab(t)}>
-                {t==='catdefs'?'Category Definitions':t==='roadmap'?'Growth Roadmap':t==='bird'?'🦅 Bird Test':t==='numbers'?'📊 Numbers':t.charAt(0).toUpperCase()+t.slice(1)}
+                {t==='catdefs'?'Category Definitions':t==='roadmap'?'Growth Roadmap':t==='bird'?'🦅 Bird Test':t==='numbers'?'📊 Numbers':t==='contracts'?'📄 Contracts':t.charAt(0).toUpperCase()+t.slice(1)}
                 {t==='files'&&(staff.files||[]).length>0&&<span style={{marginLeft:4,fontSize:14,background:'var(--go)',color:'var(--lime)',borderRadius:8,padding:'1px 5px',fontFamily:"'Barlow Condensed',sans-serif"}}>{(staff.files||[]).length}</span>}
               </button>
             ))}
@@ -9737,6 +9778,9 @@ function ProfileModal({staff,onClose,evals,setEvals,sessions,setStaff,allStaff,p
 
           {/* PROFILE TAB */}
           {tab==='profile'&&(<ProfileEditTab staff={staff} setStaff={setStaff} perfData={perfData} onClose={onClose}/>)}
+
+          {/* CONTRACTS TAB */}
+          {tab==='contracts'&&(<ContractsTab staff={staff} setStaff={setStaff}/>)}
 
           {/* SCORES TAB */}
           {tab==='scores'&&rs&&(<ScoresEditTab staff={staff} setStaff={setStaff} activeTrack={activeTrack} setActiveTrack={setActiveTrack} tracks={tracks} rs={rs} trackScore={trackScore} trackTotal={trackTotal}/>)}
@@ -10092,27 +10136,7 @@ function StaffNumbersTab({staff,perfData}){
   // buckets, most-complete wins) and, for months covered by fresh daily revenue (synced to
   // localStorage by the Performance page), override this person's revenue with the daily-derived
   // figure — so the profile always matches the Performance & Revenue and Reports pages.
-  const snapshots=React.useMemo(()=>{
-    const best={};
-    (perfData.snapshots||[]).forEach(s=>{
-      const k=(s.date||'').slice(0,7)+'|'+((s.type||'sales')==='shift'?'shift':'monthly');
-      const w=(s.rows||[]).reduce((a,r)=>a+(parseFloat(r.revenue)||0)+(parseFloat(r.completed)||0)+(parseFloat(r.appointments)||0)+(parseFloat(r.appointmentHours)||0),0)+(s.rows||[]).length*0.001;
-      if(!best[k]||w>best[k]._w)best[k]={snap:s,_w:w};
-    });
-    let snaps=Object.values(best).map(x=>x.snap).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-    let daily=[];try{daily=JSON.parse(localStorage.getItem('rvgd3_daily_rev')||'[]');}catch(e){}
-    if(daily.length){
-      const byM={};let mMin=null,mMax=null;
-      daily.forEach(r=>{const m=(r.date||'').slice(0,7);if(!m)return;if(!mMin||m<mMin)mMin=m;if(!mMax||m>mMax)mMax=m;if(r.staff_id===staff.id)byM[m]=(byM[m]||0)+(r.revenue||0);});
-      snaps=snaps.map(s=>{
-        const m=(s.date||'').slice(0,7);
-        if((s.type||'sales')==='shift'||!(mMin&&m>=mMin&&m<=mMax))return s;
-        const rows=(s.rows||[]).map(r=>r.staffId===staff.id?{...r,revenue:Math.round((byM[m]||0)*100)/100}:r);
-        return{...s,rows};
-      });
-    }
-    return snaps;
-  },[perfData.snapshots,staff.id]);
+  const snapshots=React.useMemo(()=>PERF_CANON(perfData,staff.id),[perfData.snapshots,staff.id]);
 
   // Latest MONTHLY snapshot (shift snapshots carry utilization, not revenue/visits)
   const monthly=snapshots.filter(s=>(s.type||'sales')!=='shift');
@@ -12029,8 +12053,169 @@ function getBandLabel(v){
   if(n>=7)return{label:'Competent',cls:'band-competent'};
   if(n>=5)return{label:'Transactional',cls:'band-transact'};
   return{label:'Surface',cls:'band-surface'};
-}function ProfileEditTab({staff,setStaff,perfData,onClose}){
+}
+function ContractsTab({staff,setStaff}){
+  const[busy,setBusy]=useState(false);const[aiBusy,setAiBusy]=useState(false);const[showDoc,setShowDoc]=useState(false);const[edit,setEdit]=useState(false);
+  const ct=staff.contract||null;const hist=staff.contractHist||[];
+  const upd=(patch)=>setStaff(prev=>prev.map(x=>x.id===staff.id?{...x,...patch}:x));
+  const setCt=(nx)=>upd({contract:nx});
+  const ren=staff.contractRenewal;const dleft=ren?Math.round((new Date(ren)-new Date())/86400000):null;
+  const cfg=()=>{try{return JSON.parse(localStorage.getItem('rvgd3_drive')||'{}');}catch(e){return{};}};
+  const setup=()=>{const c=cfg();
+    const url=window.prompt('Apps Script Web App URL:',c.url||'');if(url===null)return;
+    const sec=window.prompt('Shared secret:',c.secret||'');if(sec===null)return;
+    try{localStorage.setItem('rvgd3_drive',JSON.stringify({url:url.trim(),secret:sec.trim()}));window.alert('Saved on this device.');}catch(e){}};
+  const bodyText=()=>ct&&(ct.draft||('This amendment modifies the existing employment agreement between Revibe and '+staff.name+'. All other terms remain unchanged and in force.\n\n'
+    +(ct.kind==='split'?'Previous split: ':'Previous rate: ')+ct.from+'\n'+(ct.kind==='split'?'New split: ':'New rate: ')+ct.to
+    +'\nRole: '+(staff.role||'—')+'\nEffective date: '+(ct.effective||new Date().toISOString().slice(0,10))
+    +'\n\nThis change reflects demonstrated competency assessed through the Revibe Growth & Development framework.\n\nChanges take effect on the first full pay period on or after the effective date above.'));
+  const draft=async(mode)=>{
+    if(aiBusy||!ct)return;setAiBusy(true);
+    try{
+      const gx=(()=>{try{const g=JSON.parse(localStorage.getItem('rvgd3_gx')||'{}');return((g.people||{})[staff.name])||null;}catch(e){return null;}})();
+      const basis=gx&&gx.reviews&&gx.reviews.length?((gx.reviews[gx.reviews.length-1].log||[]).map(l=>l.t).join(' | ').slice(0,900)):'';
+      const facts={company:'Revibe',employee:staff.name,role:staff.role||'',sites:staff.site||'',changeType:ct.kind==='split'?'revenue split percentage':'hourly rate',
+        previous:ct.from,updated:ct.to,effectiveDate:ct.effective||new Date().toISOString().slice(0,10),renewalOnFile:staff.contractRenewal||'none recorded',basis:basis};
+      const prompt='You are drafting an employment document for Revibe, a multi-location wellness and performance clinic in Ontario, Canada. Clear, plain, professional Canadian-English business language.\n\n'
+        +(mode==='full'?'Draft a COMPLETE employment agreement: parties and effective date; position and reporting; compensation (using the updated figure below); hours and scheduling; the Revibe Growth & Development progression framework as the basis for future compensation changes; confidentiality; professional conduct; termination with notice per Ontario ESA minimums; signature block. Numbered sections with short headings.'
+                        :'Draft a SHORT AMENDMENT to an existing employment agreement — 4 to 6 tight paragraphs plus a signature block: what is changing, the effective date, that all other terms remain in force, and that the change reflects demonstrated competency assessed through the Revibe Growth & Development framework.')
+        +'\n\nRULES: use ONLY the facts provided — never invent dates, dollar figures, hours, benefits or clauses. Mark anything you do not have as a placeholder in square brackets like [START DATE]. Do not claim legal review. Plain text, no markdown symbols.\n\nFACTS:\n'+JSON.stringify(facts,null,1);
+      const SB=window.__SB;const su=((SB&&SB.supabaseUrl)||'https://ekjzbdvvxvylembmrphv.supabase.co').replace(/\/$/,'');const sk=(SB&&SB.supabaseKey)||'';
+      const r=await fetch(su+'/functions/v1/ai-summary',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+sk,'apikey':sk},body:JSON.stringify({prompt,max_tokens:mode==='full'?3000:1400})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok||j.error)throw new Error((j&&j.error)||('HTTP '+r.status));
+      setCt({...ct,draft:String(j.text||'').trim(),draftMode:mode,draftAt:new Date().toISOString()});setShowDoc(true);
+    }catch(e){window.alert('Draft failed: '+((e&&e.message)||'unknown'));}
+    setAiBusy(false);
+  };
+  const toDrive=async(send)=>{
+    const c=cfg();if(!ct)return;
+    if(!c.url||!c.secret){window.alert('Click ⚙ Drive setup first.');return;}
+    if(send&&!staff.email){window.alert('No email on this profile.');return;}
+    if(send&&!window.confirm('Email this agreement to '+staff.email+' now?'))return;
+    setBusy(true);
+    try{
+      const r=await fetch(c.url,{method:'POST',headers:{'content-type':'text/plain;charset=utf-8'},body:JSON.stringify({secret:c.secret,name:staff.name,email:staff.email||'',send:!!send,
+        docTitle:ct.draftMode==='full'?'Employment Agreement':'Contract Amendment',
+        subtitle:(staff.role||'')+' · '+(ct.kind==='split'?'split ':'rate ')+ct.from+' → '+ct.to+' · effective '+(ct.effective||''),text:bodyText()})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok||j.error)throw new Error((j&&j.error)||('HTTP '+r.status));
+      setCt({...ct,docUrl:j.docUrl,pdfUrl:j.pdfUrl,folderUrl:j.folderUrl,sentAt:j.emailed?new Date().toISOString().slice(0,10):(ct.sentAt||'')});
+      window.alert(j.emailed?('Filed in Drive and emailed to '+staff.email):'Filed in Drive.');
+    }catch(e){window.alert('Drive filing failed: '+((e&&e.message)||'unknown')+'\n\nCheck the URL, that access is "Anyone", and the secret matches.');}
+    setBusy(false);
+  };
+  const signIt=()=>{const d=new Date().toISOString().slice(0,10);
+    const done={...ct,status:'signed',signed:d};
+    upd({contract:null,contractHist:[done,...hist],contractSigned:d,...(ct.kind==='split'?{split:String(ct.to).replace('%','')}:{rate:ct.to+'/hr'})});
+    try{COMP_ADD({staffId:staff.id,name:staff.name,kind:ct.kind==='split'?'split':'rate',from:ct.from,to:ct.to,effective:ct.effective||d,signedAt:d,source:'profile'});}catch(e){}
+  };
+  const manual=()=>{const kind=window.confirm('OK = hourly RATE change · Cancel = SPLIT % change')?'rate':'split';
+    const from=window.prompt(kind==='rate'?'Current rate (e.g. $22.50)':'Current split (e.g. 45%)',kind==='rate'?(staff.rate||''):(staff.split?staff.split+'%':''));if(from===null)return;
+    const to=window.prompt(kind==='rate'?'New rate (e.g. $25)':'New split (e.g. 50%)','');if(!to)return;
+    setCt({status:'pending',kind,raised:new Date().toISOString().slice(0,10),from:from||'—',to:to,role:staff.role||'',step:kind==='split'?'Split % change':'Rate change',effective:'',signed:''});};
+  const CARD={background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:9,padding:'14px 17px',marginBottom:12};
+  return(<div>
+    <div style={CARD}>
+      <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+        <span style={{fontSize:16,fontWeight:800,color:'var(--text)'}}>Agreement on file</span>
+        <span style={{flex:1}}/>
+        <button className="btn btn-ghost btn-xs" onClick={setup}>⚙ Drive setup</button>
+      </div>
+      <div style={{display:'flex',gap:22,flexWrap:'wrap',marginTop:10}}>
+        <div><div style={{fontSize:12,color:'var(--g-888)'}}>Renewal date</div>
+          <input type="date" value={ren||''} onChange={e=>upd({contractRenewal:e.target.value})} style={{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:13,padding:'5px 8px',marginTop:3}}/>
+          {ren&&<div style={{fontSize:12.5,marginTop:3,color:dleft<0?'var(--c-red)':dleft<=60?'var(--c-amb)':'var(--g-999)'}}>{dleft<0?'overdue by '+Math.abs(dleft)+' days':'in '+dleft+' days'}</div>}</div>
+        <div><div style={{fontSize:12,color:'var(--g-888)'}}>Last signed</div>
+          <input type="date" value={staff.contractSigned||''} onChange={e=>upd({contractSigned:e.target.value})} style={{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:13,padding:'5px 8px',marginTop:3}}/></div>
+        <div><div style={{fontSize:12,color:'var(--g-888)'}}>Current rate</div><div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginTop:6}}>{staff.rate||'—'}</div></div>
+        <div><div style={{fontSize:12,color:'var(--g-888)'}}>Current split</div><div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginTop:6}}>{staff.split?staff.split+'%':'—'}</div></div>
+      </div>
+    </div>
+
+    {!ct&&(<div style={{...CARD,borderStyle:'dashed'}}>
+      <div style={{fontSize:14,color:'var(--g-999)',lineHeight:1.7}}>No amendment in progress. One is raised automatically when {staff.name.split(' ')[0]} is moved up a pay step in Guest Experience, or when their Split % changes on the Profile tab.</div>
+      <button className="btn btn-ghost btn-sm" style={{marginTop:9}} onClick={manual}>＋ Raise one manually</button>
+    </div>)}
+
+    {ct&&(<div style={{...CARD,border:'1px solid var(--c-amb)',background:'rgba(180,101,15,.07)'}}>
+      <div style={{fontSize:15,fontWeight:800,color:'var(--c-amb)'}}>⚠ Amendment pending signature</div>
+      <div style={{fontSize:14,color:'var(--text)',marginTop:5}}>{ct.kind==='split'?'Split':'Rate'} {ct.from} → <b>{ct.to}</b>{ct.step?' · '+ct.step:''} · raised {ct.raised}</div>
+      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginTop:10}}>
+        <span style={{fontSize:13,color:'var(--g-999)'}}>Effective</span>
+        <input type="date" value={ct.effective||''} onChange={e=>setCt({...ct,effective:e.target.value})} style={{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--text)',fontSize:13,padding:'5px 8px'}}/>
+        <button className="btn btn-ghost btn-sm" disabled={aiBusy} onClick={()=>draft('amend')}>{aiBusy?'✍️ drafting…':'✍️ AI draft amendment'}</button>
+        <button className="btn btn-ghost btn-sm" disabled={aiBusy} onClick={()=>draft('full')}>📜 AI full contract</button>
+        <button className="btn btn-ghost btn-sm" onClick={()=>setShowDoc(v=>!v)}>{showDoc?'hide document':'📄 View document'}</button>
+        <button className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>toDrive(false)}>📁 File in Drive</button>
+        <button className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>toDrive(true)}>📧 File + email</button>
+        <button className="btn btn-lime btn-sm" onClick={signIt}>✓ Mark signed</button>
+        <button className="btn btn-ghost btn-xs" onClick={()=>{if(window.confirm('Discard this pending amendment?'))setCt(null);}}>✕ discard</button>
+      </div>
+      {(ct.docUrl||ct.pdfUrl)&&(<div style={{fontSize:13,marginTop:9,display:'flex',gap:14,flexWrap:'wrap'}}>
+        {ct.docUrl&&<a href={ct.docUrl} target="_blank" rel="noreferrer" style={{color:'var(--c-blu2)'}}>📄 Google Doc</a>}
+        {ct.pdfUrl&&<a href={ct.pdfUrl} target="_blank" rel="noreferrer" style={{color:'var(--c-blu2)'}}>📕 PDF</a>}
+        {ct.folderUrl&&<a href={ct.folderUrl} target="_blank" rel="noreferrer" style={{color:'var(--c-blu2)'}}>📁 Drive folder</a>}
+        {ct.sentAt&&<span style={{color:'var(--lime)'}}>📧 emailed {ct.sentAt}</span>}
+      </div>)}
+      {showDoc&&(<div style={{marginTop:12}}>
+        <div style={{display:'flex',gap:8,marginBottom:7,flexWrap:'wrap'}}>
+          <button className="btn btn-ghost btn-xs" onClick={()=>setEdit(v=>!v)}>{edit?'done editing':'✎ edit wording'}</button>
+          {ct.draft&&<button className="btn btn-ghost btn-xs" onClick={()=>setCt({...ct,draft:null})}>↺ standard wording</button>}
+          <button className="btn btn-ghost btn-xs" onClick={()=>{navigator.clipboard&&navigator.clipboard.writeText(bodyText());}}>⧉ copy text</button>
+          {ct.draft&&<span style={{fontSize:12,color:'var(--c-amb)',alignSelf:'center'}}>AI draft — check every line; [BRACKETS] need filling.</span>}
+        </div>
+        {edit?<textarea value={bodyText()} onChange={e=>setCt({...ct,draft:e.target.value})} style={{width:'100%',minHeight:300,background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:6,color:'var(--text)',fontSize:13,lineHeight:1.6,padding:10,fontFamily:'inherit'}}/>
+             :<div style={{whiteSpace:'pre-wrap',fontSize:13.5,color:'var(--g-aaa)',lineHeight:1.8,background:'var(--surface3)',borderRadius:6,padding:'14px 16px'}}>{bodyText()}</div>}
+      </div>)}
+    </div>)}
+
+    <div style={CARD}>
+      <div style={{fontSize:15,fontWeight:800,color:'var(--text)',marginBottom:8}}>History · {hist.length}</div>
+      {hist.length===0?<div style={{fontSize:13.5,color:'var(--g-888)'}}>Nothing signed through the dashboard yet. Signed amendments land here with their Drive links.</div>
+       :hist.map((h,i)=>(<div key={i} style={{display:'flex',gap:14,alignItems:'center',flexWrap:'wrap',padding:'7px 0',borderTop:i?'1px solid var(--border)':'none'}}>
+          <span style={{fontSize:13.5,color:'var(--text)',fontWeight:700,minWidth:130}}>{h.kind==='split'?'Split':'Rate'} {h.from} → {h.to}</span>
+          <span style={{fontSize:13,color:'var(--g-999)'}}>effective {h.effective||'—'}</span>
+          <span style={{fontSize:13,color:'var(--lime)'}}>signed {h.signed}</span>
+          {h.pdfUrl&&<a href={h.pdfUrl} target="_blank" rel="noreferrer" style={{fontSize:13,color:'var(--c-blu2)'}}>📕 PDF</a>}
+          {h.docUrl&&<a href={h.docUrl} target="_blank" rel="noreferrer" style={{fontSize:13,color:'var(--c-blu2)'}}>📄 Doc</a>}
+        </div>))}
+    </div>
+  </div>);
+}
+function ProfileEditTab({staff,setStaff,perfData,onClose}){
   const[editing,setEditing]=useState(false);const[conPrint,setConPrint]=useState(false);const[conBusy,setConBusy]=useState(false);const[conEdit,setConEdit]=useState(false);
+  const[drvBusy,setDrvBusy]=useState(false);
+  // 📁 Google Drive filing via an Apps Script web app in Dave's own Workspace (L130)
+  const drvCfg=()=>{try{return JSON.parse(localStorage.getItem('rvgd3_drive')||'{}');}catch(e){return{};}};
+  const drvSetup=()=>{const c=drvCfg();
+    const url=window.prompt('Apps Script Web App URL (from Deploy → Web app):',c.url||'');if(url===null)return;
+    const sec=window.prompt('Shared secret (must match SHARED_SECRET in the script):',c.secret||'');if(sec===null)return;
+    try{localStorage.setItem('rvgd3_drive',JSON.stringify({url:url.trim(),secret:sec.trim()}));window.alert('Drive settings saved on this device.');}catch(e){}};
+  const toDrive=async(send)=>{
+    const c=drvCfg();const ct=staff.contract;
+    if(!c.url||!c.secret){window.alert('Set the Apps Script URL and secret first — click ⚙ Drive setup.');return;}
+    if(!ct){return;}
+    if(send&&!staff.email){window.alert('No email on this profile — add one before sending.');return;}
+    if(send&&!window.confirm('Email this agreement to '+staff.email+' now?'))return;
+    setDrvBusy(true);
+    try{
+      const text=ct.draft||('This amendment modifies the existing employment agreement between Revibe and '+staff.name+'. All other terms remain unchanged and in force.\n\n'
+        +(ct.kind==='split'?'Previous split: ':'Previous rate: ')+ct.from+'\n'+(ct.kind==='split'?'New split: ':'New rate: ')+ct.to
+        +'\nRole: '+(staff.role||'—')+'\nEffective date: '+(ct.effective||new Date().toISOString().slice(0,10))
+        +'\n\nThis change reflects demonstrated competency assessed through the Revibe Growth & Development framework.\n\nChanges take effect on the first full pay period on or after the effective date above.');
+      const r=await fetch(c.url,{method:'POST',headers:{'content-type':'text/plain;charset=utf-8'},body:JSON.stringify({
+        secret:c.secret,name:staff.name,email:staff.email||'',send:!!send,
+        docTitle:ct.draftMode==='full'?'Employment Agreement':'Contract Amendment',
+        subtitle:(staff.role||'')+' · '+(ct.kind==='split'?'split ':'rate ')+ct.from+' → '+ct.to+' · effective '+(ct.effective||new Date().toISOString().slice(0,10)),
+        text:text})});
+      const j=await r.json().catch(()=>({}));
+      if(!r.ok||j.error)throw new Error((j&&j.error)||('HTTP '+r.status));
+      setStaff(prev=>prev.map(x=>x.id===staff.id?{...x,contract:{...ct,docUrl:j.docUrl,pdfUrl:j.pdfUrl,folderUrl:j.folderUrl,sentAt:j.emailed?new Date().toISOString().slice(0,10):(ct.sentAt||'')}}:x));
+      window.alert(j.emailed?('Filed in Drive and emailed to '+staff.email):'Filed in Drive.');
+    }catch(e){window.alert('Drive filing failed: '+((e&&e.message)||'unknown')+'\n\nCheck the Web App URL, that it is deployed with access "Anyone", and that the secret matches.');}
+    setDrvBusy(false);
+  };
   // ✍️ AI contract drafting — reuses the SAME ai-summary Edge Function the meeting summaries use (L129)
   const draftContract=async(mode)=>{
     if(conBusy)return;const ct=staff.contract;if(!ct)return;setConBusy(true);
@@ -12137,12 +12322,21 @@ function getBandLabel(v){
                 <button className="btn btn-lime btn-sm" onClick={()=>setConPrint(true)}>📄 Generate amendment</button>
                 <button className="btn btn-ghost btn-sm" disabled={conBusy} title="Claude drafts the amendment wording from this person's actual review record — counts against the AI budget" onClick={()=>draftContract('amend')}>{conBusy?'✍️ drafting…':'✍️ AI draft amendment'}</button>
                 <button className="btn btn-ghost btn-sm" disabled={conBusy} title="Claude drafts a COMPLETE employment agreement with placeholders for anything it doesn't know" onClick={()=>draftContract('full')}>{conBusy?'…':'📜 AI full contract'}</button>
+                <button className="btn btn-ghost btn-sm" disabled={drvBusy} title="Create the Google Doc + PDF in the Revibe contracts folder" onClick={()=>toDrive(false)}>{drvBusy?'…':'📁 File in Drive'}</button>
+                <button className="btn btn-ghost btn-sm" disabled={drvBusy} title="File in Drive AND email it to this person from your Workspace account" onClick={()=>toDrive(true)}>{drvBusy?'…':'📧 File + email for signing'}</button>
+                <button className="btn btn-ghost btn-xs" title="Set the Apps Script Web App URL and shared secret (stored on this device)" onClick={drvSetup}>⚙ Drive setup</button>
                 <button className="btn btn-ghost btn-sm" onClick={()=>{const d=new Date().toISOString().slice(0,10);
                   setStaff(prev=>prev.map(x=>x.id===staff.id?{...x,contract:{...ct,status:'signed',signed:d},contractSigned:d,...(ct.kind==='split'?{split:String(ct.to).replace('%','')}:{rate:ct.to+'/hr'})}:x));
                   COMP_ADD({staffId:staff.id,name:staff.name,kind:ct.kind==='split'?'split':'rate',from:ct.from,to:ct.to,effective:ct.effective||d,signedAt:d,source:'profile'});}}>✓ Mark signed</button>
               </div>
             </div>)}
             {ct&&ct.status==='signed'&&<div style={{fontSize:14,color:'var(--lime)',marginTop:6}}>✓ Amendment signed {ct.signed} — {ct.from} → {ct.to}.</div>}
+            {ct&&(ct.docUrl||ct.pdfUrl)&&(<div style={{fontSize:13,color:'var(--g-999)',marginTop:7,display:'flex',gap:12,flexWrap:'wrap'}}>
+              {ct.docUrl&&<a href={ct.docUrl} target="_blank" rel="noreferrer" style={{color:'var(--c-blu2)'}}>📄 Google Doc</a>}
+              {ct.pdfUrl&&<a href={ct.pdfUrl} target="_blank" rel="noreferrer" style={{color:'var(--c-blu2)'}}>📕 PDF</a>}
+              {ct.folderUrl&&<a href={ct.folderUrl} target="_blank" rel="noreferrer" style={{color:'var(--c-blu2)'}}>📁 Their folder</a>}
+              {ct.sentAt&&<span style={{color:'var(--lime)'}}>📧 emailed {ct.sentAt}</span>}
+            </div>)}
             {conPrint&&ct&&(<div style={{marginTop:12}}>
               <div className="no-print" style={{display:'flex',gap:8,marginBottom:8}}>
                 <button className="btn btn-lime btn-sm" onClick={()=>{document.body.classList.add('evrpt-print');const done=()=>{document.body.classList.remove('evrpt-print');window.removeEventListener('afterprint',done);};window.addEventListener('afterprint',done);setTimeout(()=>{window.print();setTimeout(done,900);},60);}}>🖨 Print / Save as PDF</button>
@@ -13081,9 +13275,400 @@ function AddLtProfileModal({onClose,onAdd}){
   );
 }
 
-function LeadershipPage(){
+
+// ===== CLINICAL LEADERSHIP & DEVELOPMENT SYSTEM (L133) =======================
+// Upper management → Clinical Lead → Clinician. Every priority carries baseline,
+// target, action, measurement and review date; every competency score is dated and
+// never overwritten; KPI figures come from PERF_STAT so they match every other page.
+const LD_LEADS=[
+ {id:'jmac',name:'Jennifer Macpherson',short:'Jmac',area:'RMT',match:['rmt','massage'],
+  mandate:'Build an RMT group that is clinically strong, communicates well, integrates with the rest of Revibe and develops sustainable caseloads.'},
+ {id:'anesto',name:'Anesto',short:'Anesto',area:'Osteo + Naturopathic',match:['osteo','naturopath','nd'],
+  mandate:'Develop Osteo and ND clinicians while making their role inside Revibe clearer and better integrated.'},
+ {id:'zee',name:'Zeeruk',short:'Zee',area:'Performance',match:['performance','trainer','kinesio','strength'],
+  mandate:'Build a scalable Revibe Performance system that other practitioners can deliver.'},
+ {id:'scott',name:'Scott',short:'Scott',area:'Physio + Clinical Growth',match:['physio','physical therapy'],
+  mandate:'Raise physiotherapy standards while strengthening clinical development across all of Revibe.'},
+ {id:'mike',name:'Mike Ross',short:'Mike',area:'Clinical Director Development — Oakville',kind:'director',match:[],
+  mandate:'Develop from strong physiotherapist into Oakville Clinical Director — owning the health of a clinic, not just its clinical function.'}];
+const LD_TYPES=[['behaviour','Behaviour','Are they actually doing it?'],['activity','Activity','How often is it happening?'],['outcome','Outcome','Did results actually change?']];
+const LD_SCALE=['Not demonstrated','Developing','Consistent','Independent','Can teach / develop others'];
+const LD_AREAS=['Assessment quality','Clinical reasoning','Treatment planning','Guest communication','Care Map / integration','Internal referrals','Documentation','Caseload & rebooking','Professional habits','Team contribution','Leadership potential'];
+const LD_STATUS=[['notstarted','Not started'],['inprogress','In progress'],['ontrack','On track'],['watch','Watch'],['attention','Needs attention'],['done','Completed']];
+const LD_STCOL={notstarted:'var(--g-666)',inprogress:'var(--c-blu2)',ontrack:'var(--c-grn)',watch:'var(--c-yel)',attention:'var(--c-red)',done:'var(--g-777)'};
+// Mike's Clinical Director readiness — the 13 dimensions, each scored 1-5 with dated history
+const LD_READY=[
+ ['clinical','Clinical performance','Own caseload, quality and numbers held while leading'],
+ ['mentor','Mentorship','Did the clinician get better because of Mike?'],
+ ['comms','Leadership communication','Expectations, feedback, disagreement, follow-up'],
+ ['people','Developing different people','Adapts to high performers, strugglers, quiet personalities'],
+ ['initiative','Initiative & ownership','Problems → problems with solutions → action → prevention'],
+ ['standards','Protecting standards','Acts when standards slip, without being told'],
+ ['systems','System improvement','Improves the environment, not just the people'],
+ ['decisions','Decision making','Situation → recommendation → outcome → what was learned'],
+ ['hiring','Hiring & team building','Evaluation, onboarding, integration, early development'],
+ ['community','Community development','Oakville relationships, partnerships, referrals'],
+ ['business','Business & financial literacy','Revenue, labour, utilization — what he can influence'],
+ ['influence','Influence without authority','Leader before the title exists'],
+ ['leaders','Developing other leaders','Creating leaders, not only better clinicians']];
+const LD_STAGES=['Strong clinician','Mentor','Clinical leader','Director-ready','Clinical Director','Developer of leaders'];
+const LD_PHASES=[['Sept–Oct','PROVE','Master yourself + learn the business'],['Oct–Nov','DEVELOP','Develop people + understand the machine'],
+ ['Nov–Dec','BUILD','Build Oakville'],['Dec–Jan','ESTABLISH','Build the operating system'],['Jan–Feb','OPERATE','Launch Oakville'],
+ ['Feb–Mar','OWN','Take responsibility for the business'],['Mar–Apr','LEAD','Clinical Director']];
+
+function LeadDevTab({staff,perfData}){
+  const[db,setDb]=useState(()=>{try{return JSON.parse(localStorage.getItem('rvgd3_leaddev')||'{}');}catch(e){return{};}});
+  const[view,setView]=useState({lead:null,person:null});
+  const save=(next)=>{setDb(next);try{localStorage.setItem('rvgd3_leaddev',JSON.stringify(next));
+    const m=JSON.parse(localStorage.getItem('rvgd3__ts')||'{}');m['leaddev']=Date.now();localStorage.setItem('rvgd3__ts',JSON.stringify(m));
+    if(window.__SB&&window.__GDSYNC&&window.__GDSYNC.ready)window.__SB.from('gd_store').upsert({id:'leaddev',data:{v:next,t:Date.now()}}).then(()=>{},()=>{});
+  }catch(e){}};
+  const planOf=(id)=>(db.plans||{})[id]||{priorities:[],evidence:[],checkins:[],actions:[],comp:{}};
+  const setPlan=(id,patch)=>save({...db,plans:{...(db.plans||{}),[id]:{...planOf(id),...patch}}});
+  const today=()=>new Date().toISOString().slice(0,10);
+  const daysSince=(d)=>d?Math.round((new Date()-new Date(d))/86400000):null;
+  const teamOf=(lead)=>{const ov=(db.assign||{});
+    return (staff||[]).filter(p=>{ if(ov[p.id])return ov[p.id]===lead.id;
+      if(!lead.match.length)return false;
+      const d=((p.discipline||'')+' '+(p.role||'')).toLowerCase();
+      return lead.match.some(m=>d.indexOf(m)>=0);});};
+  const openActions=(id)=>(planOf(id).actions||[]).filter(a=>a.status!=='Complete'&&a.status!=='Cancelled');
+  const overdueActions=(id)=>openActions(id).filter(a=>a.due&&new Date(a.due)<new Date());
+  const health=(lead)=>{const team=teamOf(lead);if(!team.length)return{pct:null,team:0,plans:0,fresh:0,onTrack:null,acts:0,od:0};
+    let plans=0,fresh=0,ok=0,prio=0,acts=0,od=0;
+    team.forEach(p=>{const pl=planOf(p.id);const act=(pl.priorities||[]).filter(x=>x.status!=='done');
+      if(act.length)plans++;
+      const last=(pl.checkins||[])[0];if(last&&daysSince(last.date)<=45)fresh++;
+      act.forEach(x=>{prio++;if(x.status==='ontrack'||x.status==='inprogress')ok++;});
+      acts+=openActions(p.id).length;od+=overdueActions(p.id).length;});
+    return{pct:Math.round(((plans/team.length)*0.4+(fresh/team.length)*0.35+(prio?ok/prio:0)*0.25)*100),
+      team:team.length,plans,fresh,onTrack:prio?Math.round(ok/prio*100):null,acts,od};};
+  const alerts=()=>{const out=[];const ack=(db.ack||{});
+    LD_LEADS.forEach(l=>teamOf(l).forEach(p=>{
+      const pl=planOf(p.id);const act=(pl.priorities||[]).filter(x=>x.status!=='done');
+      const last=(pl.checkins||[])[0];const ds=last?daysSince(last.date):null;
+      const push=(sev,t)=>{const k=p.id+'|'+t;if(!ack[k])out.push({sev,who:p.name,lead:l.short,t,id:p.id,lid:l.id,k});};
+      if(!act.length)push('amber','No active development priority');
+      if(ds==null)push('amber','Never checked in');else if(ds>45)push('red','No check-in in '+ds+' days');
+      overdueActions(p.id).forEach(a=>push('red','Action overdue — '+a.t));
+      act.forEach(x=>{if(x.review&&new Date(x.review)<new Date())push('red','Review overdue — '+x.area);
+        if(x.status==='attention')push('red','Needs attention — '+x.area);
+        if(x.status==='watch')push('amber','Watch — '+x.area);});}));
+    return out.sort((a,b)=>(a.sev==='red'?0:1)-(b.sev==='red'?0:1));};
+
+  const C={background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'15px 18px'};
+  const lbl={fontSize:12,letterSpacing:'1.4px',textTransform:'uppercase',color:'var(--g-888)',fontFamily:"'Barlow Condensed',sans-serif"};
+  const dot=(c)=>({width:9,height:9,borderRadius:9,background:c,display:'inline-block'});
+  const trendChip=(st)=>{if(!st||st.avg3==null)return <span style={{fontSize:12.5,color:'var(--g-666)'}}>no data</span>;
+    const a=st.dir==='up'?'↑':st.dir==='down'?'↓':'→';const c=st.dir==='up'?'var(--c-grn)':st.dir==='down'?'var(--c-red)':'var(--g-999)';
+    return <span style={{fontSize:12.5,color:c}}>{a} {Math.round(st.avg3).toLocaleString()} <span style={{color:'var(--g-666)'}}>3-mo avg{st.prev3!=null?' · was '+Math.round(st.prev3).toLocaleString():''}</span></span>;};
+
+  // ============ LEVEL 3 · one person (clinician OR a lead's own plan) ============
+  const PersonView=({person,lead,back})=>{
+    const id=person.id;const pl=planOf(id);
+    const act=(pl.priorities||[]).filter(x=>x.status!=='done');
+    const rev=PERF_STAT(perfData,id,'revenue'),vis=PERF_STAT(perfData,id,'completed');
+    const addPrio=()=>{if(act.length>=3){window.alert('Three active priorities is the maximum — close one first. That limit is the point.');return;}
+      const area=window.prompt('Development area:\n\n'+LD_AREAS.join('\n'),'');if(!area)return;
+      const gap=window.prompt('Specific gap — what exactly is inconsistent?','');if(gap===null)return;
+      const baseline=window.prompt('Baseline — where are they now?','');if(baseline===null)return;
+      const target=window.prompt('Target — what does improved actually look like?','');if(target===null)return;
+      const action=window.prompt('Action — what will specifically be done?','');if(action===null)return;
+      const measure=window.prompt('Measured by (observation, referral count, rebooking %, case review…):','');if(measure===null)return;
+      const review=window.prompt('Review date (YYYY-MM-DD):',new Date(Date.now()+2592e6).toISOString().slice(0,10));if(!review)return;
+      const type=window.confirm('OK = Behaviour · Cancel = choose Activity/Outcome')?'behaviour':(window.confirm('OK = Activity · Cancel = Outcome')?'activity':'outcome');
+      setPlan(id,{priorities:[{id:'p'+Date.now(),area,gap,baseline,target,action,measure,review,type,status:'inprogress',created:today()},...(pl.priorities||[])]});};
+    const setPrio=(pid,patch)=>setPlan(id,{priorities:(pl.priorities||[]).map(x=>x.id===pid?{...x,...patch}:x)});
+    const completePrio=(x)=>{const ev=(pl.evidence||[]).filter(e=>e.prio===x.id).length;
+      if(!ev){window.alert('A priority cannot be completed without evidence. Log at least one piece of evidence against it first.');return;}
+      setPrio(x.id,{status:'done',closed:today()});};
+    const addEv=(kind,prio)=>{const t=window.prompt(kind==='kpi'?'What moved, and by how much?':kind==='concern'?'What is the concern?':'What did you observe?','');if(!t)return;
+      setPlan(id,{evidence:[{date:today(),by:lead?lead.short:'Lead',kind,t,prio:prio||null},...(pl.evidence||[])]});};
+    const addAction=()=>{const t=window.prompt('Action — what specifically will be done?','');if(!t)return;
+      const owner=window.prompt('Owner:',lead?lead.short:'');if(owner===null)return;
+      const due=window.prompt('Due date (YYYY-MM-DD):',new Date(Date.now()+1209600000).toISOString().slice(0,10));if(!due)return;
+      setPlan(id,{actions:[{id:'a'+Date.now(),t,owner,due,status:'Open',created:today()},...(pl.actions||[])]});};
+    const setAct=(aid,patch)=>setPlan(id,{actions:(pl.actions||[]).map(a=>a.id===aid?{...a,...patch}:a)});
+    const checkin=()=>{const wins=window.prompt('Since last check-in — wins?','');if(wins===null)return;
+      const chal=window.prompt('Challenges / missed commitments?','');if(chal===null)return;
+      const nxt=window.prompt('Next check-in date (YYYY-MM-DD):',new Date(Date.now()+2592e6).toISOString().slice(0,10));if(!nxt)return;
+      setPlan(id,{checkins:[{date:today(),by:lead?lead.short:'Lead',wins,chal,next:nxt},...(pl.checkins||[])]});};
+    const scoreComp=(key,label)=>{const cur=((pl.comp||{})[key]||[])[0];
+      const v=window.prompt(label+'\n\n1 Not demonstrated · 2 Developing · 3 Consistent · 4 Independent · 5 Can teach'+(cur?'\n\nCurrent: '+cur.v:''),cur?String(cur.v):'');
+      const n=parseInt(v);if(!(n>=1&&n<=5))return;
+      const why=window.prompt('Evidence for this score — what changed?','');if(why===null)return;
+      setPlan(id,{comp:{...(pl.comp||{}),[key]:[{v:n,date:today(),why,by:lead?lead.short:'Lead'},...((pl.comp||{})[key]||[])]}});};
+    const last=(pl.checkins||[])[0];
+    return(<div style={{maxWidth:1020}}>
+      <button className="btn btn-ghost btn-sm" onClick={back}>← back</button>
+      <div style={{...C,marginTop:12}}>
+        <div style={{display:'flex',gap:14,alignItems:'baseline',flexWrap:'wrap'}}>
+          <span style={{fontSize:21,fontWeight:800,color:'var(--text)'}}>{person.name}</span>
+          <span style={{fontSize:13.5,color:'var(--g-999)'}}>{person.discipline||person.role||''}{lead?' · lead: '+lead.short:''}</span>
+          <span style={{flex:1}}/>
+          <button className="btn btn-ghost btn-sm" onClick={addAction}>＋ Action</button>
+          <button className="btn btn-lime btn-sm" onClick={checkin}>✓ Check-in</button>
+        </div>
+        <div style={{display:'flex',gap:26,flexWrap:'wrap',marginTop:12}}>
+          <div><div style={lbl}>Revenue</div>{trendChip(rev)}</div>
+          <div><div style={lbl}>Completed visits</div>{trendChip(vis)}</div>
+          <div><div style={lbl}>Last check-in</div><span style={{fontSize:12.5,color:last?(daysSince(last.date)>45?'var(--c-red)':'var(--g-ccc)'):'var(--c-amb)'}}>{last?last.date+' · '+daysSince(last.date)+'d ago':'never'}</span></div>
+          <div><div style={lbl}>Next check-in</div><span style={{fontSize:12.5,color:'var(--g-ccc)'}}>{last&&last.next?last.next:'—'}</span></div>
+          <div><div style={lbl}>Open actions</div><span style={{fontSize:12.5,color:overdueActions(id).length?'var(--c-red)':'var(--g-ccc)'}}>{openActions(id).length}{overdueActions(id).length?' · '+overdueActions(id).length+' overdue':''}</span></div>
+        </div>
+        {rev.lastMonth&&<div style={{fontSize:11.5,color:'var(--g-666)',marginTop:8}}>Numbers from the Jane import through {rev.lastMonth} — the same source as this person's Numbers tab and Performance &amp; Revenue.</div>}
+      </div>
+
+      {openActions(id).length>0&&(<div style={{...C,marginTop:12}}>
+        <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:8}}>Open actions</div>
+        {openActions(id).map((a,i)=>{const od=a.due&&new Date(a.due)<new Date();
+          return(<div key={a.id} style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap',padding:'7px 0',borderTop:i?'1px solid var(--border)':'none'}}>
+            <span style={dot(od?'var(--c-red)':'var(--c-blu2)')}/>
+            <span style={{fontSize:13.5,color:'var(--g-ccc)',flex:1}}>{a.t}</span>
+            <span style={{fontSize:12.5,color:'var(--g-888)'}}>{a.owner}</span>
+            <span style={{fontSize:12.5,color:od?'var(--c-red)':'var(--g-888)'}}>due {a.due}</span>
+            <button className="btn btn-ghost btn-xs" onClick={()=>setAct(a.id,{status:'Complete',done:today()})}>✓ done</button>
+          </div>);})}
+      </div>)}
+
+      <div style={{...C,marginTop:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,flexWrap:'wrap'}}>
+          <span style={{fontSize:16,fontWeight:800,color:'var(--text)'}}>Development priorities</span>
+          <span style={{fontSize:12.5,color:'var(--g-888)'}}>maximum three at a time</span>
+          <span style={{flex:1}}/>
+          <button className="btn btn-ghost btn-sm" onClick={addPrio}>＋ Add priority</button>
+        </div>
+        {!(pl.priorities||[]).length&&<div style={{fontSize:13.5,color:'var(--g-888)'}}>Nothing set. A priority needs a gap, a baseline, a target, an action, a measurement and a review date — that is what makes progress provable.</div>}
+        {(pl.priorities||[]).map(x=>{const evs=(pl.evidence||[]).filter(e=>e.prio===x.id);
+          return(<div key={x.id} style={{borderTop:'1px solid var(--border)',padding:'11px 0',opacity:x.status==='done'?.55:1}}>
+            <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+              <span style={dot(LD_STCOL[x.status]||'var(--g-666)')}/>
+              <span style={{fontSize:15,fontWeight:700,color:'var(--text)'}}>{x.area}</span>
+              <span style={{fontSize:11,padding:'1px 7px',borderRadius:5,border:'1px solid var(--border)',color:'var(--g-999)'}}>{(LD_TYPES.find(t=>t[0]===x.type)||[])[1]||'Behaviour'}</span>
+              <span style={{flex:1}}/>
+              <select value={x.status} onChange={e=>setPrio(x.id,{status:e.target.value})} style={{background:'var(--surface3)',border:'1px solid var(--border)',borderRadius:5,color:'var(--g-ccc)',fontSize:12,padding:'3px 6px'}}>
+                {LD_STATUS.filter(st=>st[0]!=='done').map(([v,l])=><option key={v} value={v}>{l}</option>)}</select>
+              <span style={{fontSize:12.5,color:x.review&&new Date(x.review)<new Date()&&x.status!=='done'?'var(--c-red)':'var(--g-888)'}}>review {x.review||'—'}</span>
+              <button className="btn btn-ghost btn-xs" onClick={()=>addEv('obs',x.id)}>＋ evidence</button>
+              {x.status!=='done'&&<button className="btn btn-ghost btn-xs" title={evs.length?'Complete this priority':'Needs evidence before it can be completed'} onClick={()=>completePrio(x)}>complete</button>}
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'2px 18px',marginTop:6,paddingLeft:19}}>
+              {[['Gap',x.gap],['Baseline',x.baseline],['Target',x.target],['Action',x.action],['Measured by',x.measure]].map(([k,v])=>(
+                <div key={k} style={{fontSize:12.5,color:'var(--g-aaa)',lineHeight:1.55}}><span style={{color:'var(--g-666)'}}>{k}: </span>{v||'—'}</div>))}
+            </div>
+            <div style={{fontSize:12,color:evs.length?'var(--c-grn)':'var(--c-amb)',paddingLeft:19,marginTop:4}}>{evs.length?evs.length+' piece'+(evs.length>1?'s':'')+' of evidence':'no evidence yet'}</div>
+          </div>);})}
+      </div>
+
+      <div style={{...C,marginTop:12}}>
+        <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:4}}>Competencies</div>
+        <div style={{fontSize:12.5,color:'var(--g-888)',marginBottom:8}}>Every score is dated and kept — nothing is overwritten. Click to score with evidence.</div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'6px 16px'}}>
+          {LD_AREAS.map(a=>{const key=a.toLowerCase().replace(/[^a-z]/g,'');const h=(pl.comp||{})[key]||[];const cur=h[0];const prev=h[1];
+            return(<div key={a} onClick={()=>scoreComp(key,a)} style={{display:'flex',gap:8,alignItems:'center',cursor:'pointer',padding:'3px 0'}} title={h.length?h.map(x=>x.date+' → '+x.v+(x.why?' · '+x.why:'')).join('\n'):'not scored'}>
+              <span style={{fontSize:13,color:'var(--g-aaa)',flex:1}}>{a}</span>
+              {prev&&<span style={{fontSize:11.5,color:'var(--g-666)'}}>{prev.v}→</span>}
+              <span style={{fontSize:14,fontWeight:800,color:cur?(cur.v>=4?'var(--c-grn)':cur.v>=3?'var(--c-lime2)':cur.v>=2?'var(--c-yel)':'var(--c-amb)'):'var(--g-666)'}}>{cur?cur.v:'—'}</span>
+            </div>);})}
+        </div>
+      </div>
+
+      <div style={{...C,marginTop:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,flexWrap:'wrap'}}>
+          <span style={{fontSize:16,fontWeight:800,color:'var(--text)'}}>Evidence &amp; history</span>
+          <span style={{flex:1}}/>
+          <button className="btn btn-ghost btn-xs" onClick={()=>addEv('obs')}>＋ Observation</button>
+          <button className="btn btn-ghost btn-xs" onClick={()=>addEv('kpi')}>＋ Number moved</button>
+          <button className="btn btn-ghost btn-xs" onClick={()=>addEv('concern')}>＋ Concern</button>
+        </div>
+        {(()=>{const rows=[...(pl.evidence||[]).map(e=>({...e,_t:e.kind})),
+            ...(pl.checkins||[]).map(c=>({date:c.date,by:c.by,_t:'checkin',t:'Check-in — '+(c.wins||'')+(c.chal?' · Challenges: '+c.chal:'')})),
+            ...Object.keys(pl.comp||{}).reduce((a,k)=>a.concat((pl.comp[k]||[]).map(x=>({date:x.date,by:x.by,_t:'comp',t:'Competency → '+x.v+(x.why?' · '+x.why:'')}))),[])]
+            .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+          if(!rows.length)return <div style={{fontSize:13.5,color:'var(--g-888)'}}>Empty. This log is what answers "why did this person progress?" a year from now.</div>;
+          return rows.slice(0,30).map((e,i)=>(
+            <div key={i} style={{display:'flex',gap:12,padding:'6px 0',borderTop:i?'1px solid var(--border)':'none',fontSize:13.5,lineHeight:1.6}}>
+              <span style={{color:'var(--g-666)',minWidth:88}}>{e.date}</span>
+              <span style={{minWidth:78,color:e._t==='kpi'?'var(--c-grn)':e._t==='checkin'?'var(--c-blu2)':e._t==='concern'?'var(--c-red)':e._t==='comp'?'var(--c-lime2)':'var(--g-888)'}}>
+                {e._t==='kpi'?'number':e._t==='checkin'?'check-in':e._t==='concern'?'concern':e._t==='comp'?'competency':'observed'}</span>
+              <span style={{color:'var(--g-ccc)',flex:1}}>{e.t}</span>
+              <span style={{color:'var(--g-666)'}}>{e.by||''}</span>
+            </div>));})()}
+      </div>
+    </div>);
+  };
+
+  if(view.person){
+    const p=(staff||[]).find(x=>x.id===view.person);const lead=LD_LEADS.find(l=>l.id===view.lead);
+    if(p)return <PersonView person={p} lead={lead} back={()=>setView({lead:view.lead,person:null})}/>;
+  }
+
+  // ============ MIKE · Clinical Director readiness ============
+  if(view.lead==='mike'){
+    const lead=LD_LEADS.find(l=>l.id==='mike');const pl=planOf('mike');
+    const stage=(db.mikeStage!=null?db.mikeStage:2);
+    const setStage=(n)=>save({...db,mikeStage:n});
+    const scoreDim=(key,label,desc)=>{const h=(pl.comp||{})[key]||[];const cur=h[0];
+      const v=window.prompt(label+'\n'+desc+'\n\n1 Not demonstrated · 2 Developing · 3 Consistent · 4 Independent · 5 Can teach'+(cur?'\n\nCurrent: '+cur.v+' ('+cur.date+')':''),cur?String(cur.v):'');
+      const n=parseInt(v);if(!(n>=1&&n<=5))return;
+      const why=window.prompt('Evidence — what specifically demonstrates this?','');if(why===null)return;
+      setPlan('mike',{comp:{...(pl.comp||{}),[key]:[{v:n,date:today(),why,by:'Dave'},...h]}});};
+    const scored=LD_READY.filter(([k])=>((pl.comp||{})[k]||[]).length);
+    const avg=scored.length?(scored.reduce((a,[k])=>a+((pl.comp||{})[k][0].v),0)/scored.length):null;
+    const mentees=teamOf(lead);
+    return(<div style={{maxWidth:1020}}>
+      <button className="btn btn-ghost btn-sm" onClick={()=>setView({lead:null,person:null})}>← All leads</button>
+      <div style={{...C,marginTop:12,borderLeft:'4px solid var(--c-blu2)'}}>
+        <div style={{display:'flex',gap:14,alignItems:'baseline',flexWrap:'wrap'}}>
+          <span style={{fontSize:21,fontWeight:800,color:'var(--text)'}}>Mike Ross</span>
+          <span style={{fontSize:13.5,color:'var(--c-blu2)'}}>Clinical Director Development — Oakville</span>
+          <span style={{flex:1}}/>
+          <span style={{fontSize:26,fontWeight:800,color:avg==null?'var(--g-666)':avg>=4?'var(--c-grn)':avg>=3?'var(--c-lime2)':'var(--c-yel)'}}>{avg==null?'—':avg.toFixed(1)}</span>
+          <span style={{fontSize:12,color:'var(--g-888)'}}>avg of {scored.length}/13 scored</span>
+        </div>
+        <div style={{fontSize:13.5,color:'var(--g-aaa)',lineHeight:1.7,marginTop:6}}>{lead.mandate}</div>
+        <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:12}}>
+          {LD_STAGES.map((st,i)=>(
+            <button key={st} onClick={()=>setStage(i)} style={{fontSize:12,padding:'5px 10px',borderRadius:7,cursor:'pointer',
+              border:'1px solid '+(i===stage?'var(--c-blu2)':'var(--border)'),
+              background:i<stage?'rgba(122,196,144,.14)':i===stage?'rgba(29,95,168,.18)':'transparent',
+              color:i===stage?'var(--c-blu2)':i<stage?'var(--c-grn)':'var(--g-777)',fontWeight:i===stage?800:400}}>{i<stage?'✓ ':''}{st}</button>))}
+        </div>
+        <div style={{fontSize:11.5,color:'var(--g-666)',marginTop:7}}>Stage is set by evidence, never by time elapsed. Click a stage to move him when the evidence supports it.</div>
+      </div>
+
+      <div style={{...C,marginTop:12}}>
+        <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:3}}>Oakville readiness — 13 dimensions</div>
+        <div style={{fontSize:12.5,color:'var(--g-888)',marginBottom:9}}>Click any row to score it with evidence. Previous score, trend and evidence date are kept.</div>
+        {LD_READY.map(([k,label,desc],i)=>{const h=(pl.comp||{})[k]||[];const cur=h[0],prev=h[1];
+          const dir=cur&&prev?(cur.v>prev.v?'↑':cur.v<prev.v?'↓':'→'):null;
+          return(<div key={k} onClick={()=>scoreDim(k,label,desc)} style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap',padding:'9px 0',borderTop:i?'1px solid var(--border)':'none',cursor:'pointer'}}>
+            <div style={{flex:1,minWidth:230}}>
+              <div style={{fontSize:14.5,fontWeight:700,color:'var(--text)'}}>{label}</div>
+              <div style={{fontSize:12,color:'var(--g-888)'}}>{desc}</div>
+            </div>
+            <span style={{fontSize:12,color:'var(--g-666)',minWidth:120}}>{cur?h.length+' entr'+(h.length>1?'ies':'y')+' · '+cur.date:'not scored'}</span>
+            {prev&&<span style={{fontSize:12.5,color:'var(--g-666)'}}>{prev.v} {dir}</span>}
+            <span style={{width:74,textAlign:'right',fontSize:19,fontWeight:800,color:cur?(cur.v>=4?'var(--c-grn)':cur.v>=3?'var(--c-lime2)':cur.v>=2?'var(--c-yel)':'var(--c-amb)'):'var(--g-666)'}}>{cur?cur.v:'—'}<span style={{fontSize:12,color:'var(--g-666)'}}>/5</span></span>
+          </div>);})}
+      </div>
+
+      <div style={{...C,marginTop:12}}>
+        <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:8}}>Sept → April roadmap</div>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {LD_PHASES.map(([when,name,what],i)=>(
+            <div key={name} style={{flex:'1 1 128px',border:'1px solid var(--border)',borderLeft:'3px solid '+(i<=stage?'var(--c-grn)':'var(--border)'),borderRadius:8,padding:'9px 11px'}}>
+              <div style={{fontSize:11,color:'var(--g-666)'}}>{when}</div>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,fontWeight:800,letterSpacing:'1px',color:i<=stage?'var(--c-grn)':'var(--g-999)'}}>{name}</div>
+              <div style={{fontSize:11.5,color:'var(--g-888)',lineHeight:1.5,marginTop:2}}>{what}</div>
+            </div>))}
+        </div>
+      </div>
+
+      <div style={{...C,marginTop:12}}>
+        <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:6}}>Clinicians Mike is mentoring · {mentees.length}</div>
+        {!mentees.length&&<div style={{fontSize:13.5,color:'var(--g-888)'}}>None assigned yet. The measure that matters is not whether Mike mentored someone — it is whether they got better because of it.</div>}
+        {mentees.map((p,i)=>(
+          <div key={p.id} onClick={()=>setView({lead:'mike',person:p.id})} style={{display:'flex',gap:12,alignItems:'center',padding:'8px 0',borderTop:i?'1px solid var(--border)':'none',cursor:'pointer'}}>
+            <span style={{fontSize:14.5,fontWeight:700,color:'var(--text)',flex:1}}>{p.name}</span>
+            {trendChip(PERF_STAT(perfData,p.id,'revenue'))}<span style={{color:'var(--g-666)'}}>›</span>
+          </div>))}
+      </div>
+
+      <div style={{marginTop:12}}><PersonView person={{id:'mike',name:'Mike Ross — leadership plan',discipline:'Physiotherapist'}} lead={{short:'Dave'}} back={()=>setView({lead:null,person:null})}/></div>
+    </div>);
+  }
+
+  // ============ LEVEL 2 · a lead's team ============
+  if(view.lead){
+    const lead=LD_LEADS.find(l=>l.id===view.lead);const team=teamOf(lead);const h=health(lead);
+    return(<div style={{maxWidth:1020}}>
+      <button className="btn btn-ghost btn-sm" onClick={()=>setView({lead:null,person:null})}>← All leads</button>
+      <div style={{...C,marginTop:12}}>
+        <div style={{display:'flex',gap:14,alignItems:'baseline',flexWrap:'wrap'}}>
+          <span style={{fontSize:21,fontWeight:800,color:'var(--text)'}}>{lead.name}</span>
+          <span style={{fontSize:13.5,color:'var(--g-999)'}}>{lead.area}</span>
+          <span style={{flex:1}}/>
+          <span style={{fontSize:26,fontWeight:800,color:h.pct>=80?'var(--c-grn)':h.pct>=60?'var(--c-yel)':h.pct==null?'var(--g-666)':'var(--c-red)'}}>{h.pct==null?'—':h.pct+'%'}</span>
+        </div>
+        <div style={{fontSize:13.5,color:'var(--g-aaa)',lineHeight:1.7,marginTop:6}}>{lead.mandate}</div>
+        <div style={{fontSize:12.5,color:'var(--g-888)',marginTop:7}}>{h.plans}/{h.team} have an active plan (40%) · {h.fresh}/{h.team} checked in within 45 days (35%) · {h.onTrack==null?'—':h.onTrack+'% of priorities on track'} (25%) · {h.acts} open actions{h.od?' · '+h.od+' overdue':''}</div>
+      </div>
+      <div style={{...C,marginTop:12}}>
+        <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:8}}>Their people · {team.length}</div>
+        {!team.length&&<div style={{fontSize:13.5,color:'var(--g-888)'}}>Nobody matched this discipline yet — people are matched from the discipline on their Staff Profile.</div>}
+        {team.map((p,i)=>{const pp=planOf(p.id);const act=(pp.priorities||[]).filter(x=>x.status!=='done');
+          const lastc=(pp.checkins||[])[0];const ds=lastc?daysSince(lastc.date):null;const od=overdueActions(p.id).length;
+          return(<div key={p.id} onClick={()=>setView({lead:lead.id,person:p.id})} style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap',padding:'10px 0',borderTop:i?'1px solid var(--border)':'none',cursor:'pointer'}}>
+            <span style={{fontSize:15,fontWeight:700,color:'var(--text)',minWidth:165}}>{p.name}</span>
+            <span style={{display:'flex',gap:5}}>{act.length?act.map(x=><span key={x.id} title={x.area} style={dot(LD_STCOL[x.status]||'var(--g-666)')}/>):<span style={{fontSize:12.5,color:'var(--c-amb)'}}>no plan</span>}</span>
+            <span style={{fontSize:12.5,color:ds==null?'var(--c-amb)':ds>45?'var(--c-red)':'var(--g-888)',minWidth:125}}>{ds==null?'never checked in':'checked in '+ds+'d ago'}</span>
+            {od>0&&<span style={{fontSize:12.5,color:'var(--c-red)'}}>{od} overdue</span>}
+            <span style={{flex:1}}/>
+            {trendChip(PERF_STAT(perfData,p.id,'revenue'))}
+            <span style={{color:'var(--g-666)'}}>›</span>
+          </div>);})}
+      </div>
+    </div>);
+  }
+
+  // ============ LEVEL 1 · executive ============
+  const al=alerts();
+  const ackAll=(k)=>save({...db,ack:{...(db.ack||{}),[k]:today()}});
+  const mikePl=planOf('mike');const mikeScored=LD_READY.filter(([k])=>((mikePl.comp||{})[k]||[]).length);
+  const mikeAvg=mikeScored.length?(mikeScored.reduce((a,[k])=>a+((mikePl.comp||{})[k][0].v),0)/mikeScored.length):null;
+  return(<div style={{maxWidth:1020}}>
+    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(224px,1fr))',gap:12}}>
+      {LD_LEADS.filter(l=>l.kind!=='director').map(l=>{const h=health(l);
+        return(<div key={l.id} onClick={()=>setView({lead:l.id,person:null})} style={{...C,cursor:'pointer',borderLeft:'4px solid '+(h.pct==null?'var(--border)':h.pct>=80?'var(--c-grn)':h.pct>=60?'var(--c-yel)':'var(--c-red)')}}>
+          <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+            <span style={{fontSize:17,fontWeight:800,color:'var(--text)'}}>{l.short}</span>
+            <span style={{flex:1}}/>
+            <span style={{fontSize:22,fontWeight:800,color:h.pct==null?'var(--g-666)':h.pct>=80?'var(--c-grn)':h.pct>=60?'var(--c-yel)':'var(--c-red)'}}>{h.pct==null?'—':h.pct+'%'}</span>
+          </div>
+          <div style={{fontSize:12.5,color:'var(--g-999)'}}>{l.area}</div>
+          <div style={{fontSize:12.5,color:'var(--g-888)',marginTop:8,lineHeight:1.6}}>{h.team} clinicians · {h.plans} with a plan<br/>{h.fresh} checked in recently{h.od?' · '+h.od+' overdue actions':''}</div>
+        </div>);})}
+      <div onClick={()=>setView({lead:'mike',person:null})} style={{...C,cursor:'pointer',borderLeft:'4px solid var(--c-blu2)'}}>
+        <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+          <span style={{fontSize:17,fontWeight:800,color:'var(--text)'}}>Mike Ross</span>
+          <span style={{flex:1}}/>
+          <span style={{fontSize:22,fontWeight:800,color:mikeAvg==null?'var(--g-666)':mikeAvg>=4?'var(--c-grn)':mikeAvg>=3?'var(--c-lime2)':'var(--c-yel)'}}>{mikeAvg==null?'—':mikeAvg.toFixed(1)}</span>
+        </div>
+        <div style={{fontSize:12.5,color:'var(--c-blu2)'}}>Clinical Director Development</div>
+        <div style={{fontSize:12.5,color:'var(--g-888)',marginTop:8,lineHeight:1.6}}>Stage: {LD_STAGES[db.mikeStage!=null?db.mikeStage:2]}<br/>{mikeScored.length}/13 readiness areas scored</div>
+      </div>
+    </div>
+
+    <div style={{...C,marginTop:14}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,flexWrap:'wrap'}}>
+        <span style={{fontSize:16,fontWeight:800,color:'var(--text)'}}>Needs attention</span>
+        <span style={{fontSize:12.5,color:'var(--g-888)'}}>this list is the only thing you should have to read</span>
+        <span style={{flex:1}}/>
+        {al.length>0&&<span style={{fontSize:12.5,color:'var(--g-888)'}}>{al.filter(a=>a.sev==='red').length} urgent · {al.length} total</span>}
+      </div>
+      {!al.length&&<div style={{fontSize:13.5,color:'var(--c-grn)'}}>✓ Nothing outstanding — everyone tracked has an active plan, a recent check-in and no overdue actions.</div>}
+      {al.slice(0,14).map((a,i)=>(
+        <div key={i} style={{display:'flex',gap:12,alignItems:'center',padding:'7px 0',borderTop:i?'1px solid var(--border)':'none',fontSize:13.5}}>
+          <span style={dot(a.sev==='red'?'var(--c-red)':'var(--c-yel)')}/>
+          <span onClick={()=>setView({lead:a.lid,person:a.id})} style={{color:'var(--text)',fontWeight:700,minWidth:155,cursor:'pointer'}}>{a.who}</span>
+          <span onClick={()=>setView({lead:a.lid,person:a.id})} style={{color:'var(--g-aaa)',flex:1,cursor:'pointer'}}>{a.t}</span>
+          <span style={{color:'var(--g-666)'}}>{a.lead}</span>
+          <button className="btn btn-ghost btn-xs" title="Acknowledge — hides this until it recurs" onClick={()=>ackAll(a.k)}>✓</button>
+        </div>))}
+    </div>
+
+    <div style={{...C,marginTop:12}}>
+      <div style={{fontSize:13.5,color:'var(--g-aaa)',lineHeight:1.8}}>
+        <b style={{color:'var(--text)'}}>How this works.</b> You develop the leads; the leads develop their clinicians. Every priority carries a gap, baseline, target, action, measurement and review date, and cannot be completed without evidence. Competency scores are dated and never overwritten, so you can see June 2 → August 3 → October 4 and the evidence behind each change.
+        <br/><b style={{color:'var(--text)'}}>Development health</b> = active plans (40%) + check-ins within 45 days (35%) + priorities on track (25%). Revenue and visits come from the same Jane import as Performance &amp; Revenue, shown as a 3-month average against the previous three.
+      </div>
+    </div>
+  </div>);
+}
+function LeadershipPage({staff,perfData}){
   const[ltData,setLtData]=useState(()=>{try{const s=localStorage.getItem('rvgd3_leadership');if(s)return JSON.parse(s);}catch(e){}return SEED_LEADERSHIP;});
-  const[activeTab,setActiveTab]=useState('roster');
+  const[activeTab,setActiveTab]=useState('develop');
   const[selectedPerson,setSelectedPerson]=useState(null);
   const[filterLoc,setFilterLoc]=useState('all');
   const[filterStatus,setFilterStatus]=useState('all');
@@ -13133,9 +13718,9 @@ function LeadershipPage(){
           <div style={{fontSize:14,color:'var(--g-999)'}}>Click any row to view and edit all scores · Leadership = Stability Under Weight</div>
         </div>
         <div className="flex aic g6">
-          {['roster','heat-map','identity','risk-matrix','doctrine'].map(t=>(
+          {['develop','roster','heat-map','identity','risk-matrix','doctrine'].map(t=>(
             <button key={t} className={`btn btn-sm ${activeTab===t?'btn-go':'btn-ghost'}`} onClick={()=>setActiveTab(t)}>
-              {t==='roster'?'◎ Roster':t==='heat-map'?'▣ Heat Map':t==='identity'?'⬡ Identity Map':t==='risk-matrix'?'⚠ Risk Matrix':'◐ Doctrine'}
+              {t==='develop'?'🎯 Development':t==='roster'?'◎ Roster':t==='heat-map'?'▣ Heat Map':t==='identity'?'⬡ Identity Map':t==='risk-matrix'?'⚠ Risk Matrix':'◐ Doctrine'}
             </button>
           ))}
           <button className="btn btn-lime btn-sm" onClick={()=>setShowAdd(true)}>+ Add</button>
@@ -13149,6 +13734,7 @@ function LeadershipPage(){
         ))}
       </div>
 
+      {activeTab==='develop'&&<LeadDevTab staff={staff} perfData={perfData}/>}
       {activeTab==='roster'&&(
         <div>
           <div className="filter-row">
