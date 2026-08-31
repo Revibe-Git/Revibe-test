@@ -1883,7 +1883,7 @@ const RELATED_SPORTS=[['Basketball','Volleyball','Tennis / Racquet','Pickleball'
 const relatedSport=(a,b)=>{const la=String(a).toLowerCase(),lb=String(b).toLowerCase();if(la===lb)return false;return RELATED_SPORTS.some(grp=>{const ll=grp.map(x=>x.toLowerCase());return ll.includes(la)&&ll.includes(lb);});};
 const isSportName=(x)=>{const lx=String(x).toLowerCase();return SPORT_NAMES.some(s=>s.toLowerCase()===lx)||/box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);};
 // A staff member can work at multiple sites; site is stored comma-separated ("Mississauga, Markham")
-window.__BUILD='build L136';
+window.__BUILD='build L137';
 // Native print (Cmd+P) also gets report-mode: if a printable report is on screen, mask to it
 window.addEventListener('beforeprint',()=>{if(document.querySelector('.evrpt-print-area'))document.body.classList.add('evrpt-print');});
 window.addEventListener('afterprint',()=>{document.body.classList.remove('evrpt-print');}); // bump every delivery — the sidebar badge and By-Location stamp both read this
@@ -13406,7 +13406,22 @@ function LeadDevTab({staff,perfData}){
       if(tags.length)out.push({sev,who:p.name,lead:l.short,tags,id:p.id,lid:l.id,k:p.id});}));
     return out.sort((a,b)=>(a.sev==='red'?0:1)-(b.sev==='red'?0:1)||a.who.localeCompare(b.who));};
 
-  const C={background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'15px 18px'};
+  const C={background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:12,padding:'15px 18px'};
+  const LDCSS=(<style>{`
+    .ldsec{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--h,var(--c-grn));border-radius:12px;padding:15px 18px;margin-bottom:12px;transition:border-color .15s}
+    .ldsec:hover{border-left-color:var(--h,var(--c-grn))}
+    .ldsec h4{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;letter-spacing:1.4px;color:var(--g-eee);margin:0 0 2px}
+    .ldsec .sub{font-size:12px;color:var(--g-666);margin-bottom:11px}
+    .ldseg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+    .ldseg button{width:30px;height:26px;border:0;border-right:1px solid var(--border);background:transparent;color:var(--g-777);
+      font:800 12.5px 'Barlow Condensed',sans-serif;cursor:pointer;transition:background .12s,color .12s}
+    .ldseg button:last-child{border-right:0}
+    .ldseg button:hover{background:var(--surface3);color:var(--g-ddd)}
+    .ldseg button.on{background:linear-gradient(180deg,var(--h,var(--c-grn)),color-mix(in srgb,var(--h,var(--c-grn)) 70%,black));color:#0b1410}
+    .ldseg button.lit{background:color-mix(in srgb,var(--h,var(--c-grn)) 22%,transparent);color:var(--g-ddd)}
+    .ldcr{display:flex;gap:12px;align-items:center;padding:9px 0;border-top:1px solid var(--border)}
+    .ldcr:first-of-type{border-top:0}
+  `}</style>);
   const lbl={fontSize:12,letterSpacing:'1.4px',textTransform:'uppercase',color:'var(--g-888)',fontFamily:"'Barlow Condensed',sans-serif"};
   const dot=(c)=>({width:9,height:9,borderRadius:9,background:c,display:'inline-block'});
   const trendChip=(st)=>{if(!st||st.avg3==null)return <span style={{fontSize:12.5,color:'var(--g-666)'}}>no data</span>;
@@ -13414,7 +13429,7 @@ function LeadDevTab({staff,perfData}){
     return <span style={{fontSize:12.5,color:c}}>{a} {Math.round(st.avg3).toLocaleString()} <span style={{color:'var(--g-666)'}}>3-mo avg{st.prev3!=null?' · was '+Math.round(st.prev3).toLocaleString():''}</span></span>;};
 
   // ============ LEVEL 3 · one person (clinician OR a lead's own plan) ============
-  const PersonView=({person,lead,back})=>{
+  const PersonView=({person,lead,back,embed,hue})=>{
     const id=person.id;const pl=planOf(id);
     const act=(pl.priorities||[]).filter(x=>x.status!=='done');
     const rev=PERF_STAT(perfData,id,'revenue'),vis=PERF_STAT(perfData,id,'completed');
@@ -13443,15 +13458,15 @@ function LeadDevTab({staff,perfData}){
       const chal=window.prompt('Challenges / missed commitments?','');if(chal===null)return;
       const nxt=window.prompt('Next check-in date (YYYY-MM-DD):',new Date(Date.now()+2592e6).toISOString().slice(0,10));if(!nxt)return;
       setPlan(id,{checkins:[{date:today(),by:lead?lead.short:'Lead',wins,chal,next:nxt},...(pl.checkins||[])]});};
-    const scoreComp=(key,label)=>{const cur=((pl.comp||{})[key]||[])[0];
-      const v=window.prompt(label+'\n\n1 Not demonstrated · 2 Developing · 3 Consistent · 4 Independent · 5 Can teach'+(cur?'\n\nCurrent: '+cur.v:''),cur?String(cur.v):'');
-      const n=parseInt(v);if(!(n>=1&&n<=5))return;
-      const why=window.prompt('Evidence for this score — what changed?','');if(why===null)return;
-      setPlan(id,{comp:{...(pl.comp||{}),[key]:[{v:n,date:today(),why,by:lead?lead.short:'Lead'},...((pl.comp||{})[key]||[])]}});};
+    const setComp=(key,label,n)=>{const h=((pl.comp||{})[key]||[]);
+      if(h[0]&&h[0].v===n)return;
+      const why=window.prompt(label+' → '+n+' · '+LD_SCALE[n-1]+'\n\nEvidence — what shows this?','');if(why===null)return;
+      setPlan(id,{comp:{...(pl.comp||{}),[key]:[{v:n,date:today(),why,by:lead?lead.short:'Lead'},...h]}});};
     const last=(pl.checkins||[])[0];
-    return(<div style={{maxWidth:1020}}>
-      <button className="btn btn-ghost btn-sm" onClick={back}>← back</button>
-      <div style={{...C,marginTop:12}}>
+    return(<div style={{maxWidth:1020,'--h':hue||'var(--c-grn)'}}>
+      {LDCSS}
+      {!embed&&<button className="btn btn-ghost btn-sm" onClick={back}>← back</button>}
+      {!embed&&<div style={{...C,marginTop:12}}>
         <div style={{display:'flex',gap:14,alignItems:'baseline',flexWrap:'wrap'}}>
           <span style={{fontSize:21,fontWeight:800,color:'var(--text)'}}>{person.name}</span>
           <span style={{fontSize:13.5,color:'var(--g-999)'}}>{person.discipline||person.role||''}{lead?' · lead: '+lead.short:''}</span>
@@ -13467,7 +13482,11 @@ function LeadDevTab({staff,perfData}){
           <div><div style={lbl}>Open actions</div><span style={{fontSize:12.5,color:overdueActions(id).length?'var(--c-red)':'var(--g-ccc)'}}>{openActions(id).length}{overdueActions(id).length?' · '+overdueActions(id).length+' overdue':''}</span></div>
         </div>
         {rev.lastMonth&&<div style={{fontSize:11,color:'var(--g-666)',marginTop:8}}>Jane import through {rev.lastMonth} · same source as Numbers &amp; Performance</div>}
-      </div>
+      </div>}
+      {embed&&<div style={{display:'flex',gap:8,justifyContent:'flex-end',marginBottom:10}}>
+        <button className="btn btn-ghost btn-sm" onClick={addAction}>＋ Action</button>
+        <button className="btn btn-lime btn-sm" onClick={checkin}>✓ Check-in</button>
+      </div>}
 
       {openActions(id).length>0&&(<div style={{...C,marginTop:12}}>
         <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:8}}>Open actions</div>
@@ -13510,18 +13529,17 @@ function LeadDevTab({staff,perfData}){
           </div>);})}
       </div>
 
-      <div style={{...C,marginTop:12}}>
-        <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:4}}>Competencies</div>
-        <div style={{fontSize:12,color:'var(--g-666)',marginBottom:8}}>Click any area to score it. History is kept.</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:'6px 16px'}}>
-          {LD_AREAS.map(a=>{const key=a.toLowerCase().replace(/[^a-z]/g,'');const h=(pl.comp||{})[key]||[];const cur=h[0];const prev=h[1];
-            return(<div key={a} onClick={()=>scoreComp(key,a)} style={{display:'flex',gap:8,alignItems:'center',cursor:'pointer',padding:'3px 0'}} title={h.length?h.map(x=>x.date+' → '+x.v+(x.why?' · '+x.why:'')).join('\n'):'not scored'}>
-              <span style={{fontSize:13,color:'var(--g-aaa)',flex:1}}>{a}</span>
-              {prev&&<span style={{fontSize:11.5,color:'var(--g-666)'}}>{prev.v}→</span>}
-              <span style={{fontSize:14,fontWeight:800,color:cur?(cur.v>=4?'var(--c-grn)':cur.v>=3?'var(--c-lime2)':cur.v>=2?'var(--c-yel)':'var(--c-amb)'):'var(--g-666)'}}>{cur?cur.v:'—'}</span>
-            </div>);})}
-        </div>
-      </div>
+      {!embed&&<div className="ldsec" style={{marginTop:12}}>
+        <h4>COMPETENCIES</h4>
+        <div className="sub">Click a level to score it. Evidence is asked for; history is kept.</div>
+        {LD_AREAS.map(a=>{const key=a.toLowerCase().replace(/[^a-z]/g,'');const h=(pl.comp||{})[key]||[];const cur=h[0];const prev=h[1];
+          return(<div key={a} className="ldcr" title={h.length?h.map(x=>x.date+' → '+x.v+(x.why?' · '+x.why:'')).join('\n'):'not scored'}>
+            <span style={{fontSize:13.5,color:'var(--g-ccc)',flex:1}}>{a}</span>
+            {prev&&<span style={{fontSize:11.5,color:'var(--g-666)'}}>{prev.v} →</span>}
+            <span className="ldseg">{[1,2,3,4,5].map(n=>(
+              <button key={n} className={cur&&cur.v===n?'on':cur&&n<cur.v?'lit':''} title={LD_SCALE[n-1]} onClick={()=>setComp(key,a,n)}>{n}</button>))}</span>
+          </div>);})}
+      </div>}
 
       <div style={{...C,marginTop:12}}>
         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,flexWrap:'wrap'}}>
@@ -13558,10 +13576,9 @@ function LeadDevTab({staff,perfData}){
     const lead=LD_LEADS.find(l=>l.id==='mike');const pl=planOf('mike');
     const stage=(db.mikeStage!=null?db.mikeStage:2);
     const setStage=(n)=>save({...db,mikeStage:n});
-    const scoreDim=(key,label,desc)=>{const h=(pl.comp||{})[key]||[];const cur=h[0];
-      const v=window.prompt(label+'\n'+desc+'\n\n1 Not demonstrated · 2 Developing · 3 Consistent · 4 Independent · 5 Can teach'+(cur?'\n\nCurrent: '+cur.v+' ('+cur.date+')':''),cur?String(cur.v):'');
-      const n=parseInt(v);if(!(n>=1&&n<=5))return;
-      const why=window.prompt('Evidence — what specifically demonstrates this?','');if(why===null)return;
+    const scoreDim=(key,label,n)=>{const h=(pl.comp||{})[key]||[];
+      if(h[0]&&h[0].v===n)return;
+      const why=window.prompt(label+' → '+n+' · '+LD_SCALE[n-1]+'\n\nEvidence — what specifically demonstrates this?','');if(why===null)return;
       setPlan('mike',{comp:{...(pl.comp||{}),[key]:[{v:n,date:today(),why,by:'Dave'},...h]}});};
     const scored=LD_READY.filter(([k])=>((pl.comp||{})[k]||[]).length);
     const avg=scored.length?(scored.reduce((a,[k])=>a+((pl.comp||{})[k][0].v),0)/scored.length):null;
@@ -13587,19 +13604,21 @@ function LeadDevTab({staff,perfData}){
         <div style={{fontSize:11.5,color:'var(--g-666)',marginTop:7}}>Stage moves on evidence, not time.</div>
       </div>
 
-      <div style={{...C,marginTop:12}}>
-        <div style={{fontSize:16,fontWeight:800,color:'var(--text)',marginBottom:3}}>Oakville readiness — 13 dimensions</div>
-        <div style={{fontSize:12,color:'var(--g-666)',marginBottom:9}}>Click a row to score it. Evidence required; history kept.</div>
+      {LDCSS}
+      <div className="ldsec" style={{'--h':'#b89bd8',marginTop:12}}>
+        <h4>OAKVILLE READINESS · 13 DIMENSIONS</h4>
+        <div className="sub">Click a level to score it. Evidence required; history kept.</div>
         {LD_READY.map(([k,label,desc],i)=>{const h=(pl.comp||{})[k]||[];const cur=h[0],prev=h[1];
           const dir=cur&&prev?(cur.v>prev.v?'↑':cur.v<prev.v?'↓':'→'):null;
-          return(<div key={k} onClick={()=>scoreDim(k,label,desc)} style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap',padding:'9px 0',borderTop:i?'1px solid var(--border)':'none',cursor:'pointer'}}>
-            <div style={{flex:1,minWidth:230}}>
+          return(<div key={k} className="ldcr" style={{flexWrap:'wrap'}} title={h.length?h.map(x=>x.date+' → '+x.v+(x.why?' · '+x.why:'')).join('\n'):'not scored'}>
+            <div style={{flex:1,minWidth:220}}>
               <div style={{fontSize:14.5,fontWeight:700,color:'var(--text)'}}>{label}</div>
               <div style={{fontSize:12,color:'var(--g-888)'}}>{desc}</div>
             </div>
-            <span style={{fontSize:12,color:'var(--g-666)',minWidth:120}}>{cur?h.length+' entr'+(h.length>1?'ies':'y')+' · '+cur.date:'not scored'}</span>
-            {prev&&<span style={{fontSize:12.5,color:'var(--g-666)'}}>{prev.v} {dir}</span>}
-            <span style={{width:74,textAlign:'right',fontSize:19,fontWeight:800,color:cur?(cur.v>=4?'var(--c-grn)':cur.v>=3?'var(--c-lime2)':cur.v>=2?'var(--c-yel)':'var(--c-amb)'):'var(--g-666)'}}>{cur?cur.v:'—'}<span style={{fontSize:12,color:'var(--g-666)'}}>/5</span></span>
+            <span style={{fontSize:11.5,color:'var(--g-666)',minWidth:96}}>{cur?cur.date:'not scored'}</span>
+            {prev&&<span style={{fontSize:12,color:'var(--g-666)'}}>{prev.v} {dir}</span>}
+            <span className="ldseg" style={{'--h':'#b89bd8'}}>{[1,2,3,4,5].map(n=>(
+              <button key={n} className={cur&&cur.v===n?'on':cur&&n<cur.v?'lit':''} title={LD_SCALE[n-1]} onClick={()=>scoreDim(k,label,n)}>{n}</button>))}</span>
           </div>);})}
       </div>
 
@@ -13646,10 +13665,9 @@ function LeadDevTab({staff,perfData}){
       return{planPct:team.length?Math.round(h.plans/team.length*100):null,
         ciPct:team.length?Math.round(h.fresh/team.length*100):null,
         actPct:acts?Math.round(done/acts*100):null,improved,compUp,od:h.od};})();
-    const scoreLC=(key,label,desc)=>{const hh=(lp.comp||{})[key]||[];const cur=hh[0];
-      const v=window.prompt(label+'\n'+desc+'\n\n1 Not demonstrated · 2 Developing · 3 Consistent · 4 Independent · 5 Can teach'+(cur?'\n\nCurrent: '+cur.v+' ('+cur.date+')':''),cur?String(cur.v):'');
-      const n=parseInt(v);if(!(n>=1&&n<=5))return;
-      const why=window.prompt('Evidence — what shows this?','');if(why===null)return;
+    const scoreLC=(key,label,n)=>{const hh=(lp.comp||{})[key]||[];
+      if(hh[0]&&hh[0].v===n)return;
+      const why=window.prompt(label+' → '+n+' · '+LD_SCALE[n-1]+'\n\nEvidence — what shows this?','');if(why===null)return;
       setPlan(lead.id,{comp:{...(lp.comp||{}),[key]:[{v:n,date:today(),why,by:'Dave'},...hh]}});};
     const lcScored=LD_LEADCOMP.filter(([k])=>((lp.comp||{})[k]||[]).length);
     const lcAvg=lcScored.length?(lcScored.reduce((a,[k])=>a+((lp.comp||{})[k][0].v),0)/lcScored.length):null;
@@ -13684,9 +13702,9 @@ function LeadDevTab({staff,perfData}){
       </div>
 
       {leadTab==='plan'&&(<div style={{marginTop:12}}>
-        <div style={{...C,marginBottom:12}}>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:19,fontWeight:800,letterSpacing:'1.4px',color:'var(--g-eee)',marginBottom:3}}>WHAT THEY ARE BUILDING</div>
-          <div style={{fontSize:12,color:'var(--g-666)',marginBottom:11}}>Where are we now, where should we be by January, where by April.</div>
+        <div className="ldsec" style={{'--h':hue}}>
+          <h4>WHAT THEY ARE BUILDING</h4>
+          <div className="sub">Where are we now, where should we be by January, where by April.</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(230px,1fr))',gap:10}}>
             {[['now','NOW','Where the department actually is'],['jan','BY JANUARY','Medium-term target'],['apr','BY APRIL','After Oakville, multi-site']].map(([k,l2,ph])=>(
               <div key={k}>
@@ -13697,9 +13715,9 @@ function LeadDevTab({staff,perfData}){
           </div>
         </div>
 
-        <div style={{...C,marginBottom:12}}>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:19,fontWeight:800,letterSpacing:'1.4px',color:'var(--g-eee)',marginBottom:3}}>THEIR MANDATE, BROKEN DOWN</div>
-          <div style={{fontSize:12,color:'var(--g-666)',marginBottom:10}}>The areas this lead owns for their people.</div>
+        <div className="ldsec" style={{'--h':hue}}>
+          <h4>THEIR MANDATE, BROKEN DOWN</h4>
+          <div className="sub">The areas this lead owns for their people.</div>
           {(LD_FOCUS[lead.id]||[]).map(([t,d],i2)=>(
             <div key={t} style={{display:'flex',gap:12,padding:'9px 0',borderTop:i2?'1px solid var(--border)':'none'}}>
               <span style={{width:3,alignSelf:'stretch',background:hue,opacity:.6,borderRadius:3,flexShrink:0}}/>
@@ -13708,20 +13726,25 @@ function LeadDevTab({staff,perfData}){
             </div>))}
         </div>
 
-        <div style={{...C,marginBottom:12}}>
-          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:19,fontWeight:800,letterSpacing:'1.4px',color:'var(--g-eee)',marginBottom:3}}>LEADERSHIP COMPETENCIES</div>
-          <div style={{fontSize:12,color:'var(--g-666)',marginBottom:10}}>Helping is "come to me". Developing is "here is your gap, here is the plan, here is when we review it." Click to score with evidence.</div>
-          {LD_LEADCOMP.map(([k,label,desc],i2)=>{const hh=(lp.comp||{})[k]||[];const cur=hh[0],prev=hh[1];
-            return(<div key={k} className="ldl-row" onClick={()=>scoreLC(k,label,desc)} style={{borderTop:i2?'1px solid var(--border)':'none',borderRadius:0}}>
-              <div style={{flex:1,minWidth:200}}>
+        <div className="ldsec" style={{'--h':hue}}>
+          <h4>LEADERSHIP COMPETENCIES</h4>
+          <div className="sub">Helping is "come to me". Developing is "here is your gap, here is the plan, here is when we review it."</div>
+          {LD_LEADCOMP.map(([k,label,desc])=>{const hh=(lp.comp||{})[k]||[];const cur=hh[0],prev=hh[1];
+            return(<div key={k} className="ldcr" title={hh.length?hh.map(x=>x.date+' → '+x.v+(x.why?' · '+x.why:'')).join('\n'):'not scored'}>
+              <div style={{flex:1,minWidth:190}}>
                 <div style={{fontSize:14,fontWeight:700,color:'var(--g-ddd)'}}>{label}</div>
                 <div style={{fontSize:12,color:'var(--g-777)'}}>{desc}</div></div>
-              {prev&&<span style={{fontSize:12,color:'var(--g-666)'}}>{prev.v} →</span>}
-              <span style={{fontSize:18,fontWeight:800,width:46,textAlign:'right',color:cur?(cur.v>=4?'var(--c-grn)':cur.v>=3?'var(--c-lime2)':cur.v>=2?'var(--c-yel)':'var(--c-amb)'):'var(--g-666)'}}>{cur?cur.v:'—'}</span>
+              {prev&&<span style={{fontSize:11.5,color:'var(--g-666)'}}>{prev.v} →</span>}
+              <span className="ldseg">{[1,2,3,4,5].map(n=>(
+                <button key={n} className={cur&&cur.v===n?'on':cur&&n<cur.v?'lit':''} title={LD_SCALE[n-1]} onClick={()=>scoreLC(k,label,n)}>{n}</button>))}</span>
             </div>);})}
         </div>
 
-        <PersonView person={{id:lead.id,name:lead.name+' — development plan',discipline:lead.area}} lead={{short:'Dave'}} back={()=>setLeadTab('team')}/>
+        <div className="ldsec" style={{'--h':hue}}>
+          <h4>THEIR DEVELOPMENT PLAN</h4>
+          <div className="sub">Priorities, actions and evidence — the same discipline they apply to their people.</div>
+          <PersonView person={{id:lead.id,name:lead.name,discipline:lead.area}} lead={{short:'Dave'}} embed hue={hue} back={()=>setLeadTab('team')}/>
+        </div>
       </div>)}
 
       {leadTab==='team'&&(<div style={{...C,marginTop:12}}>
