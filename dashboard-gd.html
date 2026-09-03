@@ -1891,7 +1891,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L143';
+window.__BUILD = 'build L144';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -27709,10 +27709,15 @@ function PerformancePage({
         const {
           data: sd
         } = await SB.from('shift_daily').select('data').eq('id', 'singleton').maybeSingle();
-        if (sd && Array.isArray(sd.data)) {
+        if (sd && Array.isArray(sd.data) && sd.data.length) {
           setDailyShift(sd.data);
           try {
             localStorage.setItem('rvgd3_daily_shift', JSON.stringify(sd.data));
+          } catch (e) {}
+        } else {
+          try {
+            const loc = JSON.parse(localStorage.getItem('rvgd3_daily_shift') || '[]');
+            if (Array.isArray(loc) && loc.length) window.sbSingleton('shift_daily', loc);
           } catch (e) {}
         }
       } catch (e) {}
@@ -29309,13 +29314,7 @@ function PerformancePage({
           try {
             localStorage.setItem('rvgd3_daily_shift', JSON.stringify(merged));
           } catch (e) {}
-          try {
-            const SB = window.__SB;
-            if (SB) await SB.from('shift_daily').upsert({
-              id: 'singleton',
-              data: merged
-            });
-          } catch (e) {}
+          await window.sbSingleton('shift_daily', merged);
           const months = Array.from(new Set(newDailyShift.map(r => (r.date || '').slice(0, 7)).filter(m => m.length === 7)));
           months.forEach(month => {
             const dayRows = merged.filter(r => (r.date || '').slice(0, 7) === month);
