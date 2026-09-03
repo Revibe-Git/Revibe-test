@@ -1891,7 +1891,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L141';
+window.__BUILD = 'build L142';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -3793,7 +3793,7 @@ function App() {
   const [page, setPage] = useState(() => {
     try {
       const h = (window.location.hash || '').replace(/^#\/?/, '');
-      if (h && PAGES[h]) return h;
+      if (h && NAV.some(nv => nv.id === h)) return h;
     } catch (e) {}
     try {
       const nm = localStorage.getItem('rvgd3_me') || '';
@@ -3824,7 +3824,7 @@ function App() {
     const onNav = () => {
       try {
         const h = (window.location.hash || '').replace(/^#\/?/, '');
-        if (h && PAGES[h]) setPage(h);else if (!h) setPage('overview');
+        if (h && NAV.some(nv => nv.id === h)) setPage(h);else if (!h) setPage('overview');
       } catch (e) {}
     };
     window.addEventListener('popstate', onNav);
@@ -58085,7 +58085,9 @@ const LD_FOCUS = {
 const LD_PHASES = [['Sept–Oct', 'PROVE', 'Master yourself + learn the business'], ['Oct–Nov', 'DEVELOP', 'Develop people + understand the machine'], ['Nov–Dec', 'BUILD', 'Build Oakville'], ['Dec–Jan', 'ESTABLISH', 'Build the operating system'], ['Jan–Feb', 'OPERATE', 'Launch Oakville'], ['Feb–Mar', 'OWN', 'Take responsibility for the business'], ['Mar–Apr', 'LEAD', 'Clinical Director']];
 function LeadDevTab({
   staff,
-  perfData
+  perfData,
+  evals,
+  openProfile
 }) {
   const [db, setDb] = useState(() => {
     try {
@@ -58886,42 +58888,148 @@ function LeadDevTab({
           marginTop: 4
         }
       }, evs.length ? evs.length + ' piece' + (evs.length > 1 ? 's' : '') + ' of evidence' : 'no evidence yet'));
-    })), !embed && React.createElement("div", {
-      className: "ldsec",
-      style: {
-        marginTop: 12
-      }
-    }, React.createElement("h4", null, "COMPETENCIES"), React.createElement("div", {
-      className: "sub"
-    }, "Click a level to score it. Evidence is asked for; history is kept."), LD_AREAS.map(a => {
-      const key = a.toLowerCase().replace(/[^a-z]/g, '');
-      const h = (pl.comp || {})[key] || [];
-      const cur = h[0];
-      const prev = h[1];
+    })), !embed && (() => {
+      const st = (staff || []).find(x => x.id === id) || person || {};
+      const best = typeof getBestScore === 'function' ? getBestScore(st) : null;
+      const myEvals = (evals || []).filter(e => e && e.staffId === id).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+      const lastEv = myEvals[0];
+      let gxRow = null;
+      try {
+        const g = ld('gx', {
+          people: {}
+        });
+        const rec = (g.people || {})[st.name] || Object.values(g.people || {}).find(r => r && r.sid === id);
+        if (rec && rec.payLevel != null) {
+          const E = GX_ENGINE(rec);
+          gxRow = {
+            pay: GX_PAY[rec.payLevel][0],
+            earned: GX_PAY[E.earnedIdx][0],
+            higher: E.earnedIdx > rec.payLevel
+          };
+        }
+      } catch (e) {}
+      const legacy = Object.entries(pl.comp || {}).filter(([, h]) => h && h.length);
       return React.createElement("div", {
-        key: a,
-        className: "ldcr",
-        title: h.length ? h.map(x => x.date + ' → ' + x.v + (x.why ? ' · ' + x.why : '')).join('\n') : 'not scored'
+        className: "ldsec",
+        style: {
+          marginTop: 12
+        }
+      }, React.createElement("h4", null, "WHERE THEY STAND \u2014 FROM G&D"), React.createElement("div", {
+        className: "sub"
+      }, "Read-only. Clinical competencies are graded once, in G&D \u2014 this roadmap builds on those scores instead of re-grading them here."), React.createElement("div", {
+        style: {
+          display: 'flex',
+          gap: 22,
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          padding: '6px 0 2px'
+        }
+      }, React.createElement("div", null, React.createElement("div", {
+        style: {
+          fontSize: 11,
+          letterSpacing: '1.1px',
+          textTransform: 'uppercase',
+          color: 'var(--g-777)',
+          fontWeight: 700
+        }
+      }, "Best rubric score"), React.createElement("div", {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          marginTop: 2
+        }
       }, React.createElement("span", {
+        style: {
+          fontFamily: "'Barlow Condensed',sans-serif",
+          fontSize: 26,
+          fontWeight: 800,
+          color: best != null ? 'var(--c-grn)' : 'var(--g-666)'
+        }
+      }, best != null ? best : '—'), best != null && React.createElement(LvBadge, {
+        score: best
+      }))), React.createElement("div", null, React.createElement("div", {
+        style: {
+          fontSize: 11,
+          letterSpacing: '1.1px',
+          textTransform: 'uppercase',
+          color: 'var(--g-777)',
+          fontWeight: 700
+        }
+      }, "Latest evaluation"), React.createElement("div", {
         style: {
           fontSize: 13.5,
           color: 'var(--g-ccc)',
+          marginTop: 2
+        }
+      }, lastEv ? (lastEv.type || 'Evaluation') + ' · ' + (lastEv.date || '') : 'none logged yet')), gxRow && React.createElement("div", null, React.createElement("div", {
+        style: {
+          fontSize: 11,
+          letterSpacing: '1.1px',
+          textTransform: 'uppercase',
+          color: 'var(--g-777)',
+          fontWeight: 700
+        }
+      }, "Guest Experience"), React.createElement("div", {
+        style: {
+          fontSize: 13.5,
+          color: gxRow.higher ? 'var(--c-yel)' : 'var(--g-ccc)',
+          marginTop: 2
+        }
+      }, "at ", gxRow.pay, gxRow.higher ? ' · grades support ' + gxRow.earned : '')), React.createElement("span", {
+        style: {
           flex: 1
         }
-      }, a), prev && React.createElement("span", {
+      }), typeof openProfile === 'function' && React.createElement("button", {
+        className: "btn btn-ghost btn-xs",
+        onClick: () => openProfile(id)
+      }, "Open profile \u2197"), typeof openProfile === 'function' && React.createElement("button", {
+        className: "btn btn-lime btn-xs",
+        onClick: () => openProfile(id),
+        title: "Grading happens in G&D \u2014 the profile's evaluation and scores tabs \u2014 never here."
+      }, "Grade in G&D \u2192")), !myEvals.length && best == null && React.createElement("div", {
         style: {
-          fontSize: 12,
-          color: 'var(--g-666)'
+          fontSize: 12.5,
+          color: 'var(--c-amb)',
+          marginTop: 6
         }
-      }, prev.v, " \u2192"), React.createElement("span", {
-        className: "ldseg"
-      }, [1, 2, 3, 4, 5].map(n => React.createElement("button", {
-        key: n,
-        className: cur && cur.v === n ? 'on' : cur && n < cur.v ? 'lit' : '',
-        title: LD_SCALE[n - 1],
-        onClick: () => setComp(key, a, n)
-      }, n))));
-    })), React.createElement("div", {
+      }, "No G&D scores yet \u2014 log an evaluation from their profile and it shows here automatically."), legacy.length > 0 && React.createElement("details", {
+        style: {
+          marginTop: 8
+        }
+      }, React.createElement("summary", {
+        style: {
+          fontSize: 12.5,
+          color: 'var(--g-777)',
+          cursor: 'pointer'
+        }
+      }, "Scores recorded on this page before grading moved to G&D (", legacy.length, ") \u2014 kept for history"), React.createElement("div", {
+        style: {
+          marginTop: 6
+        }
+      }, legacy.map(([k, h]) => {
+        const a = LD_AREAS.find(x => x.toLowerCase().replace(/[^a-z]/g, '') === k) || k;
+        const cur = h[0];
+        return React.createElement("div", {
+          key: k,
+          style: {
+            display: 'flex',
+            gap: 10,
+            fontSize: 12.5,
+            color: 'var(--g-999)',
+            padding: '2px 0'
+          }
+        }, React.createElement("span", {
+          style: {
+            flex: 1
+          }
+        }, a), React.createElement("span", null, cur.v, " / 5"), React.createElement("span", {
+          style: {
+            color: 'var(--g-666)'
+          }
+        }, cur.date));
+      }))));
+    })(), React.createElement("div", {
       style: {
         ...C,
         marginTop: 12
@@ -59570,7 +59678,11 @@ function LeadDevTab({
       }
     }, React.createElement("h4", null, "LEADERSHIP COMPETENCIES"), React.createElement("div", {
       className: "sub"
-    }, "Helping is \"come to me\". Developing is \"here is your gap, here is the plan, here is when we review it.\""), LD_LEADCOMP.map(([k, label, desc]) => {
+    }, "Helping is \"come to me\". Developing is \"here is your gap, here is the plan, here is when we review it.\" ", React.createElement("span", {
+      style: {
+        color: 'var(--g-777)'
+      }
+    }, "Leadership behaviours only \u2014 clinical competencies are graded in G&D, never here.")), LD_LEADCOMP.map(([k, label, desc]) => {
       const hh = (lp.comp || {})[k] || [];
       const cur = hh[0],
         prev = hh[1];
@@ -60214,7 +60326,9 @@ function LeadDevTab({
 }
 function LeadershipPage({
   staff,
-  perfData
+  perfData,
+  evals,
+  openProfile
 }) {
   const [ltData, setLtData] = useState(() => {
     try {
@@ -60389,7 +60503,9 @@ function LeadershipPage({
     className: "lt-stat-lbl"
   }, s.label)))), activeTab === 'develop' && React.createElement(LeadDevTab, {
     staff: staff,
-    perfData: perfData
+    perfData: perfData,
+    evals: evals,
+    openProfile: openProfile
   }), activeTab === 'roster' && React.createElement("div", {
     className: "ltr"
   }, React.createElement("style", null, `
