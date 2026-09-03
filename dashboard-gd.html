@@ -1891,7 +1891,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L142';
+window.__BUILD = 'build L143';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -46887,7 +46887,7 @@ function MdLite({
   }));
 }
 function DBHealthCard() {
-  const TABLES = [['staff', 'Staff roster'], ['performance_snapshots', 'Monthly snapshots'], ['daily_appointments', 'Daily appointments'], ['daily_revenue', 'Daily revenue'], ['shift_daily', 'Shift / utilization'], ['source_files', 'Uploaded report files'], ['revenue_basis', 'Revenue basis (books)'], ['retention_summaries', 'Retention imports'], ['retention_entries', 'Retention entries'], ['gva_entries', 'GVA entries'], ['call_log', 'Call log · leads · sources'], ['call_reports', 'Saved call reports'], ['weekly_reports', 'Saved weekly reports'], ['form_subs', 'Check-in forms'], ['pkg_assign', 'Package assignments'], ['match_profiles', 'Care-mapper profiles'], ['session_log', 'Manual session log (legacy)'], ['systematic_sessions', 'Systematic sessions'], ['systematic_concepts', 'Systematic concepts'], ['systematic_playbook', 'Clinical playbook'], ['gd_tracker', 'G&D tracker'], ['leadership_entries', 'Leadership tracker'], ['resources', 'Clinician resources'], ['staff_comments', 'Staff comments'], ['meetings', 'Schedule & meetings']];
+  const TABLES = [['staff', 'Staff roster'], ['performance_snapshots', 'Monthly snapshots'], ['daily_appointments', 'Daily appointments'], ['daily_revenue', 'Daily revenue'], ['shift_daily', 'Shift / utilization'], ['source_files', 'Uploaded report files'], ['revenue_basis', 'Revenue basis (books)'], ['retention_summaries', 'Retention imports'], ['retention_entries', 'Retention entries'], ['gva_entries', 'GVA entries'], ['call_log', 'Call log · leads · sources'], ['call_reports', 'Saved call reports'], ['weekly_reports', 'Saved weekly reports'], ['form_subs', 'Check-in forms'], ['pkg_assign', 'Package assignments'], ['match_profiles', 'Care-mapper profiles'], ['session_log', 'Manual session log (legacy)'], ['systematic_sessions', 'Systematic sessions'], ['systematic_concepts', 'Systematic concepts'], ['systematic_playbook', 'Clinical playbook'], ['gd_tracker', 'G&D tracker'], ['leadership_entries', 'Leadership tracker'], ['resources', 'Clinician resources'], ['staff_comments', 'Staff comments'], ['meetings', 'Schedule & meetings'], ['notifications', 'Notifications (cross-device)'], ['evaluations', 'Evaluations'], ['education_sessions', 'Education sessions'], ['transcripts', 'Meeting transcripts'], ['comp_changes', 'Compensation ledger'], ['gd_store', 'Synced store (staff/gx/comp)'], ['ai_usage', 'AI usage meter']];
   const [res, setRes] = React.useState(null);
   const [busy, setBusy] = React.useState(false);
   const run = async () => {
