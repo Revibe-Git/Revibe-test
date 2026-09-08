@@ -1892,7 +1892,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L147';
+window.__BUILD = 'build L149';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -3987,7 +3987,7 @@ function App() {
             t: Date.now()
           }
         }).then(() => {}, () => {});
-        ['staff', 'evals', 'sessions', 'gx', 'comp', 'leaddev'].forEach(k => {
+        ['staff', 'evals', 'sessions', 'gx', 'comp', 'leaddev', 'academy'].forEach(k => {
           const sRow = srv[k];
           let localV = null;
           try {
@@ -4014,6 +4014,27 @@ function App() {
               assign: {
                 ...(S.assign || {}),
                 ...(L.assign || {})
+              }
+            };
+          })() : k === 'academy' ? (() => {
+            const L = localV || {},
+              S = (sRow ? sRow.v : null) || {};
+            const people = {
+              ...(S.people || {})
+            };
+            Object.keys(L.people || {}).forEach(id => {
+              const a = L.people[id],
+                b = people[id];
+              const w = x => x ? Object.keys((x || {}).done || {}).length * 100 + ((x || {}).log || []).length : -1;
+              people[id] = w(a) >= w(b) ? a : b;
+            });
+            return {
+              ...S,
+              ...L,
+              people,
+              docs: {
+                ...(S.docs || {}),
+                ...(L.docs || {})
               }
             };
           })() : GD_MERGE_ARR(localV, sRow ? sRow.v : null, tomb[k]);
@@ -40072,54 +40093,75 @@ const gxSeed = () => {
   };
 };
 const RvTreeCSS = React.createElement("style", null, `
-  .rvt{position:relative;border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;
-    background:radial-gradient(120% 90% at 50% 108%, #14211c 0%, #0c1413 42%, #070b0a 100%);}
+  .rvt{position:relative;border:1px solid rgba(255,255,255,.16);border-radius:16px;overflow:hidden;margin-bottom:14px;color:#f0f8f3;
+    background:
+      radial-gradient(80% 70% at 88% 6%, rgba(201,242,111,.30) 0%, rgba(201,242,111,0) 55%),
+      radial-gradient(70% 60% at 6% 100%, rgba(47,214,168,.26) 0%, rgba(47,214,168,0) 60%),
+      radial-gradient(120% 130% at 18% 0%, #2ba884 0%, #17795d 38%, #0c4a39 70%, #062e24 100%);}
   .rvt-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:16px 20px 0;}
-  .rvt-title{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;letter-spacing:2.2px;text-transform:uppercase;color:#eef2ef;}
-  .rvt-sub{font-size:12px;color:rgba(230,240,235,.5);line-height:1.5;}
-  .rvt-node{cursor:pointer;}
-  .rvt-node:hover .rvt-ring{stroke:rgba(255,255,255,.85);}
+  .rvt-title{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;letter-spacing:2.2px;text-transform:uppercase;color:#fff;}
+  .rvt-sub{font-size:12px;color:rgba(238,248,242,.62);line-height:1.5;}
+  .rvt-node{cursor:pointer;transition:transform .16s ease;transform-box:fill-box;transform-origin:center;}
+  .rvt-node:hover{transform:scale(1.08);}
+  .rvt-node:hover .rvt-ring{stroke:#fff;}
   .rvt-lbl{font-family:'Barlow Condensed',sans-serif;letter-spacing:1.1px;text-transform:uppercase;pointer-events:none;}
   .rvt-xp{display:flex;align-items:center;gap:12px;padding:2px 20px 14px;flex-wrap:wrap;}
-  .rvt-xp b{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:800;color:#e9c08a;line-height:1;}
-  .rvt-xp .m{font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:1.6px;text-transform:uppercase;color:rgba(230,240,235,.45);}
-  .rvt-bar{flex:1;min-width:140px;max-width:340px;height:4px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden;}
-  .rvt-bar>div{height:100%;background:linear-gradient(90deg,#b98a55,#e9c08a);border-radius:2px;transition:width .5s ease;}
-  .rvt-panel{border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.28);padding:15px 20px 17px;min-height:96px;}
-  .rvt-pn{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#f2f5f2;}
-  .rvt-pl{font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:#e9c08a;}
-  .rvt-pd{font-size:13px;color:rgba(230,240,235,.72);line-height:1.6;max-width:70ch;}
-  .rvt-ph{font-size:11.5px;color:rgba(230,240,235,.42);}
-  .rvt-hint{font-size:12.5px;color:rgba(230,240,235,.4);padding:8px 0;}
+  .rvt-xp b{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:800;color:#c9f26f;line-height:1;}
+  .rvt-xp .m{font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:1.6px;text-transform:uppercase;color:rgba(238,248,242,.55);}
+  .rvt-bar{flex:1;min-width:140px;max-width:340px;height:5px;border-radius:3px;background:rgba(255,255,255,.16);overflow:hidden;}
+  .rvt-bar>div{height:100%;background:linear-gradient(90deg,#2fd6a8,#c9f26f);border-radius:3px;transition:width .5s ease;}
+  .rvt-panel{border-top:1px solid rgba(255,255,255,.12);background:rgba(3,26,19,.42);padding:15px 20px 17px;min-height:96px;}
+  .rvt-pn{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#fff;}
+  .rvt-pl{font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:#c9f26f;}
+  .rvt-pd{font-size:13px;color:rgba(238,248,242,.8);line-height:1.6;max-width:70ch;}
+  .rvt-ph{font-size:11.5px;color:rgba(238,248,242,.5);}
+  .rvt-hint{font-size:12.5px;color:rgba(238,248,242,.5);padding:8px 0;}
   .rvt-seg{display:inline-flex;gap:5px;}
-  .rvt-seg button{width:34px;height:30px;border-radius:6px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.05);
-    color:rgba(255,255,255,.75);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .12s;}
-  .rvt-seg button:hover{border-color:rgba(255,255,255,.6);background:rgba(255,255,255,.12);}
-  .rvt-seg button.lit{background:rgba(233,192,138,.16);border-color:rgba(233,192,138,.35);color:#e9c08a;}
-  .rvt-seg button.on{background:#e9c08a;border-color:#e9c08a;color:#131311;box-shadow:0 0 14px rgba(233,192,138,.45);}
+  .rvt-seg button{width:34px;height:30px;border-radius:6px;border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.08);
+    color:rgba(255,255,255,.85);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .13s;}
+  .rvt-seg button:hover{border-color:#fff;background:rgba(255,255,255,.16);transform:translateY(-1px);}
+  .rvt-seg button.lit{background:rgba(201,242,111,.2);border-color:rgba(201,242,111,.45);color:#c9f26f;}
+  .rvt-seg button.on{background:linear-gradient(135deg,#2fd6a8,#c9f26f);border-color:#c9f26f;color:#06301f;box-shadow:0 0 16px rgba(80,225,175,.55);}
   .rvt-fx{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:5;}
   .rvt-fx-t{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:800;letter-spacing:4px;text-transform:uppercase;color:#fff;
-    text-shadow:0 0 22px rgba(233,192,138,.9);animation:rvtT 1.5s ease forwards;}
-  .rvt-fx-ring{position:absolute;width:70px;height:70px;border:2px solid rgba(233,192,138,.8);border-radius:50%;animation:rvtR 1.4s ease-out forwards;}
+    text-shadow:0 0 22px rgba(160,235,140,.95);animation:rvtT 1.5s ease forwards;}
+  .rvt-fx-ring{position:absolute;width:70px;height:70px;border:2px solid rgba(201,242,111,.85);border-radius:50%;animation:rvtR 1.4s ease-out forwards;}
   .rvt-fx-ring.r2{animation-delay:.15s;}
   @keyframes rvtR{from{transform:scale(.4);opacity:1;}to{transform:scale(6);opacity:0;}}
   @keyframes rvtT{0%{opacity:0;transform:scale(.85);}18%{opacity:1;transform:scale(1.04);}30%{transform:scale(1);}78%{opacity:1;}100%{opacity:0;}}
-  @media (prefers-reduced-motion:reduce){.rvt-fx-ring{display:none;}.rvt-fx-t{animation:rvtT 0.9s linear forwards;}}
-  /* progression rail (pay ladder / roadmap) */
+  @media (prefers-reduced-motion:reduce){.rvt-fx-ring{display:none;}.rvt-fx-t{animation:rvtT 0.9s linear forwards;}.rvt-node,.rvh,.rvp-dot,.rvt-seg button{transition:none;}}
+  /* hero tiles (the Wins/Losses tiles from the reference) */
+  .rvh{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.17);border-radius:14px;padding:10px 14px;min-width:104px;flex:1 1 104px;
+    transition:transform .16s ease,box-shadow .16s ease,background .16s ease;}
+  .rvh:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(2,20,14,.5);background:rgba(255,255,255,.14);}
+  .rvh.click{cursor:pointer;}
+  .rvh.fill{background:linear-gradient(135deg,#2fd6a8,#c9f26f);border-color:rgba(255,255,255,.35);}
+  .rvh.fill .rvh-v{color:#06301f;}
+  .rvh.fill:hover{box-shadow:0 10px 26px rgba(60,215,160,.5);}
+  .rvh-l{font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;font-family:'Barlow Condensed',sans-serif;font-weight:700;color:rgba(238,248,242,.6);}
+  .rvh.fill .rvh-l{color:rgba(6,44,30,.85);}
+  .rvh-v{font-family:'Barlow Condensed',sans-serif;font-size:25px;font-weight:800;line-height:1.12;color:#fff;}
+  .rvh-s{font-size:10.5px;color:rgba(238,248,242,.5);}
+  .rvh.fill .rvh-s{color:rgba(6,44,30,.75);}
+  .rvc{display:inline-block;font-size:11.5px;font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;text-transform:uppercase;color:rgba(238,248,242,.78);
+    border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);border-radius:6px;padding:2px 8px;transition:background .15s;}
+  .rvc:hover{background:rgba(255,255,255,.14);}
+  /* progression rail (pay ladder / levels / stages) */
   .rvp{position:relative;overflow-x:auto;padding:22px 8px 8px;}
   .rvp-row{display:flex;align-items:flex-start;min-width:max-content;position:relative;}
-  .rvp-step{display:flex;flex-direction:column;align-items:center;width:82px;position:relative;}
-  .rvp-line{position:absolute;top:17px;left:50%;width:100%;height:2px;background:rgba(255,255,255,.13);}
-  .rvp-line.lit{background:linear-gradient(90deg,#e9c08a,#b98a55);box-shadow:0 0 8px rgba(233,192,138,.35);}
+  .rvp-step{display:flex;flex-direction:column;align-items:center;width:94px;position:relative;}
+  .rvp-line{position:absolute;top:17px;left:50%;width:100%;height:2px;background:rgba(255,255,255,.18);}
+  .rvp-line.lit{background:linear-gradient(90deg,#2fd6a8,#c9f26f);box-shadow:0 0 10px rgba(80,225,175,.4);}
   .rvp-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;z-index:2;
-    font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;border:2px solid rgba(255,255,255,.22);background:#0d1312;color:rgba(255,255,255,.4);}
-  .rvp-dot.done{border-color:var(--st,#e9c08a);color:#0d1312;background:var(--st,#e9c08a);}
-  .rvp-dot.cur{border-color:#fff;color:#fff;background:#0d1312;box-shadow:0 0 0 5px rgba(255,255,255,.09),0 0 22px rgba(233,192,138,.55);animation:rvpPulse 2.2s ease-in-out infinite;}
-  .rvp-dot.earn{border-style:dashed;border-color:#e9c08a;color:#e9c08a;}
-  @keyframes rvpPulse{0%,100%{box-shadow:0 0 0 5px rgba(255,255,255,.09),0 0 16px rgba(233,192,138,.4);}50%{box-shadow:0 0 0 5px rgba(255,255,255,.14),0 0 30px rgba(233,192,138,.75);}}
+    font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;border:2px solid rgba(255,255,255,.3);background:#0d4030;color:rgba(255,255,255,.55);transition:transform .15s ease;}
+  .rvp-step:hover .rvp-dot{transform:scale(1.1);}
+  .rvp-dot.done{border-color:var(--st,#c9f26f);color:#06301f;background:var(--st,#c9f26f);}
+  .rvp-dot.cur{border-color:#fff;color:#fff;background:#0d4030;box-shadow:0 0 0 5px rgba(255,255,255,.12),0 0 24px rgba(160,235,140,.65);animation:rvpPulse 2.2s ease-in-out infinite;}
+  .rvp-dot.earn{border-style:dashed;border-color:#c9f26f;color:#c9f26f;}
+  @keyframes rvpPulse{0%,100%{box-shadow:0 0 0 5px rgba(255,255,255,.12),0 0 16px rgba(160,235,140,.45);}50%{box-shadow:0 0 0 5px rgba(255,255,255,.18),0 0 32px rgba(160,235,140,.85);}}
   @media (prefers-reduced-motion:reduce){.rvp-dot.cur{animation:none;}}
-  .rvp-l1{margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;color:rgba(255,255,255,.85);text-align:center;}
-  .rvp-l2{font-size:10px;color:rgba(255,255,255,.42);text-align:center;line-height:1.35;max-width:78px;letter-spacing:.3px;}
+  .rvp-l1{margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;color:rgba(255,255,255,.9);text-align:center;}
+  .rvp-l2{font-size:10px;color:rgba(255,255,255,.5);text-align:center;line-height:1.35;max-width:90px;letter-spacing:.3px;}
   `);
 const RV_SHORT = (label, maxLen) => {
   const w = String(label || '').split(/\s+/);
@@ -40253,8 +40295,8 @@ function RvSkillTree({
     cx: cx,
     cy: cy,
     r: "15",
-    fill: "#0c1211",
-    stroke: "rgba(255,255,255,.5)",
+    fill: "#0b3529",
+    stroke: "rgba(255,255,255,.55)",
     strokeWidth: "1.6"
   }), React.createElement("circle", {
     cx: cx,
@@ -40302,8 +40344,8 @@ function RvSkillTree({
       cx: nd.x,
       cy: nd.y,
       r: "23",
-      fill: on ? '#101a17' : '#0b100f',
-      stroke: on ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.18)',
+      fill: on ? '#0f4636' : '#0b3529',
+      stroke: on ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.2)',
       strokeWidth: "1.6",
       className: "rvt-ring"
     }), on && React.createElement("circle", {
@@ -40634,19 +40676,19 @@ function RvPathRail({
   })));
 }
 const RV_TRACK_HUE = {
-  clinical: '#a6d89f',
-  spa: '#c9aef0',
-  sc: '#e9d27a'
+  clinical: '#8de8a0',
+  spa: '#d9a9ff',
+  sc: '#ffd166'
 };
-const RV_SECT_HUES = ['#a6d89f', '#e9c08a', '#9fc7e8'];
+const RV_SECT_HUES = ['#7ee0a3', '#ffd166', '#8ec9ff'];
 const RV_R1 = v => v == null ? 0 : Math.round(v * 10) / 10;
 const RV_DARK_INK = {
-  grid: 'rgba(255,255,255,.16)',
-  lbl: 'rgba(230,240,235,.6)',
-  val: '#f2f5f2',
-  big: '#f6f8f6',
-  sub: 'rgba(230,240,235,.5)',
-  dot: '#0c1413'
+  grid: 'rgba(255,255,255,.18)',
+  lbl: 'rgba(238,248,242,.66)',
+  val: '#fff',
+  big: '#fff',
+  sub: 'rgba(238,248,242,.55)',
+  dot: '#0f4636'
 };
 const RV_CHUNK3 = arr => {
   const n = arr.length;
@@ -40664,54 +40706,32 @@ const RvHeroTile = ({
   sub,
   valCol,
   fill,
-  hue
+  hue,
+  onClick,
+  title
 }) => React.createElement("div", {
-  style: {
-    background: fill ? hue || '#a6d89f' : 'rgba(255,255,255,.055)',
-    border: '1px solid ' + (fill ? hue || '#a6d89f' : 'rgba(255,255,255,.12)'),
-    borderRadius: 12,
-    padding: '10px 14px',
-    minWidth: 104,
-    flex: '1 1 104px'
-  }
+  className: 'rvh' + (fill ? ' fill' : '') + (onClick ? ' click' : ''),
+  onClick: onClick,
+  title: title,
+  role: onClick ? 'button' : undefined
 }, React.createElement("div", {
-  style: {
-    fontSize: 10.5,
-    letterSpacing: '1.4px',
-    textTransform: 'uppercase',
-    fontFamily: "'Barlow Condensed',sans-serif",
-    fontWeight: 700,
-    color: fill ? 'rgba(10,18,14,.75)' : 'rgba(230,240,235,.5)'
-  }
+  className: "rvh-l"
 }, lbl), React.createElement("div", {
-  style: {
-    fontFamily: "'Barlow Condensed',sans-serif",
-    fontSize: 25,
-    fontWeight: 800,
-    lineHeight: 1.12,
-    color: fill ? '#0d1411' : valCol || '#f2f5f2'
-  }
+  className: "rvh-v",
+  style: valCol && !fill ? {
+    color: valCol
+  } : null
 }, val), sub ? React.createElement("div", {
-  style: {
-    fontSize: 10.5,
-    color: fill ? 'rgba(10,18,14,.6)' : 'rgba(230,240,235,.42)'
-  }
+  className: "rvh-s"
 }, sub) : null);
 const RvHeroChip = ({
   txt,
   col
 }) => React.createElement("span", {
-  style: {
-    fontSize: 11.5,
-    fontFamily: "'Barlow Condensed',sans-serif",
-    letterSpacing: '1px',
-    textTransform: 'uppercase',
-    color: col || 'rgba(230,240,235,.72)',
-    border: '1px solid rgba(255,255,255,.16)',
-    background: 'rgba(255,255,255,.05)',
-    borderRadius: 5,
-    padding: '2px 8px'
-  }
+  className: "rvc",
+  style: col ? {
+    color: col
+  } : null
 }, txt);
 function RvProfileHero({
   staff,
@@ -40723,7 +40743,8 @@ function RvProfileHero({
   trackTotal,
   lv,
   perfData,
-  evals
+  evals,
+  go
 }) {
   const hue = RV_TRACK_HUE[activeTrack] || '#a6d89f';
   const rev = PERF_STAT(perfData, staff.id, 'revenue'),
@@ -40947,16 +40968,22 @@ function RvProfileHero({
     val: rev.avg3 != null ? '$' + Math.round(rev.avg3).toLocaleString() : '—',
     sub: rev.dir ? arrow(rev.dir) + ' vs prior 3' : null,
     fill: true,
-    hue: hue
+    hue: hue,
+    onClick: go ? () => go('numbers') : null,
+    title: go ? 'Open Numbers' : null
   }), React.createElement(RvHeroTile, {
     lbl: "Visits \xB7 3mo",
     val: vis.avg3 != null ? Math.round(vis.avg3) : '—',
     sub: vis.dir ? arrow(vis.dir) + ' vs prior 3' : null,
-    valCol: dirCol(vis.dir)
+    valCol: dirCol(vis.dir),
+    onClick: go ? () => go('numbers') : null,
+    title: go ? 'Open Numbers' : null
   }), React.createElement(RvHeroTile, {
     lbl: "Evaluations",
     val: evCount,
-    sub: evCount ? 'on record' : 'none yet'
+    sub: evCount ? 'on record' : 'none yet',
+    onClick: go ? () => go('evaluations') : null,
+    title: go ? 'Open Evaluations' : null
   })), React.createElement("div", {
     style: {
       display: 'flex',
@@ -40966,11 +40993,15 @@ function RvProfileHero({
   }, React.createElement(RvHeroTile, {
     lbl: "Level",
     val: lv ? lv.label.replace('Level ', 'L').split(' ')[0] : '—',
-    sub: lv ? lv.label.split('– ')[1] || '' : 'pending evaluation'
+    sub: lv ? lv.label.split('– ')[1] || '' : 'pending evaluation',
+    onClick: go && (tracks || []).length ? () => go('scores') : null,
+    title: go ? 'Open Scores' : null
   }), React.createElement(RvHeroTile, {
     lbl: "Weighted score",
     val: trackTotal != null ? trackTotal : '—',
-    sub: rs && (tracks || []).length ? rs.label + ' rubric' : 'no rubric track'
+    sub: rs && (tracks || []).length ? rs.label + ' rubric' : 'no rubric track',
+    onClick: go && (tracks || []).length ? () => go('scores') : null,
+    title: go ? 'Open Scores' : null
   })))));
 }
 function RvProfileTrees({
@@ -41079,6 +41110,33 @@ function RvProfileTrees({
           pointsNoun: lead.kind === 'director' ? 'readiness points' : 'leadership points'
         }));
       }
+    }
+  } catch (e) {}
+  try {
+    const adb = JSON.parse(localStorage.getItem('rvgd3_academy') || '{}');
+    const ap = (adb.people || {})[staff.id];
+    if (ap && (AC_TOTXP(ap) > 0 || Object.keys(ap.done || {}).length)) {
+      const f = AC_FLIP(ap);
+      const nodes = AC_SW.map(sw => ({
+        k: 'ac' + sw.id,
+        label: sw.name,
+        desc: sw.desc + ' Unlocks at: ' + AC_REQTEXT(sw.req) + '.',
+        level: f[sw.id] ? 1 : 0,
+        max: 1
+      }));
+      blocks.push(React.createElement(RvSkillCard, {
+        key: "ac",
+        title: 'Academy switches — ' + first,
+        sub: 'Stage ' + AC_STAGEOF(ap) + ' · ' + AC_TRACKS.map(t => t.name + ' L' + AC_LEVEL((ap.xp || {})[t.id])).join(' · ') + ' — earned in Leadership → Academy, mirrored here.',
+        groups: RV_CHUNK3(nodes).map((ns, i) => ({
+          name: '',
+          hue: RV_SECT_HUES[i % 3],
+          nodes: ns
+        })),
+        canScore: false,
+        lvNoun: "Flipped",
+        pointsNoun: "switches flipped"
+      }));
     }
   } catch (e) {}
   if (!blocks.length) return React.createElement("div", {
@@ -47331,7 +47389,8 @@ function ProfileModal({
     trackTotal: trackTotal,
     lv: lv,
     perfData: perfData,
-    evals: evals
+    evals: evals,
+    go: setTab
   }), (() => {
     const avail = getTabs();
     const LBL = {
@@ -61574,6 +61633,1781 @@ function LeadDevTab({
     }
   }, "Active plans 40% \xB7 check-ins within 45 days 35% \xB7 priorities on track 25%. A priority needs a gap, baseline, target, action, measurement and review date, and cannot be completed without evidence. Competency scores are dated and never overwritten. Revenue and visits come from the same Jane import as Performance & Revenue, shown as a 3-month average against the previous three.")));
 }
+const AC_XPL = 100,
+  AC_MAXLV = 10;
+const AC_TRACKS = [{
+  id: "clinical",
+  name: "Clinical",
+  blurb: "Assessment, treatment planning, manual skill, outcomes"
+}, {
+  id: "business",
+  name: "Business",
+  blurb: "Financial literacy, KPIs, retention, referrals"
+}, {
+  id: "leadership",
+  name: "Leadership",
+  blurb: "Accountability, coaching, hard conversations, delegation"
+}, {
+  id: "community",
+  name: "Community",
+  blurb: "Networking, workshops, partnerships, brand"
+}, {
+  id: "character",
+  name: "Character",
+  blurb: "Integrity, humility, consistency, resilience"
+}];
+const AC_SW = [{
+  id: "reliability",
+  name: "Reliability",
+  age: "18-22",
+  desc: "Does what they say they'll do, every time, without being chased.",
+  req: {
+    character: 2
+  }
+}, {
+  id: "ownership",
+  name: "Ownership",
+  age: "22-25",
+  desc: "Stops blaming circumstances. The outcome is theirs.",
+  req: {
+    character: 3,
+    clinical: 2
+  }
+}, {
+  id: "confidence",
+  name: "Clinical confidence",
+  age: "23-26",
+  desc: "Makes sound calls without constant reassurance.",
+  req: {
+    clinical: 4
+  }
+}, {
+  id: "humility",
+  name: "Humility",
+  age: "24-28",
+  desc: "Actively seeks feedback and can name their own limits.",
+  req: {
+    character: 4,
+    clinical: 4
+  }
+}, {
+  id: "systems",
+  name: "Systems thinking",
+  age: "26-30",
+  desc: "Improves the process instead of only working inside it.",
+  req: {
+    business: 3,
+    leadership: 2
+  }
+}, {
+  id: "financial",
+  name: "Financial awareness",
+  age: "25-30",
+  desc: "Understands revenue, cost, and their own business impact.",
+  req: {
+    business: 4
+  }
+}, {
+  id: "regulation",
+  name: "Emotional regulation",
+  age: "26-32",
+  desc: "Handles stress and conflict without destabilising the room.",
+  req: {
+    character: 6
+  }
+}, {
+  id: "teaching",
+  name: "Teaching",
+  age: "26-32",
+  desc: "Develops other people deliberately, not accidentally.",
+  req: {
+    leadership: 4,
+    clinical: 5
+  }
+}, {
+  id: "leading",
+  name: "Leadership",
+  age: "28-35",
+  desc: "Holds people accountable and keeps their trust.",
+  req: {
+    leadership: 6,
+    character: 6
+  }
+}, {
+  id: "strategic",
+  name: "Strategic thinking",
+  age: "30+",
+  desc: "Balances this week against the three-year picture.",
+  req: {
+    business: 6,
+    leadership: 7,
+    community: 3
+  }
+}];
+const AC_STAGES = [{
+  n: 1,
+  name: "Identity",
+  need: [],
+  minAge: 18,
+  maxAge: 22,
+  q: "Who am I and how does work actually operate?"
+}, {
+  n: 2,
+  name: "Competence",
+  need: ["reliability"],
+  minAge: 23,
+  maxAge: 25,
+  q: "Am I actually good at this yet?"
+}, {
+  n: 3,
+  name: "Ownership",
+  need: ["reliability", "ownership", "confidence"],
+  minAge: 26,
+  maxAge: 29,
+  q: "What am I building?"
+}, {
+  n: 4,
+  name: "Leadership",
+  need: ["reliability", "ownership", "confidence", "humility", "systems", "financial"],
+  minAge: 30,
+  maxAge: 34,
+  q: "How do I grow people?"
+}, {
+  n: 5,
+  name: "Multiplication",
+  need: ["reliability", "ownership", "confidence", "humility", "systems", "financial", "regulation", "teaching", "leading"],
+  minAge: 35,
+  maxAge: 40,
+  q: "How does this scale without me?"
+}, {
+  n: 6,
+  name: "Legacy",
+  need: ["reliability", "ownership", "confidence", "humility", "systems", "financial", "regulation", "teaching", "leading", "strategic"],
+  minAge: 41,
+  maxAge: 200,
+  q: "What exists when I'm gone?"
+}];
+const AC_MIS = [{
+  id: "m101",
+  s: 1,
+  t: "Run a perfect week",
+  d: "Five days: no late arrivals, every chart closed same day.",
+  xp: {
+    character: 80,
+    clinical: 20
+  }
+}, {
+  id: "m102",
+  s: 1,
+  t: "Present a case to the team",
+  d: "One patient, start to finish, in front of peers.",
+  xp: {
+    clinical: 60,
+    leadership: 30
+  }
+}, {
+  id: "m103",
+  s: 1,
+  t: "Own a clinic task for a week",
+  d: "Something small and visible. Room turnover, equipment, opening.",
+  xp: {
+    leadership: 50,
+    character: 30
+  }
+}, {
+  id: "m104",
+  s: 1,
+  t: "Learn every front desk workflow",
+  d: "Booking, rebooking, billing, insurance, phone. Well enough to cover.",
+  xp: {
+    business: 50,
+    community: 20
+  }
+}, {
+  id: "m105",
+  s: 1,
+  t: "Set and define your schedule",
+  d: "Know your availability, your capacity, and what you earn at every fill rate \u2014 then set the number you are actually working toward.",
+  xp: {
+    business: 70,
+    character: 50
+  }
+}, {
+  id: "m201",
+  s: 2,
+  t: "Track your own KPIs for 90 days",
+  d: "Rebooking, retention, visit average. Your numbers, your spreadsheet.",
+  xp: {
+    business: 90,
+    character: 40
+  }
+}, {
+  id: "m202",
+  s: 2,
+  t: "Solve one recurring clinic problem",
+  d: "Find something that annoys everyone weekly. Kill it.",
+  xp: {
+    business: 60,
+    leadership: 40
+  }
+}, {
+  id: "m203",
+  s: 2,
+  t: "Mentor a student or new hire",
+  d: "Through their first 30 days, to a standard you'd sign off on.",
+  xp: {
+    leadership: 70,
+    character: 40
+  }
+}, {
+  id: "m204",
+  s: 2,
+  t: "Deliver a clinical education session",
+  d: "Teach the team something they don't already know.",
+  xp: {
+    clinical: 80,
+    leadership: 40
+  }
+}, {
+  id: "m205",
+  s: 2,
+  t: "Take one piece of hard feedback and act on it",
+  d: "Ask for it. Write down what you changed. Report back in 30 days.",
+  xp: {
+    character: 70
+  }
+}, {
+  id: "m301",
+  s: 3,
+  t: "Write an SOP other people use",
+  d: "Documented, adopted, and still in use 60 days later.",
+  xp: {
+    business: 80,
+    leadership: 60
+  }
+}, {
+  id: "m302",
+  s: 3,
+  t: "Lead a six-week project",
+  d: "Scope it, run it, land it. You own the deadline.",
+  xp: {
+    leadership: 90,
+    business: 50
+  }
+}, {
+  id: "m303",
+  s: 3,
+  t: "Move one clinic KPI measurably",
+  d: "Pick the metric first. Show the before and after.",
+  xp: {
+    business: 100,
+    leadership: 40
+  }
+}, {
+  id: "m304",
+  s: 3,
+  t: "Coach another clinician through a mission",
+  d: "Their completion counts as yours.",
+  xp: {
+    leadership: 100,
+    character: 50
+  }
+}, {
+  id: "m305",
+  s: 3,
+  t: "Represent Revibe at a community event",
+  d: "Front of house, not back of room. Bring leads home.",
+  xp: {
+    community: 90
+  }
+}, {
+  id: "m401",
+  s: 4,
+  t: "Run one-on-ones for a full quarter",
+  d: "Monthly, documented, with follow-through people can feel.",
+  xp: {
+    leadership: 110,
+    character: 60
+  }
+}, {
+  id: "m402",
+  s: 4,
+  t: "Build a training module someone else delivers",
+  d: "If only you can teach it, it isn't built yet.",
+  xp: {
+    leadership: 100,
+    clinical: 60
+  }
+}, {
+  id: "m403",
+  s: 4,
+  t: "Write the succession plan for your own role",
+  d: "Name the person. Name the gap. Name the date.",
+  xp: {
+    leadership: 90,
+    business: 60
+  }
+}, {
+  id: "m404",
+  s: 4,
+  t: "Lead a cross-location initiative",
+  d: "Something that needs two sites to agree.",
+  xp: {
+    leadership: 90,
+    community: 50
+  }
+}, {
+  id: "m405",
+  s: 4,
+  t: "Take one difficult conversation to resolution",
+  d: "The one you've been avoiding. Relationship intact afterwards.",
+  xp: {
+    character: 100,
+    leadership: 60
+  }
+}, {
+  id: "m501",
+  s: 5,
+  t: "Own a location's numbers for a quarter",
+  d: "Revenue, cost, utilisation. You answer for all three.",
+  xp: {
+    business: 140,
+    leadership: 70
+  }
+}, {
+  id: "m502",
+  s: 5,
+  t: "Hire and onboard a clinician end to end",
+  d: "Sourcing through their first successful month.",
+  xp: {
+    leadership: 120,
+    business: 60
+  }
+}, {
+  id: "m503",
+  s: 5,
+  t: "Run a quarter with the owner out of the room",
+  d: "No escalations that you couldn't have handled.",
+  xp: {
+    leadership: 140,
+    character: 80
+  }
+}, {
+  id: "m504",
+  s: 5,
+  t: "Build a partnership that produces referrals",
+  d: "Signed, active, and measurable at 90 days.",
+  xp: {
+    community: 130,
+    business: 60
+  }
+}, {
+  id: "m601",
+  s: 6,
+  t: "Develop a leader who develops a leader",
+  d: "Two generations deep. That's the whole test.",
+  xp: {
+    leadership: 160,
+    character: 100
+  }
+}, {
+  id: "m602",
+  s: 6,
+  t: "Own a discipline's standards across Revibe",
+  d: "Every location practising to a bar you set.",
+  xp: {
+    clinical: 150,
+    leadership: 80
+  }
+}, {
+  id: "m603",
+  s: 6,
+  t: "Represent Revibe publicly",
+  d: "Teaching, speaking, or media. Outside the building.",
+  xp: {
+    community: 150
+  }
+}];
+const AC_RTRK = {
+  SLF: {
+    name: "Self",
+    acad: "character"
+  },
+  PEO: {
+    name: "People",
+    acad: "leadership"
+  },
+  OPS: {
+    name: "Operations",
+    acad: "business"
+  },
+  BIZ: {
+    name: "Business",
+    acad: "business"
+  },
+  PRF: {
+    name: "Performance",
+    acad: "clinical"
+  }
+};
+const AC_MODS = [{
+  id: "SELF-M1",
+  t: "Leading Yourself",
+  trk: "SLF",
+  lv: "L1",
+  n: 6,
+  doc: "A0",
+  gate: true,
+  xp: 225
+}, {
+  id: "PEO-M1",
+  t: "Communication Foundations",
+  trk: "PEO",
+  lv: "L1",
+  n: 2,
+  doc: "A1"
+}, {
+  id: "PEO-M2",
+  t: "Feedback & Accountability",
+  trk: "PEO",
+  lv: "L2",
+  n: 3,
+  doc: "A1"
+}, {
+  id: "PEO-M3",
+  t: "Coaching & Developing People",
+  trk: "PEO",
+  lv: "L3",
+  n: 3,
+  doc: "A1"
+}, {
+  id: "PEO-M4",
+  t: "Trust, EQ & Culture",
+  trk: "PEO",
+  lv: "L4",
+  n: 3,
+  doc: "A1"
+}, {
+  id: "OPS-M1",
+  t: "Managing Yourself (Ops)",
+  trk: "OPS",
+  lv: "L1",
+  n: 3,
+  doc: "A2"
+}, {
+  id: "OPS-M2",
+  t: "Running the Clinic Day",
+  trk: "OPS",
+  lv: "L2",
+  n: 1,
+  doc: "A2"
+}, {
+  id: "OPS-M3",
+  t: "Projects & Systems",
+  trk: "OPS",
+  lv: "L3",
+  n: 3,
+  doc: "A2"
+}, {
+  id: "OPS-M4",
+  t: "Managing with Data",
+  trk: "OPS",
+  lv: "L4",
+  n: 1,
+  doc: "A2"
+}, {
+  id: "BIZ-M1",
+  t: "Money Basics",
+  trk: "BIZ",
+  lv: "L1",
+  n: 1,
+  doc: "A3"
+}, {
+  id: "BIZ-M2",
+  t: "Growth & Partnerships",
+  trk: "BIZ",
+  lv: "L2",
+  n: 2,
+  doc: "A3"
+}, {
+  id: "BIZ-M3",
+  t: "Strategic Thinking",
+  trk: "BIZ",
+  lv: "L3",
+  n: 1,
+  doc: "A3"
+}, {
+  id: "PRF-M1",
+  t: "Clinical Excellence",
+  trk: "PRF",
+  lv: "L1",
+  n: 2,
+  doc: "A3"
+}, {
+  id: "PRF-M2",
+  t: "Patient Journey & Numbers",
+  trk: "PRF",
+  lv: "L2",
+  n: 2,
+  doc: "A3"
+}];
+const AC_DOCS = {
+  A0: {
+    t: "Academy 00 \u2014 Overview & Self",
+    u: "https://docs.google.com/document/d/1m1x_jDWvfDgZ53Q3JOM1qd6u4EoBKoY3xQO1FSZcE-8/edit"
+  },
+  A1: {
+    t: "Academy 01 \u2014 People Track",
+    u: "https://docs.google.com/document/d/1OorzZOxio7xZ8OrS-FxFhgpxh0DHksZhbhhJMabiReU/edit"
+  },
+  A2: {
+    t: "Academy 02 \u2014 Operations Track",
+    u: "https://docs.google.com/document/d/179FLsEaMkf2WFIzRHkJAXfEfUT-B4ClRx_Q9deJMPYM/edit"
+  },
+  A3: {
+    t: "Academy 03 \u2014 Business & Performance",
+    u: "https://docs.google.com/document/d/1vh4_UT7SLwqXOMmMS5eUC48rTWWvE47PcSQeUQYw6Fw/edit"
+  },
+  TREE: {
+    t: "RLOS Master Skill Tree v1.0",
+    u: "https://docs.google.com/document/d/1BoGuRL0eo4X2OjjYYuKDC-9TcWzAaNGUPbXMb2HOPwg/edit"
+  },
+  PLAY: {
+    t: "RLOS Pilot Playbook",
+    u: ""
+  }
+};
+const AC_LES = [{
+  id: "SLF-MAS-01",
+  t: "Self-Awareness",
+  m: "SELF-M1"
+}, {
+  id: "SLF-MAS-02",
+  t: "Self-Management",
+  m: "SELF-M1"
+}, {
+  id: "SLF-MAS-03",
+  t: "Stress & Resilience",
+  m: "SELF-M1"
+}, {
+  id: "SLF-OWN-01",
+  t: "Ownership",
+  m: "SELF-M1"
+}, {
+  id: "SLF-OWN-02",
+  t: "Receiving Feedback",
+  m: "SELF-M1"
+}, {
+  id: "SLF-PRO-01",
+  t: "Professionalism",
+  m: "SELF-M1"
+}, {
+  id: "PEO-COM-01",
+  t: "Active Listening",
+  m: "PEO-M1"
+}, {
+  id: "PEO-COM-02",
+  t: "Verbal Communication",
+  m: "PEO-M1"
+}, {
+  id: "PEO-FBK-01",
+  t: "Giving Feedback",
+  m: "PEO-M2"
+}, {
+  id: "PEO-FBK-02",
+  t: "Difficult Conversations",
+  m: "PEO-M2"
+}, {
+  id: "PEO-ACC-01",
+  t: "Team Accountability",
+  m: "PEO-M2"
+}, {
+  id: "PEO-CCH-01",
+  t: "Coaching Fundamentals",
+  m: "PEO-M3"
+}, {
+  id: "PEO-CCH-02",
+  t: "One-on-Ones",
+  m: "PEO-M3"
+}, {
+  id: "PEO-TEA-02",
+  t: "Delegating People",
+  m: "PEO-M3"
+}, {
+  id: "PEO-REL-01",
+  t: "Trust Building",
+  m: "PEO-M4"
+}, {
+  id: "PEO-REL-02",
+  t: "Emotional Intelligence",
+  m: "PEO-M4"
+}, {
+  id: "PEO-CUL-01",
+  t: "Living the Culture",
+  m: "PEO-M4"
+}, {
+  id: "OPS-SLM-01",
+  t: "Time Management",
+  m: "OPS-M1"
+}, {
+  id: "OPS-SLM-02",
+  t: "Prioritization",
+  m: "OPS-M1"
+}, {
+  id: "OPS-EXE-01",
+  t: "Follow Through",
+  m: "OPS-M1"
+}, {
+  id: "OPS-GXP-01",
+  t: "Guest Experience Standards",
+  m: "OPS-M2"
+}, {
+  id: "OPS-PRJ-01",
+  t: "Project Planning",
+  m: "OPS-M3"
+}, {
+  id: "OPS-SYS-01",
+  t: "SOP Development",
+  m: "OPS-M3"
+}, {
+  id: "OPS-DEC-02",
+  t: "Problem Solving",
+  m: "OPS-M3"
+}, {
+  id: "OPS-DAT-01",
+  t: "KPI Management",
+  m: "OPS-M4"
+}, {
+  id: "BIZ-FIN-01",
+  t: "Financial Literacy",
+  m: "BIZ-M1"
+}, {
+  id: "BIZ-GRO-02",
+  t: "Sales & Enrollment",
+  m: "BIZ-M2"
+}, {
+  id: "BIZ-GRO-03",
+  t: "Referrals & Networking",
+  m: "BIZ-M2"
+}, {
+  id: "BIZ-STR-01",
+  t: "Strategic Thinking",
+  m: "BIZ-M3"
+}, {
+  id: "PRF-CLX-01",
+  t: "Clinical Standards",
+  m: "PRF-M1"
+}, {
+  id: "PRF-CLX-02",
+  t: "Treatment Planning",
+  m: "PRF-M1"
+}, {
+  id: "PRF-PTJ-02",
+  t: "Patient Education",
+  m: "PRF-M2"
+}, {
+  id: "PRF-MET-01",
+  t: "Clinical KPIs",
+  m: "PRF-M2"
+}];
+const AC_COND = [{
+  n: "The Nice Manager",
+  d: "Liked, but the standard quietly erodes because nothing hard ever gets said.",
+  rx: ["PEO-FBK-01", "PEO-FBK-02", "PEO-ACC-01"]
+}, {
+  n: "The Quiet Avoider",
+  d: "Sees the problem, waits for it to resolve itself. It never does.",
+  rx: ["PEO-FBK-02"]
+}, {
+  n: "The Lone Wolf",
+  d: "Absorbs everything personally rather than building capacity around them.",
+  rx: ["SLF-MAS-03", "PEO-TEA-02"]
+}, {
+  n: "The Busy Operator",
+  d: "Always working, rarely on the things that compound. Loudest task wins.",
+  rx: ["OPS-SLM-01", "OPS-SLM-02", "OPS-SYS-01", "SLF-MAS-03"]
+}, {
+  n: "The Producer-Promoted",
+  d: "Great clinician made leader, still solving everything themselves.",
+  rx: ["PEO-CCH-01", "OPS-DAT-01"]
+}, {
+  n: "The Big Thinker",
+  d: "Excellent ideas, thin follow-through. The 90% graveyard.",
+  rx: ["OPS-EXE-01", "OPS-PRJ-01", "BIZ-STR-01"]
+}, {
+  n: "Builder-Without-Systems",
+  d: "Builds real things that only work while they personally hold them.",
+  rx: ["OPS-SYS-01"]
+}, {
+  n: "Poor Listener / Reactive",
+  d: "Responds to what they expected to hear rather than what was said.",
+  rx: ["PEO-COM-01"]
+}];
+const AC_SWRX = {
+  reliability: {
+    m: ["SELF-M1"],
+    n: ["SLF-OWN-01", "SLF-PRO-01"],
+    prov: false
+  },
+  ownership: {
+    m: ["SELF-M1"],
+    n: ["SLF-OWN-01"],
+    prov: false,
+    note: "The single most prescribed node in the tree."
+  },
+  confidence: {
+    m: ["PRF-M1"],
+    n: ["PRF-CLX-01", "PRF-CLX-02"],
+    prov: false
+  },
+  humility: {
+    m: ["SELF-M1"],
+    n: ["SLF-OWN-02"],
+    prov: false
+  },
+  systems: {
+    m: ["OPS-M3"],
+    n: ["OPS-SYS-01", "OPS-PRJ-01", "OPS-DEC-02"],
+    prov: false
+  },
+  financial: {
+    m: ["BIZ-M1"],
+    n: ["BIZ-FIN-01"],
+    prov: false,
+    note: "Called the most common Business-pillar gap in the whole system."
+  },
+  regulation: {
+    m: ["SELF-M1"],
+    n: ["SLF-MAS-02", "SLF-MAS-03"],
+    prov: false
+  },
+  teaching: {
+    m: ["PEO-M3", "PRF-M2"],
+    n: ["PEO-CCH-01", "PEO-CCH-02", "PRF-PTJ-02"],
+    prov: false
+  },
+  leading: {
+    m: ["PEO-M2", "PEO-M4"],
+    n: ["PEO-FBK-01", "PEO-FBK-02", "PEO-ACC-01", "PEO-REL-01"],
+    prov: false
+  },
+  strategic: {
+    m: ["BIZ-M3", "OPS-M4"],
+    n: ["BIZ-STR-01", "OPS-DAT-01"],
+    prov: false
+  }
+};
+const AC_MIRX = {
+  m101: "SELF-M1",
+  m102: "PRF-M1",
+  m103: "SELF-M1",
+  m104: "OPS-M2",
+  m105: "OPS-M1",
+  m201: "BIZ-M1",
+  m202: "OPS-M2",
+  m203: "PRF-M2",
+  m204: "PRF-M2",
+  m205: "SELF-M1",
+  m301: "OPS-M3",
+  m302: "OPS-M3",
+  m303: "BIZ-M2",
+  m304: "PRF-M2",
+  m305: "BIZ-M2",
+  m401: "PEO-M3",
+  m402: "PRF-M2",
+  m403: "PEO-M3",
+  m404: "OPS-M3",
+  m405: "PEO-M2",
+  m501: "BIZ-M3",
+  m502: "PEO-M3",
+  m503: "OPS-M4",
+  m504: "BIZ-M3",
+  m601: "PEO-M4",
+  m602: "PRF-M2",
+  m603: "BIZ-M3"
+};
+const AC_MINODE = {
+  m101: "SLF-PRO-01",
+  m102: "PRF-CLX-01",
+  m103: "SLF-OWN-01",
+  m104: "OPS-GXP-01",
+  m105: "OPS-SLM-01",
+  m201: "PRF-MET-01",
+  m202: "OPS-DEC-02",
+  m203: "PEO-CCH-01",
+  m204: "PRF-PTJ-02",
+  m205: "SLF-OWN-02",
+  m301: "OPS-SYS-01",
+  m302: "OPS-PRJ-01",
+  m303: "OPS-DAT-01",
+  m304: "PEO-CCH-01",
+  m305: "BIZ-GRO-03",
+  m401: "PEO-CCH-02",
+  m402: "PRF-PTJ-02",
+  m403: "PEO-TEA-02",
+  m404: "OPS-PRJ-01",
+  m405: "PEO-FBK-02",
+  m501: "BIZ-FIN-01",
+  m502: "PEO-ACC-01",
+  m503: "PEO-TEA-02",
+  m504: "BIZ-GRO-03",
+  m601: "PEO-CCH-01",
+  m602: "OPS-SYS-01",
+  m603: "PEO-CUL-01"
+};
+const AC_RSTAGE = {
+  1: {
+    lv: "L1",
+    c: "SELF-M1 + PRF-M1, plus PEO-COM-01/02"
+  },
+  2: {
+    lv: "L1\u2192L2",
+    c: "PRF-M2 + PEO-M1, intro OPS-SLM"
+  },
+  3: {
+    lv: "L2",
+    c: "People track by need + BIZ-GRO-02; first mentoring reps (PRF-EDU-03 shadowing)"
+  },
+  4: {
+    lv: "L2\u2192L3",
+    c: "PRF-EDU (teaching, mentoring, protocols), PEO-M2/M3 at standard, OPS-DAT-01"
+  },
+  5: {
+    lv: "L3",
+    c: "PRF-CLL nodes + PEO-TEA + BIZ-M1/M3"
+  },
+  6: {
+    lv: "L3\u2192L4",
+    c: "PRF-CLL + PEO-TEA + BIZ-M1/M3, teaching at standard"
+  }
+};
+const AC_LEVEL = xp => Math.min(AC_MAXLV, 1 + Math.floor((xp || 0) / AC_XPL));
+const AC_BLANK = () => ({
+  xp: {
+    clinical: 0,
+    business: 0,
+    leadership: 0,
+    community: 0,
+    character: 0
+  },
+  done: {},
+  log: [],
+  age: null
+});
+const AC_REQMET = (p, req) => {
+  for (const k in req) {
+    if (AC_LEVEL((p.xp || {})[k]) < req[k]) return false;
+  }
+  return true;
+};
+const AC_FLIP = p => {
+  const o = {};
+  AC_SW.forEach(sw => {
+    o[sw.id] = AC_REQMET(p, sw.req);
+  });
+  return o;
+};
+const AC_STAGEOF = p => {
+  const f = AC_FLIP(p);
+  let best = 1;
+  AC_STAGES.forEach(st => {
+    if (st.need.every(id => f[id])) best = st.n;
+  });
+  return best;
+};
+const AC_EXPECTED = age => {
+  if (age == null || age === '') return null;
+  const a = +age;
+  if (!(a > 0)) return null;
+  const st = AC_STAGES.filter(x => a >= x.minAge);
+  return st.length ? st[st.length - 1].n : 1;
+};
+const AC_TNAME = id => {
+  const t = AC_TRACKS.find(x => x.id === id);
+  return t ? t.name : id;
+};
+const AC_REQTEXT = req => Object.keys(req).map(k => AC_TNAME(k) + ' L' + req[k]).join(' · ');
+const AC_LESSON = nid => {
+  const l = AC_LES.find(x => x.id === nid);
+  return l ? l.t : nid;
+};
+const AC_MODNAME = mid => {
+  const m = AC_MODS.find(x => x.id === mid);
+  return m ? m.t : mid;
+};
+const AC_TOTXP = p => AC_TRACKS.reduce((a, t) => a + ((p.xp || {})[t.id] || 0), 0);
+const AC_HUES = {
+  clinical: '#7ee0a3',
+  business: '#ffd166',
+  leadership: '#ff8a9d',
+  community: '#8ec9ff',
+  character: '#d9a9ff'
+};
+function AcademyTab({
+  staff,
+  openProfile
+}) {
+  const [db, setDb] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('rvgd3_academy') || '{}');
+    } catch (e) {
+      return {};
+    }
+  });
+  const save = next => {
+    setDb(next);
+    try {
+      localStorage.setItem('rvgd3_academy', JSON.stringify(next));
+      const m = JSON.parse(localStorage.getItem('rvgd3__ts') || '{}');
+      m['academy'] = Date.now();
+      localStorage.setItem('rvgd3__ts', JSON.stringify(m));
+    } catch (e) {}
+    if (window.__SB && window.__GDSYNC && window.__GDSYNC.ready) window.__SB.from('gd_store').upsert({
+      id: 'academy',
+      data: {
+        v: next,
+        t: Date.now()
+      }
+    }).then(() => {}, () => {});
+  };
+  const roster = (staff || []).filter(x => x && x.name).sort((a, b) => a.name.localeCompare(b.name));
+  const [selId, setSelId] = usePersist('academy.person', '');
+  const sel = roster.find(x => x.id === selId) || null;
+  const [swSel, setSwSel] = useState(AC_SW[0].id);
+  const [fx, setFx] = useState(null);
+  const pOf = id => {
+    const raw = (db.people || {})[id] || {};
+    return {
+      ...AC_BLANK(),
+      ...raw,
+      xp: {
+        ...AC_BLANK().xp,
+        ...(raw.xp || {})
+      }
+    };
+  };
+  const setP = (id, patch) => save({
+    ...db,
+    people: {
+      ...(db.people || {}),
+      [id]: {
+        ...pOf(id),
+        ...patch
+      }
+    }
+  });
+  const docsOf = () => {
+    const d = {};
+    for (const k in AC_DOCS) d[k] = {
+      t: AC_DOCS[k].t,
+      u: (db.docs || {})[k] != null ? db.docs[k] : AC_DOCS[k].u
+    };
+    return d;
+  };
+  const C = {
+    background: 'var(--surface2)',
+    border: '1px solid var(--border)',
+    borderRadius: 10,
+    padding: '16px 18px',
+    marginBottom: 12
+  };
+  const H = ({
+    children
+  }) => React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 16,
+      letterSpacing: '1.4px',
+      textTransform: 'uppercase',
+      fontWeight: 800,
+      color: 'var(--g-ddd)',
+      marginBottom: 10
+    }
+  }, children);
+  const complete = async mid => {
+    if (!sel) return;
+    const m = AC_MIS.find(x => x.id === mid);
+    const p = pOf(sel.id);
+    if (!m || p.done[mid]) return;
+    const note = await rvAsk({
+      label: 'Evidence — what actually happened?',
+      hint: 'One line for the log. XP lands when you confirm.',
+      ok: 'Award XP'
+    });
+    if (note == null) return;
+    const before = {};
+    AC_TRACKS.forEach(t => {
+      before[t.id] = AC_LEVEL(p.xp[t.id]);
+    });
+    const stBefore = AC_STAGEOF(p);
+    const xp = {
+      ...p.xp
+    };
+    for (const k in m.xp) {
+      xp[k] = Math.min(AC_MAXLV * AC_XPL, (xp[k] || 0) + m.xp[k]);
+    }
+    const ups = AC_TRACKS.filter(t => AC_LEVEL(xp[t.id]) > before[t.id]).map(t => t.name + ' → L' + AC_LEVEL(xp[t.id]));
+    const stAfter = AC_STAGEOF({
+      ...p,
+      xp
+    });
+    const entry = {
+      mid,
+      t: m.t,
+      date: GD_TODAY(),
+      by: typeof RV_ME === 'function' ? RV_ME().name || '—' : '—',
+      note: String(note || ''),
+      xp: m.xp,
+      ups
+    };
+    setP(sel.id, {
+      xp,
+      done: {
+        ...p.done,
+        [mid]: GD_TODAY()
+      },
+      log: [entry, ...(p.log || [])].slice(0, 80)
+    });
+    setFx(stAfter > stBefore ? 'STAGE UP — ' + (AC_STAGES.find(x => x.n === stAfter) || {}).name : ups.length ? 'LEVEL UP — ' + ups.join(' · ') : 'XP AWARDED');
+    setTimeout(() => setFx(null), 1900);
+  };
+  const undo = mid => {
+    if (!sel || !window.confirm('Un-complete this mission and remove its XP?')) return;
+    const m = AC_MIS.find(x => x.id === mid);
+    const p = pOf(sel.id);
+    if (!m || !p.done[mid]) return;
+    const xp = {
+      ...p.xp
+    };
+    for (const k in m.xp) {
+      xp[k] = Math.max(0, (xp[k] || 0) - m.xp[k]);
+    }
+    const done = {
+      ...p.done
+    };
+    delete done[mid];
+    setP(sel.id, {
+      xp,
+      done,
+      log: [{
+        mid,
+        t: m.t + ' (undone)',
+        date: GD_TODAY(),
+        note: '',
+        xp: {}
+      }, ...(p.log || [])].slice(0, 80)
+    });
+  };
+  const editDoc = async k => {
+    const d = docsOf()[k];
+    const u = await rvAsk({
+      label: d.t,
+      hint: 'Google Doc link for this source document.',
+      value: d.u || '',
+      ok: 'Save link'
+    });
+    if (u == null) return;
+    save({
+      ...db,
+      docs: {
+        ...(db.docs || {}),
+        [k]: String(u).trim()
+      }
+    });
+  };
+  const board = roster.map(st => {
+    const p = pOf(st.id);
+    const f = AC_FLIP(p);
+    const flips = AC_SW.filter(sw => f[sw.id]).length;
+    const stage = AC_STAGEOF(p);
+    const next = AC_SW.find(sw => !f[sw.id]);
+    return {
+      st,
+      p,
+      flips,
+      stage,
+      next,
+      txp: AC_TOTXP(p)
+    };
+  });
+  const P = sel ? pOf(sel.id) : null;
+  const F = P ? AC_FLIP(P) : null;
+  const stage = P ? AC_STAGEOF(P) : null;
+  const exp = P ? AC_EXPECTED(P.age) : null;
+  const doneCount = P ? Object.keys(P.done || {}).length : 0;
+  const avail = P ? AC_MIS.filter(m => m.s <= stage + 1) : [];
+  const swNode = AC_SW.find(x => x.id === swSel) || AC_SW[0];
+  const rx = AC_SWRX[swNode.id] || {};
+  return React.createElement("div", {
+    style: {
+      marginTop: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      ...C,
+      borderLeft: '3px solid #c9f26f'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 12,
+      alignItems: 'center',
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 20,
+      fontWeight: 800,
+      letterSpacing: '1.5px',
+      textTransform: 'uppercase'
+    }
+  }, "\uD83C\uDF93 Leadership Academy"), React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: 'var(--g-999)',
+      flex: 1,
+      minWidth: 220
+    }
+  }, "Missions are the only XP source. Levels flip switches, switches unlock stages. Same people as everywhere else \u2014 progress saves and syncs like the rest of the dashboard."), React.createElement("select", {
+    value: selId,
+    onChange: e => setSelId(e.target.value),
+    style: {
+      background: 'var(--surface3)',
+      border: '1px solid var(--border)',
+      borderRadius: 6,
+      color: 'var(--text)',
+      fontSize: 13,
+      padding: '6px 9px',
+      minWidth: 200
+    }
+  }, React.createElement("option", {
+    value: ""
+  }, "Squad board \u2014 pick a person\u2026"), roster.map(x => React.createElement("option", {
+    key: x.id,
+    value: x.id
+  }, x.name))), sel && React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: () => openProfile && openProfile(sel.id)
+  }, "Open profile \u2197"), sel && React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: () => setSelId('')
+  }, "\u2190 Squad board"))), !sel && React.createElement("div", {
+    style: {
+      ...C
+    }
+  }, React.createElement(H, null, "Squad board \u2014 where everyone stands"), React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-777)',
+      marginBottom: 10
+    }
+  }, "Fresh start: everyone begins at Stage 1 with zero XP \u2014 progress is earned mission by mission. Click a row to open their character sheet."), React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))',
+      gap: 10
+    }
+  }, board.map(({
+    st,
+    p,
+    flips,
+    stage: sg,
+    next,
+    txp
+  }) => React.createElement("div", {
+    key: st.id,
+    onClick: () => setSelId(st.id),
+    style: {
+      cursor: 'pointer',
+      border: '1px solid var(--border)',
+      borderLeft: '3px solid #c9f26f',
+      borderRadius: 10,
+      padding: '11px 13px',
+      background: 'var(--surface3)',
+      transition: 'transform .15s'
+    },
+    onMouseEnter: e => e.currentTarget.style.transform = 'translateY(-2px)',
+    onMouseLeave: e => e.currentTarget.style.transform = ''
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: 8
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 14.5,
+      fontWeight: 700,
+      color: 'var(--g-eee)'
+    }
+  }, st.name), React.createElement("span", {
+    style: {
+      marginLeft: 'auto',
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 12,
+      letterSpacing: '1px',
+      textTransform: 'uppercase',
+      color: '#c9f26f'
+    }
+  }, "Stage ", sg, " \xB7 ", (AC_STAGES.find(x => x.n === sg) || {}).name)), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: 'var(--g-888)',
+      marginTop: 3
+    }
+  }, flips, "/", AC_SW.length, " switches \xB7 ", Object.keys(p.done || {}).length, " missions \xB7 ", txp, " XP"), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: 'var(--g-777)',
+      marginTop: 5
+    }
+  }, next ? 'Next switch: ' + next.name + ' — needs ' + AC_REQTEXT(next.req) : 'Every switch flipped.'))))), sel && P && React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "rvt",
+    style: {
+      marginBottom: 12
+    }
+  }, RvTreeCSS, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 22,
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      padding: '18px 22px 16px'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 9,
+      minWidth: 220,
+      flex: '1 1 230px'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 14
+    }
+  }, React.createElement("div", {
+    style: {
+      width: 64,
+      height: 64,
+      borderRadius: '50%',
+      border: '2px solid #c9f26f',
+      background: 'rgba(255,255,255,.08)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 23,
+      fontWeight: 800,
+      color: '#fff',
+      boxShadow: '0 0 18px rgba(201,242,111,.35)',
+      flexShrink: 0
+    }
+  }, RV_MONO(sel.name)), React.createElement("div", null, React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 28,
+      fontWeight: 800,
+      letterSpacing: '1px',
+      textTransform: 'uppercase',
+      color: '#fff',
+      lineHeight: 1.05
+    }
+  }, sel.name), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: 'rgba(238,248,242,.6)',
+      marginTop: 2
+    }
+  }, sel.role, sel.site ? ' · ' + sel.site : ''))), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 5,
+      flexWrap: 'wrap'
+    }
+  }, AC_TRACKS.map(t => React.createElement(RvHeroChip, {
+    key: t.id,
+    txt: t.name + ' L' + AC_LEVEL(P.xp[t.id]),
+    col: AC_HUES[t.id]
+  }))), React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      letterSpacing: '1px',
+      textTransform: 'uppercase',
+      fontFamily: "'Barlow Condensed',sans-serif",
+      color: 'rgba(238,248,242,.55)'
+    }
+  }, "Age"), React.createElement("input", {
+    value: P.age || '',
+    onChange: e => setP(sel.id, {
+      age: e.target.value.replace(/[^0-9]/g, '').slice(0, 3)
+    }),
+    placeholder: "\u2014",
+    style: {
+      width: 52,
+      background: 'rgba(255,255,255,.1)',
+      border: '1px solid rgba(255,255,255,.25)',
+      borderRadius: 6,
+      color: '#fff',
+      fontSize: 13,
+      padding: '3px 7px'
+    }
+  }), exp != null && React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      fontFamily: "'Barlow Condensed',sans-serif",
+      letterSpacing: '1px',
+      textTransform: 'uppercase',
+      color: stage > exp ? '#7ee0a3' : stage < exp ? '#c9f26f' : 'rgba(238,248,242,.7)'
+    }
+  }, stage > exp ? '▲ ahead of the age guide' : stage < exp ? '◔ behind the age guide (expected stage ' + exp + ')' : 'on the age guide'))), React.createElement(RvRadar, {
+    axes: AC_TRACKS.map(t => ({
+      label: t.name,
+      value: AC_LEVEL(P.xp[t.id]),
+      max: AC_MAXLV
+    })),
+    size: 266,
+    hue: "#c9f26f",
+    center: {
+      big: AC_TOTXP(P),
+      sub: 'total xp'
+    },
+    ink: RV_DARK_INK
+  }), React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10,
+      flex: '1 1 250px',
+      minWidth: 230
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 10,
+      flexWrap: 'wrap'
+    }
+  }, React.createElement(RvHeroTile, {
+    lbl: "Stage",
+    val: (AC_STAGES.find(x => x.n === stage) || {}).name,
+    sub: 'stage ' + stage + ' of ' + AC_STAGES.length,
+    fill: true
+  }), React.createElement(RvHeroTile, {
+    lbl: "Switches",
+    val: AC_SW.filter(sw => F[sw.id]).length + ' / ' + AC_SW.length,
+    sub: "flipped"
+  })), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 10,
+      flexWrap: 'wrap'
+    }
+  }, React.createElement(RvHeroTile, {
+    lbl: "Missions",
+    val: doneCount + ' / ' + AC_MIS.length,
+    sub: "completed"
+  }), (() => {
+    const nx = AC_STAGES.find(x => x.n === stage + 1);
+    if (!nx) return React.createElement(RvHeroTile, {
+      lbl: "Stage",
+      val: "MAX",
+      sub: "top of the arc"
+    });
+    const miss = nx.need.filter(id => !F[id]).length;
+    return React.createElement(RvHeroTile, {
+      lbl: 'To stage ' + nx.n,
+      val: miss,
+      sub: miss === 1 ? 'switch left' : 'switches left'
+    });
+  })()))), fx && React.createElement("div", {
+    className: "rvt-fx"
+  }, React.createElement("div", {
+    className: "rvt-fx-ring"
+  }), React.createElement("div", {
+    className: "rvt-fx-ring r2"
+  }), React.createElement("div", {
+    className: "rvt-fx-t"
+  }, fx))), React.createElement("div", {
+    className: "rvt",
+    style: {
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    className: "rvt-head"
+  }, React.createElement("span", {
+    className: "rvt-title"
+  }, "The six stages"), React.createElement("span", {
+    className: "rvt-sub"
+  }, "Each stage unlocks when its switches are flipped. Age ranges are a guide, not a rule.")), React.createElement(RvPathRail, {
+    steps: AC_STAGES.map(st => ({
+      label: String(st.n),
+      l1: st.name,
+      l2: st.minAge + '–' + (st.maxAge > 100 ? '∞' : st.maxAge),
+      hue: '#c9f26f',
+      title: st.q
+    })),
+    current: stage - 1,
+    earnedIdx: stage - 1
+  })), React.createElement("div", {
+    className: "rvt",
+    style: {
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    className: "rvt-head"
+  }, React.createElement("span", {
+    className: "rvt-title"
+  }, "The ten switches"), React.createElement("span", {
+    className: "rvt-sub"
+  }, "A switch flips itself the moment the track levels behind it are earned \u2014 nobody grades it directly.")), React.createElement(RvSkillTree, {
+    height: 470,
+    groups: RV_CHUNK3(AC_SW.map(sw => ({
+      k: sw.id,
+      label: sw.name,
+      desc: sw.desc,
+      level: F[sw.id] ? 1 : 0,
+      max: 1
+    }))).map((ns, i) => ({
+      name: '',
+      hue: RV_SECT_HUES[i % 3],
+      nodes: ns
+    })),
+    selected: swSel,
+    onSelect: setSwSel
+  }), React.createElement("div", {
+    className: "rvt-panel"
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: 12,
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("span", {
+    className: "rvt-pn"
+  }, swNode.name), React.createElement("span", {
+    className: "rvt-pl"
+  }, F[swNode.id] ? 'FLIPPED' : 'not yet'), React.createElement("span", {
+    className: "rvt-ph"
+  }, "usual age ", swNode.age)), React.createElement("div", {
+    className: "rvt-pd",
+    style: {
+      marginTop: 5
+    }
+  }, swNode.desc), React.createElement("div", {
+    className: "rvt-ph",
+    style: {
+      marginTop: 7
+    }
+  }, "Unlocks at: ", Object.keys(swNode.req).map(k => {
+    const have = AC_LEVEL(P.xp[k]),
+      need = swNode.req[k];
+    return React.createElement("span", {
+      key: k,
+      style: {
+        marginRight: 12,
+        color: have >= need ? '#7ee0a3' : '#c9f26f'
+      }
+    }, AC_TNAME(k), " L", need, " (at L", have, ")");
+  })), (rx.m || []).length > 0 && React.createElement("div", {
+    className: "rvt-ph",
+    style: {
+      marginTop: 6
+    }
+  }, "Study: ", (rx.m || []).map(m => AC_MODNAME(m)).join(' · '), (rx.n || []).length ? ' — nodes ' + (rx.n || []).map(AC_LESSON).join(', ') : '', rx.note ? ' · ' + rx.note : ''))), React.createElement("div", {
+    style: {
+      ...C
+    }
+  }, React.createElement(H, null, "Missions \u2014 the only way XP is earned"), React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-777)',
+      marginBottom: 12
+    }
+  }, "Available up to one stage ahead. Completing one asks for a line of evidence and awards its XP; everything is logged and can be undone."), AC_STAGES.map(st => {
+    const ms = AC_MIS.filter(m => m.s === st.n);
+    if (!ms.length) return null;
+    const locked = st.n > stage + 1;
+    return React.createElement("div", {
+      key: st.n,
+      style: {
+        marginBottom: 14,
+        opacity: locked ? 0.55 : 1
+      }
+    }, React.createElement("div", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 13,
+        letterSpacing: '1.5px',
+        textTransform: 'uppercase',
+        fontWeight: 800,
+        color: locked ? 'var(--g-777)' : '#c9f26f',
+        marginBottom: 6
+      }
+    }, "Stage ", st.n, " \xB7 ", st.name, locked ? ' — locked (' + (st.n - stage) + ' stages ahead)' : ''), ms.map(m => {
+      const d = P.done[m.id];
+      const prep = AC_MIRX[m.id];
+      const node = AC_MINODE[m.id];
+      const dd = prep ? docsOf()[(AC_MODS.find(x => x.id === prep) || {}).doc] : null;
+      return React.createElement("div", {
+        key: m.id,
+        style: {
+          display: 'flex',
+          gap: 12,
+          alignItems: 'flex-start',
+          borderTop: '1px solid var(--border)',
+          padding: '9px 0'
+        }
+      }, React.createElement("div", {
+        style: {
+          flex: 1,
+          minWidth: 220
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 14.5,
+          fontWeight: 700,
+          color: d ? 'var(--c-grn)' : 'var(--g-eee)'
+        }
+      }, d ? '✓ ' : '', m.t), React.createElement("div", {
+        style: {
+          fontSize: 12.5,
+          color: 'var(--g-999)',
+          marginTop: 2,
+          lineHeight: 1.55
+        }
+      }, m.d), React.createElement("div", {
+        style: {
+          display: 'flex',
+          gap: 5,
+          flexWrap: 'wrap',
+          marginTop: 5
+        }
+      }, Object.keys(m.xp).map(k => React.createElement("span", {
+        key: k,
+        style: {
+          fontSize: 11.5,
+          fontFamily: "'Barlow Condensed',sans-serif",
+          letterSpacing: '.8px',
+          color: AC_HUES[k],
+          border: '1px solid var(--border)',
+          borderRadius: 5,
+          padding: '1px 7px'
+        }
+      }, "+", m.xp[k], " ", AC_TNAME(k))), prep && React.createElement("span", {
+        style: {
+          fontSize: 11.5,
+          color: 'var(--g-777)'
+        }
+      }, "prep: ", AC_MODNAME(prep), dd && dd.u ? React.createElement("a", {
+        href: dd.u,
+        target: "_blank",
+        rel: "noreferrer",
+        style: {
+          color: 'var(--c-blu2)',
+          marginLeft: 5
+        }
+      }, "doc \u2197") : null), node && React.createElement("span", {
+        style: {
+          fontSize: 11.5,
+          color: 'var(--g-777)'
+        }
+      }, "trains: ", AC_LESSON(node)))), React.createElement("div", {
+        style: {
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          gap: 4
+        }
+      }, d ? React.createElement(React.Fragment, null, React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: 'var(--c-grn)'
+        }
+      }, d), React.createElement("button", {
+        className: "btn btn-ghost btn-xs",
+        onClick: () => undo(m.id)
+      }, "undo")) : locked ? React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: 'var(--g-777)'
+        }
+      }, "locked") : React.createElement("button", {
+        className: "btn btn-lime btn-sm",
+        onClick: () => complete(m.id)
+      }, "Mark complete")));
+    }));
+  })), (P.log || []).length > 0 && React.createElement("div", {
+    style: {
+      ...C
+    }
+  }, React.createElement(H, null, "Log"), (P.log || []).slice(0, 12).map((l, i) => React.createElement("div", {
+    key: i,
+    style: {
+      display: 'flex',
+      gap: 10,
+      borderTop: i ? '1px solid var(--border)' : 'none',
+      padding: '7px 0',
+      fontSize: 12.5,
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("span", {
+    style: {
+      color: 'var(--g-777)'
+    }
+  }, l.date), React.createElement("span", {
+    style: {
+      color: 'var(--g-ccc)',
+      fontWeight: 600
+    }
+  }, l.t), l.note ? React.createElement("span", {
+    style: {
+      color: 'var(--g-888)'
+    }
+  }, "\u2014 ", l.note) : null, (l.ups || []).length ? React.createElement("span", {
+    style: {
+      color: '#c9f26f'
+    }
+  }, l.ups.join(' · ')) : null)))), React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))',
+      gap: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      ...C,
+      marginBottom: 0
+    }
+  }, React.createElement(H, null, "Curriculum library"), React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-777)',
+      marginBottom: 8
+    }
+  }, "The RLOS source documents. Links open your Academy Google Docs; \u270E edits a link."), Object.keys(docsOf()).map(k => {
+    const d = docsOf()[k];
+    return React.createElement("div", {
+      key: k,
+      style: {
+        display: 'flex',
+        gap: 8,
+        alignItems: 'center',
+        borderTop: '1px solid var(--border)',
+        padding: '7px 0'
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: 'var(--g-ccc)',
+        flex: 1
+      }
+    }, d.t), d.u ? React.createElement("a", {
+      href: d.u,
+      target: "_blank",
+      rel: "noreferrer",
+      style: {
+        fontSize: 12.5,
+        color: 'var(--c-blu2)'
+      }
+    }, "open \u2197") : React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: 'var(--g-777)'
+      }
+    }, "no link"), React.createElement("button", {
+      className: "btn btn-ghost btn-xs",
+      onClick: () => editDoc(k)
+    }, "\u270E"));
+  }), React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, Object.keys(AC_RTRK).map(tk => React.createElement("details", {
+    key: tk,
+    style: {
+      borderTop: '1px solid var(--border)',
+      padding: '6px 0'
+    }
+  }, React.createElement("summary", {
+    style: {
+      cursor: 'pointer',
+      fontSize: 13,
+      color: 'var(--g-ddd)',
+      fontWeight: 600
+    }
+  }, AC_RTRK[tk].name, " track \u2014 ", AC_MODS.filter(m => m.trk === tk).length, " modules"), AC_MODS.filter(m => m.trk === tk).map(m => React.createElement("div", {
+    key: m.id,
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-999)',
+      padding: '4px 0 4px 14px'
+    }
+  }, React.createElement("b", {
+    style: {
+      color: 'var(--g-ccc)'
+    }
+  }, m.lv, " \xB7 ", m.t), " \u2014 ", AC_LES.filter(l => l.m === m.id).map(l => l.t).join(', '))))))), React.createElement("div", {
+    style: {
+      ...C,
+      marginBottom: 0
+    }
+  }, React.createElement(H, null, "Conditions \u2014 named failure patterns"), React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-777)',
+      marginBottom: 8
+    }
+  }, "Spot the pattern, prescribe the nodes. From the kit, verbatim."), AC_COND.map(cd => React.createElement("details", {
+    key: cd.n,
+    style: {
+      borderTop: '1px solid var(--border)',
+      padding: '6px 0'
+    }
+  }, React.createElement("summary", {
+    style: {
+      cursor: 'pointer',
+      fontSize: 13,
+      color: 'var(--g-ddd)',
+      fontWeight: 600
+    }
+  }, cd.n), React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-999)',
+      padding: '5px 0 3px 14px',
+      lineHeight: 1.55
+    }
+  }, cd.d, React.createElement("br", null), React.createElement("span", {
+    style: {
+      color: 'var(--c-yel)'
+    }
+  }, "Rx: ", cd.rx.map(AC_LESSON).join(' · '))))), React.createElement("div", {
+    style: {
+      marginTop: 12,
+      fontSize: 12.5,
+      color: 'var(--g-777)',
+      lineHeight: 1.6,
+      borderTop: '1px solid var(--border)',
+      paddingTop: 10
+    }
+  }, React.createElement("b", {
+    style: {
+      color: 'var(--g-ccc)'
+    }
+  }, "How it plays:"), " ", AC_XPL, " XP = one track level (max L", AC_MAXLV, "). Missions are the only XP source. Levels flip switches automatically; stages unlock when their switches are flipped. Utilization and earnings live in Performance & Revenue \u2014 the academy never duplicates them."))));
+}
 function LeadershipPage({
   staff,
   perfData,
@@ -61695,11 +63529,11 @@ function LeadershipPage({
     }
   }, "Click any row to view and edit all scores \xB7 Leadership = Stability Under Weight")), React.createElement("div", {
     className: "flex aic g6"
-  }, ['develop', 'roster', 'heat-map', 'identity', 'risk-matrix', 'doctrine'].map(t => React.createElement("button", {
+  }, ['develop', 'academy', 'roster', 'heat-map', 'identity', 'risk-matrix', 'doctrine'].map(t => React.createElement("button", {
     key: t,
     className: `btn btn-sm ${activeTab === t ? 'btn-go' : 'btn-ghost'}`,
     onClick: () => setActiveTab(t)
-  }, t === 'develop' ? '🎯 Development' : t === 'roster' ? '◎ Roster' : t === 'heat-map' ? '▣ Heat Map' : t === 'identity' ? '⬡ Identity Map' : t === 'risk-matrix' ? '⚠ Risk Matrix' : '◐ Doctrine')), React.createElement("button", {
+  }, t === 'develop' ? '🎯 Development' : t === 'academy' ? '🎓 Academy' : t === 'roster' ? '◎ Roster' : t === 'heat-map' ? '▣ Heat Map' : t === 'identity' ? '⬡ Identity Map' : t === 'risk-matrix' ? '⚠ Risk Matrix' : '◐ Doctrine')), React.createElement("button", {
     className: "btn btn-lime btn-sm",
     onClick: () => setShowAdd(true)
   }, "+ Add"), React.createElement("button", {
@@ -61712,7 +63546,7 @@ function LeadershipPage({
     onClick: () => {
       if (window.confirm('Reset to sample data?')) save(SEED_LEADERSHIP);
     }
-  }, "\u21BA"))), activeTab !== 'develop' && React.createElement("div", {
+  }, "\u21BA"))), activeTab !== 'develop' && activeTab !== 'academy' && React.createElement("div", {
     className: "lt-grid",
     style: {
       gridTemplateColumns: 'repeat(6,1fr)'
@@ -61755,6 +63589,9 @@ function LeadershipPage({
     staff: staff,
     perfData: perfData,
     evals: evals,
+    openProfile: openProfile
+  }), activeTab === 'academy' && React.createElement(AcademyTab, {
+    staff: staff,
     openProfile: openProfile
   }), activeTab === 'roster' && React.createElement("div", {
     className: "ltr"
