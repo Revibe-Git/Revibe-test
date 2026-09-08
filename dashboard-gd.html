@@ -1892,7 +1892,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L151';
+window.__BUILD = 'build L152';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -63154,7 +63154,13 @@ function AcademyTab({
         color: locked ? 'var(--g-777)' : 'var(--c-grn)',
         marginBottom: 6
       }
-    }, "Stage ", st.n, " \xB7 ", st.name, locked ? ' — locked (' + (st.n - stage) + ' stages ahead)' : ''), ms.map(m => {
+    }, "Stage ", st.n, " \xB7 ", st.name, locked ? ' — locked (' + (st.n - stage) + ' stages ahead)' : ''), React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))',
+        gap: 10
+      }
+    }, ms.map(m => {
       const d = P.done[m.id];
       const prep = AC_MIRX[m.id];
       const node = AC_MINODE[m.id];
@@ -63163,27 +63169,53 @@ function AcademyTab({
         key: m.id,
         style: {
           display: 'flex',
-          gap: 12,
-          alignItems: 'flex-start',
-          borderTop: '1px solid var(--border)',
-          padding: '9px 0'
-        }
+          flexDirection: 'column',
+          gap: 6,
+          border: '1px solid var(--border)',
+          borderLeft: '3px solid ' + (d ? 'var(--c-grn)' : locked ? 'var(--border)' : 'var(--c-grn)'),
+          borderRadius: 10,
+          padding: '11px 13px',
+          background: d ? 'color-mix(in srgb, var(--surface3) 90%, var(--c-grn) 10%)' : 'var(--surface3)',
+          transition: 'transform .15s'
+        },
+        onMouseEnter: e => {
+          if (!locked) e.currentTarget.style.transform = 'translateY(-2px)';
+        },
+        onMouseLeave: e => e.currentTarget.style.transform = ''
       }, React.createElement("div", {
         style: {
-          flex: 1,
-          minWidth: 220
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 8
         }
-      }, React.createElement("div", {
+      }, React.createElement("span", {
         style: {
           fontSize: 14.5,
           fontWeight: 700,
           color: d ? 'var(--c-grn)' : 'var(--g-eee)'
         }
-      }, d ? '✓ ' : '', m.t), React.createElement("div", {
+      }, d ? '✓ ' : '', m.t), React.createElement("span", {
+        style: {
+          marginLeft: 'auto',
+          flexShrink: 0
+        }
+      }, d ? React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: 'var(--c-grn)'
+        }
+      }, d) : locked ? React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: 'var(--g-777)'
+        }
+      }, "locked") : React.createElement("button", {
+        className: "btn btn-lime btn-xs",
+        onClick: () => complete(m.id)
+      }, "Complete"))), React.createElement("div", {
         style: {
           fontSize: 12.5,
           color: 'var(--g-999)',
-          marginTop: 2,
           lineHeight: 1.55
         }
       }, m.d), React.createElement("div", {
@@ -63191,7 +63223,8 @@ function AcademyTab({
           display: 'flex',
           gap: 5,
           flexWrap: 'wrap',
-          marginTop: 5
+          alignItems: 'center',
+          marginTop: 'auto'
         }
       }, Object.keys(m.xp).map(k => React.createElement("span", {
         key: k,
@@ -63205,12 +63238,18 @@ function AcademyTab({
           borderRadius: 5,
           padding: '1px 7px'
         }
-      }, "+", m.xp[k], " ", AC_TNAME(k))), prep && React.createElement("span", {
+      }, "+", m.xp[k], " ", AC_TNAME(k))), d && React.createElement("button", {
+        className: "btn btn-ghost btn-xs",
+        style: {
+          marginLeft: 'auto'
+        },
+        onClick: () => undo(m.id)
+      }, "undo")), (prep || node) && React.createElement("div", {
         style: {
           fontSize: 11.5,
           color: 'var(--g-777)'
         }
-      }, "prep: ", AC_MODNAME(prep), dd && dd.u ? React.createElement("a", {
+      }, prep ? React.createElement(React.Fragment, null, "prep: ", AC_MODNAME(prep), dd && dd.u ? React.createElement("a", {
         href: dd.u,
         target: "_blank",
         rel: "noreferrer",
@@ -63218,37 +63257,8 @@ function AcademyTab({
           color: 'var(--c-blu2)',
           marginLeft: 5
         }
-      }, "doc \u2197") : null), node && React.createElement("span", {
-        style: {
-          fontSize: 11.5,
-          color: 'var(--g-777)'
-        }
-      }, "trains: ", AC_LESSON(node)))), React.createElement("div", {
-        style: {
-          flexShrink: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-end',
-          gap: 4
-        }
-      }, d ? React.createElement(React.Fragment, null, React.createElement("span", {
-        style: {
-          fontSize: 12,
-          color: 'var(--c-grn)'
-        }
-      }, d), React.createElement("button", {
-        className: "btn btn-ghost btn-xs",
-        onClick: () => undo(m.id)
-      }, "undo")) : locked ? React.createElement("span", {
-        style: {
-          fontSize: 12,
-          color: 'var(--g-777)'
-        }
-      }, "locked") : React.createElement("button", {
-        className: "btn btn-lime btn-sm",
-        onClick: () => complete(m.id)
-      }, "Mark complete")));
-    }));
+      }, "doc \u2197") : null) : null, prep && node ? ' · ' : '', node ? 'trains: ' + AC_LESSON(node) : ''));
+    })));
   })), (P.log || []).length > 0 && React.createElement("div", {
     style: {
       ...C
