@@ -1892,7 +1892,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L149';
+window.__BUILD = 'build L151';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -62605,8 +62605,8 @@ function AcademyTab({
     return d;
   };
   const C = {
-    background: 'var(--surface2)',
-    border: '1px solid var(--border)',
+    background: 'color-mix(in srgb, var(--surface2) 91%, #2fd6a8 9%)',
+    border: '1px solid color-mix(in srgb, var(--border) 72%, #2fd6a8 28%)',
     borderRadius: 10,
     padding: '16px 18px',
     marginBottom: 12
@@ -62739,13 +62739,14 @@ function AcademyTab({
   const swNode = AC_SW.find(x => x.id === swSel) || AC_SW[0];
   const rx = AC_SWRX[swNode.id] || {};
   return React.createElement("div", {
+    className: "acx",
     style: {
       marginTop: 12
     }
   }, React.createElement("div", {
     style: {
       ...C,
-      borderLeft: '3px solid #c9f26f'
+      borderLeft: '3px solid var(--c-grn)'
     }
   }, React.createElement("div", {
     style: {
@@ -62821,7 +62822,7 @@ function AcademyTab({
     style: {
       cursor: 'pointer',
       border: '1px solid var(--border)',
-      borderLeft: '3px solid #c9f26f',
+      borderLeft: '3px solid var(--c-grn)',
       borderRadius: 10,
       padding: '11px 13px',
       background: 'var(--surface3)',
@@ -62848,7 +62849,7 @@ function AcademyTab({
       fontSize: 12,
       letterSpacing: '1px',
       textTransform: 'uppercase',
-      color: '#c9f26f'
+      color: 'var(--c-grn)'
     }
   }, "Stage ", sg, " \xB7 ", (AC_STAGES.find(x => x.n === sg) || {}).name)), React.createElement("div", {
     style: {
@@ -62930,8 +62931,7 @@ function AcademyTab({
     }
   }, AC_TRACKS.map(t => React.createElement(RvHeroChip, {
     key: t.id,
-    txt: t.name + ' L' + AC_LEVEL(P.xp[t.id]),
-    col: AC_HUES[t.id]
+    txt: t.name + ' L' + AC_LEVEL(P.xp[t.id])
   }))), React.createElement("div", {
     style: {
       display: 'flex',
@@ -63077,9 +63077,9 @@ function AcademyTab({
       desc: sw.desc,
       level: F[sw.id] ? 1 : 0,
       max: 1
-    }))).map((ns, i) => ({
+    }))).map(ns => ({
       name: '',
-      hue: RV_SECT_HUES[i % 3],
+      hue: '#c9f26f',
       nodes: ns
     })),
     selected: swSel,
@@ -63116,7 +63116,7 @@ function AcademyTab({
       key: k,
       style: {
         marginRight: 12,
-        color: have >= need ? '#7ee0a3' : '#c9f26f'
+        color: have >= need ? '#c9f26f' : '#ffd166'
       }
     }, AC_TNAME(k), " L", need, " (at L", have, ")");
   })), (rx.m || []).length > 0 && React.createElement("div", {
@@ -63151,7 +63151,7 @@ function AcademyTab({
         letterSpacing: '1.5px',
         textTransform: 'uppercase',
         fontWeight: 800,
-        color: locked ? 'var(--g-777)' : '#c9f26f',
+        color: locked ? 'var(--g-777)' : 'var(--c-grn)',
         marginBottom: 6
       }
     }, "Stage ", st.n, " \xB7 ", st.name, locked ? ' — locked (' + (st.n - stage) + ' stages ahead)' : ''), ms.map(m => {
@@ -63199,8 +63199,9 @@ function AcademyTab({
           fontSize: 11.5,
           fontFamily: "'Barlow Condensed',sans-serif",
           letterSpacing: '.8px',
-          color: AC_HUES[k],
-          border: '1px solid var(--border)',
+          color: 'var(--c-grn)',
+          border: '1px solid color-mix(in srgb, var(--c-grn) 35%, transparent)',
+          background: 'color-mix(in srgb, var(--c-grn) 8%, transparent)',
           borderRadius: 5,
           padding: '1px 7px'
         }
