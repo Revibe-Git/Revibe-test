@@ -1891,7 +1891,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L144';
+window.__BUILD = 'build L145';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -40070,6 +40070,556 @@ const gxSeed = () => {
     kpis
   };
 };
+const RvTreeCSS = React.createElement("style", null, `
+  .rvt{position:relative;border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px;
+    background:radial-gradient(120% 90% at 50% 108%, #14211c 0%, #0c1413 42%, #070b0a 100%);}
+  .rvt-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:16px 20px 0;}
+  .rvt-title{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;letter-spacing:2.2px;text-transform:uppercase;color:#eef2ef;}
+  .rvt-sub{font-size:12px;color:rgba(230,240,235,.5);line-height:1.5;}
+  .rvt-node{cursor:pointer;}
+  .rvt-node:hover .rvt-ring{stroke:rgba(255,255,255,.85);}
+  .rvt-lbl{font-family:'Barlow Condensed',sans-serif;letter-spacing:1.1px;text-transform:uppercase;pointer-events:none;}
+  .rvt-xp{display:flex;align-items:center;gap:12px;padding:2px 20px 14px;flex-wrap:wrap;}
+  .rvt-xp b{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:800;color:#e9c08a;line-height:1;}
+  .rvt-xp .m{font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:1.6px;text-transform:uppercase;color:rgba(230,240,235,.45);}
+  .rvt-bar{flex:1;min-width:140px;max-width:340px;height:4px;border-radius:2px;background:rgba(255,255,255,.12);overflow:hidden;}
+  .rvt-bar>div{height:100%;background:linear-gradient(90deg,#b98a55,#e9c08a);border-radius:2px;transition:width .5s ease;}
+  .rvt-panel{border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.28);padding:15px 20px 17px;min-height:96px;}
+  .rvt-pn{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;letter-spacing:1.6px;text-transform:uppercase;color:#f2f5f2;}
+  .rvt-pl{font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:#e9c08a;}
+  .rvt-pd{font-size:13px;color:rgba(230,240,235,.72);line-height:1.6;max-width:70ch;}
+  .rvt-ph{font-size:11.5px;color:rgba(230,240,235,.42);}
+  .rvt-hint{font-size:12.5px;color:rgba(230,240,235,.4);padding:8px 0;}
+  .rvt-seg{display:inline-flex;gap:5px;}
+  .rvt-seg button{width:34px;height:30px;border-radius:6px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.05);
+    color:rgba(255,255,255,.75);font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:all .12s;}
+  .rvt-seg button:hover{border-color:rgba(255,255,255,.6);background:rgba(255,255,255,.12);}
+  .rvt-seg button.lit{background:rgba(233,192,138,.16);border-color:rgba(233,192,138,.35);color:#e9c08a;}
+  .rvt-seg button.on{background:#e9c08a;border-color:#e9c08a;color:#131311;box-shadow:0 0 14px rgba(233,192,138,.45);}
+  .rvt-fx{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:5;}
+  .rvt-fx-t{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:800;letter-spacing:4px;text-transform:uppercase;color:#fff;
+    text-shadow:0 0 22px rgba(233,192,138,.9);animation:rvtT 1.5s ease forwards;}
+  .rvt-fx-ring{position:absolute;width:70px;height:70px;border:2px solid rgba(233,192,138,.8);border-radius:50%;animation:rvtR 1.4s ease-out forwards;}
+  .rvt-fx-ring.r2{animation-delay:.15s;}
+  @keyframes rvtR{from{transform:scale(.4);opacity:1;}to{transform:scale(6);opacity:0;}}
+  @keyframes rvtT{0%{opacity:0;transform:scale(.85);}18%{opacity:1;transform:scale(1.04);}30%{transform:scale(1);}78%{opacity:1;}100%{opacity:0;}}
+  @media (prefers-reduced-motion:reduce){.rvt-fx-ring{display:none;}.rvt-fx-t{animation:rvtT 0.9s linear forwards;}}
+  /* progression rail (pay ladder / roadmap) */
+  .rvp{position:relative;overflow-x:auto;padding:22px 8px 8px;}
+  .rvp-row{display:flex;align-items:flex-start;min-width:max-content;position:relative;}
+  .rvp-step{display:flex;flex-direction:column;align-items:center;width:82px;position:relative;}
+  .rvp-line{position:absolute;top:17px;left:50%;width:100%;height:2px;background:rgba(255,255,255,.13);}
+  .rvp-line.lit{background:linear-gradient(90deg,#e9c08a,#b98a55);box-shadow:0 0 8px rgba(233,192,138,.35);}
+  .rvp-dot{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;position:relative;z-index:2;
+    font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;border:2px solid rgba(255,255,255,.22);background:#0d1312;color:rgba(255,255,255,.4);}
+  .rvp-dot.done{border-color:var(--st,#e9c08a);color:#0d1312;background:var(--st,#e9c08a);}
+  .rvp-dot.cur{border-color:#fff;color:#fff;background:#0d1312;box-shadow:0 0 0 5px rgba(255,255,255,.09),0 0 22px rgba(233,192,138,.55);animation:rvpPulse 2.2s ease-in-out infinite;}
+  .rvp-dot.earn{border-style:dashed;border-color:#e9c08a;color:#e9c08a;}
+  @keyframes rvpPulse{0%,100%{box-shadow:0 0 0 5px rgba(255,255,255,.09),0 0 16px rgba(233,192,138,.4);}50%{box-shadow:0 0 0 5px rgba(255,255,255,.14),0 0 30px rgba(233,192,138,.75);}}
+  @media (prefers-reduced-motion:reduce){.rvp-dot.cur{animation:none;}}
+  .rvp-l1{margin-top:8px;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:800;letter-spacing:.5px;color:rgba(255,255,255,.85);text-align:center;}
+  .rvp-l2{font-size:10px;color:rgba(255,255,255,.42);text-align:center;line-height:1.35;max-width:78px;letter-spacing:.3px;}
+  `);
+const RV_SHORT = (label, maxLen) => {
+  const w = String(label || '').split(/\s+/);
+  let out = '';
+  for (const x of w) {
+    if ((out + ' ' + x).trim().length > maxLen) break;
+    out = (out + ' ' + x).trim();
+  }
+  return out || String(label || '').slice(0, maxLen);
+};
+const RV_MONO = label => {
+  const w = String(label || '').split(/[\s&,\/-]+/).filter(Boolean);
+  return ((w[0] || '?').slice(0, 1) + ((w[1] || '').slice(0, 1) || (w[0] || '').slice(1, 2))).toUpperCase();
+};
+function RvSkillTree({
+  groups,
+  selected,
+  onSelect,
+  height = 520
+}) {
+  const W = 1000,
+    H = height,
+    cx = W / 2,
+    cy = H - 26,
+    Rx = 442,
+    Ry = H - 158;
+  const span = Math.PI * 0.86,
+    a0 = -span / 2,
+    total = groups.length;
+  const placed = [],
+    links = [],
+    glabels = [];
+  groups.forEach((g, gi) => {
+    const ga = a0 + span * ((gi + 0.5) / total);
+    const n = g.nodes.length;
+    let prev = {
+      x: cx,
+      y: cy,
+      lv: 1
+    };
+    g.nodes.forEach((nd, ni) => {
+      const f = n === 1 ? 1 : 0.34 + 0.66 * ni / (n - 1);
+      const ang = ga + (ni % 2 ? 1 : -1) * 0.085 * (ni ? 1 : 0.4);
+      const x = cx + Math.sin(ang) * Rx * f,
+        y = cy - Math.cos(ang) * Ry * f;
+      placed.push({
+        ...nd,
+        x,
+        y,
+        hue: g.hue
+      });
+      links.push({
+        x1: prev.x,
+        y1: prev.y,
+        x2: x,
+        y2: y,
+        lit: prev.lv > 0 && nd.level > 0,
+        hue: g.hue
+      });
+      prev = {
+        x,
+        y,
+        lv: nd.level
+      };
+    });
+    glabels.push({
+      x: cx + Math.sin(ga) * Rx * 1.0,
+      y: Math.max(26, cy - Math.cos(ga) * Ry * 1.0 - 38),
+      t: g.name,
+      hue: g.hue
+    });
+  });
+  const stars = Array.from({
+    length: 44
+  }, (_, i) => ({
+    x: i * 197 % 991 / 991 * W,
+    y: i * 283 % 877 / 877 * (H * 0.8),
+    o: 0.06 + i * 53 % 89 / 89 * 0.16,
+    r: i % 7 === 0 ? 1.6 : 1
+  }));
+  return React.createElement("svg", {
+    viewBox: '0 0 ' + W + ' ' + H,
+    style: {
+      width: '100%',
+      display: 'block'
+    },
+    role: "img",
+    "aria-label": "Skill tree"
+  }, React.createElement("defs", null, React.createElement("filter", {
+    id: "rvglow",
+    x: "-80%",
+    y: "-80%",
+    width: "260%",
+    height: "260%"
+  }, React.createElement("feGaussianBlur", {
+    stdDeviation: "7",
+    result: "b"
+  }), React.createElement("feMerge", null, React.createElement("feMergeNode", {
+    in: "b"
+  }), React.createElement("feMergeNode", {
+    in: "SourceGraphic"
+  })))), stars.map((st, i) => React.createElement("circle", {
+    key: 's' + i,
+    cx: st.x,
+    cy: st.y,
+    r: st.r,
+    fill: "#fff",
+    opacity: st.o
+  })), [0.34, 0.67, 1].map(f => React.createElement("ellipse", {
+    key: f,
+    cx: cx,
+    cy: cy,
+    rx: Rx * f,
+    ry: Ry * f,
+    fill: "none",
+    stroke: "rgba(255,255,255,.055)",
+    strokeWidth: "1"
+  })), links.map((l, i) => React.createElement("line", {
+    key: 'l' + i,
+    x1: l.x1,
+    y1: l.y1,
+    x2: l.x2,
+    y2: l.y2,
+    stroke: l.lit ? 'rgba(255,255,255,.75)' : 'rgba(255,255,255,.14)',
+    strokeWidth: l.lit ? 2.2 : 1.4,
+    style: l.lit ? {
+      filter: 'drop-shadow(0 0 4px rgba(255,255,255,.5))'
+    } : null
+  })), React.createElement("circle", {
+    cx: cx,
+    cy: cy,
+    r: "15",
+    fill: "#0c1211",
+    stroke: "rgba(255,255,255,.5)",
+    strokeWidth: "1.6"
+  }), React.createElement("circle", {
+    cx: cx,
+    cy: cy,
+    r: "5",
+    fill: "rgba(255,255,255,.75)"
+  }), glabels.map((g, i) => React.createElement("text", {
+    key: 'g' + i,
+    x: g.x,
+    y: g.y,
+    textAnchor: "middle",
+    className: "rvt-lbl",
+    fontSize: "14",
+    fill: g.hue,
+    opacity: "0.9",
+    style: {
+      letterSpacing: '3px'
+    }
+  }, g.t)), placed.map(nd => {
+    const sel = selected === nd.k,
+      mastered = nd.level >= nd.max,
+      on = nd.level > 0;
+    const circ = 2 * Math.PI * 27;
+    return React.createElement("g", {
+      key: nd.k,
+      className: "rvt-node",
+      onClick: () => onSelect && onSelect(nd.k)
+    }, sel && React.createElement("circle", {
+      cx: nd.x,
+      cy: nd.y,
+      r: "34",
+      fill: "none",
+      stroke: "#fff",
+      strokeWidth: "1.6",
+      opacity: "0.9"
+    }), mastered && React.createElement("circle", {
+      cx: nd.x,
+      cy: nd.y,
+      r: "23",
+      fill: "none",
+      stroke: nd.hue,
+      strokeWidth: "2.5",
+      filter: "url(#rvglow)"
+    }), React.createElement("circle", {
+      cx: nd.x,
+      cy: nd.y,
+      r: "23",
+      fill: on ? '#101a17' : '#0b100f',
+      stroke: on ? 'rgba(255,255,255,.7)' : 'rgba(255,255,255,.18)',
+      strokeWidth: "1.6",
+      className: "rvt-ring"
+    }), on && React.createElement("circle", {
+      cx: nd.x,
+      cy: nd.y,
+      r: "27",
+      fill: "none",
+      stroke: nd.hue,
+      strokeWidth: "3",
+      strokeLinecap: "round",
+      strokeDasharray: circ * nd.level / nd.max + ' 999',
+      transform: 'rotate(-90 ' + nd.x + ' ' + nd.y + ')',
+      opacity: "0.95"
+    }), React.createElement("text", {
+      x: nd.x,
+      y: nd.y + 5.5,
+      textAnchor: "middle",
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontWeight: "800",
+      fontSize: "15",
+      fill: on ? '#f2f5f2' : 'rgba(255,255,255,.35)',
+      style: {
+        letterSpacing: '1px'
+      },
+      pointerEvents: "none"
+    }, RV_MONO(nd.label)), React.createElement("text", {
+      x: nd.x,
+      y: nd.y + 46,
+      textAnchor: "middle",
+      className: "rvt-lbl",
+      fontSize: "11",
+      fill: sel ? '#fff' : on ? 'rgba(255,255,255,.62)' : 'rgba(255,255,255,.3)'
+    }, nd.short || RV_SHORT(nd.label.split(/[,(]/)[0], 19)), React.createElement("circle", {
+      cx: nd.x,
+      cy: nd.y,
+      r: "33",
+      fill: "transparent"
+    }));
+  }));
+}
+function RvSkillCard({
+  title,
+  sub,
+  groups,
+  scale,
+  onScore,
+  canScore = true,
+  fxLabel = 'Competency increased',
+  pointsNoun = 'competency points'
+}) {
+  const all = groups.reduce((a, g) => a.concat(g.nodes), []);
+  const [sel, setSel] = useState(all.find(n => n.level > 0 && n.level < n.max) ? all.find(n => n.level > 0 && n.level < n.max).k : all[0] && all[0].k);
+  const node = all.find(n => n.k === sel) || null;
+  const earned = all.reduce((a, n) => a + (n.level || 0), 0),
+    maxPts = all.reduce((a, n) => a + n.max, 0);
+  const [fx, setFx] = useState(null);
+  const prevRef = React.useRef(null);
+  useEffect(() => {
+    const cur = {};
+    all.forEach(n => {
+      cur[n.k] = n.level || 0;
+    });
+    const prev = prevRef.current;
+    prevRef.current = cur;
+    if (!prev) return;
+    const up = all.find(n => (cur[n.k] || 0) > (prev[n.k] || 0));
+    if (up) {
+      setFx(up.label);
+      const t = setTimeout(() => setFx(null), 1600);
+      return () => clearTimeout(t);
+    }
+  });
+  return React.createElement("div", {
+    className: "rvt"
+  }, RvTreeCSS, React.createElement("div", {
+    className: "rvt-head"
+  }, React.createElement("span", {
+    className: "rvt-title"
+  }, title), React.createElement("span", {
+    className: "rvt-sub"
+  }, sub)), React.createElement(RvSkillTree, {
+    groups: groups,
+    selected: sel,
+    onSelect: setSel
+  }), React.createElement("div", {
+    className: "rvt-xp"
+  }, React.createElement("b", null, earned), React.createElement("span", {
+    className: "m"
+  }, "/ ", maxPts, " ", pointsNoun), React.createElement("div", {
+    className: "rvt-bar"
+  }, React.createElement("div", {
+    style: {
+      width: (maxPts ? Math.round(earned / maxPts * 100) : 0) + '%'
+    }
+  }))), React.createElement("div", {
+    className: "rvt-panel"
+  }, !node && React.createElement("div", {
+    className: "rvt-hint"
+  }, "Select a skill above to see what it means", canScore ? ' and score it' : '', "."), node && React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 22,
+      flexWrap: 'wrap',
+      alignItems: 'flex-start'
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 260
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: 12,
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("span", {
+    className: "rvt-pn"
+  }, node.label), React.createElement("span", {
+    className: "rvt-pl"
+  }, node.level ? 'Level ' + node.level + ' / ' + node.max : 'Not scored yet'), node.prev != null && React.createElement("span", {
+    className: "rvt-ph"
+  }, node.prev, " \u2192 ", node.level), node.date && React.createElement("span", {
+    className: "rvt-ph"
+  }, node.date)), React.createElement("div", {
+    className: "rvt-pd",
+    style: {
+      marginTop: 5
+    }
+  }, node.desc), scale && React.createElement("div", {
+    className: "rvt-ph",
+    style: {
+      marginTop: 6
+    }
+  }, node.level ? 'Current: ' + (scale[node.level - 1] || '') : 'Level 1 = ' + (scale[0] || ''), node.level && node.level < node.max ? React.createElement("span", null, " \xB7 Next: ", scale[node.level] || '') : null), (node.history || []).length > 1 && React.createElement("div", {
+    className: "rvt-ph",
+    style: {
+      marginTop: 6
+    }
+  }, (node.history || []).slice(0, 4).map((h, i) => React.createElement("span", {
+    key: i,
+    style: {
+      marginRight: 12
+    }
+  }, h.date, " \u2192 ", h.v, h.why ? ' · ' + String(h.why).slice(0, 40) : '')))), canScore && onScore && React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 6,
+      alignItems: 'flex-end'
+    }
+  }, React.createElement("span", {
+    className: "rvt-ph",
+    style: {
+      letterSpacing: '1.4px',
+      textTransform: 'uppercase'
+    }
+  }, "Score \u2014 evidence asked for, history kept"), React.createElement("span", {
+    className: "rvt-seg"
+  }, [1, 2, 3, 4, 5].map(n => React.createElement("button", {
+    key: n,
+    className: node.level === n ? 'on' : node.level && n < node.level ? 'lit' : '',
+    title: scale ? scale[n - 1] : '',
+    onClick: () => onScore(node.k, node.label, n)
+  }, n)))))), fx && React.createElement("div", {
+    className: "rvt-fx"
+  }, React.createElement("div", {
+    className: "rvt-fx-ring"
+  }), React.createElement("div", {
+    className: "rvt-fx-ring r2"
+  }), React.createElement("div", {
+    className: "rvt-fx-t"
+  }, fxLabel)));
+}
+function RvRadar({
+  axes,
+  size = 250,
+  hue = 'var(--c-grn)',
+  center
+}) {
+  const n = (axes || []).length;
+  if (!n) return null;
+  const cx = size / 2,
+    cy = size / 2,
+    R = size / 2 - 58;
+  const pt = (i, f) => {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / n;
+    return [cx + Math.cos(a) * R * f, cy + Math.sin(a) * R * f];
+  };
+  const poly = axes.map((ax, i) => pt(i, Math.max(0.04, Math.min(1, (ax.value || 0) / (ax.max || 10))))).map(p => p.join(',')).join(' ');
+  return React.createElement("svg", {
+    viewBox: '0 0 ' + size + ' ' + size,
+    style: {
+      width: size,
+      maxWidth: '100%',
+      display: 'block'
+    },
+    role: "img",
+    "aria-label": "Category scores"
+  }, [0.25, 0.5, 0.75, 1].map(f => React.createElement("polygon", {
+    key: f,
+    points: axes.map((_, i) => pt(i, f).join(',')).join(' '),
+    fill: "none",
+    stroke: "var(--border)",
+    strokeWidth: "1",
+    opacity: f === 1 ? 0.9 : 0.5
+  })), axes.map((_, i) => {
+    const [px, py] = pt(i, 1);
+    return React.createElement("line", {
+      key: 'x' + i,
+      x1: cx,
+      y1: cy,
+      x2: px,
+      y2: py,
+      stroke: "var(--border)",
+      strokeWidth: "1",
+      opacity: "0.4"
+    });
+  }), React.createElement("polygon", {
+    points: poly,
+    fill: hue,
+    fillOpacity: "0.14",
+    stroke: hue,
+    strokeWidth: "2",
+    strokeLinejoin: "round"
+  }), axes.map((ax, i) => {
+    const f = Math.max(0.04, Math.min(1, (ax.value || 0) / (ax.max || 10)));
+    const [px, py] = pt(i, f);
+    return React.createElement("circle", {
+      key: 'd' + i,
+      cx: px,
+      cy: py,
+      r: "3.4",
+      fill: hue,
+      stroke: "var(--surface2)",
+      strokeWidth: "2"
+    });
+  }), axes.map((ax, i) => {
+    const [px, py] = pt(i, 1.3);
+    return React.createElement("text", {
+      key: 't' + i,
+      x: px,
+      y: py,
+      textAnchor: "middle",
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: "10.5",
+      fill: "var(--g-999)",
+      style: {
+        letterSpacing: '.8px',
+        textTransform: 'uppercase'
+      }
+    }, RV_SHORT(String(ax.label), 13), React.createElement("tspan", {
+      x: px,
+      dy: "11",
+      fontSize: "11.5",
+      fontWeight: "800",
+      fill: "var(--g-ddd)"
+    }, ax.value != null ? ax.value : '—'));
+  }), center && React.createElement(React.Fragment, null, React.createElement("text", {
+    x: cx,
+    y: cy + 2,
+    textAnchor: "middle",
+    fontFamily: "'Barlow Condensed',sans-serif",
+    fontWeight: "800",
+    fontSize: "30",
+    fill: "var(--g-eee)"
+  }, center.big), React.createElement("text", {
+    x: cx,
+    y: cy + 17,
+    textAnchor: "middle",
+    fontFamily: "'Barlow Condensed',sans-serif",
+    fontSize: "9.5",
+    fill: "var(--g-777)",
+    style: {
+      letterSpacing: '1.6px',
+      textTransform: 'uppercase'
+    }
+  }, center.sub)));
+}
+function RvPathRail({
+  steps,
+  current,
+  earnedIdx,
+  dark = true
+}) {
+  return React.createElement("div", {
+    className: "rvp",
+    style: dark ? null : {
+      background: 'transparent'
+    }
+  }, RvTreeCSS, React.createElement("div", {
+    className: "rvp-row"
+  }, steps.map((st, i) => {
+    const done = current != null && i < current,
+      cur = i === current,
+      earn = earnedIdx != null && i <= earnedIdx && current != null && i > current;
+    return React.createElement("div", {
+      key: i,
+      className: "rvp-step",
+      title: st.title || st.sub || st.label
+    }, i < steps.length - 1 && React.createElement("div", {
+      className: 'rvp-line' + (current != null && i < current ? ' lit' : '')
+    }), React.createElement("div", {
+      className: 'rvp-dot' + (done ? ' done' : cur ? ' cur' : earn ? ' earn' : ''),
+      style: st.hue ? {
+        '--st': st.hue
+      } : null
+    }, done ? '✓' : st.label), React.createElement("div", {
+      className: "rvp-l1",
+      style: cur ? {
+        color: '#fff'
+      } : null
+    }, st.l1 || ''), st.l2 && React.createElement("div", {
+      className: "rvp-l2"
+    }, st.l2));
+  })));
+}
 function MyGrowthPage({
   staff,
   setPage,
@@ -40451,47 +41001,30 @@ function MyGrowthPage({
   }, E.graded.graded, " of ", E.graded.total), " competency questions have been graded so far. Anything ungraded can\u2019t count toward a step, so a gate showing \u201Cnot graded yet\u201D isn\u2019t a mark against you \u2014 it just hasn\u2019t been assessed. Worth raising at your next check-in."))), React.createElement(Card, {
     accent: "var(--border)"
   }, React.createElement(Lbl, null, "The whole path"), React.createElement("div", {
+    className: "rvt",
     style: {
-      display: 'flex',
-      gap: 6,
-      flexWrap: 'wrap'
+      marginBottom: 8
     }
-  }, GX_ROLES.map((r, i) => {
-    const here = role === r[0];
-    const past = lvl != null && GX_ROLES.findIndex(x => x[0] === role) > i;
-    return React.createElement("div", {
-      key: r[0],
-      style: {
-        flex: '1 1 130px',
-        minWidth: 130,
-        padding: '10px 12px',
-        borderRadius: 8,
-        background: here ? 'var(--surface3)' : 'transparent',
-        border: '1px solid ' + (here ? GX_STAGE_HUE[r[3].toUpperCase()] || 'var(--border)' : 'var(--border)'),
-        opacity: past ? .55 : 1
-      }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 12,
-        fontWeight: 800,
-        color: here ? 'var(--c-grn)' : 'var(--g-999)',
-        letterSpacing: '.6px'
-      }
-    }, r[0], here ? ' · you' : ''), React.createElement("div", {
-      style: {
-        fontSize: 12.5,
-        color: 'var(--g-bbb)',
-        marginTop: 3,
-        lineHeight: 1.4
-      }
-    }, r[1]), React.createElement("div", {
-      style: {
-        fontSize: 12,
-        color: 'var(--g-777)',
-        marginTop: 3
-      }
-    }, r[2]));
-  })), React.createElement("div", {
+  }, React.createElement(RvPathRail, {
+    steps: GX_PAY.map((pRow, i) => ({
+      label: pRow[0].replace('$', ''),
+      l1: GX_ROLEBYPAY[i],
+      l2: pRow[1],
+      hue: GX_STAGE_HUE[GX_STAGE_OF[i]],
+      title: pRow[0] + ' · ' + pRow[1] + ' — ' + pRow[2]
+    })),
+    current: lvl != null ? lvl : null,
+    earnedIdx: lvl != null ? E.earnedIdx : null
+  }), lvl != null && E.earnedIdx > lvl && React.createElement("div", {
+    style: {
+      padding: '0 16px 12px',
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 12.5,
+      letterSpacing: '1.2px',
+      textTransform: 'uppercase',
+      color: '#e9c08a'
+    }
+  }, "\u25C8 Grades already support ", GX_PAY[E.earnedIdx][0], " \u2014 the move happens at a review")), React.createElement("div", {
     style: {
       fontSize: 12.5,
       color: 'var(--g-777)',
@@ -46058,6 +46591,79 @@ function ProfileModal({
       textAlign: 'center'
     }
   }, "Pending", React.createElement("br", null), "Evaluation"))), (() => {
+    if (!rs || !trackScore) return null;
+    const axes = (rs.cats || []).map(c => ({
+      label: c.label || c.id,
+      value: trackScore[c.id] != null ? trackScore[c.id] : null,
+      max: 10
+    })).filter(a => a.value != null);
+    if (axes.length < 3) return null;
+    const rev = PERF_STAT(perfData, staff.id, 'revenue'),
+      vis = PERF_STAT(perfData, staff.id, 'completed');
+    const evCount = (evals || []).filter(e => e && e.staffId === staff.id).length;
+    const arrow = d => d === 'up' ? '▲' : d === 'down' ? '▼' : '—';
+    const dirCol = d => d === 'up' ? 'var(--c-grn)' : d === 'down' ? 'var(--c-red)' : 'var(--g-777)';
+    const chip = (lbl, val, sub, col) => React.createElement("div", {
+      style: {
+        background: 'var(--surface3)',
+        border: '1px solid var(--border)',
+        borderRadius: 10,
+        padding: '10px 14px',
+        minWidth: 108
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 10.5,
+        letterSpacing: '1.3px',
+        textTransform: 'uppercase',
+        color: 'var(--g-777)',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontWeight: 700
+      }
+    }, lbl), React.createElement("div", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 24,
+        fontWeight: 800,
+        color: col || 'var(--g-eee)',
+        lineHeight: 1.15
+      }
+    }, val), sub && React.createElement("div", {
+      style: {
+        fontSize: 10.5,
+        color: 'var(--g-777)'
+      }
+    }, sub));
+    return React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 20,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        background: 'var(--surface2)',
+        border: '1px solid var(--border)',
+        borderRadius: 12,
+        padding: '10px 16px',
+        margin: '12px 0 2px'
+      }
+    }, React.createElement(RvRadar, {
+      axes: axes,
+      size: 286,
+      hue: TRACK_META[activeTrack]?.color || 'var(--c-grn)',
+      center: {
+        big: trackTotal != null ? trackTotal : '—',
+        sub: 'weighted'
+      }
+    }), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 10,
+        flexWrap: 'wrap',
+        flex: 1,
+        minWidth: 220
+      }
+    }, chip('Revenue · 3mo avg', rev.avg3 != null ? '$' + Math.round(rev.avg3).toLocaleString() : '—', rev.dir ? arrow(rev.dir) + ' vs prior 3' : null, dirCol(rev.dir)), chip('Visits · 3mo avg', vis.avg3 != null ? Math.round(vis.avg3) : '—', vis.dir ? arrow(vis.dir) + ' vs prior 3' : null, dirCol(vis.dir)), chip('Evaluations', evCount, evCount ? 'on record' : 'none yet'), lv && chip('Level', lv.label.replace('Level ', 'L').split(' ')[0], lv.label.split('– ')[1] || '')));
+  })(), (() => {
     const avail = getTabs();
     const LBL = {
       profile: 'Profile',
@@ -59240,65 +59846,46 @@ function LeadDevTab({
         color: 'var(--g-666)',
         marginTop: 7
       }
-    }, "Stage moves on evidence, not time.")), LDCSS, React.createElement("div", {
-      className: "ldsec",
-      style: {
-        '--h': '#b89bd8',
-        marginTop: 12
-      }
-    }, React.createElement("h4", null, "OAKVILLE READINESS \xB7 13 DIMENSIONS"), React.createElement("div", {
-      className: "sub"
-    }, "Click a level to score it. Evidence required; history kept."), LD_READY.map(([k, label, desc], i) => {
-      const h = (pl.comp || {})[k] || [];
-      const cur = h[0],
-        prev = h[1];
-      const dir = cur && prev ? cur.v > prev.v ? '↑' : cur.v < prev.v ? '↓' : '→' : null;
-      return React.createElement("div", {
-        key: k,
-        className: "ldcr",
-        style: {
-          flexWrap: 'wrap'
-        },
-        title: h.length ? h.map(x => x.date + ' → ' + x.v + (x.why ? ' · ' + x.why : '')).join('\n') : 'not scored'
-      }, React.createElement("div", {
-        style: {
-          flex: 1,
-          minWidth: 220
-        }
-      }, React.createElement("div", {
-        style: {
-          fontSize: 14.5,
-          fontWeight: 700,
-          color: 'var(--text)'
-        }
-      }, label), React.createElement("div", {
-        style: {
-          fontSize: 12,
-          color: 'var(--g-888)'
-        }
-      }, desc)), React.createElement("span", {
-        style: {
-          fontSize: 12,
-          color: 'var(--g-666)',
-          minWidth: 96
-        }
-      }, cur ? cur.date : 'not scored'), prev && React.createElement("span", {
-        style: {
-          fontSize: 12,
-          color: 'var(--g-666)'
-        }
-      }, prev.v, " ", dir), React.createElement("span", {
-        className: "ldseg",
-        style: {
-          '--h': '#b89bd8'
-        }
-      }, [1, 2, 3, 4, 5].map(n => React.createElement("button", {
-        key: n,
-        className: cur && cur.v === n ? 'on' : cur && n < cur.v ? 'lit' : '',
-        title: LD_SCALE[n - 1],
-        onClick: () => scoreDim(k, label, n)
-      }, n))));
-    })), React.createElement("div", {
+    }, "Stage moves on evidence, not time.")), LDCSS, (() => {
+      const mk = idx => idx.map(i => {
+        const [k, label, desc] = LD_READY[i];
+        const h = (pl.comp || {})[k] || [];
+        const cur = h[0],
+          prev = h[1];
+        return {
+          k,
+          label,
+          desc,
+          level: cur ? cur.v : 0,
+          max: 5,
+          prev: prev ? prev.v : null,
+          date: cur ? cur.date : null,
+          history: h
+        };
+      });
+      const groups = [{
+        name: 'THE CRAFT',
+        hue: '#8fd0a8',
+        nodes: mk([0, 1, 2, 3])
+      }, {
+        name: 'THE LEADER',
+        hue: '#e9c08a',
+        nodes: mk([4, 5, 6, 7])
+      }, {
+        name: 'THE DIRECTOR',
+        hue: '#c9aef0',
+        nodes: mk([8, 9, 10, 11, 12])
+      }];
+      return React.createElement(RvSkillCard, {
+        title: "Oakville readiness \u2014 13 dimensions",
+        sub: "Stage moves on evidence, not time. Score from the node \u2014 evidence required, history kept.",
+        groups: groups,
+        scale: LD_SCALE,
+        onScore: scoreDim,
+        fxLabel: "Readiness increased",
+        pointsNoun: "readiness points"
+      });
+    })(), React.createElement("div", {
       style: {
         ...C,
         marginTop: 12
@@ -59670,55 +60257,46 @@ function LeadDevTab({
         lineHeight: 1.6,
         marginTop: 1
       }
-    }, d))))), React.createElement("div", {
-      className: "ldsec",
-      style: {
-        '--h': hue
-      }
-    }, React.createElement("h4", null, "LEADERSHIP COMPETENCIES"), React.createElement("div", {
-      className: "sub"
-    }, "Helping is \"come to me\". Developing is \"here is your gap, here is the plan, here is when we review it.\" ", React.createElement("span", {
-      style: {
-        color: 'var(--g-777)'
-      }
-    }, "Leadership behaviours only \u2014 clinical competencies are graded in G&D, never here.")), LD_LEADCOMP.map(([k, label, desc]) => {
-      const hh = (lp.comp || {})[k] || [];
-      const cur = hh[0],
-        prev = hh[1];
-      return React.createElement("div", {
-        key: k,
-        className: "ldcr",
-        title: hh.length ? hh.map(x => x.date + ' → ' + x.v + (x.why ? ' · ' + x.why : '')).join('\n') : 'not scored'
-      }, React.createElement("div", {
-        style: {
-          flex: 1,
-          minWidth: 190
-        }
-      }, React.createElement("div", {
-        style: {
-          fontSize: 14,
-          fontWeight: 700,
-          color: 'var(--g-ddd)'
-        }
-      }, label), React.createElement("div", {
-        style: {
-          fontSize: 12,
-          color: 'var(--g-777)'
-        }
-      }, desc)), prev && React.createElement("span", {
-        style: {
-          fontSize: 12,
-          color: 'var(--g-666)'
-        }
-      }, prev.v, " \u2192"), React.createElement("span", {
-        className: "ldseg"
-      }, [1, 2, 3, 4, 5].map(n => React.createElement("button", {
-        key: n,
-        className: cur && cur.v === n ? 'on' : cur && n < cur.v ? 'lit' : '',
-        title: LD_SCALE[n - 1],
-        onClick: () => scoreLC(k, label, n)
-      }, n))));
-    })), React.createElement("div", {
+    }, d))))), (() => {
+      const mk = idx => idx.map(i => {
+        const [k, label, desc] = LD_LEADCOMP[i];
+        const hh = (lp.comp || {})[k] || [];
+        const cur = hh[0],
+          prev = hh[1];
+        return {
+          k,
+          label,
+          desc,
+          level: cur ? cur.v : 0,
+          max: 5,
+          prev: prev ? prev.v : null,
+          date: cur ? cur.date : null,
+          history: hh
+        };
+      });
+      const groups = [{
+        name: 'COACH',
+        hue: hue,
+        nodes: mk([0, 4, 5])
+      }, {
+        name: 'MANAGE',
+        hue: hue,
+        nodes: mk([1, 2, 3])
+      }, {
+        name: 'BUILD',
+        hue: hue,
+        nodes: mk([6, 7, 8, 9])
+      }];
+      return React.createElement(RvSkillCard, {
+        title: 'Leadership skill tree — ' + lead.name.split(' ')[0],
+        sub: 'Helping is "come to me". Developing is "here is your gap, here is the plan, here is when we review it." Leadership behaviours only — clinical competencies are graded in G&D, never here.',
+        groups: groups,
+        scale: LD_SCALE,
+        onScore: scoreLC,
+        fxLabel: "Leadership skill increased",
+        pointsNoun: "leadership points"
+      });
+    })(), React.createElement("div", {
       className: "ldsec",
       style: {
         '--h': hue
