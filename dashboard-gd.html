@@ -1892,7 +1892,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L146';
+window.__BUILD = 'build L147';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -41090,6 +41090,271 @@ function RvProfileTrees({
   }, "This view mirrors what G&D records about ", first, " \u2014 rubric scores from Evaluations, Guest Experience grades, leadership scores. Once any of those exist, each one becomes a constellation here. Nothing is ever graded on this tab."));
   return React.createElement("div", null, blocks);
 }
+const RV_LV_HUE = ['#9fc7e8', '#e9d27a', '#8fd0a8', '#cae8c1'];
+function MyGrowthClinician({
+  person,
+  perfData
+}) {
+  const tracks = person.tracks || [];
+  const [trk, setTrk] = useState(tracks[0]);
+  const t = tracks.includes(trk) ? trk : tracks[0];
+  const rs = RUBRIC_SYSTEMS[t];
+  const sc = (person.scores || {})[t] || {};
+  const total = sc.total != null ? sc.total : null;
+  const lv = getLevel(total);
+  const lvIdx = lv ? LEVELS.indexOf(lv) : null;
+  const nxtLv = lvIdx != null && lvIdx < LEVELS.length - 1 ? LEVELS[lvIdx + 1] : null;
+  const evs = (() => {
+    try {
+      return (ld('evals', []) || []).filter(e => e && e.staffId === person.id);
+    } catch (e) {
+      return [];
+    }
+  })();
+  const Card = ({
+    children,
+    accent,
+    style
+  }) => React.createElement("div", {
+    style: {
+      background: 'var(--surface2)',
+      border: '1px solid var(--border)',
+      borderLeft: '3px solid ' + (accent || 'var(--border)'),
+      borderRadius: 10,
+      padding: '18px 20px',
+      marginBottom: 14,
+      ...(style || {})
+    }
+  }, children);
+  const Lbl = ({
+    children
+  }) => React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 16,
+      letterSpacing: '1.4px',
+      textTransform: 'uppercase',
+      fontWeight: 800,
+      color: 'var(--g-ddd)',
+      marginBottom: 10
+    }
+  }, children);
+  const nextBandOf = v => v <= 4 ? ['5–6', rs.col56Label || 'Transactional'] : v <= 6 ? ['7', rs.col7Label || 'Competent'] : v < 7.5 ? ['8–10', rs.col810Label || 'Predictive'] : v < 10 ? ['8–10', rs.col810Label || 'Predictive'] : null;
+  const bandText = (cd, v) => !cd ? null : v <= 4 ? cd.col56 : v <= 6 ? cd.col7 : cd.col810;
+  const levers = (rs.cats || []).map(c => {
+    const v = sc[c.id] != null ? sc[c.id] : null;
+    const cd = (rs.catDefs || []).find(x => x.id === c.id);
+    return {
+      id: c.id,
+      label: c.label,
+      w: c.weight || 0,
+      v,
+      cd,
+      pull: v == null ? (c.weight || 0) * 3 : (c.weight || 0) * Math.max(0, 10 - v)
+    };
+  }).filter(x => x.v == null || x.v < 10).sort((a, b) => b.pull - a.pull).slice(0, 4);
+  return React.createElement(React.Fragment, null, React.createElement(RvProfileHero, {
+    staff: person,
+    activeTrack: t,
+    setActiveTrack: setTrk,
+    tracks: tracks,
+    rs: rs,
+    trackScore: sc,
+    trackTotal: total,
+    lv: lv,
+    perfData: perfData,
+    evals: evs
+  }), total == null ? React.createElement(Card, {
+    accent: "var(--c-amb)"
+  }, React.createElement(Lbl, null, "Pending evaluation"), React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: 'var(--g-bbb)',
+      lineHeight: 1.7
+    }
+  }, "You don\u2019t have ", rs ? rs.label : 'rubric', " scores recorded yet, so there is no level to map. That is normal before your first evaluation \u2014 it isn\u2019t a judgement about your work.", React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, "Your lead grades the rubric at an evaluation; once that happens, this page shows your level, the next one, and exactly which categories move you there."))) : React.createElement(React.Fragment, null, React.createElement(Card, {
+    accent: RV_LV_HUE[lvIdx != null ? lvIdx : 0]
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 26,
+      flexWrap: 'wrap',
+      alignItems: 'flex-start'
+    }
+  }, React.createElement("div", {
+    style: {
+      minWidth: 150
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 12,
+      letterSpacing: '1.2px',
+      textTransform: 'uppercase',
+      color: 'var(--g-777)',
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, "You are here"), React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 42,
+      fontWeight: 800,
+      lineHeight: 1,
+      color: lv ? lv.color : 'var(--text)'
+    }
+  }, lv ? lv.short : '—'), React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      color: 'var(--g-ccc)',
+      marginTop: 4,
+      fontWeight: 600
+    }
+  }, lv ? lv.label.split('– ')[1] || lv.label : ''), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: 'var(--g-777)',
+      marginTop: 3
+    }
+  }, rs.label, " track \xB7 weighted ", total, "/10")), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 230
+    }
+  }, nxtLv ? React.createElement(React.Fragment, null, React.createElement("div", {
+    style: {
+      fontSize: 12,
+      letterSpacing: '1.2px',
+      textTransform: 'uppercase',
+      color: 'var(--g-777)',
+      fontWeight: 700,
+      marginBottom: 4
+    }
+  }, "Next level"), React.createElement("div", {
+    style: {
+      fontSize: 20,
+      fontWeight: 800,
+      color: 'var(--c-grn)',
+      fontFamily: "'Barlow Condensed',sans-serif"
+    }
+  }, nxtLv.short, " \xB7 ", nxtLv.label.split('– ')[1] || ''), React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: 'var(--g-999)',
+      marginTop: 4,
+      lineHeight: 1.6
+    }
+  }, "Reached at a weighted score of ", React.createElement("b", {
+    style: {
+      color: 'var(--g-ddd)'
+    }
+  }, nxtLv.min), " \u2014 you are ", React.createElement("b", {
+    style: {
+      color: 'var(--g-ddd)'
+    }
+  }, Math.round((nxtLv.min - total) * 100) / 100), " away. The score is set at evaluations; the categories below move it most.")) : React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      color: 'var(--g-bbb)',
+      lineHeight: 1.65
+    }
+  }, "You are at the top of the level ladder \u2014 the standard now is holding it, and helping others get here.")))), nxtLv && levers.length > 0 && React.createElement(Card, {
+    accent: "var(--c-yel)"
+  }, React.createElement(Lbl, null, "What moves your score most"), React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-777)',
+      marginBottom: 10
+    }
+  }, "Your level comes from the weighted total, so a heavy category with room to grow is worth more than a light one. Ranked by weight \xD7 room:"), levers.map((x, i) => React.createElement("div", {
+    key: x.id,
+    style: {
+      borderTop: i ? '1px solid var(--border)' : 'none',
+      paddingTop: i ? 14 : 0,
+      marginTop: i ? 14 : 0
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 10,
+      alignItems: 'baseline',
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 15,
+      fontWeight: 700,
+      color: 'var(--g-eee)'
+    }
+  }, x.label), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: 'var(--g-777)'
+    }
+  }, x.w, "% of the total"), React.createElement("span", {
+    style: {
+      marginLeft: 'auto',
+      fontSize: 13,
+      fontWeight: 700,
+      color: x.v == null ? 'var(--g-777)' : 'var(--c-yel)'
+    }
+  }, x.v == null ? 'not graded yet' : 'at ' + x.v + ' / 10')), x.v != null && x.cd && bandText(x.cd, x.v) && React.createElement("div", {
+    style: {
+      marginTop: 9,
+      background: 'var(--surface3)',
+      borderRadius: 8,
+      padding: '11px 13px'
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 12,
+      letterSpacing: '.8px',
+      textTransform: 'uppercase',
+      fontWeight: 800,
+      color: 'var(--c-yel)',
+      marginBottom: 7
+    }
+  }, "What the next band looks like", nextBandOf(x.v) ? ' — ' + nextBandOf(x.v)[0] : ''), React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      color: 'var(--g-bbb)',
+      lineHeight: 1.7
+    }
+  }, bandText(x.cd, x.v))))), React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: 'var(--g-777)',
+      marginTop: 12
+    }
+  }, "The full band definitions for every category are on your profile \u2192 Category Definitions."))), React.createElement(Card, {
+    accent: "var(--border)"
+  }, React.createElement(Lbl, null, "The whole path"), React.createElement("div", {
+    className: "rvt",
+    style: {
+      marginBottom: 8
+    }
+  }, React.createElement(RvPathRail, {
+    steps: LEVELS.map((L, i) => ({
+      label: L.short,
+      l1: L.label.split('– ')[1] || L.short,
+      l2: L.min + '–' + L.max,
+      hue: RV_LV_HUE[i],
+      title: L.label + ' — weighted ' + L.min + ' to ' + L.max
+    })),
+    current: lvIdx != null ? lvIdx : null,
+    earnedIdx: lvIdx != null ? lvIdx : null
+  })), React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-777)',
+      marginTop: 11,
+      lineHeight: 1.6
+    }
+  }, "Levels come straight from the weighted rubric score \u2014 there is nothing to apply for. Score moves at an evaluation, level follows.")));
+}
 function MyGrowthPage({
   staff,
   setPage,
@@ -41120,6 +41385,7 @@ function MyGrowthPage({
   const pd = (gx.people || {})[me] || {};
   const E = GX_ENGINE(pd);
   const person = (staff || []).find(x => x.name === me);
+  const isClin = !!(person && (person.tracks || []).length);
   const Card = ({
     children,
     accent,
@@ -41258,7 +41524,7 @@ function MyGrowthPage({
       marginBottom: 20,
       lineHeight: 1.6
     }
-  }, "This is your own view of the Guest Experience framework. Nothing here changes anyone\u2019s grades \u2014 it just shows you what your reviewer sees, so you never have to ask where you stand."), React.createElement(AttentionPanel, {
+  }, isClin ? 'This is your own view of your clinical development track. Nothing here changes anyone\u2019s grades \u2014 it just shows you what your reviewer sees, so you never have to ask where you stand.' : 'This is your own view of the Guest Experience framework. Nothing here changes anyone\u2019s grades \u2014 it just shows you what your reviewer sees, so you never have to ask where you stand.'), React.createElement(AttentionPanel, {
     staff: staff,
     meetings: meetings,
     perfData: perfData,
@@ -41268,7 +41534,10 @@ function MyGrowthPage({
     },
     setPage: setPage,
     title: "Your items"
-  }), (() => {
+  }), isClin && React.createElement(MyGrowthClinician, {
+    person: person,
+    perfData: perfData
+  }), !isClin && (() => {
     const vals = GX_CATS.map(([c, l]) => ({
       label: l,
       value: E.catAvg(c) != null ? RV_R1(E.catAvg(c)) : null,
@@ -41378,7 +41647,7 @@ function MyGrowthPage({
       val: E.graded.graded + ' / ' + E.graded.total,
       sub: "competency questions"
     })))));
-  })(), lvl == null ? React.createElement(Card, {
+  })(), !isClin && (lvl == null ? React.createElement(Card, {
     accent: "var(--c-amb)"
   }, React.createElement(Lbl, null, "Not placed yet"), React.createElement("div", {
     style: {
@@ -41578,7 +41847,7 @@ function MyGrowthPage({
     style: {
       color: 'var(--g-ccc)'
     }
-  }, E.graded.graded, " of ", E.graded.total), " competency questions have been graded so far. Anything ungraded can\u2019t count toward a step, so a gate showing \u201Cnot graded yet\u201D isn\u2019t a mark against you \u2014 it just hasn\u2019t been assessed. Worth raising at your next check-in."))), React.createElement(Card, {
+  }, E.graded.graded, " of ", E.graded.total), " competency questions have been graded so far. Anything ungraded can\u2019t count toward a step, so a gate showing \u201Cnot graded yet\u201D isn\u2019t a mark against you \u2014 it just hasn\u2019t been assessed. Worth raising at your next check-in.")))), !isClin && React.createElement(Card, {
     accent: "var(--border)"
   }, React.createElement(Lbl, null, "The whole path"), React.createElement("div", {
     className: "rvt",
@@ -53861,7 +54130,7 @@ function ContractsTab({
       color: 'var(--g-999)',
       lineHeight: 1.7
     }
-  }, "No amendment in progress. One is raised automatically when ", staff.name.split(' ')[0], " is moved up a pay step in Guest Experience, or when their Split % changes on the Profile tab."), React.createElement("div", {
+  }, "No amendment in progress. ", (staff.tracks || []).length ? 'One is raised automatically when ' + staff.name.split(' ')[0] + "'s Split % changes on the Profile tab; rate changes are raised here after a review." : 'One is raised automatically when ' + staff.name.split(' ')[0] + ' is moved up a pay step in Guest Experience, or when their Split % changes on the Profile tab.'), React.createElement("div", {
     className: "flex aic g6",
     style: {
       marginTop: 9
