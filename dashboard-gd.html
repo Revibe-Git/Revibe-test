@@ -1892,7 +1892,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L160';
+window.__BUILD = 'build L161';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -41143,44 +41143,56 @@ function RvProfileHero({
   let axes = null,
     center = null,
     radNote = null;
-  if (rs && (tracks || []).length) {
-    axes = (rs.cats || []).map(c => ({
-      label: c.label || c.id,
-      value: trackScore && trackScore[c.id] != null ? trackScore[c.id] : null,
-      max: 10
-    }));
+  const rubricAxes = rs && (tracks || []).length ? (rs.cats || []).map(c => ({
+    label: c.label || c.id,
+    value: trackScore && trackScore[c.id] != null ? trackScore[c.id] : null,
+    max: 10
+  })) : null;
+  const rubricGraded = !!(rubricAxes && rubricAxes.some(a => a.value != null));
+  let geAxes = null,
+    geCenter = null;
+  try {
+    const gx = ld('gx', {
+      people: {}
+    }) || {};
+    const pd = GX_PD_FOR(gx.people, staff);
+    if (pd) {
+      const E = GX_ENGINE(pd);
+      const vals = GX_CATS.map(([c, l]) => {
+        const v = E.gv2(c, null);
+        return {
+          label: l,
+          value: v != null ? RV_R1(v) : null,
+          max: 5
+        };
+      });
+      if (vals.some(a => a.value != null)) {
+        geAxes = vals;
+        const g = vals.filter(a => a.value != null);
+        geCenter = {
+          big: RV_R1(g.reduce((a, x) => a + x.value, 0) / g.length),
+          sub: 'avg grade'
+        };
+      }
+    }
+  } catch (e) {}
+  if (rubricGraded) {
+    axes = rubricAxes;
     center = {
       big: trackTotal != null ? trackTotal : '—',
       sub: 'weighted'
     };
-    if (!axes.some(a => a.value != null)) radNote = 'not evaluated yet';
-  } else {
-    try {
-      const gx = ld('gx', {
-        people: {}
-      }) || {};
-      const pd = GX_PD_FOR(gx.people, staff);
-      if (pd) {
-        const E = GX_ENGINE(pd);
-        const vals = GX_CATS.map(([c, l]) => {
-          const v = E.gv2(c, null);
-          return {
-            label: l,
-            value: v != null ? RV_R1(v) : null,
-            max: 5
-          };
-        });
-        if (vals.some(a => a.value != null)) {
-          axes = vals;
-          const g = vals.filter(a => a.value != null);
-          center = {
-            big: RV_R1(g.reduce((a, x) => a + x.value, 0) / g.length),
-            sub: 'avg grade'
-          };
-          radNote = 'Guest Experience grades';
-        }
-      }
-    } catch (e) {}
+  } else if (geAxes) {
+    axes = geAxes;
+    center = geCenter;
+    radNote = 'Guest Experience grades';
+  } else if (rubricAxes) {
+    axes = rubricAxes;
+    center = {
+      big: trackTotal != null ? trackTotal : '—',
+      sub: 'weighted'
+    };
+    radNote = 'not evaluated yet';
   }
   const arrow = d => d === 'up' ? '▲' : d === 'down' ? '▼' : '—';
   const dirCol = d => d === 'up' ? '#8fd0a8' : d === 'down' ? '#e08a8a' : 'rgba(230,240,235,.45)';
