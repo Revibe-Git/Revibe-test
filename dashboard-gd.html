@@ -254,6 +254,14 @@ tbody tr:hover td{background:var(--surface2);}
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:999;display:flex;align-items:flex-start;justify-content:center;padding:18px;backdrop-filter:blur(6px);overflow-y:auto;}
 .modal{background:var(--surface);border:1px solid var(--border2);border-radius:8px;width:100%;max-width:860px;position:relative;margin:auto;}
 .modal-wide{max-width:1140px;}
+/* L163 — the game-language working surfaces, dashboard-wide */
+.gcard{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--gh,var(--border));border-radius:10px;padding:12px 14px;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease;}
+.gcard.gclick{cursor:pointer;}
+.gcard.gclick:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.28);border-left-color:var(--gh,var(--c-grn));}
+.gcard-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;}
+.gwash{background:color-mix(in srgb, var(--surface2) 91%, #2fd6a8 9%);border-color:color-mix(in srgb, var(--border) 72%, #2fd6a8 28%);}
+.grow{display:flex;gap:12px;align-items:center;padding:9px 12px;border-radius:10px;cursor:pointer;transition:background .13s,padding-left .13s;}
+.grow:hover{background:var(--surface3);padding-left:16px;}
 .modal-stripe{height:3px;background:linear-gradient(90deg,var(--go),var(--lime));border-radius:8px 8px 0 0;}
 .modal-body{padding:22px 26px;}
 .modal-close{position:absolute;top:14px;right:14px;background:var(--surface2);border:1px solid var(--border);color:var(--text3);border-radius:4px;padding:3px 9px;cursor:pointer;font-size:15px;font-family:'Barlow',sans-serif;z-index:10;}
@@ -1892,7 +1900,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L161';
+window.__BUILD = 'build L163';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -37512,7 +37520,54 @@ function Overview({
         .ov-sc:hover{transform:translateY(-2px);box-shadow:0 10px 26px -14px rgba(0,0,0,.6);border-color:var(--border2);}
         .overview-cards .card{border-radius:11px;transition:transform .15s,box-shadow .15s;}
         .overview-cards .card:hover{box-shadow:0 10px 26px -16px rgba(0,0,0,.55);}
-      `), React.createElement(AttentionPanel, {
+      `), React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Growth & Development",
+    title: React.createElement(React.Fragment, null, "KNOW YOUR PEOPLE ", React.createElement("span", {
+      style: {
+        color: '#c9f26f'
+      }
+    }, "\xB7"), " GROW YOUR PEOPLE"),
+    sub: "One place for how every person at Revibe is developing \u2014 their competencies, their numbers, their next step \u2014 so growth is deliberate, not accidental.",
+    tiles: [{
+      lbl: 'Team avg score',
+      val: avg || '—',
+      sub: 'best track per person',
+      fill: true
+    }, {
+      lbl: 'Total staff',
+      val: staff.length,
+      sub: 'all disciplines'
+    }, {
+      lbl: 'Evaluations',
+      val: evals.length,
+      sub: scored.length + ' staff scored'
+    }, {
+      lbl: 'Multi-track',
+      val: multiTrack.length,
+      sub: 'on 2+ rubrics'
+    }],
+    pills: [{
+      k: 'mg',
+      label: '★ My Growth',
+      onClick: () => setPage('mygrowth')
+    }, {
+      k: 'st',
+      label: 'Staff Profiles',
+      onClick: () => setPage('staff')
+    }, {
+      k: 'gx',
+      label: 'Guest Experience',
+      onClick: () => setPage('gx')
+    }, {
+      k: 'pf',
+      label: 'Performance',
+      onClick: () => setPage('performance')
+    }, {
+      k: 'ld',
+      label: 'Leadership',
+      onClick: () => setPage('leadership')
+    }]
+  }), React.createElement(AttentionPanel, {
     staff: staff,
     meetings: meetings,
     perfData: perfData,
@@ -37521,60 +37576,6 @@ function Overview({
     setPage: setPage,
     title: "Needs attention today"
   }), React.createElement("div", {
-    className: "ov-band"
-  }, React.createElement("div", {
-    className: "ov-eyebrow"
-  }, "Revibe \xB7 Growth & Development"), React.createElement("div", {
-    className: "ov-head"
-  }, "KNOW YOUR PEOPLE \xB7 GROW YOUR PEOPLE"), React.createElement("div", {
-    className: "ov-sub"
-  }, "One place for how every person at Revibe is developing \u2014 their competencies, their numbers, their next step \u2014 so growth is deliberate, not accidental."), React.createElement("div", {
-    className: "ov-quick"
-  }, React.createElement("button", {
-    onClick: () => setPage('mygrowth')
-  }, "\u2605 My Growth"), React.createElement("button", {
-    onClick: () => setPage('staff')
-  }, "Staff Profiles"), React.createElement("button", {
-    onClick: () => setPage('gx')
-  }, "Guest Experience"), React.createElement("button", {
-    onClick: () => setPage('performance')
-  }, "Performance"), React.createElement("button", {
-    onClick: () => setPage('leadership')
-  }, "Leadership"))), React.createElement("div", {
-    className: "sg4 mb18 overview-cards"
-  }, React.createElement("div", {
-    className: "sc lime ov-sc"
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "Total Staff"), React.createElement("div", {
-    className: "sc-val"
-  }, staff.length), React.createElement("div", {
-    className: "sc-sub"
-  }, "All disciplines")), React.createElement("div", {
-    className: "sc go ov-sc"
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "Team Avg Score"), React.createElement("div", {
-    className: "sc-val"
-  }, avg || '—'), React.createElement("div", {
-    className: "sc-sub"
-  }, "Best track per person")), React.createElement("div", {
-    className: "sc purple ov-sc"
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "Multi-Track Staff"), React.createElement("div", {
-    className: "sc-val"
-  }, multiTrack.length), React.createElement("div", {
-    className: "sc-sub"
-  }, "Assessed on 2+ rubrics")), React.createElement("div", {
-    className: "sc gray ov-sc"
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "Evaluations"), React.createElement("div", {
-    className: "sc-val"
-  }, evals.length), React.createElement("div", {
-    className: "sc-sub"
-  }, scored.length, " staff scored"))), React.createElement("div", {
     className: "grid2 mb18"
   }, React.createElement("div", {
     className: "card"
@@ -37947,6 +37948,7 @@ function StaffPage({
   const [search, setSearch] = useState('');
   const [compAll, setCompAll] = useState(false);
   const [rolesOpen, setRolesOpen] = useState(false);
+  const [sortBy, setSortBy] = usePersist('staff.sort', 'name');
   const lvOf = s => {
     const sc = getBestScore(s);
     return sc === null ? null : getLevel(sc);
@@ -37974,6 +37976,25 @@ function StaffPage({
     }
     if (search && !s.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
+  });
+  const sortedRows = [...filtered].sort((a, b) => {
+    const nm = x => String(x.name || '').toLowerCase();
+    const byName = nm(a).localeCompare(nm(b));
+    if (sortBy === 'disc') return String(a.discipline || '~').localeCompare(String(b.discipline || '~')) || byName;
+    if (sortBy === 'site') return String(a.site || '~').localeCompare(String(b.site || '~')) || byName;
+    if (sortBy === 'score') {
+      const sa = getBestScore(a),
+        sb = getBestScore(b);
+      return (sb == null ? -1 : sb) - (sa == null ? -1 : sa) || byName;
+    }
+    if (sortBy === 'role') {
+      const da = RV_DESIGS(a),
+        db2 = RV_DESIGS(b);
+      const wa = da.some(d => d.perm === 'admin') ? 0 : da.length ? 1 : 2,
+        wb = db2.some(d => d.perm === 'admin') ? 0 : db2.length ? 1 : 2;
+      return wa - wb || byName;
+    }
+    return byName;
   });
   const anyFilter = fDisc !== 'all' || fSite !== 'all' || fTrack !== 'all' || fLv !== 'all' || !!search;
   const clearAll = () => {
@@ -38193,7 +38214,22 @@ function StaffPage({
     value: "spa"
   }, "Spa"), React.createElement("option", {
     value: "sc"
-  }, "Performance Coaching")), anyFilter && React.createElement("button", {
+  }, "Performance Coaching")), React.createElement("select", {
+    value: sortBy,
+    onChange: e => setSortBy(e.target.value),
+    "aria-label": "Sort",
+    title: "Order the table"
+  }, React.createElement("option", {
+    value: "name"
+  }, "Sort \xB7 Name A\u2013Z"), React.createElement("option", {
+    value: "disc"
+  }, "Sort \xB7 Discipline"), React.createElement("option", {
+    value: "site"
+  }, "Sort \xB7 Site"), React.createElement("option", {
+    value: "score"
+  }, "Sort \xB7 Best score"), React.createElement("option", {
+    value: "role"
+  }, "Sort \xB7 Designation")), anyFilter && React.createElement("button", {
     type: "button",
     className: "sp-clear",
     onClick: clearAll,
@@ -38385,7 +38421,7 @@ function StaffPage({
   }, "+ Add Staff") : React.createElement("button", {
     className: "btn btn-ghost btn-sm",
     onClick: clearAll
-  }, "Clear filters")))) : filtered.map(s => {
+  }, "Clear filters")))) : sortedRows.map(s => {
     const sc = getBestScore(s);
     const lv = sc !== null ? getLevel(sc) : null;
     const cf = isLead ? contractFlag(s) : null;
@@ -41123,6 +41159,110 @@ const RvHeroChip = ({
     color: col
   } : null
 }, txt);
+const RvPill = ({
+  on,
+  label,
+  onClick,
+  title
+}) => React.createElement("button", {
+  onClick: onClick,
+  title: title,
+  style: {
+    cursor: 'pointer',
+    fontFamily: "'Barlow Condensed',sans-serif",
+    fontSize: 13.5,
+    fontWeight: 800,
+    letterSpacing: '1.3px',
+    padding: '6px 15px',
+    borderRadius: 9,
+    transition: 'all .14s',
+    textTransform: 'uppercase',
+    border: '1px solid ' + (on ? '#c9f26f' : 'rgba(255,255,255,.25)'),
+    background: on ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'rgba(255,255,255,.06)',
+    color: on ? '#06301f' : 'rgba(238,248,242,.75)'
+  }
+}, label);
+function RvPageHero({
+  eyebrow,
+  title,
+  sub,
+  tiles,
+  pills,
+  left,
+  children
+}) {
+  return React.createElement("div", {
+    className: "rvt",
+    style: {
+      marginBottom: 14
+    }
+  }, RvTreeCSS, React.createElement("div", {
+    style: {
+      padding: '15px 20px ' + (pills ? '12px' : '14px')
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 18,
+      alignItems: 'center',
+      flexWrap: 'wrap'
+    }
+  }, left, React.createElement("div", {
+    style: {
+      minWidth: 200,
+      flex: '1 1 240px'
+    }
+  }, eyebrow && React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 11.5,
+      letterSpacing: '2.6px',
+      color: 'rgba(238,248,242,.55)',
+      textTransform: 'uppercase'
+    }
+  }, eyebrow), title && React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 27,
+      fontWeight: 800,
+      color: '#fff',
+      lineHeight: 1.06,
+      textTransform: 'uppercase',
+      letterSpacing: '1px'
+    }
+  }, title), sub && React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'rgba(238,248,242,.66)',
+      lineHeight: 1.55,
+      marginTop: 4,
+      maxWidth: 640
+    }
+  }, sub)), tiles && tiles.length > 0 && React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 10,
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+      flex: '1 1 300px'
+    }
+  }, tiles.map((t, i) => React.createElement(RvHeroTile, _extends({
+    key: i
+  }, t))))), pills && pills.length > 0 && React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginTop: 12,
+      flexWrap: 'wrap'
+    }
+  }, pills.map(p => React.createElement(RvPill, {
+    key: p.k || p.label,
+    on: !!p.on,
+    label: p.label,
+    onClick: p.onClick,
+    title: p.title
+  }))), children));
+}
 function RvProfileHero({
   staff,
   activeTrack,
@@ -41150,7 +41290,8 @@ function RvProfileHero({
   })) : null;
   const rubricGraded = !!(rubricAxes && rubricAxes.some(a => a.value != null));
   let geAxes = null,
-    geCenter = null;
+    geCenter = null,
+    geE = null;
   try {
     const gx = ld('gx', {
       people: {}
@@ -41158,6 +41299,7 @@ function RvProfileHero({
     const pd = GX_PD_FOR(gx.people, staff);
     if (pd) {
       const E = GX_ENGINE(pd);
+      geE = E;
       const vals = GX_CATS.map(([c, l]) => {
         const v = E.gv2(c, null);
         return {
@@ -41414,7 +41556,25 @@ function RvProfileHero({
       gap: 10,
       flexWrap: 'wrap'
     }
-  }, React.createElement(RvHeroTile, {
+  }, geE && geE.payLevel != null && React.createElement(React.Fragment, null, React.createElement(RvHeroTile, {
+    lbl: "Pay step",
+    val: GX_PAY[geE.payLevel][0],
+    sub: GX_PAY[geE.payLevel][1] + ' · ' + GX_ROLEBYPAY[geE.payLevel]
+  }), React.createElement(RvHeroTile, {
+    lbl: "Next step",
+    val: geE.nextIdx != null ? GX_PAY[geE.nextIdx][0] : 'TOP',
+    sub: geE.nextIdx != null ? geE.gateRows.filter(g => g.met).length + ' / ' + geE.gateRows.length + ' gates met' : 'of the ladder',
+    valCol: geE.nextIdx != null && geE.gateRows.length && geE.gateRows.every(g => g.met) ? '#c9f26f' : null
+  }), geE.earnedIdx > geE.payLevel && React.createElement(RvHeroTile, {
+    lbl: "Grades support",
+    val: GX_PAY[geE.earnedIdx][0],
+    sub: "move happens at a review",
+    valCol: "#c9f26f"
+  }), React.createElement(RvHeroTile, {
+    lbl: "Graded",
+    val: geE.graded.graded + ' / ' + geE.graded.total,
+    sub: "GE questions"
+  })), (rubricGraded || !geE) && React.createElement(React.Fragment, null, React.createElement(RvHeroTile, {
     lbl: "Level",
     val: lv ? lv.label.replace('Level ', 'L').split(' ')[0] : '—',
     sub: lv ? lv.label.split('– ')[1] || '' : 'pending evaluation',
@@ -41426,7 +41586,7 @@ function RvProfileHero({
     sub: rs && (tracks || []).length ? rs.label + ' rubric' : 'no rubric track',
     onClick: go && (tracks || []).length ? () => go('scores') : null,
     title: go ? 'Open Scores' : null
-  })))));
+  }))))));
 }
 function RvProfileTrees({
   staff,
@@ -43171,16 +43331,35 @@ function GuestExperiencePage({
         .gx-pill{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;border:1px solid;white-space:nowrap;}
         .gx-chk{padding:9px 2px;}
         .gx-chk:hover{background:rgba(255,255,255,.02);}
-      `), React.createElement("div", {
-    style: {
-      marginBottom: 8
-    }
+      `), React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Guest Experience",
+    sub: "Grade the framework, practice reviews, and read the system \u2014 every pay step lives inside the six-stage arc.",
+    tiles: [{
+      lbl: 'On the ladder',
+      val: Object.values(gx.people || {}).filter(p2 => p2 && p2.payLevel != null).length,
+      sub: 'GE people placed',
+      fill: true
+    }, {
+      lbl: 'Calls · this month',
+      val: live ? live.tc : '—',
+      sub: live ? live.tb + ' booked' : ''
+    }, {
+      lbl: 'Leads · this month',
+      val: live ? live.lt : '—',
+      sub: live ? live.lb + ' booked' : ''
+    }],
+    pills: [['grade', '✍️ Grade & review'], ['sop', '📘 Practice a review'], ['sys', '📖 The framework'], ['kpi', '📈 KPI scorecard']].map(([id, lb]) => ({
+      k: id,
+      label: lb,
+      on: gxTab === id,
+      onClick: () => setGxTab(id)
+    }))
   }, React.createElement("div", {
     style: {
       display: 'flex',
       flexWrap: 'wrap',
       alignItems: 'center',
-      margin: '0 0 2px'
+      marginTop: 12
     },
     title: "The GE career arc \u2014 every pay step sits inside one of these six stages"
   }, ['LEARN', 'EXECUTE', 'IMPACT', 'MANAGE', 'LEAD', 'BUILD'].map((st, i) => {
@@ -43190,38 +43369,23 @@ function GuestExperiencePage({
     }, React.createElement("span", {
       style: {
         fontFamily: "'Barlow Condensed',sans-serif",
-        fontSize: 21,
+        fontSize: 19,
         fontWeight: 800,
         letterSpacing: '3px',
-        color: i < 2 ? 'var(--c-grn)' : i < 4 ? 'var(--c-lime2)' : 'var(--c-yel)',
+        color: i < 2 ? '#7ee0a3' : i < 4 ? '#c9f26f' : '#ffd166',
+        opacity: cur ? 1 : 0.72,
         borderBottom: '3px solid ' + (cur ? 'currentColor' : 'transparent'),
         paddingBottom: 2
       },
       title: cur ? pk + ' is in the ' + st + ' stage' : undefined
     }, st), i < 5 && React.createElement("span", {
       style: {
-        color: 'var(--g-666)',
-        fontSize: 17,
-        padding: '0 10px'
+        color: 'rgba(238,248,242,.4)',
+        fontSize: 16,
+        padding: '0 9px'
       }
     }, "\u2192"));
-  }))), React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 10,
-      flexWrap: 'wrap',
-      alignItems: 'center',
-      margin: '12px 0 6px'
-    }
-  }, [['grade', '✍️ Grade & review'], ['sop', '📘 Practice a review'], ['sys', '📖 The framework'], ['kpi', '📈 KPI scorecard']].map(([id, lb]) => React.createElement("button", {
-    key: id,
-    className: `btn btn-sm ${gxTab === id ? 'btn-go' : 'btn-ghost'}`,
-    style: {
-      fontSize: 14,
-      padding: '8px 16px'
-    },
-    onClick: () => setGxTab(id)
-  }, lb))), gxTab !== 'sys' && (() => {
+  }))), gxTab !== 'sys' && (() => {
     const shown = pk && !pool.some(x => x && x.name === pk) ? pool.concat((staff || []).filter(x => x && x.name === pk)) : pool;
     return React.createElement("div", {
       style: {
@@ -43249,17 +43413,25 @@ function GuestExperiencePage({
         title: on ? 'Click again to clear the selection' : 'Open ' + nm,
         style: {
           cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
           borderRadius: 9,
-          padding: '8px 16px',
+          padding: '6px 14px 6px 8px',
           fontSize: 14,
           fontWeight: 700,
           border: '1px solid ' + (on ? 'var(--go)' : 'var(--border)'),
           background: on ? 'rgba(202,232,193,.13)' : 'var(--surface2)',
-          color: on ? 'var(--c-grn)' : 'var(--g-ccc)'
-        }
-      }, nm, pl != null && React.createElement("span", {
+          color: on ? 'var(--c-grn)' : 'var(--g-ccc)',
+          transition: 'transform .13s'
+        },
+        onMouseEnter: e => e.currentTarget.style.transform = 'translateY(-1px)',
+        onMouseLeave: e => e.currentTarget.style.transform = ''
+      }, React.createElement(Av, {
+        name: nm,
+        sz: "sm"
+      }), nm, pl != null && React.createElement("span", {
         style: {
-          marginLeft: 7,
           fontSize: 12,
           fontWeight: 400,
           opacity: .75
@@ -47163,27 +47335,56 @@ function EvalsPage({
   const filtered = sorted.filter(e => (fTrack === 'all' || e.track === fTrack) && (fPeriod === 'all' || e.type === fPeriod));
   const avgAll = evals.length ? Math.round(evals.reduce((t, e) => t + (calcScore(e.scores, e.track) || 0), 0) / evals.length * 10) / 10 : null;
   const thisMonth = evals.filter(e => (e.date || '').slice(0, 7) === GD_CURM()).length;
-  return React.createElement("div", null, React.createElement("style", null, `.evx-name:hover{color:var(--c-lime2);text-decoration:underline;}`), React.createElement("div", {
-    className: "filter-row"
-  }, React.createElement("div", {
-    className: "filter-grp"
-  }, ['all', 'clinical', 'spa', 'sc'].map(t => React.createElement("button", {
-    key: t,
-    className: `btn btn-sm ${fTrack === t ? 'btn-lime' : 'btn-ghost'}`,
-    onClick: () => setFTrack(t)
-  }, t === 'all' ? 'All Tracks' : TRACK_META[t]?.label || t)), React.createElement("span", {
+  return React.createElement("div", null, React.createElement("style", null, `.evx-name:hover{color:var(--c-lime2);text-decoration:underline;}`), React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Growth & Development",
+    sub: "Every scored rubric review, weekly through annual \u2014 the record behind every level, every gap, every profile.",
+    tiles: [{
+      lbl: 'This month',
+      val: thisMonth,
+      sub: GD_CURM(),
+      fill: true
+    }, {
+      lbl: 'Total evaluations',
+      val: evals.length,
+      sub: 'on record'
+    }, {
+      lbl: 'Average score',
+      val: avgAll !== null ? avgAll : '—',
+      sub: 'all evaluations'
+    }],
+    pills: [...['all', 'clinical', 'spa', 'sc'].map(t => ({
+      k: t,
+      label: t === 'all' ? 'All Tracks' : TRACK_META[t]?.label || t,
+      on: fTrack === t,
+      onClick: () => setFTrack(t)
+    })), {
+      k: '__log',
+      label: '＋ Log Evaluation',
+      onClick: () => setModal('addEval'),
+      title: 'Score a rubric review now'
+    }]
+  }), React.createElement("div", {
     style: {
-      color: 'var(--border)',
-      margin: '0 4px'
+      display: 'flex',
+      gap: 6,
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      margin: '0 0 12px'
     }
-  }, "|"), ['all', ...PERIODS].map(p => React.createElement("button", {
+  }, React.createElement("span", {
+    style: {
+      fontSize: 12,
+      letterSpacing: '1px',
+      textTransform: 'uppercase',
+      color: 'var(--g-777)',
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontWeight: 700
+    }
+  }, "Period"), ['all', ...PERIODS].map(p => React.createElement("button", {
     key: p,
     className: `btn btn-sm ${fPeriod === p ? 'btn-go' : 'btn-ghost'}`,
     onClick: () => setFPeriod(p)
-  }, p === 'all' ? 'All' : p))), React.createElement("button", {
-    className: "btn btn-lime btn-sm",
-    onClick: () => setModal('addEval')
-  }, "+ Log Evaluation")), justSaved && React.createElement("div", {
+  }, p === 'all' ? 'All' : p))), justSaved && React.createElement("div", {
     className: "flex aic g8",
     style: {
       background: 'rgba(68,204,170,.08)',
@@ -47215,27 +47416,7 @@ function EvalsPage({
     className: "btn btn-ghost btn-sm",
     onClick: () => setJustSaved(null),
     "aria-label": "Dismiss"
-  }, "\u2715")), evals.length > 0 && React.createElement("div", {
-    className: "sg3 mb18"
-  }, React.createElement("div", {
-    className: "sc go"
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "Total Evaluations"), React.createElement("div", {
-    className: "sc-val"
-  }, evals.length)), React.createElement("div", {
-    className: "sc lime"
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "This Month"), React.createElement("div", {
-    className: "sc-val"
-  }, thisMonth)), React.createElement("div", {
-    className: "sc gray"
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "Average Score"), React.createElement("div", {
-    className: "sc-val"
-  }, avgAll !== null ? avgAll : '—'))), evals.length === 0 ? React.createElement("div", {
+  }, "\u2715")), evals.length === 0 ? React.createElement("div", {
     className: "rv-empty"
   }, React.createElement("div", {
     className: "rv-empty-t"
@@ -47343,18 +47524,34 @@ function EduPage({
   }, [justSaved]);
   const sorted = [...sessions].sort((a, b) => new Date(b.date) - new Date(a.date));
   const filtered = f === 'all' ? sorted : sorted.filter(s => s.type === f || s.period === f);
-  return React.createElement("div", null, React.createElement("style", null, `.edx-name:hover{color:var(--c-lime2);text-decoration:underline;cursor:pointer;}`), React.createElement("div", {
-    className: "filter-row"
-  }, React.createElement("div", {
-    className: "filter-grp"
-  }, ['all', '1-on-1', 'Group', ...PERIODS.slice(0, 3)].map(x => React.createElement("button", {
-    key: x,
-    className: `btn btn-sm ${f === x ? 'btn-lime' : 'btn-ghost'}`,
-    onClick: () => setF(x)
-  }, x === 'all' ? 'All' : x))), React.createElement("button", {
-    className: "btn btn-lime btn-sm",
-    onClick: () => setModal('addSess')
-  }, "+ Log Session")), justSaved && React.createElement("div", {
+  return React.createElement("div", null, React.createElement("style", null, `.edx-name:hover{color:var(--c-lime2);text-decoration:underline;cursor:pointer;}`), React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Growth & Development",
+    sub: "Mentorship and education time, logged against the people who attended \u2014 development made visible instead of assumed.",
+    tiles: [{
+      lbl: 'Total sessions',
+      val: sessions.length,
+      sub: 'on record',
+      fill: true
+    }, {
+      lbl: '1-on-1',
+      val: sessions.filter(s2 => s2.type === '1-on-1').length,
+      sub: 'individual'
+    }, {
+      lbl: 'Group',
+      val: sessions.filter(s2 => s2.type === 'Group').length,
+      sub: 'team sessions'
+    }],
+    pills: [...['all', '1-on-1', 'Group', ...PERIODS.slice(0, 3)].map(x => ({
+      k: x,
+      label: x === 'all' ? 'All' : x,
+      on: f === x,
+      onClick: () => setF(x)
+    })), {
+      k: '__log',
+      label: '＋ Log Session',
+      onClick: () => setModal('addSess')
+    }]
+  }), justSaved && React.createElement("div", {
     className: "flex aic g8",
     style: {
       background: 'rgba(68,204,170,.08)',
@@ -47380,27 +47577,7 @@ function EduPage({
     },
     onClick: () => setJustSaved(null),
     "aria-label": "Dismiss"
-  }, "\u2715")), sessions.length > 0 && React.createElement("div", {
-    className: "sg3 mb18"
-  }, React.createElement("div", {
-    className: "sc go"
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "Total Sessions"), React.createElement("div", {
-    className: "sc-val"
-  }, sessions.length)), React.createElement("div", {
-    className: "sc gray"
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "1-on-1"), React.createElement("div", {
-    className: "sc-val"
-  }, sessions.filter(s => s.type === '1-on-1').length)), React.createElement("div", {
-    className: "sc lime"
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "Group"), React.createElement("div", {
-    className: "sc-val"
-  }, sessions.filter(s => s.type === 'Group').length))), sessions.length === 0 ? React.createElement("div", {
+  }, "\u2715")), sessions.length === 0 ? React.createElement("div", {
     className: "rv-empty"
   }, React.createElement("div", {
     className: "rv-empty-t"
@@ -69246,47 +69423,51 @@ function GDTrackerPage({
       alignItems: 'start'
     }
   }, React.createElement("div", null, React.createElement("style", null, `
-          .gdt-sum{display:flex;gap:8px;align-items:stretch;flex-wrap:wrap;margin-bottom:12px}
-          .gdt-chip{display:flex;align-items:baseline;gap:7px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:7px 12px;cursor:pointer;transition:border-color .12s,background .12s}
-          .gdt-chip:hover{border-color:var(--border2)}
-          .gdt-chip.on{border-color:var(--c-lime2);background:var(--surface3)}
-          .gdt-chip-n{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;line-height:1}
-          .gdt-chip-l{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--g-999)}
           .gdt-att{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--c-red);border-radius:11px;padding:12px 14px;margin-bottom:16px}
-        `), React.createElement("div", {
-    className: "gdt-sum"
-  }, [['all', 'Therapists', records.length, 'var(--g-ddd)'], ['overdue', 'Overdue', cntOverdue, cntOverdue ? 'var(--c-red)' : 'var(--g-555)'], ['soon', 'Due ≤14d', cntSoon, cntSoon ? 'var(--c-yel)' : 'var(--g-555)'], ['unset', 'Dates missing', cntUnset, cntUnset ? 'var(--g-aaa)' : 'var(--g-555)']].map(([v, l, n, c]) => React.createElement("button", {
-    key: v,
-    className: 'gdt-chip' + (filterStatus === v ? ' on' : ''),
-    title: v === 'all' ? 'Show everyone' : 'Show only: ' + l,
-    onClick: () => setFilterStatus(v)
-  }, React.createElement("span", {
-    className: "gdt-chip-n",
-    style: {
-      color: c
-    }
-  }, n), React.createElement("span", {
-    className: "gdt-chip-l"
-  }, l))), React.createElement("span", {
-    style: {
-      flex: 1
-    }
-  }), React.createElement("button", {
-    className: "btn btn-ghost btn-sm",
-    style: {
-      color: 'var(--g-999)'
-    },
-    onClick: () => {
-      if (confirm('Reset all dates to blank? This clears the saved schedule and reloads the seed data. Your edits will be lost.')) {
-        localStorage.removeItem('rvgd3_gdtracker');
-        setRecords(GD_SEED);
-        setSelectedId(null);
-      }
-    }
-  }, "\u21BA Reset"), React.createElement("button", {
-    className: "btn btn-lime btn-sm",
-    onClick: addRecord
-  }, "+ Add")), React.createElement("div", {
+        `), React.createElement(RvPageHero, {
+    eyebrow: "Review schedule",
+    sub: cntOverdue > 0 ? cntOverdue + ' review' + (cntOverdue !== 1 ? 's' : '') + ' overdue — book these first.' : cntSoon > 0 ? cntSoon + ' review' + (cntSoon !== 1 ? 's' : '') + ' due inside 14 days.' : 'Every quarterly and annual review has a date and none are overdue.',
+    tiles: [{
+      lbl: 'Therapists',
+      val: records.length,
+      fill: filterStatus === 'all',
+      onClick: () => setFilterStatus('all'),
+      title: 'Show everyone'
+    }, {
+      lbl: 'Overdue',
+      val: cntOverdue,
+      valCol: cntOverdue ? '#ff9d9d' : 'rgba(238,248,242,.4)',
+      fill: filterStatus === 'overdue',
+      onClick: () => setFilterStatus('overdue'),
+      title: 'Show only: overdue'
+    }, {
+      lbl: 'Due ≤14d',
+      val: cntSoon,
+      valCol: cntSoon ? '#ffd166' : 'rgba(238,248,242,.4)',
+      fill: filterStatus === 'soon',
+      onClick: () => setFilterStatus('soon'),
+      title: 'Show only: due within 14 days'
+    }, {
+      lbl: 'Dates missing',
+      val: cntUnset,
+      valCol: cntUnset ? '#eef8f2' : 'rgba(238,248,242,.4)',
+      fill: filterStatus === 'unset',
+      onClick: () => setFilterStatus('unset'),
+      title: 'Show only: missing a date'
+    }],
+    pills: [...['all', 'Mississauga', 'Markham'].map(sx => ({
+      k: sx,
+      on: filterSite === sx,
+      label: sx === 'all' ? 'All sites' : sx,
+      onClick: () => setFilterSite(sx)
+    })), {
+      k: 'add',
+      on: false,
+      label: '＋ Add therapist',
+      onClick: addRecord,
+      title: 'Add a therapist to the tracker'
+    }]
+  }), React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -69308,32 +69489,35 @@ function GDTrackerPage({
       outline: 'none',
       width: 170
     }
-  }), React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 4
-    }
-  }, ['all', 'Mississauga', 'Markham'].map(sx => React.createElement("button", {
-    key: sx,
-    onClick: () => setFilterSite(sx),
-    className: `btn btn-xs ${filterSite === sx ? 'btn-go' : 'btn-ghost'}`
-  }, sx === 'all' ? 'All sites' : sx))), React.createElement("span", {
+  }), React.createElement("span", {
     style: {
       fontSize: 12.5,
-      color: 'var(--g-777)',
-      marginLeft: 'auto',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8
+      color: 'var(--g-777)'
     }
-  }, filtered.length, " therapist", filtered.length !== 1 ? 's' : '', (search || filterSite !== 'all' || filterStatus !== 'all') && React.createElement("button", {
+  }, filtered.length, " therapist", filtered.length !== 1 ? 's' : ''), (search || filterSite !== 'all' || filterStatus !== 'all') && React.createElement("button", {
     className: "btn btn-ghost btn-xs",
     onClick: () => {
       setSearch('');
       setFilterSite('all');
       setFilterStatus('all');
     }
-  }, "clear filters"))), overdueRows.length > 0 && React.createElement("div", {
+  }, "clear filters"), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    style: {
+      color: 'var(--g-777)'
+    },
+    onClick: () => {
+      if (confirm('Reset all dates to blank? This clears the saved schedule and reloads the seed data. Your edits will be lost.')) {
+        localStorage.removeItem('rvgd3_gdtracker');
+        setRecords(GD_SEED);
+        setSelectedId(null);
+      }
+    }
+  }, "\u21BA Reset")), overdueRows.length > 0 && React.createElement("div", {
     className: "gdt-att"
   }, React.createElement("div", {
     className: "card-lbl",
