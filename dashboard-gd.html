@@ -1892,7 +1892,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L155';
+window.__BUILD = 'build L156';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -2500,11 +2500,24 @@ const RV_DESIG = [{
   group: 'Management',
   perm: 'admin'
 }];
-const RV_DESIG_OF = st => st && st.designation ? RV_DESIG.find(d => d.id === st.designation) || null : null;
+const RV_DESIGS = st => {
+  if (!st) return [];
+  const ids = Array.isArray(st.designations) ? st.designations : st.designation ? [st.designation] : [];
+  return ids.map(id => RV_DESIG.find(d => d.id === id)).filter(Boolean);
+};
+const RV_DESIG_OF = st => {
+  const l = RV_DESIGS(st);
+  return l.length ? l[0] : null;
+};
+const RV_DESIG_PERM = st => {
+  const l = RV_DESIGS(st);
+  if (!l.length) return null;
+  return l.some(d => d.perm === 'admin') ? 'admin' : 'lead';
+};
 const RV_ROLE_OF = st => {
   if (!st) return 'guest';
-  const dg = RV_DESIG_OF(st);
-  if (dg) return dg.perm;
+  const dp = RV_DESIG_PERM(st);
+  if (dp) return dp;
   const d = String(st.discipline || '').toLowerCase();
   const rt = [st.role, st.title].filter(Boolean).join(' ').toLowerCase();
   if (d === 'mgmt' || /owner|director|management|admin/.test(rt)) return 'admin';
@@ -4494,7 +4507,7 @@ function App() {
     }
   }, me.name || 'Everyone'), React.createElement("div", {
     className: "foot-sub"
-  }, (RV_DESIG_OF(me.staff) || {}).label || RV_ROLE_LABEL[me.role] || '', me.role !== 'admin' && me.role !== 'guest' ? showAll ? ' · all pages' : ' · your pages' : RV_DESIG_OF(me.staff) ? ' · all pages' : '')), me.role !== 'admin' && me.role !== 'guest' && React.createElement("button", {
+  }, RV_DESIGS(me.staff).map(d => d.label).join(' · ') || RV_ROLE_LABEL[me.role] || '', me.role !== 'admin' && me.role !== 'guest' ? showAll ? ' · all pages' : ' · your pages' : RV_DESIGS(me.staff).length ? ' · all pages' : '')), me.role !== 'admin' && me.role !== 'guest' && React.createElement("button", {
     className: "btn btn-ghost btn-xs",
     style: {
       width: '100%',
@@ -38241,22 +38254,28 @@ function StaffPage({
   }, "every tab"), "; everyone else sees the pages their role needs (they can still tap \u201CShow all pages\u201D \u2014 this is a view preference until sign-in ships, not a lock)."), React.createElement("div", {
     style: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))',
+      gridTemplateColumns: 'repeat(auto-fill,minmax(320px,1fr))',
       gap: 8
     }
   }, [...(staff || [])].sort((a, b) => String(a.name).localeCompare(String(b.name))).map(sx => {
-    const dg = RV_DESIG_OF(sx);
+    const held = RV_DESIGS(sx);
+    const perm = RV_DESIG_PERM(sx);
     const r = RV_ROLE_OF(sx);
+    const write = ids => setStaff(prev => prev.map(x => x.id === sx.id ? {
+      ...x,
+      designations: ids.length ? ids : undefined,
+      designation: undefined
+    } : x));
     return React.createElement("div", {
       key: sx.id,
       style: {
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: 9,
         border: '1px solid var(--border)',
-        borderLeft: '3px solid ' + (dg ? dg.perm === 'admin' ? 'var(--c-yel)' : 'var(--c-grn)' : 'var(--border)'),
+        borderLeft: '3px solid ' + (perm ? perm === 'admin' ? 'var(--c-yel)' : 'var(--c-grn)' : 'var(--border)'),
         borderRadius: 8,
-        padding: '7px 10px',
+        padding: '8px 10px',
         background: 'var(--surface3)'
       }
     }, React.createElement(Av, {
@@ -38269,6 +38288,12 @@ function StaffPage({
       }
     }, React.createElement("div", {
       style: {
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: 8
+      }
+    }, React.createElement("span", {
+      style: {
         fontSize: 13.5,
         fontWeight: 700,
         color: 'var(--g-eee)',
@@ -38276,39 +38301,68 @@ function StaffPage({
         overflow: 'hidden',
         textOverflow: 'ellipsis'
       }
-    }, sx.name), React.createElement("div", {
+    }, sx.name), React.createElement("span", {
       style: {
-        fontSize: 11.5,
-        color: dg ? dg.perm === 'admin' ? 'var(--c-yel)' : 'var(--c-grn)' : 'var(--g-777)'
+        fontSize: 11,
+        color: perm ? perm === 'admin' ? 'var(--c-yel)' : 'var(--c-grn)' : 'var(--g-777)',
+        flexShrink: 0
       }
-    }, dg ? 'All tabs · ' + (dg.perm === 'admin' ? 'Management' : 'Lead') : 'Standard · ' + (RV_ROLE_LABEL[r] || r))), React.createElement("select", {
-      value: sx.designation || '',
-      onChange: e => setStaff(prev => prev.map(x => x.id === sx.id ? {
-        ...x,
-        designation: e.target.value || undefined
-      } : x)),
+    }, perm ? 'All tabs · ' + (perm === 'admin' ? 'Management' : 'Lead') : 'Standard · ' + (RV_ROLE_LABEL[r] || r))), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 4,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        marginTop: 5
+      }
+    }, held.map(d => React.createElement("span", {
+      key: d.id,
+      style: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        fontSize: 11.5,
+        fontWeight: 600,
+        color: d.perm === 'admin' ? 'var(--c-yel)' : 'var(--c-grn)',
+        border: '1px solid ' + (d.perm === 'admin' ? 'color-mix(in srgb, var(--c-yel) 40%, transparent)' : 'color-mix(in srgb, var(--c-grn) 40%, transparent)'),
+        borderRadius: 10,
+        padding: '1px 8px'
+      }
+    }, d.label, React.createElement("span", {
+      style: {
+        cursor: 'pointer',
+        opacity: .65
+      },
+      title: "Remove",
+      onClick: () => write(held.filter(x => x.id !== d.id).map(x => x.id))
+    }, "\xD7"))), React.createElement("select", {
+      value: "",
+      onChange: e => {
+        const v = e.target.value;
+        if (v) write([...held.map(x => x.id), v]);
+      },
       style: {
         background: 'var(--surface2)',
-        border: '1px solid var(--border)',
-        borderRadius: 6,
-        color: 'var(--text)',
-        fontSize: 12,
-        padding: '4px 6px',
-        maxWidth: 170
+        border: '1px dashed var(--border2)',
+        borderRadius: 10,
+        color: 'var(--g-999)',
+        fontSize: 11.5,
+        padding: '2px 6px',
+        maxWidth: 130
       }
     }, React.createElement("option", {
       value: ""
-    }, "\u2014 none \u2014"), React.createElement("optgroup", {
+    }, "\uFF0B add role\u2026"), React.createElement("optgroup", {
       label: "Leads"
-    }, RV_DESIG.filter(d => d.group === 'Leads').map(d => React.createElement("option", {
+    }, RV_DESIG.filter(d => d.group === 'Leads' && !held.some(h => h.id === d.id)).map(d => React.createElement("option", {
       key: d.id,
       value: d.id
     }, d.label))), React.createElement("optgroup", {
       label: "Management"
-    }, RV_DESIG.filter(d => d.group === 'Management').map(d => React.createElement("option", {
+    }, RV_DESIG.filter(d => d.group === 'Management' && !held.some(h => h.id === d.id)).map(d => React.createElement("option", {
       key: d.id,
       value: d.id
-    }, d.label)))));
+    }, d.label)))))));
   }))), React.createElement("div", {
     className: "sp-chips"
   }, chip('all', 'Everyone', staff.length, null), LV_CHIPS.map(([k, lb, col]) => chip(k, k + ' ' + lb, counts[k], col)), counts.none > 0 && chip('none', 'Not scored', counts.none, null), isLead && counts.contract > 0 && chip('contract', '⚠ Contract action', counts.contract, 'var(--c-amb)')), React.createElement("div", {
@@ -41185,13 +41239,11 @@ function RvProfileHero({
       gap: 5,
       flexWrap: 'wrap'
     }
-  }, (() => {
-    const dg = RV_DESIG_OF(staff);
-    return dg ? React.createElement(RvHeroChip, {
-      txt: dg.label,
-      col: dg.perm === 'admin' ? '#ffd166' : '#c9f26f'
-    }) : null;
-  })(), staff.discipline ? React.createElement(RvHeroChip, {
+  }, RV_DESIGS(staff).map(dg => React.createElement(RvHeroChip, {
+    key: dg.id,
+    txt: dg.label,
+    col: dg.perm === 'admin' ? '#ffd166' : '#c9f26f'
+  })), staff.discipline ? React.createElement(RvHeroChip, {
     txt: staff.discipline,
     col: hue
   }) : null, staff.split ? React.createElement(RvHeroChip, {
