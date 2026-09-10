@@ -1892,7 +1892,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L159';
+window.__BUILD = 'build L160';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -41047,6 +41047,29 @@ const RV_TRACK_HUE = {
   spa: '#d9a9ff',
   sc: '#ffd166'
 };
+const GX_PD_FOR = (people, st) => {
+  people = people || {};
+  if (!st) return null;
+  const keys = Object.keys(people);
+  if (st.id) {
+    const k1 = keys.find(k => people[k] && people[k].sid === st.id);
+    if (k1) return people[k1];
+  }
+  const name = String(st.name || '').trim();
+  if (!name) return null;
+  if (people[name]) return people[name];
+  const n = name.toLowerCase();
+  let k = keys.find(x => x.toLowerCase().trim() === n);
+  if (!k) {
+    const first = n.split(/\s+/)[0];
+    const cands = keys.filter(x => {
+      const a = x.toLowerCase().trim();
+      return a.indexOf(n) >= 0 || n.indexOf(a) >= 0 || first.length > 2 && a.split(/\s+/)[0] === first;
+    });
+    if (cands.length === 1) k = cands[0];
+  }
+  return k ? people[k] : null;
+};
 const RV_SECT_HUES = ['#7ee0a3', '#ffd166', '#8ec9ff'];
 const RV_R1 = v => v == null ? 0 : Math.round(v * 10) / 10;
 const RV_DARK_INK = {
@@ -41136,14 +41159,17 @@ function RvProfileHero({
       const gx = ld('gx', {
         people: {}
       }) || {};
-      const pd = (gx.people || {})[staff.name];
+      const pd = GX_PD_FOR(gx.people, staff);
       if (pd) {
         const E = GX_ENGINE(pd);
-        const vals = GX_CATS.map(([c, l]) => ({
-          label: l,
-          value: E.catAvg(c) != null ? RV_R1(E.catAvg(c)) : null,
-          max: 5
-        }));
+        const vals = GX_CATS.map(([c, l]) => {
+          const v = E.gv2(c, null);
+          return {
+            label: l,
+            value: v != null ? RV_R1(v) : null,
+            max: 5
+          };
+        });
         if (vals.some(a => a.value != null)) {
           axes = vals;
           const g = vals.filter(a => a.value != null);
@@ -41438,13 +41464,13 @@ function RvProfileTrees({
     const gx = ld('gx', {
       people: {}
     }) || {};
-    const pd = (gx.people || {})[staff.name];
+    const pd = GX_PD_FOR(gx.people, staff);
     if (pd) {
       const E = GX_ENGINE(pd);
       const nodes = GX_CATS.map(([c, l]) => ({
         k: 'gx' + c,
         label: l,
-        level: RV_R1(E.catAvg(c)),
+        level: RV_R1(E.gv2(c, null)),
         max: 5,
         desc: 'Category average across its three graded questions. Graded 1–5 in the Guest Experience tab.'
       }));
@@ -41967,7 +41993,10 @@ function MyGrowthPage({
       window.dispatchEvent(new Event('rv-me'));
     } catch (e) {}
   };
-  const pd = (gx.people || {})[me] || {};
+  const pd = GX_PD_FOR(gx.people || {}, (staff || []).find(x => x.name === me) || {
+    id: null,
+    name: me
+  }) || {};
   const E = GX_ENGINE(pd);
   const person = (staff || []).find(x => x.name === me);
   const isClin = !!(person && (person.tracks || []).length);
@@ -42123,11 +42152,14 @@ function MyGrowthPage({
     person: person,
     perfData: perfData
   }), !isClin && (() => {
-    const vals = GX_CATS.map(([c, l]) => ({
-      label: l,
-      value: E.catAvg(c) != null ? RV_R1(E.catAvg(c)) : null,
-      max: 5
-    }));
+    const vals = GX_CATS.map(([c, l]) => {
+      const v = E.gv2(c, null);
+      return {
+        label: l,
+        value: v != null ? RV_R1(v) : null,
+        max: 5
+      };
+    });
     const g = vals.filter(a => a.value != null);
     const avg = g.length ? RV_R1(g.reduce((a, x) => a + x.value, 0) / g.length) : null;
     return React.createElement("div", {
