@@ -1892,7 +1892,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L156';
+window.__BUILD = 'build L159';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -60144,7 +60144,7 @@ function LeadDevTab({
     padding: '15px 18px'
   };
   const LDCSS = React.createElement("style", null, `
-    .ldsec{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--h,var(--c-grn));border-radius:12px;padding:15px 18px;margin-bottom:12px;transition:border-color .15s}
+    .ldsec{background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--h,var(--c-grn));border-radius:10px;padding:15px 18px;margin-bottom:12px;transition:border-color .15s}
     .ldsec:hover{border-left-color:var(--h,var(--c-grn))}
     .ldsec h4{font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;letter-spacing:1.4px;color:var(--g-eee);margin:0 0 2px}
     .ldsec .sub{font-size:12px;color:var(--g-666);margin-bottom:11px}
@@ -61362,102 +61362,141 @@ function LeadDevTab({
         person: null
       })
     }, "\u2190 All leads"), React.createElement("div", {
+      className: "rvt",
       style: {
-        background: 'linear-gradient(120deg,' + hue + '22,transparent)',
-        border: '1px solid var(--border)',
-        borderLeft: '4px solid ' + hue,
-        borderRadius: 14,
-        padding: '18px 22px',
-        marginTop: 12
+        marginTop: 12,
+        marginBottom: 0
+      }
+    }, RvTreeCSS, React.createElement("div", {
+      style: {
+        padding: '15px 20px 12px'
       }
     }, React.createElement("div", {
       style: {
         display: 'flex',
-        gap: 14,
-        alignItems: 'baseline',
+        gap: 16,
+        alignItems: 'center',
         flexWrap: 'wrap'
       }
-    }, React.createElement("span", {
+    }, (() => {
+      const p = RV_PHOTO(lead.name);
+      return p ? React.createElement("img", {
+        src: p,
+        alt: lead.name,
+        style: {
+          width: 78,
+          height: 78,
+          borderRadius: '50%',
+          objectFit: 'cover',
+          border: '2.5px solid ' + hue,
+          boxShadow: '0 0 22px rgba(80,225,175,.35)',
+          flexShrink: 0
+        }
+      }) : React.createElement("div", {
+        style: {
+          width: 66,
+          height: 66,
+          borderRadius: '50%',
+          border: '2px solid ' + hue,
+          background: 'rgba(255,255,255,.07)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: "'Barlow Condensed',sans-serif",
+          fontSize: 23,
+          fontWeight: 800,
+          color: '#fff',
+          flexShrink: 0
+        }
+      }, RV_MONO(lead.name));
+    })(), React.createElement("div", {
+      style: {
+        minWidth: 200,
+        flex: '1 1 240px'
+      }
+    }, React.createElement("div", {
       style: {
         fontFamily: "'Barlow Condensed',sans-serif",
-        fontSize: 30,
+        fontSize: 29,
         fontWeight: 800,
-        color: 'var(--g-eee)',
-        lineHeight: 1
+        color: '#fff',
+        lineHeight: 1.05,
+        textTransform: 'uppercase',
+        letterSpacing: '1px'
       }
-    }, lead.name), React.createElement("span", {
+    }, lead.name), React.createElement("div", {
       style: {
-        fontSize: 13.5,
-        color: hue
+        fontSize: 12.5,
+        color: 'rgba(238,248,242,.66)',
+        marginTop: 2
       }
-    }, lead.area), React.createElement("span", {
+    }, lead.area), React.createElement("div", {
       style: {
-        flex: 1
+        fontSize: 12.5,
+        color: 'rgba(238,248,242,.6)',
+        lineHeight: 1.55,
+        marginTop: 6,
+        maxWidth: 560
       }
-    }), React.createElement("div", {
+    }, lead.mandate)), React.createElement("div", {
       style: {
-        textAlign: 'right'
+        display: 'flex',
+        gap: 10,
+        flexWrap: 'wrap',
+        flex: '0 1 auto'
       }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 11,
-        letterSpacing: '1.4px',
-        color: 'var(--g-666)',
-        textTransform: 'uppercase'
-      }
-    }, "Team health"), React.createElement("div", {
-      style: {
-        fontSize: 24,
-        fontWeight: 800,
-        color: h.pct == null || !h.plans && !h.fresh ? 'var(--g-666)' : h.pct >= 80 ? 'var(--c-grn)' : h.pct >= 60 ? 'var(--c-yel)' : 'var(--c-red)'
-      }
-    }, !h.plans && !h.fresh ? '—' : h.pct + '%')), React.createElement("div", {
-      style: {
-        textAlign: 'right'
-      }
-    }, React.createElement("div", {
-      style: {
-        fontSize: 11,
-        letterSpacing: '1.4px',
-        color: 'var(--g-666)',
-        textTransform: 'uppercase'
-      }
-    }, "Their own"), React.createElement("div", {
-      style: {
-        fontSize: 24,
-        fontWeight: 800,
-        color: lcAvg == null ? 'var(--g-666)' : lcAvg >= 4 ? 'var(--c-grn)' : lcAvg >= 3 ? 'var(--c-lime2)' : 'var(--c-yel)'
-      }
-    }, lcAvg == null ? '—' : lcAvg.toFixed(1)))), React.createElement("div", {
-      style: {
-        fontSize: 13.5,
-        color: 'var(--g-aaa)',
-        lineHeight: 1.7,
-        marginTop: 7,
-        maxWidth: 700
-      }
-    }, lead.mandate), React.createElement("div", {
+    }, React.createElement(RvHeroTile, {
+      lbl: "Team health",
+      val: !h.plans && !h.fresh ? '—' : h.pct + '%',
+      sub: h.team + ' clinician' + (h.team === 1 ? '' : 's')
+    }), React.createElement(RvHeroTile, {
+      lbl: "Their own",
+      val: lcAvg == null ? '—' : lcAvg.toFixed(1),
+      sub: lcAvg == null ? 'not scored yet' : 'avg of ' + lcScored.length + '/10 skills'
+    }), React.createElement(RvHeroTile, {
+      lbl: "With a plan",
+      val: h.plans,
+      sub: h.od ? h.od + ' overdue' : 'of ' + h.team,
+      valCol: h.od ? '#e08a8a' : null
+    }))), React.createElement("div", {
       style: {
         display: 'flex',
         gap: 8,
         marginTop: 14,
         flexWrap: 'wrap'
       }
-    }, [['plan', 'THEIR OWN PLAN'], ['team', 'THEIR TEAM · ' + team.length], ['eff', 'EFFECTIVENESS']].map(([k, l2]) => React.createElement("button", {
+    }, [['plan', 'THEIR OWN PLAN'], ['tree', 'SKILL TREE'], ['team', 'THEIR TEAM · ' + team.length], ['eff', 'EFFECTIVENESS']].map(([k, l2]) => React.createElement("button", {
       key: k,
-      className: 'ldl-tab' + (leadTab === k ? ' on' : ''),
+      onClick: () => setLeadTab(k),
       style: {
-        '--h': hue
-      },
-      onClick: () => setLeadTab(k)
-    }, l2)))), leadTab === 'plan' && React.createElement("div", {
+        cursor: 'pointer',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 14,
+        fontWeight: 800,
+        letterSpacing: '1.4px',
+        padding: '7px 16px',
+        borderRadius: 9,
+        transition: 'all .14s',
+        border: '1px solid ' + (leadTab === k ? '#c9f26f' : 'rgba(255,255,255,.25)'),
+        background: leadTab === k ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'rgba(255,255,255,.06)',
+        color: leadTab === k ? '#06301f' : 'rgba(238,248,242,.75)'
+      }
+    }, l2))))), leadTab === 'plan' && React.createElement("div", {
       style: {
         marginTop: 12
       }
     }, React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit,minmax(430px,1fr))',
+        gap: 12,
+        alignItems: 'start'
+      }
+    }, React.createElement("div", {
       className: "ldsec",
       style: {
-        '--h': hue
+        '--h': hue,
+        marginBottom: 0
       }
     }, React.createElement("h4", null, "WHAT THEY ARE BUILDING"), React.createElement("div", {
       className: "sub"
@@ -61498,7 +61537,8 @@ function LeadDevTab({
     }))))), React.createElement("div", {
       className: "ldsec",
       style: {
-        '--h': hue
+        '--h': hue,
+        marginBottom: 0
       }
     }, React.createElement("h4", null, "THEIR MANDATE, BROKEN DOWN"), React.createElement("div", {
       className: "sub"
@@ -61507,7 +61547,7 @@ function LeadDevTab({
       style: {
         display: 'flex',
         gap: 12,
-        padding: '9px 0',
+        padding: '7px 0',
         borderTop: i2 ? '1px solid var(--border)' : 'none'
       }
     }, React.createElement("span", {
@@ -61521,7 +61561,7 @@ function LeadDevTab({
       }
     }), React.createElement("div", null, React.createElement("div", {
       style: {
-        fontSize: 14.5,
+        fontSize: 14,
         fontWeight: 700,
         color: 'var(--g-ddd)'
       }
@@ -61529,10 +61569,33 @@ function LeadDevTab({
       style: {
         fontSize: 12.5,
         color: 'var(--g-888)',
-        lineHeight: 1.6,
+        lineHeight: 1.55,
         marginTop: 1
       }
-    }, d))))), (() => {
+    }, d)))))), React.createElement("div", {
+      className: "ldsec",
+      style: {
+        '--h': hue
+      }
+    }, React.createElement("h4", null, "THEIR DEVELOPMENT PLAN"), React.createElement("div", {
+      className: "sub"
+    }, "Priorities, actions and evidence \u2014 the same discipline they apply to their people."), React.createElement(PersonView, {
+      person: {
+        id: lead.id,
+        name: lead.name,
+        discipline: lead.area
+      },
+      lead: {
+        short: 'Dave'
+      },
+      embed: true,
+      hue: hue,
+      back: () => setLeadTab('team')
+    }))), leadTab === 'tree' && React.createElement("div", {
+      style: {
+        marginTop: 12
+      }
+    }, (() => {
       const mk = idx => idx.map(i => {
         const [k, label, desc] = LD_LEADCOMP[i];
         const hh = (lp.comp || {})[k] || [];
@@ -61571,26 +61634,7 @@ function LeadDevTab({
         fxLabel: "Leadership skill increased",
         pointsNoun: "leadership points"
       });
-    })(), React.createElement("div", {
-      className: "ldsec",
-      style: {
-        '--h': hue
-      }
-    }, React.createElement("h4", null, "THEIR DEVELOPMENT PLAN"), React.createElement("div", {
-      className: "sub"
-    }, "Priorities, actions and evidence \u2014 the same discipline they apply to their people."), React.createElement(PersonView, {
-      person: {
-        id: lead.id,
-        name: lead.name,
-        discipline: lead.area
-      },
-      lead: {
-        short: 'Dave'
-      },
-      embed: true,
-      hue: hue,
-      back: () => setLeadTab('team')
-    }))), leadTab === 'team' && React.createElement("div", {
+    })()), leadTab === 'team' && React.createElement("div", {
       style: {
         ...C,
         marginTop: 12
@@ -61810,7 +61854,7 @@ function LeadDevTab({
       maxWidth: 1000
     }
   }, React.createElement("style", null, `
-      .ldv-card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;
+      .ldv-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;
         transition:transform .15s cubic-bezier(.2,.7,.3,1),box-shadow .15s,border-color .15s;position:relative;overflow:hidden}
       .ldv-card:before{content:'';position:absolute;inset:0 auto 0 0;width:3px;background:var(--h);opacity:.55;transition:opacity .15s,width .15s}
       .ldv-card:hover{transform:translateY(-3px);border-color:var(--h);box-shadow:0 10px 26px -14px var(--h)}
@@ -61821,54 +61865,94 @@ function LeadDevTab({
       .ldv-tag.red{border-color:rgba(214,106,96,.45);color:var(--c-red)}
       .ldv-chain{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
       .ldv-chain>div{flex:1 1 118px;padding:9px 12px;border-left:2px solid var(--h)}
-      .ldv-go{background:linear-gradient(120deg,rgba(122,196,144,.16),rgba(122,196,144,.03));border:1px solid rgba(122,196,144,.3);
+      .ldv-go{background:linear-gradient(120deg,color-mix(in srgb, var(--c-grn) 16%, transparent),color-mix(in srgb, var(--c-grn) 3%, transparent));border:1px solid color-mix(in srgb, var(--c-grn) 32%, transparent);
         border-radius:12px;padding:13px 16px;display:flex;gap:12px;align-items:center;cursor:pointer;transition:transform .15s,box-shadow .15s}
       .ldv-go:hover{transform:translateY(-2px);box-shadow:0 10px 24px -16px var(--c-grn)}
     `), React.createElement("div", {
+    className: "rvt",
     style: {
-      background: 'linear-gradient(120deg,rgba(122,196,144,.14),rgba(122,196,144,.02))',
-      border: '1px solid var(--border)',
-      borderLeft: '4px solid var(--c-grn)',
-      borderRadius: 14,
-      padding: '18px 22px',
       marginBottom: 14
+    }
+  }, RvTreeCSS, React.createElement("div", {
+    style: {
+      padding: '20px 24px 18px'
     }
   }, React.createElement("div", {
     style: {
       fontFamily: "'Barlow Condensed',sans-serif",
       fontSize: 12,
       letterSpacing: '3px',
-      color: 'var(--g-888)'
+      color: 'rgba(238,248,242,.55)'
     }
   }, "REVIBE \xB7 CLINICAL DEVELOPMENT"), React.createElement("div", {
     style: {
       fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 30,
+      fontSize: 31,
       fontWeight: 800,
-      color: 'var(--g-eee)',
+      color: '#fff',
       lineHeight: 1.05,
-      margin: '2px 0 3px'
+      margin: '3px 0 4px'
     }
   }, "DEVELOP THE LEADS ", React.createElement("span", {
     style: {
-      color: 'var(--c-grn)'
+      color: '#c9f26f'
     }
   }, "\xB7"), " THE LEADS DEVELOP THE TEAM"), React.createElement("div", {
     style: {
       fontSize: 13.5,
-      color: 'var(--g-aaa)',
+      color: 'rgba(238,248,242,.72)',
       lineHeight: 1.6,
       maxWidth: 640
     }
   }, "Proof that people are getting better \u2014 not a record that mentorship happened."), React.createElement("div", {
-    className: "ldv-chain",
     style: {
-      marginTop: 14
+      display: 'flex',
+      alignItems: 'stretch',
+      gap: 0,
+      flexWrap: 'wrap',
+      marginTop: 16
     }
   }, CHAIN.map(([k, v], i2) => React.createElement("div", {
     key: k,
     style: {
-      '--h': 'rgba(122,196,144,' + (0.35 + i2 * 0.16) + ')'
+      flex: '1 1 130px',
+      display: 'flex',
+      gap: 11,
+      alignItems: 'flex-start',
+      padding: '2px 14px 2px 0'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 0,
+      flexShrink: 0
+    }
+  }, React.createElement("div", {
+    style: {
+      width: 30,
+      height: 30,
+      borderRadius: '50%',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontWeight: 800,
+      fontSize: 13,
+      background: 'linear-gradient(135deg,#2fd6a8,#c9f26f)',
+      color: '#06301f',
+      boxShadow: '0 0 14px rgba(80,225,175,.45)'
+    }
+  }, i2 + 1), i2 < CHAIN.length - 1 && React.createElement("div", {
+    style: {
+      width: 2,
+      flex: 1,
+      minHeight: 0
+    }
+  })), React.createElement("div", {
+    style: {
+      minWidth: 0
     }
   }, React.createElement("div", {
     style: {
@@ -61876,20 +61960,27 @@ function LeadDevTab({
       fontSize: 15,
       fontWeight: 800,
       letterSpacing: '1.6px',
-      color: 'var(--c-grn)',
-      opacity: 0.5 + i2 * 0.12
+      color: '#c9f26f'
     }
   }, k), React.createElement("div", {
     style: {
       fontSize: 12,
-      color: 'var(--g-777)',
+      color: 'rgba(238,248,242,.6)',
       lineHeight: 1.45,
       marginTop: 1
     }
-  }, v))))), React.createElement("div", {
+  }, v)), i2 < CHAIN.length - 1 && React.createElement("span", {
+    style: {
+      marginLeft: 'auto',
+      alignSelf: 'center',
+      color: 'rgba(238,248,242,.35)',
+      fontSize: 15,
+      paddingRight: 6
+    }
+  }, "\u2192")))))), React.createElement("div", {
     style: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit,minmax(184px,1fr))',
+      gridTemplateColumns: 'repeat(auto-fit,minmax(228px,1fr))',
       gap: 11
     }
   }, LD_LEADS.filter(l => l.kind !== 'director').map(l => {
@@ -61908,18 +61999,42 @@ function LeadDevTab({
     }, React.createElement("div", {
       style: {
         display: 'flex',
-        gap: 13,
+        gap: 11,
         alignItems: 'center'
       }
-    }, React.createElement(Ring, {
-      pct: none ? 0 : h.pct,
-      col: HUE[l.id],
-      size: 54,
-      label: none ? '—' : h.pct,
-      sub: none ? '' : '%'
-    }), React.createElement("div", {
+    }, (() => {
+      const p = RV_PHOTO(l.name);
+      return p ? React.createElement("img", {
+        src: p,
+        alt: l.name,
+        style: {
+          width: 52,
+          height: 52,
+          borderRadius: '50%',
+          objectFit: 'cover',
+          border: '2px solid ' + HUE[l.id],
+          flexShrink: 0
+        }
+      }) : React.createElement("div", {
+        style: {
+          width: 52,
+          height: 52,
+          borderRadius: '50%',
+          border: '2px solid ' + HUE[l.id],
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: "'Barlow Condensed',sans-serif",
+          fontWeight: 800,
+          fontSize: 18,
+          color: HUE[l.id],
+          flexShrink: 0
+        }
+      }, RV_MONO(l.name));
+    })(), React.createElement("div", {
       style: {
-        minWidth: 0
+        minWidth: 0,
+        flex: 1
       }
     }, React.createElement("div", {
       style: {
@@ -61935,7 +62050,13 @@ function LeadDevTab({
         color: HUE[l.id],
         opacity: .9
       }
-    }, l.area))), React.createElement("div", {
+    }, l.area)), React.createElement(Ring, {
+      pct: none ? 0 : h.pct,
+      col: HUE[l.id],
+      size: 46,
+      label: none ? '—' : h.pct,
+      sub: none ? '' : '%'
+    })), React.createElement("div", {
       style: {
         fontSize: 12,
         color: 'var(--g-777)',
@@ -61980,18 +62101,42 @@ function LeadDevTab({
   }, React.createElement("div", {
     style: {
       display: 'flex',
-      gap: 13,
+      gap: 11,
       alignItems: 'center'
     }
-  }, React.createElement(Ring, {
-    pct: mikeScored.length / 13 * 100,
-    col: HUE.mike,
-    size: 54,
-    label: mikeAvg == null ? '—' : mikeAvg.toFixed(1),
-    sub: mikeAvg == null ? '' : '/5'
-  }), React.createElement("div", {
+  }, (() => {
+    const p = RV_PHOTO('Mike Ross');
+    return p ? React.createElement("img", {
+      src: p,
+      alt: "Mike Ross",
+      style: {
+        width: 52,
+        height: 52,
+        borderRadius: '50%',
+        objectFit: 'cover',
+        border: '2px solid ' + HUE.mike,
+        flexShrink: 0
+      }
+    }) : React.createElement("div", {
+      style: {
+        width: 52,
+        height: 52,
+        borderRadius: '50%',
+        border: '2px solid ' + HUE.mike,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontWeight: 800,
+        fontSize: 18,
+        color: HUE.mike,
+        flexShrink: 0
+      }
+    }, "MR");
+  })(), React.createElement("div", {
     style: {
-      minWidth: 0
+      minWidth: 0,
+      flex: 1
     }
   }, React.createElement("div", {
     style: {
@@ -62006,7 +62151,13 @@ function LeadDevTab({
       fontSize: 12,
       color: HUE.mike
     }
-  }, "Director track \xB7 Oakville"))), React.createElement("div", {
+  }, "Director track \xB7 Oakville")), React.createElement(Ring, {
+    pct: mikeScored.length / 13 * 100,
+    col: HUE.mike,
+    size: 46,
+    label: mikeAvg == null ? '—' : mikeAvg.toFixed(1),
+    sub: mikeAvg == null ? '' : '/5'
+  })), React.createElement("div", {
     style: {
       fontSize: 12,
       color: 'var(--g-777)',
@@ -62058,7 +62209,7 @@ function LeadDevTab({
     style: {
       background: 'var(--surface2)',
       border: '1px solid var(--border)',
-      borderRadius: 14,
+      borderRadius: 12,
       padding: '14px 16px',
       marginTop: 14
     }
@@ -63281,6 +63432,44 @@ function AcademyTab({
   const avail = P ? AC_MIS.filter(m => m.s <= stage + 1) : [];
   const swNode = AC_SW.find(x => x.id === swSel) || AC_SW[0];
   const rx = AC_SWRX[swNode.id] || {};
+  const nextUp = (() => {
+    if (!P) return null;
+    const unf = AC_SW.filter(sw => !F[sw.id]);
+    if (!unf.length) return null;
+    const gapOf = sw => {
+      let g = 0;
+      const need = {};
+      for (const k in sw.req) {
+        const nx = Math.max(0, (sw.req[k] - 1) * AC_XPL - ((P.xp || {})[k] || 0));
+        if (nx > 0) need[k] = nx;
+        g += nx;
+      }
+      return {
+        g,
+        need
+      };
+    };
+    const t = unf.map(sw => ({
+      sw,
+      ...gapOf(sw)
+    })).sort((a, b) => a.g - b.g)[0];
+    const avail2 = AC_MIS.filter(m => m.s <= stage + 1 && !P.done[m.id]);
+    const recs = avail2.map(m => {
+      let sc = 0;
+      for (const k in m.xp) {
+        if (t.need[k]) sc += Math.min(m.xp[k], t.need[k]);
+      }
+      return {
+        m,
+        sc
+      };
+    }).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 3);
+    return {
+      ...t,
+      recs
+    };
+  })();
+  const recSet = new Set(nextUp ? nextUp.recs.map(x => x.m.id) : []);
   return React.createElement("div", {
     className: "acx",
     style: {
@@ -63595,7 +63784,98 @@ function AcademyTab({
     className: "rvt-fx-ring r2"
   }), React.createElement("div", {
     className: "rvt-fx-t"
-  }, fx))), React.createElement("div", {
+  }, fx))), nextUp && React.createElement("div", {
+    style: {
+      ...C,
+      borderLeft: '3px solid var(--c-grn)'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: 10,
+      flexWrap: 'wrap'
+    }
+  }, React.createElement(H, null, "\u26A1 Next unlock \u2014 ", nextUp.sw.name), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: 'var(--g-777)'
+    }
+  }, nextUp.g, " XP away \u2014 the closest switch to flipping")), React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-999)',
+      marginBottom: 9,
+      lineHeight: 1.55
+    }
+  }, nextUp.sw.desc), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6,
+      flexWrap: 'wrap',
+      marginBottom: nextUp.recs.length ? 12 : 0
+    }
+  }, Object.keys(nextUp.need).map(k => React.createElement("span", {
+    key: k,
+    style: {
+      fontSize: 11.5,
+      fontFamily: "'Barlow Condensed',sans-serif",
+      letterSpacing: '.8px',
+      color: 'var(--c-yel)',
+      border: '1px solid color-mix(in srgb, var(--c-yel) 35%, transparent)',
+      background: 'color-mix(in srgb, var(--c-yel) 7%, transparent)',
+      borderRadius: 5,
+      padding: '1px 8px'
+    }
+  }, AC_TNAME(k), " \xB7 ", nextUp.need[k], " XP to go"))), nextUp.recs.map(({
+    m,
+    sc
+  }, i) => React.createElement("div", {
+    key: m.id,
+    style: {
+      display: 'flex',
+      gap: 10,
+      alignItems: 'center',
+      borderTop: '1px solid var(--border)',
+      padding: '8px 0'
+    }
+  }, React.createElement("span", {
+    style: {
+      color: 'var(--c-grn)',
+      flexShrink: 0
+    }
+  }, "\u26A1"), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 180
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 13.5,
+      fontWeight: 700,
+      color: 'var(--g-eee)'
+    }
+  }, m.t), React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      color: 'var(--g-777)',
+      marginLeft: 8
+    }
+  }, Object.keys(m.xp).map(k => '+' + m.xp[k] + ' ' + AC_TNAME(k)).join(' · '))), React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      color: 'var(--g-777)',
+      flexShrink: 0
+    }
+  }, sc, " XP toward it"), React.createElement("button", {
+    className: "btn btn-lime btn-xs",
+    onClick: () => complete(m.id)
+  }, "Complete"))), !nextUp.recs.length && React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-777)'
+    }
+  }, "No available mission feeds this switch yet \u2014 missions unlock as the stage rises.")), React.createElement("div", {
     className: "rvt",
     style: {
       marginBottom: 12
@@ -63682,7 +63962,16 @@ function AcademyTab({
     style: {
       marginTop: 6
     }
-  }, "Study: ", (rx.m || []).map(m => AC_MODNAME(m)).join(' · '), (rx.n || []).length ? ' — nodes ' + (rx.n || []).map(AC_LESSON).join(', ') : '', rx.note ? ' · ' + rx.note : ''))), React.createElement("div", {
+  }, "Study: ", (rx.m || []).map(m => AC_MODNAME(m)).join(' · '), (rx.n || []).length ? ' — nodes ' + (rx.n || []).map(AC_LESSON).join(', ') : '', rx.note ? ' · ' + rx.note : ''), !F[swNode.id] && (() => {
+    const feed = AC_MIS.filter(m => !P.done[m.id] && Object.keys(m.xp).some(k => swNode.req[k] && AC_LEVEL(P.xp[k]) < swNode.req[k]));
+    if (!feed.length) return null;
+    return React.createElement("div", {
+      className: "rvt-ph",
+      style: {
+        marginTop: 6
+      }
+    }, "Missions that feed it: ", feed.slice(0, 4).map(m => m.t).join(' · '), feed.length > 4 ? ' · +' + (feed.length - 4) + ' more' : '');
+  })())), React.createElement("div", {
     style: {
       ...C
     }
@@ -63752,7 +64041,20 @@ function AcademyTab({
           fontWeight: 700,
           color: d ? 'var(--c-grn)' : 'var(--g-eee)'
         }
-      }, d ? '✓ ' : '', m.t), React.createElement("span", {
+      }, d ? '✓ ' : '', m.t), !d && recSet.has(m.id) && React.createElement("span", {
+        title: "Fastest path to the next switch",
+        style: {
+          fontSize: 10.5,
+          fontFamily: "'Barlow Condensed',sans-serif",
+          letterSpacing: '1px',
+          textTransform: 'uppercase',
+          color: 'var(--c-grn)',
+          border: '1px solid color-mix(in srgb, var(--c-grn) 40%, transparent)',
+          borderRadius: 5,
+          padding: '0 6px',
+          flexShrink: 0
+        }
+      }, "\u26A1 next unlock"), React.createElement("span", {
         style: {
           marginLeft: 'auto',
           flexShrink: 0
