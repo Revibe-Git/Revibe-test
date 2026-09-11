@@ -1920,7 +1920,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L167';
+window.__BUILD = 'build L168';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -3114,24 +3114,44 @@ const sv = (k, v) => {
     localStorage.setItem('rvgd3__ts', JSON.stringify(m));
   } catch (e) {}
   try {
+    sv._dirty = sv._dirty || {};
+    sv._dirty[k] = Date.now();
+    const flushOne = kk => {
+      const SBc = window.__SB;
+      if (!SBc) return;
+      let vv = null;
+      try {
+        vv = JSON.parse(localStorage.getItem('rvgd3_' + kk) || 'null');
+      } catch (e) {}
+      if (vv == null) {
+        delete sv._dirty[kk];
+        return;
+      }
+      SBc.from('gd_store').upsert({
+        id: kk,
+        data: {
+          v: vv,
+          t: Date.now()
+        }
+      }).then(r => {
+        if (!r.error) delete sv._dirty[kk];
+        window.__SYNC = {
+          ok: !r.error,
+          at: Date.now(),
+          msg: r.error ? r.error.message : ''
+        };
+      }, () => {});
+    };
+    window.__GD_FLUSH = () => {
+      try {
+        Object.keys(sv._dirty || {}).forEach(flushOne);
+      } catch (e) {}
+    };
+    window.__GD_DIRTY = () => Object.keys(sv._dirty || {});
     if (window.__SB && window.__GDSYNC && window.__GDSYNC.ready) {
       sv._t = sv._t || {};
       clearTimeout(sv._t[k]);
-      sv._t[k] = setTimeout(() => {
-        window.__SB.from('gd_store').upsert({
-          id: k,
-          data: {
-            v: v,
-            t: Date.now()
-          }
-        }).then(r => {
-          window.__SYNC = {
-            ok: !r.error,
-            at: Date.now(),
-            msg: r.error ? r.error.message : ''
-          };
-        }, () => {});
-      }, 600);
+      sv._t[k] = setTimeout(() => flushOne(k), 600);
     }
   } catch (e) {}
 };
@@ -3376,13 +3396,14 @@ const RV_ATTENTION = ({
     if (mine() && it.who !== me.name) return;
     out.push(it);
   };
+  const canComp = !!me && me.role === 'admin' && me.name;
   (staff || []).forEach(st => {
     if (st.contract && st.contract.status === 'pending') push({
       sev: 2,
       who: st.name,
       staffId: st.id,
       what: 'Contract amendment awaiting signature',
-      why: (st.contract.from || '') + (st.contract.to ? ' → ' + st.contract.to : ''),
+      why: canComp ? (st.contract.from || '') + (st.contract.to ? ' → ' + st.contract.to : '') : 'details on the profile · Contracts',
       page: 'staff',
       go: 'Open profile'
     });
@@ -3464,26 +3485,28 @@ const RV_ATTENTION = ({
     });
   } catch (e) {}
   try {
-    const gx = ld('gx', {
-      people: {}
-    }) || {};
-    Object.keys(gx.people || {}).forEach(nm => {
-      const pd = gx.people[nm];
-      if (!pd || pd.payLevel == null) return;
-      const E = GX_ENGINE(pd);
-      if (E.earnedIdx > pd.payLevel) {
-        const st = (staff || []).find(x => x.name === nm) || {};
-        push({
-          sev: 1,
-          who: nm,
-          staffId: st.id,
-          what: 'Grades support ' + GX_PAY[E.earnedIdx][0] + ' — currently at ' + GX_PAY[pd.payLevel][0],
-          why: 'decide at the next review',
-          page: 'gx',
-          go: 'Guest Experience'
-        });
-      }
-    });
+    if (canComp) {
+      const gx = ld('gx', {
+        people: {}
+      }) || {};
+      Object.keys(gx.people || {}).forEach(nm => {
+        const pd = gx.people[nm];
+        if (!pd || pd.payLevel == null) return;
+        const E = GX_ENGINE(pd);
+        if (E.earnedIdx > pd.payLevel) {
+          const st = (staff || []).find(x => x.name === nm) || {};
+          push({
+            sev: 1,
+            who: nm,
+            staffId: st.id,
+            what: 'Grades support ' + GX_PAY[E.earnedIdx][0] + ' — currently at ' + GX_PAY[pd.payLevel][0],
+            why: 'decide at the next review',
+            page: 'gx',
+            go: 'Guest Experience'
+          });
+        }
+      });
+    }
   } catch (e) {}
   try {
     const subs = ld('formSubs', []) || [];
@@ -4145,6 +4168,9 @@ function App() {
           window.__GDSYNC = {
             ready: true
           };
+          try {
+            window.__GD_FLUSH && window.__GD_FLUSH();
+          } catch (e) {}
           return;
         }
         let ts = {};
@@ -4258,6 +4284,9 @@ function App() {
       window.__GDSYNC = {
         ready: true
       };
+      try {
+        window.__GD_FLUSH && window.__GD_FLUSH();
+      } catch (e) {}
     };
     go();
     let last = Date.now();
@@ -4267,9 +4296,47 @@ function App() {
       go();
     };
     window.addEventListener('focus', onFocus);
+    const onHide = () => {
+      try {
+        const SBc = window.__SB;
+        const dirty = window.__GD_DIRTY && window.__GD_DIRTY() || [];
+        if (!SBc || !dirty.length) return;
+        const su = String(SBc.supabaseUrl || '').replace(/\/$/, ''),
+          sk = SBc.supabaseKey || '';
+        if (!su || !sk) return;
+        dirty.forEach(kk => {
+          let vv = null;
+          try {
+            vv = JSON.parse(localStorage.getItem('rvgd3_' + kk) || 'null');
+          } catch (e) {}
+          if (vv == null) return;
+          try {
+            fetch(su + '/rest/v1/gd_store?on_conflict=id', {
+              method: 'POST',
+              keepalive: true,
+              headers: {
+                'content-type': 'application/json',
+                apikey: sk,
+                authorization: 'Bearer ' + sk,
+                prefer: 'resolution=merge-duplicates'
+              },
+              body: JSON.stringify([{
+                id: kk,
+                data: {
+                  v: vv,
+                  t: Date.now()
+                }
+              }])
+            });
+          } catch (e) {}
+        });
+      } catch (e) {}
+    };
+    window.addEventListener('pagehide', onHide);
     return () => {
       c = true;
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('pagehide', onHide);
     };
   }, []);
   const SB = () => window.__SB;
@@ -20965,21 +21032,27 @@ function CallHistoryPage() {
       const cm = GD_CURM();
       let c = 0,
         b = 0;
+      const num = x => {
+        const n = parseFloat(x);
+        return isFinite(n) && n > 0 && n < 100000 ? n : 0;
+      };
       Object.values(data.calls || {}).forEach(locMap => {
         Object.entries(locMap || {}).forEach(([d, day]) => {
           if (!String(d).startsWith(cm)) return;
           Object.entries(day || {}).forEach(([k, v]) => {
-            if (k === '_x' || v == null) return;
-            if (typeof v === 'number') c += v;else {
-              c += v.c || 0;
-              b += v.b || 0;
+            if (!k || k[0] === '_' || v == null) return;
+            if (typeof v === 'object') {
+              c += num(v.c);
+              b += num(v.b);
+            } else {
+              c += num(v);
             }
           });
         });
       });
       return {
-        c,
-        b
+        c: Math.round(c),
+        b: Math.round(b)
       };
     } catch (e) {
       return {
