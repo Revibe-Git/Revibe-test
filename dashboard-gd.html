@@ -1920,7 +1920,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L170';
+window.__BUILD = 'build L171';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -42654,7 +42654,11 @@ function MyGrowthPage({
   }) || {};
   const E = GX_ENGINE(pd);
   const person = (staff || []).find(x => x.name === me);
-  const isClin = !!(person && (person.tracks || []).length);
+  const hasRubricGrades = !!(person && (person.tracks || []).some(t => {
+    const sc = (person.scores || {})[t] || {};
+    return Object.values(sc).some(v => v != null && v !== '' && +v > 0);
+  }));
+  const isClin = !!(person && (person.tracks || []).length) && (!RV_IS_GE(person) || hasRubricGrades);
   const Card = ({
     children,
     accent,
