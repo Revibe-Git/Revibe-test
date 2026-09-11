@@ -262,6 +262,26 @@ tbody tr:hover td{background:var(--surface2);}
 .gwash{background:color-mix(in srgb, var(--surface2) 91%, #2fd6a8 9%);border-color:color-mix(in srgb, var(--border) 72%, #2fd6a8 28%);}
 .grow{display:flex;gap:12px;align-items:center;padding:9px 12px;border-radius:10px;cursor:pointer;transition:background .13s,padding-left .13s;}
 .grow:hover{background:var(--surface3);padding-left:16px;}
+.gchip{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:4px 12px 4px 5px;cursor:pointer;transition:all .13s;color:#eef8f2;font-size:13px;font-weight:700;}
+.gchip:hover{background:rgba(255,255,255,.14);transform:translateY(-1px);border-color:rgba(201,242,111,.55);}
+.gchip .gchip-s{color:rgba(238,248,242,.6);font-size:11.5px;font-weight:400;}
+/* ── L165: the app-feel layer — one motion language for EVERY tab ─────────────── */
+@keyframes rvpgin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.pgin{animation:rvpgin .3s cubic-bezier(.22,.9,.35,1) both;}
+@keyframes rvmodin{from{opacity:0;transform:translateY(14px) scale(.97)}to{opacity:1;transform:none}}
+.modal{animation:rvmodin .22s cubic-bezier(.22,.9,.35,1) both;}
+@keyframes rvovin{from{opacity:0}to{opacity:1}}
+.overlay{animation:rvovin .16s ease both;}
+.btn{will-change:transform;}
+.btn:hover{transform:translateY(-1px);}
+.btn:active{transform:translateY(0) scale(.95);transition-duration:.05s;}
+.rvpill:active{transform:scale(.94);}
+.gcard.gclick:active{transform:translateY(0) scale(.985);}
+.grow:active{background:var(--surface3);}
+.rvh.click:active{transform:scale(.97);}
+.nav-item:hover{padding-left:19px;}
+#rvtip{position:fixed;z-index:12000;pointer-events:none;background:linear-gradient(140deg,#11503d,#0b3529);color:#eef8f2;border:1px solid rgba(201,242,111,.45);border-radius:9px;padding:8px 12px;font-size:12.5px;font-weight:500;max-width:300px;line-height:1.55;box-shadow:0 12px 30px rgba(0,0,0,.5);animation:rvpgin .14s ease both;}
+@media (prefers-reduced-motion:reduce){.pgin,.modal,.overlay,#rvtip{animation:none;}.btn:hover,.btn:active,.rvpill:active,.gcard.gclick:active,.rvh.click:active{transform:none;}}
 .modal-stripe{height:3px;background:linear-gradient(90deg,var(--go),var(--lime));border-radius:8px 8px 0 0;}
 .modal-body{padding:22px 26px;}
 .modal-close{position:absolute;top:14px;right:14px;background:var(--surface2);border:1px solid var(--border);color:var(--text3);border-radius:4px;padding:3px 9px;cursor:pointer;font-size:15px;font-family:'Barlow',sans-serif;z-index:10;}
@@ -1900,7 +1920,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L163';
+window.__BUILD = 'build L167';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -3863,6 +3883,71 @@ function RvAskHost() {
     onClick: () => done(val)
   }, q.ok || 'Save'))));
 }
+function RvTipHost() {
+  const [tip, setTip] = useState(null);
+  useEffect(() => {
+    let cur = null;
+    const clear = () => {
+      cur = null;
+      setTip(null);
+    };
+    const over = e => {
+      const t = e.target;
+      const el = t && t.closest ? t.closest('[title],[data-rvtip]') : null;
+      if (!el) {
+        if (cur) clear();
+        return;
+      }
+      if (el === cur) return;
+      const raw = el.getAttribute('title');
+      if (raw != null && raw !== '') {
+        el.setAttribute('data-rvtip', raw);
+        el.removeAttribute('title');
+      }
+      const txt = el.getAttribute('data-rvtip');
+      if (!txt) {
+        if (cur) clear();
+        return;
+      }
+      cur = el;
+      const r = el.getBoundingClientRect();
+      const below = r.bottom + 10,
+        up = below > window.innerHeight - 96;
+      setTip({
+        txt,
+        x: Math.round(Math.min(window.innerWidth - 160, Math.max(160, r.left + r.width / 2))),
+        y: up ? null : Math.round(below),
+        b: up ? Math.round(window.innerHeight - r.top + 10) : null
+      });
+    };
+    const out = e => {
+      if (cur && (!e.relatedTarget || !cur.contains(e.relatedTarget))) clear();
+    };
+    document.addEventListener('mouseover', over, true);
+    document.addEventListener('mouseout', out, true);
+    document.addEventListener('mousedown', clear, true);
+    window.addEventListener('scroll', clear, true);
+    return () => {
+      document.removeEventListener('mouseover', over, true);
+      document.removeEventListener('mouseout', out, true);
+      document.removeEventListener('mousedown', clear, true);
+      window.removeEventListener('scroll', clear, true);
+    };
+  }, []);
+  if (!tip) return null;
+  return React.createElement("div", {
+    id: "rvtip",
+    style: {
+      left: tip.x,
+      transform: 'translateX(-50%)',
+      ...(tip.y != null ? {
+        top: tip.y
+      } : {
+        bottom: tip.b
+      })
+    }
+  }, tip.txt);
+}
 function App() {
   const [meName, setMeName] = useState(() => {
     try {
@@ -4633,7 +4718,8 @@ function App() {
   }, "Check-in form"))))), React.createElement("div", {
     className: "scroll"
   }, React.createElement("div", {
-    className: "pg"
+    className: "pg pgin",
+    key: page
   }, (() => {
     const m = PAGE_META[page];
     const nv = NAV.find(n => n.id === page) || {};
@@ -4671,7 +4757,10 @@ function App() {
   }))))), React.createElement(ChromeBoundary, {
     name: "RvAskHost",
     quiet: true
-  }, React.createElement(RvAskHost, null)), palette && React.createElement(ChromeBoundary, {
+  }, React.createElement(RvAskHost, null)), React.createElement(ChromeBoundary, {
+    name: "RvTipHost",
+    quiet: true
+  }, React.createElement(RvTipHost, null)), palette && React.createElement(ChromeBoundary, {
     name: "Palette",
     quiet: true
   }, React.createElement(CommandPalette, {
@@ -5856,32 +5945,48 @@ function CommunityPage({
   .ev-ql .ev-ql-in{flex:1 1 100%;width:100%!important;min-width:0;font-size:16px!important;}
   .ev-ql .ev-ql-btn{flex:1 1 100%;padding:9px 12px;}
 }
-`), React.createElement(GhlPanel, null), React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
-      flexWrap: 'wrap',
-      justifyContent: 'flex-end',
-      marginBottom: 4
-    }
-  }, React.createElement("button", {
-    className: "btn btn-ghost btn-sm",
-    onClick: () => {
-      setShowImp(v => !v);
-    }
-  }, showImp ? 'Close import' : '⬆ Import form fills'), React.createElement("button", {
-    className: "btn btn-ghost btn-sm",
-    onClick: () => {
-      setShowRep(v => !v);
-    }
-  }, showRep ? 'Hide report' : '📊 Report'), React.createElement("button", {
-    className: "btn btn-go btn-sm",
-    onClick: () => {
-      setEv(blankEv);
-      setShowAdd(v => !v);
-    }
-  }, showAdd ? 'Cancel' : '+ Log event')), (showAdd || ev.id) && React.createElement("div", {
+`), React.createElement(GhlPanel, null), React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Community & Events",
+    sub: "Every event, its lead pipeline and its true ROI \u2014 booth costs, therapist opportunity time, and what actually booked.",
+    tiles: [{
+      lbl: 'Events',
+      val: events.length,
+      sub: 'logged',
+      fill: true
+    }, {
+      lbl: 'Leads',
+      val: TOT.n,
+      sub: 'from all events'
+    }, {
+      lbl: 'Booked',
+      val: TOT.b,
+      sub: TOT.n ? Math.round(TOT.b / TOT.n * 100) + '% conversion' : ''
+    }, {
+      lbl: 'Still open',
+      val: TOT.open,
+      valCol: TOT.open ? '#ffd166' : 'rgba(238,248,242,.4)',
+      sub: TOT.open ? 'leads to work' : 'pipeline clear'
+    }],
+    pills: [{
+      k: 'add',
+      label: showAdd ? 'Cancel' : '＋ Log event',
+      on: showAdd,
+      onClick: () => {
+        setEv(blankEv);
+        setShowAdd(v => !v);
+      }
+    }, {
+      k: 'imp',
+      label: showImp ? 'Close import' : '⬆ Import form fills',
+      on: showImp,
+      onClick: () => setShowImp(v => !v)
+    }, {
+      k: 'rep',
+      label: showRep ? 'Hide report' : '📊 Report',
+      on: showRep,
+      onClick: () => setShowRep(v => !v)
+    }]
+  }), (showAdd || ev.id) && React.createElement("div", {
     style: {
       background: 'var(--surface2)',
       border: '1px solid var(--border)',
@@ -20855,13 +20960,67 @@ function CallHistoryPage() {
       dAllNoI
     };
   }, [view, repWeek, viewingSavedRep, savedCallReports, data.leads, sources]);
+  const heroCM = (() => {
+    try {
+      const cm = GD_CURM();
+      let c = 0,
+        b = 0;
+      Object.values(data.calls || {}).forEach(locMap => {
+        Object.entries(locMap || {}).forEach(([d, day]) => {
+          if (!String(d).startsWith(cm)) return;
+          Object.entries(day || {}).forEach(([k, v]) => {
+            if (k === '_x' || v == null) return;
+            if (typeof v === 'number') c += v;else {
+              c += v.c || 0;
+              b += v.b || 0;
+            }
+          });
+        });
+      });
+      return {
+        c,
+        b
+      };
+    } catch (e) {
+      return {
+        c: 0,
+        b: 0
+      };
+    }
+  })();
   return React.createElement("div", null, React.createElement("style", null, `
 .chx-more{position:relative;margin-left:auto;}
 .chx-more>summary{list-style:none;}
 .chx-more>summary::-webkit-details-marker{display:none;}
 .chx-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:80;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:210px;box-shadow:0 12px 34px rgba(0,0,0,.45);}
 @media (max-width:480px){.chx-grid input{font-size:16px!important;}}
-`), React.createElement("div", {
+`), React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Guest Experience",
+    sub: "Front-desk new-patient calls, lead sources and follow-ups \u2014 both locations, every discipline, synced live.",
+    tiles: [{
+      lbl: 'Calls · this month',
+      val: heroCM.c,
+      sub: GD_CURM(),
+      fill: true
+    }, {
+      lbl: 'Booked · this month',
+      val: heroCM.b,
+      sub: heroCM.c ? Math.round(heroCM.b / heroCM.c * 100) + '% conversion' : ''
+    }, {
+      lbl: 'Follow-ups due',
+      val: dueN,
+      valCol: dueN ? '#ffd166' : 'rgba(238,248,242,.4)',
+      sub: dueN ? 'waiting on you' : 'all clear',
+      onClick: () => setView('agenda'),
+      title: 'Open the follow-up agenda'
+    }],
+    pills: [['calls', '📞 Call Volume'], ['leads', '🎯 Lead Sources'], ['ia', '📋 IA Tracker'], ['agenda', '🗓 Follow-ups' + (dueN > 0 ? ' · ' + dueN : '')], ['report', '📄 Weekly Report'], ['monthly', '📆 Reports']].map(([v, l]) => ({
+      k: v,
+      label: l,
+      on: view === v,
+      onClick: () => setView(v)
+    }))
+  }), React.createElement("div", {
     style: {
       display: 'flex',
       gap: 4,
@@ -20869,11 +21028,7 @@ function CallHistoryPage() {
       alignItems: 'center',
       flexWrap: 'wrap'
     }
-  }, [['calls', '📞 Call Volume'], ['leads', '🎯 Lead Sources'], ['ia', '📋 IA Tracker'], ['agenda', '🗓 Follow-ups' + (dueN > 0 ? ' (' + dueN + ')' : '')], ['report', '📄 Weekly Report'], ['monthly', '📆 Reports']].map(([v, l]) => React.createElement("button", {
-    key: v,
-    className: `btn btn-sm ${view === v ? 'btn-go' : 'btn-ghost'}`,
-    onClick: () => setView(v)
-  }, l)), React.createElement("input", {
+  }, React.createElement("input", {
     type: "file",
     accept: "application/json,.json",
     ref: backupRef,
@@ -33008,52 +33163,60 @@ button.pf-chip{cursor:pointer;}
 .pf-danger{border-color:var(--c-red);border-color:color-mix(in srgb,var(--c-red) 40%,transparent);}
 .pf-danger>summary{color:var(--c-red);}
 .pf-snapbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
-`), slowBanner, React.createElement("div", {
-    className: "pf-nav"
-  }, React.createElement("div", {
-    className: "pf-nav-grp"
-  }, React.createElement("div", {
-    className: "pf-nav-eb"
-  }, "Operational"), React.createElement("div", {
-    className: "pf-nav-btns"
-  }, React.createElement("button", {
-    className: `btn btn-sm ${tab === 'overview' ? 'btn-go' : 'btn-ghost'}`,
-    onClick: () => setTab('overview')
-  }, "\u25A3 Overview"))), React.createElement("div", {
-    className: "pf-nav-grp"
-  }, React.createElement("div", {
-    className: "pf-nav-eb"
-  }, "Reporting"), React.createElement("div", {
-    className: "pf-nav-btns"
-  }, React.createElement("button", {
-    className: `btn btn-sm ${PF_PEOPLE.includes(tab) ? 'btn-go' : 'btn-ghost'}`,
-    onClick: () => setTab(PF_PEOPLE.includes(pfMetric) ? pfMetric : 'revenue')
-  }, "\uD83D\uDC65 By practitioner"), React.createElement("button", {
-    className: `btn btn-sm ${tab === 'retention' ? 'btn-go' : 'btn-ghost'}`,
-    onClick: () => setTab('retention')
-  }, "\uD83D\uDD04 Retention"), React.createElement("button", {
-    className: `btn btn-sm ${tab === 'trends' ? 'btn-go' : 'btn-ghost'}`,
-    onClick: () => setTab('trends')
-  }, "\u2197 Trends"))), React.createElement("div", {
-    className: "pf-nav-grp"
-  }, React.createElement("div", {
-    className: "pf-nav-eb"
-  }, "Leadership"), React.createElement("div", {
-    className: "pf-nav-btns"
-  }, React.createElement("button", {
-    className: "btn btn-sm btn-ghost",
-    title: "Weekly / monthly / quarterly report \u2014 red flags, gaps and wins, ready for the meeting",
-    onClick: () => setPage && setPage('reports')
-  }, "\uD83D\uDCC4 Reports & flags \u2192"))), React.createElement("div", {
-    className: "pf-nav-grp pf-nav-data"
-  }, React.createElement("div", {
-    className: "pf-nav-eb"
-  }, "Data"), React.createElement("div", {
-    className: "pf-nav-btns"
-  }, React.createElement("button", {
-    className: `btn btn-sm ${tab === 'import' ? 'btn-go' : 'btn-ghost'}`,
-    onClick: () => setTab('import')
-  }, "\uD83D\uDCC2 Import & backup")))), tab !== 'import' && (() => {
+`), slowBanner, (() => {
+    const months = new Set((data.snapshots || []).map(sn => (sn.date || '').slice(0, 7)).filter(Boolean)).size;
+    const tracked = new Set((data.snapshots || []).flatMap(sn => (sn.rows || []).map(r => r.staffId).filter(Boolean))).size;
+    return React.createElement(RvPageHero, {
+      eyebrow: "Revibe \xB7 Business",
+      sub: "Jane imports become one canonical record \u2014 revenue, utilization, visits, GVA and retention per practitioner, month over month.",
+      tiles: [{
+        lbl: 'Months of data',
+        val: months,
+        sub: 'complete record',
+        fill: true
+      }, {
+        lbl: 'Practitioners tracked',
+        val: tracked,
+        sub: 'with imported numbers'
+      }, {
+        lbl: 'Saved reports',
+        val: savedReports.length,
+        sub: 'weekly · monthly'
+      }],
+      pills: [{
+        k: 'overview',
+        label: '▣ Overview',
+        on: tab === 'overview',
+        onClick: () => setTab('overview')
+      }, {
+        k: 'people',
+        label: '👥 By practitioner',
+        on: PF_PEOPLE.includes(tab),
+        onClick: () => setTab(PF_PEOPLE.includes(pfMetric) ? pfMetric : 'revenue')
+      }, {
+        k: 'retention',
+        label: '🔄 Retention',
+        on: tab === 'retention',
+        onClick: () => setTab('retention')
+      }, {
+        k: 'trends',
+        label: '↗ Trends',
+        on: tab === 'trends',
+        onClick: () => setTab('trends')
+      }, {
+        k: 'reports',
+        label: '📄 Reports & flags →',
+        on: false,
+        onClick: () => setPage && setPage('reports'),
+        title: 'Weekly / monthly / quarterly report — red flags, gaps and wins, ready for the meeting'
+      }, {
+        k: 'import',
+        label: '📂 Import & backup',
+        on: tab === 'import',
+        onClick: () => setTab('import')
+      }]
+    });
+  })(), tab !== 'import' && (() => {
     const winTo = (usingCustomRange ? (customTo || '').slice(0, 7) : dateTo) || '';
     const trendEl = (t, fmt) => {
       if (!t || t.n === 0) return React.createElement("span", {
@@ -37508,6 +37671,12 @@ function Overview({
     const sc = getBestScore(s);
     return sc !== null && sc < 6;
   }).sort((a, b) => (getBestScore(a) || 0) - (getBestScore(b) || 0)).slice(0, 5), [staff]);
+  const jumpStaff = (k, v) => {
+    try {
+      sessionStorage.setItem('rvgd3_ui_staff.' + k, JSON.stringify(v));
+    } catch (e) {}
+    setPage('staff');
+  };
   return React.createElement("div", null, React.createElement("style", null, `
         .ov-band{background:linear-gradient(115deg,rgba(202,232,193,.10),rgba(0,88,77,.14) 55%,transparent);border:1px solid var(--border);border-left:4px solid var(--lime);border-radius:12px;padding:20px 24px;margin-bottom:18px;}
         .ov-eyebrow{font-family:'Barlow Condensed',sans-serif;font-size:12.5px;letter-spacing:2.4px;text-transform:uppercase;color:var(--c-lime2);font-weight:700;}
@@ -37578,62 +37747,125 @@ function Overview({
   }), React.createElement("div", {
     className: "grid2 mb18"
   }, React.createElement("div", {
-    className: "card"
+    className: "card gcard",
+    style: {
+      '--gh': 'var(--c-grn)'
+    }
   }, React.createElement("div", {
     className: "card-head"
   }, React.createElement("span", {
     className: "card-lbl"
-  }, "Level Distribution")), [{
+  }, "Team Progression"), React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      color: 'var(--g-777)'
+    }
+  }, "tap a level to see who's there")), React.createElement("div", {
+    style: {
+      display: 'flex',
+      height: 12,
+      borderRadius: 6,
+      overflow: 'hidden',
+      gap: 2,
+      margin: '2px 0 12px'
+    }
+  }, [[4, 'var(--c-lime2)'], [3, 'var(--c-grn)'], [2, 'var(--c-yel)'], [1, 'var(--lc1)']].map(([n, c]) => lvC[n] > 0 && React.createElement("div", {
+    key: n,
+    style: {
+      flex: lvC[n],
+      background: c,
+      minWidth: 6
+    },
+    title: 'Level ' + n + ' — ' + lvC[n]
+  })), lvC.u > 0 && React.createElement("div", {
+    style: {
+      flex: lvC.u,
+      background: 'var(--surface3)',
+      minWidth: 6
+    },
+    title: 'Not yet scored — ' + lvC.u
+  })), [{
     n: 4,
+    k: 'L4',
     label: 'Level 4 – Advanced',
     c: 'var(--c-lime2)'
   }, {
     n: 3,
+    k: 'L3',
     label: 'Level 3 – Proficient',
     c: 'var(--c-grn)'
   }, {
     n: 2,
+    k: 'L2',
     label: 'Level 2 – Developing',
     c: 'var(--c-yel)'
   }, {
     n: 1,
+    k: 'L1',
     label: 'Level 1 – Foundational',
     c: 'var(--lc1)'
   }].map(l => React.createElement("div", {
     key: l.n,
-    className: "flex aic g12 mb12"
+    className: "grow",
+    onClick: () => jumpStaff('fLevel', l.k),
+    title: 'Open Staff Profiles filtered to ' + l.label
   }, React.createElement("div", {
     style: {
-      width: 6,
-      height: 6,
-      borderRadius: 2,
+      width: 8,
+      height: 8,
+      borderRadius: 3,
       background: l.c,
       flexShrink: 0
     }
   }), React.createElement("div", {
     className: "sm",
     style: {
-      flex: 1
+      flex: '0 0 168px'
     }
   }, l.label), React.createElement("div", {
     style: {
-      fontSize: 24,
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontWeight: 700,
-      color: l.c,
-      lineHeight: 1
-    }
-  }, lvC[l.n]))), lvC.u > 0 && React.createElement("div", {
-    className: "flex aic g12",
-    style: {
-      opacity: .3
+      flex: 1,
+      height: 5,
+      borderRadius: 3,
+      background: 'var(--surface3)',
+      overflow: 'hidden'
     }
   }, React.createElement("div", {
     style: {
-      width: 6,
-      height: 6,
-      borderRadius: 2,
-      background: '#333',
+      width: (staff.length ? Math.round(lvC[l.n] / staff.length * 100) : 0) + '%',
+      height: '100%',
+      background: l.c,
+      borderRadius: 3,
+      transition: 'width .4s'
+    }
+  })), React.createElement("div", {
+    style: {
+      fontSize: 22,
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontWeight: 800,
+      color: l.c,
+      lineHeight: 1,
+      width: 30,
+      textAlign: 'right'
+    }
+  }, lvC[l.n]), React.createElement("span", {
+    style: {
+      color: 'var(--g-666)',
+      fontSize: 12
+    }
+  }, "\u203A"))), lvC.u > 0 && React.createElement("div", {
+    className: "grow",
+    style: {
+      opacity: .55
+    },
+    onClick: () => jumpStaff('fLevel', 'none'),
+    title: "Open Staff Profiles filtered to not-yet-scored"
+  }, React.createElement("div", {
+    style: {
+      width: 8,
+      height: 8,
+      borderRadius: 3,
+      background: 'var(--surface3)',
       flexShrink: 0
     }
   }), React.createElement("div", {
@@ -37643,28 +37875,45 @@ function Overview({
     }
   }, "GX / Not yet scored"), React.createElement("div", {
     style: {
-      fontSize: 24,
+      fontSize: 22,
       fontFamily: "'Barlow Condensed',sans-serif",
-      fontWeight: 700,
-      lineHeight: 1
+      fontWeight: 800,
+      lineHeight: 1,
+      width: 30,
+      textAlign: 'right'
     }
-  }, lvC.u))), React.createElement("div", {
-    className: "card"
+  }, lvC.u), React.createElement("span", {
+    style: {
+      color: 'var(--g-666)',
+      fontSize: 12
+    }
+  }, "\u203A"))), React.createElement("div", {
+    className: "card gcard",
+    style: {
+      '--gh': 'var(--c-grn)'
+    }
   }, React.createElement("div", {
     className: "card-head"
   }, React.createElement("span", {
     className: "card-lbl"
-  }, "Rubric Tracks Active")), ['clinical', 'spa', 'sc'].map(t => {
+  }, "Rubric Tracks Active"), React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      color: 'var(--g-777)'
+    }
+  }, "tap a track to see its people")), ['clinical', 'spa', 'sc'].map(t => {
     const m = TRACK_META[t];
     const cnt = staff.filter(s => s.tracks && s.tracks.includes(t)).length;
     const rs = RUBRIC_SYSTEMS[t];
     return React.createElement("div", {
       key: t,
-      className: "flex aic g10 mb14"
+      className: "grow",
+      onClick: () => jumpStaff('fTrack', t),
+      title: 'Open Staff Profiles filtered to ' + rs.label
     }, React.createElement("div", {
       style: {
         width: 6,
-        height: 24,
+        height: 26,
         borderRadius: 2,
         background: m.color,
         flexShrink: 0
@@ -37684,10 +37933,15 @@ function Overview({
       style: {
         fontSize: 22,
         fontFamily: "'Barlow Condensed',sans-serif",
-        fontWeight: 700,
+        fontWeight: 800,
         color: m.color
       }
-    }, cnt));
+    }, cnt), React.createElement("span", {
+      style: {
+        color: 'var(--g-666)',
+        fontSize: 12
+      }
+    }, "\u203A"));
   }))), React.createElement("div", {
     className: "grid2"
   }, React.createElement("div", {
@@ -37699,43 +37953,57 @@ function Overview({
   }, "Top Performers"), React.createElement("button", {
     className: "btn btn-ghost btn-xs",
     onClick: () => setPage('staff')
-  }, "All Staff")), top5.map((s, i) => React.createElement("div", {
-    key: s.id,
-    className: "flex aic g10 mb12",
-    style: {
-      cursor: 'pointer'
-    },
-    onClick: () => openProfile(s.id)
-  }, React.createElement("div", {
-    style: {
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 16,
-      color: 'var(--text3)',
-      width: 18,
-      textAlign: 'center'
-    }
-  }, i + 1), React.createElement(Av, {
-    name: s.name,
-    sz: "sm"
-  }), React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, React.createElement("div", {
-    className: "sm fw5"
-  }, s.name), React.createElement("div", {
-    className: "flex aic g4 mt8",
-    style: {
-      marginTop: 3
-    }
-  }, React.createElement(DBadge, {
-    d: s.discipline
-  }), s.tracks && s.tracks.map(t => React.createElement(TrackBadge, {
-    key: t,
-    t: t
-  })))), React.createElement(ScoreBar, {
-    score: getBestScore(s)
-  })))), React.createElement("div", {
+  }, "All Staff")), top5.map((s, i) => {
+    const medal = i === 0 ? '#ffd166' : i === 1 ? '#c9f26f' : i === 2 ? '#2fd6a8' : null;
+    return React.createElement("div", {
+      key: s.id,
+      className: "grow",
+      onClick: () => openProfile(s.id),
+      title: "Open profile"
+    }, React.createElement("div", {
+      style: {
+        width: 24,
+        height: 24,
+        borderRadius: '50%',
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 13.5,
+        fontWeight: 800,
+        background: i === 0 ? medal : 'transparent',
+        color: i === 0 ? '#12250f' : medal || 'var(--text3)',
+        border: medal ? '1.6px solid ' + medal : '1px solid var(--border)'
+      }
+    }, i + 1), React.createElement(Av, {
+      name: s.name,
+      sz: "sm"
+    }), React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, React.createElement("div", {
+      className: "sm fw5"
+    }, s.name), React.createElement("div", {
+      className: "flex aic g4",
+      style: {
+        marginTop: 3
+      }
+    }, React.createElement(DBadge, {
+      d: s.discipline
+    }), s.tracks && s.tracks.map(t => React.createElement(TrackBadge, {
+      key: t,
+      t: t
+    })))), React.createElement(ScoreBar, {
+      score: getBestScore(s)
+    }), React.createElement("span", {
+      style: {
+        color: 'var(--g-666)',
+        fontSize: 12
+      }
+    }, "\u203A"));
+  })), React.createElement("div", {
     className: "card"
   }, React.createElement("div", {
     className: "card-head"
@@ -37753,38 +38021,79 @@ function Overview({
     }
   }, "Where coaching lands first \u2014 lowest current scores, not a ranking of people."), attention.map(s => {
     const sc = getBestScore(s);
+    const col = sc < 4 ? 'var(--red)' : 'var(--yellow)';
+    const lv = getLevel(sc);
+    const nextAt = sc < 4 ? 4 : sc < 6 ? 6 : 7.5;
     return React.createElement("div", {
       key: s.id,
-      className: "flex aic g10 mb12",
-      style: {
-        cursor: 'pointer'
-      },
-      onClick: () => openProfile(s.id)
+      className: "grow",
+      onClick: () => openProfile(s.id),
+      title: "Open profile"
     }, React.createElement(Av, {
       name: s.name,
       sz: "sm"
     }), React.createElement("div", {
       style: {
-        flex: 1
+        flex: 1,
+        minWidth: 0
       }
     }, React.createElement("div", {
       className: "sm fw5"
-    }, s.name), React.createElement(DBadge, {
+    }, s.name, " ", React.createElement("span", {
+      style: {
+        marginLeft: 4
+      }
+    }, React.createElement(DBadge, {
       d: s.discipline
-    })), React.createElement("div", {
+    }))), React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 7,
+        marginTop: 4
+      }
+    }, React.createElement("div", {
+      style: {
+        flex: 1,
+        maxWidth: 190,
+        height: 5,
+        borderRadius: 3,
+        background: 'var(--surface3)',
+        overflow: 'hidden'
+      }
+    }, React.createElement("div", {
+      style: {
+        width: Math.min(100, sc / 10 * 100) + '%',
+        height: '100%',
+        background: col,
+        borderRadius: 3
+      }
+    })), React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: 'var(--g-777)',
+        whiteSpace: 'nowrap'
+      }
+    }, Math.round((nextAt - sc) * 10) / 10, " to next band"))), React.createElement("div", {
       style: {
         textAlign: 'right'
       }
     }, React.createElement("div", {
       style: {
         fontSize: 22,
-        fontWeight: 700,
-        color: sc < 4 ? 'var(--red)' : 'var(--yellow)',
-        fontFamily: "'Barlow Condensed',sans-serif"
+        fontWeight: 800,
+        color: col,
+        fontFamily: "'Barlow Condensed',sans-serif",
+        lineHeight: 1
       }
     }, sc), React.createElement(LvBadge, {
       score: sc
-    })));
+    })), React.createElement("span", {
+      style: {
+        color: 'var(--g-666)',
+        fontSize: 12
+      }
+    }, "\u203A"));
   }))), React.createElement("div", {
     className: "card",
     style: {
@@ -37818,13 +38127,10 @@ function Overview({
     const site = (typeof siteList === 'function' ? siteList(s)[0] : s.site) || s.site || '';
     return React.createElement("div", {
       key: s.id,
+      className: "gcard gclick",
       onClick: () => openProfile(s.id),
       style: {
-        cursor: 'pointer',
-        background: 'var(--surface2)',
-        border: '1px solid var(--border)',
-        borderRadius: 8,
-        padding: '10px 12px'
+        '--gh': 'var(--c-grn)'
       }
     }, React.createElement("div", {
       className: "flex aic g8",
@@ -41135,21 +41441,45 @@ const RvHeroTile = ({
   hue,
   onClick,
   title
-}) => React.createElement("div", {
-  className: 'rvh' + (fill ? ' fill' : '') + (onClick ? ' click' : ''),
-  onClick: onClick,
-  title: title,
-  role: onClick ? 'button' : undefined
-}, React.createElement("div", {
-  className: "rvh-l"
-}, lbl), React.createElement("div", {
-  className: "rvh-v",
-  style: valCol && !fill ? {
-    color: valCol
-  } : null
-}, val), sub ? React.createElement("div", {
-  className: "rvh-s"
-}, sub) : null);
+}) => {
+  const num = typeof val === 'number' && isFinite(val) ? val : null;
+  const dec = num != null && Math.round(num) !== num ? 1 : 0;
+  const [shown, setShown] = useState(num != null ? 0 : null);
+  useEffect(() => {
+    if (num == null) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setShown(num);
+      return;
+    }
+    let raf,
+      t0 = null;
+    const dur = 650;
+    const step = t => {
+      if (t0 == null) t0 = t;
+      const p2 = Math.min(1, (t - t0) / dur);
+      const e = 1 - Math.pow(1 - p2, 3);
+      setShown(dec ? Math.round(num * e * 10) / 10 : Math.round(num * e));
+      if (p2 < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [num]);
+  return React.createElement("div", {
+    className: 'rvh' + (fill ? ' fill' : '') + (onClick ? ' click' : ''),
+    onClick: onClick,
+    title: title,
+    role: onClick ? 'button' : undefined
+  }, React.createElement("div", {
+    className: "rvh-l"
+  }, lbl), React.createElement("div", {
+    className: "rvh-v",
+    style: valCol && !fill ? {
+      color: valCol
+    } : null
+  }, num != null ? dec ? (shown ?? 0).toFixed(1) : shown : val), sub ? React.createElement("div", {
+    className: "rvh-s"
+  }, sub) : null);
+};
 const RvHeroChip = ({
   txt,
   col
@@ -41165,6 +41495,7 @@ const RvPill = ({
   onClick,
   title
 }) => React.createElement("button", {
+  className: "rvpill",
   onClick: onClick,
   title: title,
   style: {
@@ -44278,9 +44609,10 @@ function GuestExperiencePage({
     }, "Pick a team member to see where they are"), React.createElement("div", {
       className: "rv-empty-p"
     }, "Each person's card opens on a compact summary \u2014 pay step, assessed placement, gates met and the first thing blocking them \u2014 then the ten category scores to grade. Every change saves and syncs automatically."), pool.length > 0 && React.createElement("div", {
+      className: "gcard-grid",
       style: {
-        borderTop: '1px solid var(--border)',
-        marginTop: 4
+        marginTop: 10,
+        textAlign: 'left'
       }
     }, pool.map(p2 => {
       const nm = p2.name;
@@ -44289,33 +44621,86 @@ function GuestExperiencePage({
       const last = rv.length ? rv[rv.length - 1] : null;
       const gr = Object.values(rec.g3 || {}).reduce((a, c) => a + Object.values(c || {}).filter(Boolean).length, 0);
       const pl = rec.payLevel;
+      const tot = GX_CATS.length * 3;
+      const pct = Math.round(gr / tot * 100);
+      const stCol = !rv.length ? 'var(--c-amb)' : last && !last.closed ? 'var(--c-yel)' : 'var(--c-grn)';
       return React.createElement("div", {
         key: nm,
-        className: "att-row",
+        className: "gcard gclick",
         style: {
-          padding: '9px 6px',
-          borderBottom: '1px solid var(--border)',
-          borderRadius: 0
+          '--gh': stCol
         },
-        onClick: () => setPerson(nm)
-      }, React.createElement("span", {
-        className: "att-dot",
+        onClick: () => setPerson(nm),
+        title: 'Open ' + nm
+      }, React.createElement("div", {
         style: {
-          background: !rv.length ? 'var(--c-amb)' : last && !last.closed ? 'var(--c-yel)' : 'var(--c-grn)'
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          marginBottom: 8
         }
-      }), React.createElement("span", {
-        className: "att-what"
-      }, React.createElement("b", null, nm), React.createElement("span", {
+      }, React.createElement(Av, {
+        name: nm,
+        sz: "md"
+      }), React.createElement("div", {
         style: {
-          color: 'var(--g-888)',
-          marginLeft: 8,
-          fontSize: 12.5
+          flex: 1,
+          minWidth: 0
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 14.5,
+          fontWeight: 800,
+          color: 'var(--g-eee)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis'
+        }
+      }, nm), React.createElement("div", {
+        style: {
+          fontSize: 11.5,
+          color: pl != null ? 'var(--c-grn)' : 'var(--c-amb)'
         }
       }, pl != null ? GX_PAY[pl][0] + ' · ' + GX_ROLEBYPAY[pl] : 'pay level not set')), React.createElement("span", {
-        className: "att-why"
-      }, gr ? gr + '/' + GX_CATS.length * 3 + ' graded' : 'not graded yet', " \xB7 ", last ? (last.closed ? 'reviewed ' : 'review open ') + last.date : 'never reviewed'), React.createElement("span", {
-        className: "att-go"
-      }, "Open \u2192"));
+        style: {
+          color: 'var(--g-666)',
+          fontSize: 13
+        }
+      }, "\u203A")), React.createElement("div", {
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8
+        }
+      }, React.createElement("div", {
+        style: {
+          flex: 1,
+          height: 5,
+          borderRadius: 3,
+          background: 'var(--surface3)',
+          overflow: 'hidden'
+        }
+      }, React.createElement("div", {
+        style: {
+          width: pct + '%',
+          height: '100%',
+          background: 'var(--c-grn)',
+          borderRadius: 3,
+          transition: 'width .4s'
+        }
+      })), React.createElement("span", {
+        style: {
+          fontSize: 11,
+          color: 'var(--g-777)',
+          whiteSpace: 'nowrap'
+        }
+      }, gr ? gr + '/' + tot + ' graded' : 'not graded yet')), React.createElement("div", {
+        style: {
+          fontSize: 11.5,
+          color: stCol,
+          marginTop: 5
+        }
+      }, last ? (last.closed ? '✓ reviewed ' : '● review open ') + last.date : 'never reviewed'));
     })), React.createElement("div", {
       style: {
         display: 'flex',
@@ -47363,7 +47748,56 @@ function EvalsPage({
       onClick: () => setModal('addEval'),
       title: 'Score a rubric review now'
     }]
-  }), React.createElement("div", {
+  }, (() => {
+    const last = {};
+    evals.forEach(e => {
+      if (e.staffId && e.date && (!last[e.staffId] || e.date > last[e.staffId])) last[e.staffId] = e.date;
+    });
+    const due = (staff || []).filter(s2 => s2.tracks && s2.tracks.length > 0).map(s2 => {
+      const d = last[s2.id];
+      const days = d ? Math.round((Date.now() - new Date(d)) / 86400000) : null;
+      return {
+        s2,
+        days
+      };
+    }).sort((a, b) => (b.days == null ? 1e9 : b.days) - (a.days == null ? 1e9 : a.days)).slice(0, 3);
+    if (!due.length) return null;
+    return React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 9,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        marginTop: 12
+      }
+    }, React.createElement("span", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 12.5,
+        fontWeight: 800,
+        letterSpacing: '2px',
+        color: '#ffd166'
+      }
+    }, "\u26A1 DUE NEXT"), due.map(({
+      s2,
+      days
+    }) => React.createElement("span", {
+      key: s2.id,
+      className: "gchip",
+      onClick: () => openProfile(s2.id),
+      title: 'Open ' + s2.name + "'s profile"
+    }, React.createElement(Av, {
+      name: s2.name,
+      sz: "sm"
+    }), s2.name, React.createElement("span", {
+      className: "gchip-s"
+    }, days == null ? 'never evaluated' : days + 'd since last'))), React.createElement("span", {
+      style: {
+        fontSize: 11.5,
+        color: 'rgba(238,248,242,.45)'
+      }
+    }, "longest without a scored review"));
+  })()), React.createElement("div", {
     style: {
       display: 'flex',
       gap: 6,
@@ -47551,7 +47985,58 @@ function EduPage({
       label: '＋ Log Session',
       onClick: () => setModal('addSess')
     }]
-  }), justSaved && React.createElement("div", {
+  }, (() => {
+    const last = {};
+    sessions.forEach(se => {
+      (se.attendees || []).forEach(id => {
+        if (se.date && (!last[id] || se.date > last[id])) last[id] = se.date;
+      });
+    });
+    const due = (staff || []).filter(s2 => s2.tracks && s2.tracks.length > 0).map(s2 => {
+      const d = last[s2.id];
+      const days = d ? Math.round((Date.now() - new Date(d)) / 86400000) : null;
+      return {
+        s2,
+        days
+      };
+    }).sort((a, b) => (b.days == null ? 1e9 : b.days) - (a.days == null ? 1e9 : a.days)).slice(0, 3);
+    if (!due.length) return null;
+    return React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 9,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        marginTop: 12
+      }
+    }, React.createElement("span", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 12.5,
+        fontWeight: 800,
+        letterSpacing: '2px',
+        color: '#ffd166'
+      }
+    }, "\u26A1 DUE NEXT"), due.map(({
+      s2,
+      days
+    }) => React.createElement("span", {
+      key: s2.id,
+      className: "gchip",
+      onClick: () => openProfile(s2.id),
+      title: 'Open ' + s2.name + "'s profile"
+    }, React.createElement(Av, {
+      name: s2.name,
+      sz: "sm"
+    }), s2.name, React.createElement("span", {
+      className: "gchip-s"
+    }, days == null ? 'no sessions yet' : days + 'd since last'))), React.createElement("span", {
+      style: {
+        fontSize: 11.5,
+        color: 'rgba(238,248,242,.45)'
+      }
+    }, "longest without education time"));
+  })()), justSaved && React.createElement("div", {
     className: "flex aic g8",
     style: {
       background: 'rgba(68,204,170,.08)',
@@ -47672,7 +48157,56 @@ function MentorsPage({
   }), [staff, sessions, evals]);
   const unassigned = coverage.filter(c => !c.mentorName);
   const byName = n => staff.find(x => x.name === n) || null;
-  return React.createElement("div", null, React.createElement("style", null, `.mtx-name:hover{color:var(--c-lime2);text-decoration:underline;cursor:pointer;}`), React.createElement("div", {
+  return React.createElement("div", null, React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Growth & Development",
+    sub: "Who mentors whom, and when each person was last seen \u2014 coverage made visible so nobody develops alone.",
+    tiles: [{
+      lbl: 'On a track',
+      val: coverage.length,
+      sub: 'people covered here',
+      fill: true
+    }, {
+      lbl: 'With a mentor',
+      val: coverage.length - unassigned.length,
+      sub: 'assigned'
+    }, {
+      lbl: 'No mentor yet',
+      val: unassigned.length,
+      valCol: unassigned.length ? '#ffd166' : 'rgba(238,248,242,.4)',
+      sub: unassigned.length ? 'needs pairing' : 'everyone covered'
+    }]
+  }, unassigned.length > 0 && React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 9,
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      marginTop: 12
+    }
+  }, React.createElement("span", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 12.5,
+      fontWeight: 800,
+      letterSpacing: '2px',
+      color: '#ffd166'
+    }
+  }, "\u26A1 NEEDS A MENTOR"), unassigned.slice(0, 4).map(c => React.createElement("span", {
+    key: c.s.id,
+    className: "gchip",
+    onClick: () => openProfile(c.s.id),
+    title: 'Open ' + c.s.name + "'s profile"
+  }, React.createElement(Av, {
+    name: c.s.name,
+    sz: "sm"
+  }), c.s.name, React.createElement("span", {
+    className: "gchip-s"
+  }, c.nSess ? c.nSess + ' session' + (c.nSess !== 1 ? 's' : '') : 'no sessions yet'))), unassigned.length > 4 && React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      color: 'rgba(238,248,242,.45)'
+    }
+  }, "+", unassigned.length - 4, " more below"))), React.createElement("style", null, `.mtx-name:hover{color:var(--c-lime2);text-decoration:underline;cursor:pointer;}`), React.createElement("div", {
     className: "grid2 mb18"
   }, MENTORS.map(m => {
     const mSess = sessions.filter(s => s.mentorId === m.id);
@@ -47882,51 +48416,33 @@ function GapsPage({
     });
     return result;
   }, [staff, evals]);
-  return React.createElement("div", null, React.createElement("div", {
-    className: "sg3 mb18"
-  }, React.createElement("div", {
-    className: "sc yellow",
-    style: {
-      cursor: 'pointer',
-      outline: mFilter === 'below' ? '2px solid var(--c-yel)' : 'none'
-    },
-    onClick: () => setMFilter(mFilter === 'below' ? 'all' : 'below')
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "Staff Below L2"), React.createElement("div", {
-    className: "sc-val"
-  }, staff.filter(s => {
-    const sc = getBestScore(s);
-    return sc !== null && sc < 6;
-  }).length), React.createElement("div", {
-    className: "sc-sub"
-  }, "Score under 6.0 \u2014 click to list")), React.createElement("div", {
-    className: "sc purple",
-    style: {
-      cursor: 'pointer',
-      outline: mFilter === 'multi' ? '2px solid var(--c-pur)' : 'none'
-    },
-    onClick: () => setMFilter(mFilter === 'multi' ? 'all' : 'multi')
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "Multi-Track"), React.createElement("div", {
-    className: "sc-val"
-  }, staff.filter(s => s.tracks && s.tracks.length > 1).length), React.createElement("div", {
-    className: "sc-sub"
-  }, "Assessed on 2+ rubrics \u2014 click to list")), React.createElement("div", {
-    className: "sc go",
-    style: {
-      cursor: 'pointer',
-      outline: mFilter === 'pending' ? '2px solid var(--go)' : 'none'
-    },
-    onClick: () => setMFilter(mFilter === 'pending' ? 'all' : 'pending')
-  }, React.createElement("div", {
-    className: "sc-lbl"
-  }, "Pending Scores"), React.createElement("div", {
-    className: "sc-val"
-  }, staff.filter(s => s.tracks && s.tracks.length > 0 && getBestScore(s) === null).length), React.createElement("div", {
-    className: "sc-sub"
-  }, "No audit data yet \u2014 click to list"))), ['clinical', 'spa', 'sc'].map(track => {
+  return React.createElement("div", null, React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Growth & Development",
+    sub: "Where the team is weakest \u2014 lowest category averages per track, and the people a coaching plan reaches first.",
+    tiles: [{
+      lbl: 'Below L2',
+      val: staff.filter(s2 => {
+        const sc = getBestScore(s2);
+        return sc !== null && sc < 6;
+      }).length,
+      valCol: '#ffd166',
+      fill: mFilter === 'below',
+      onClick: () => setMFilter(mFilter === 'below' ? 'all' : 'below'),
+      title: 'Score under 6.0 — tap to list'
+    }, {
+      lbl: 'Multi-track',
+      val: staff.filter(s2 => s2.tracks && s2.tracks.length > 1).length,
+      fill: mFilter === 'multi',
+      onClick: () => setMFilter(mFilter === 'multi' ? 'all' : 'multi'),
+      title: 'Assessed on 2+ rubrics — tap to list'
+    }, {
+      lbl: 'Pending scores',
+      val: staff.filter(s2 => s2.tracks && s2.tracks.length > 0 && getBestScore(s2) === null).length,
+      fill: mFilter === 'pending',
+      onClick: () => setMFilter(mFilter === 'pending' ? 'all' : 'pending'),
+      title: 'No audit data yet — tap to list'
+    }]
+  }), ['clinical', 'spa', 'sc'].map(track => {
     const rs = RUBRIC_SYSTEMS[track];
     const m = TRACK_META[track];
     const avgs = trackAvgs[track];
@@ -50721,53 +51237,75 @@ function FormsPage({
   }
   return React.createElement("div", null, React.createElement(MeetingTranscriber, {
     staff: staff
-  }), React.createElement("div", {
-    className: "flex aic jsb mb18"
-  }, React.createElement("div", null, React.createElement("div", {
+  }), React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 G&D Check-in System",
+    sub: "The three-part review cycle \u2014 Monthly momentum \xB7 Quarterly scoring \xB7 Annual alignment. Submissions land here and wait for a lead's review.",
+    tiles: [{
+      lbl: 'Submissions',
+      val: submissions.length,
+      sub: 'all time',
+      fill: true
+    }, {
+      lbl: 'Waiting review',
+      val: waitingAll.length,
+      valCol: waitingAll.length ? '#ffd166' : 'rgba(238,248,242,.4)',
+      sub: waitingAll.length ? 'need a lead' : 'all caught up'
+    }, {
+      lbl: 'Reviewed',
+      val: submissions.length - waitingAll.length,
+      sub: 'closed out'
+    }],
+    pills: [{
+      k: 'list',
+      label: '＋ New Form',
+      on: view === 'list',
+      onClick: () => setView('list')
+    }, {
+      k: 'subs',
+      label: 'Submissions · ' + submissions.length,
+      on: view === 'submissions',
+      onClick: () => setView('submissions')
+    }]
+  }, waitingAll.length > 0 && React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 9,
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      marginTop: 12
+    }
+  }, React.createElement("span", {
     style: {
       fontFamily: "'Barlow Condensed',sans-serif",
       fontSize: 12.5,
+      fontWeight: 800,
       letterSpacing: '2px',
-      textTransform: 'uppercase',
-      color: 'var(--g-aaa)',
-      marginBottom: 4
+      color: '#ffd166'
     }
-  }, "G&D Check-In System"), React.createElement("div", {
+  }, "\u26A1 WAITING REVIEW"), [...waitingAll].sort((a, b) => (a.submittedAt || '').localeCompare(b.submittedAt || '')).slice(0, 3).map(sub => {
+    const who = sub.data?.clinician || sub.data?.basic?.clinician || '—';
+    const days = sub.submittedAt ? Math.round((Date.now() - new Date(sub.submittedAt)) / 86400000) : null;
+    return React.createElement("span", {
+      key: sub.id,
+      className: "gchip",
+      onClick: () => {
+        setView('submissions');
+        setFilterType('all');
+        setExpandedSub(sub.id);
+      },
+      title: 'Open this ' + (FORM_DEFS[sub.formType]?.short || sub.formType) + ' submission'
+    }, React.createElement(Av, {
+      name: who,
+      sz: "sm"
+    }), who, React.createElement("span", {
+      className: "gchip-s"
+    }, (FORM_DEFS[sub.formType]?.short || sub.formType) + (days != null ? ' · ' + days + 'd ago' : '')));
+  }), React.createElement("span", {
     style: {
-      fontSize: 13,
-      color: 'var(--g-999)'
+      fontSize: 11.5,
+      color: 'rgba(238,248,242,.45)'
     }
-  }, "Three-part review cycle: Monthly momentum \xB7 Quarterly scoring \xB7 Annual alignment")), React.createElement("div", {
-    className: "flex aic g8"
-  }, React.createElement("button", {
-    className: `btn btn-sm ${view === 'submissions' ? 'btn-go' : 'btn-ghost'}`,
-    onClick: () => setView('submissions')
-  }, "Submissions ", submissions.length > 0 && React.createElement("span", {
-    style: {
-      marginLeft: 4,
-      background: 'var(--lime)',
-      color: 'var(--wellness)',
-      borderRadius: 8,
-      padding: '1px 6px',
-      fontSize: 14,
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontWeight: 700
-    }
-  }, submissions.length), waitingAll.length > 0 && React.createElement("span", {
-    style: {
-      marginLeft: 4,
-      background: 'color-mix(in srgb, var(--c-amb) 15%, transparent)',
-      color: 'var(--c-amb)',
-      borderRadius: 8,
-      padding: '1px 6px',
-      fontSize: 12,
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontWeight: 700
-    }
-  }, waitingAll.length, " waiting")), React.createElement("button", {
-    className: `btn btn-sm ${view === 'list' ? 'btn-go' : 'btn-ghost'}`,
-    onClick: () => setView('list')
-  }, "New Form"))), view === 'list' && React.createElement("div", null, ['monthly', 'quarterly', 'annual'].map(type => {
+  }, "oldest first \u2014 tap to open"))), view === 'list' && React.createElement("div", null, ['monthly', 'quarterly', 'annual'].map(type => {
     const fd = FORM_DEFS[type];
     const count = submissions.filter(s => s.formType === type).length;
     const colors = {
@@ -50778,10 +51316,11 @@ function FormsPage({
     const c = colors[type];
     return React.createElement("div", {
       key: type,
-      className: "form-card",
+      className: "form-card gcard gclick",
       style: {
+        '--gh': colors[type],
         marginBottom: 14,
-        cursor: 'pointer'
+        padding: 0
       },
       onClick: () => {
         setFormType(type);
@@ -52502,36 +53041,46 @@ function ResourcesPage() {
     setActiveChapter(cid);
     setChapQ('');
   };
-  return React.createElement("div", null, React.createElement("div", {
-    className: "flex aic jsb mb14",
-    style: {
-      flexWrap: 'wrap',
-      gap: 8
-    }
+  return React.createElement("div", null, React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Lead Resources",
+    sub: "The operating documents \u2014 read, search and land back on the chapter you left.",
+    tiles: [{
+      lbl: 'Documents',
+      val: Object.keys(SOP_SECTIONS).length,
+      fill: true
+    }, {
+      lbl: 'Chapters',
+      val: Object.values(SOP_SECTIONS).reduce((a, d) => a + d.chapters.length, 0),
+      sub: 'across both SOPs'
+    }],
+    pills: Object.entries(SOP_SECTIONS).map(([key, doc]) => ({
+      k: key,
+      label: doc.icon + ' ' + doc.label,
+      on: docKey === key,
+      onClick: () => {
+        setActiveDoc(key);
+        setActiveChapter(doc.chapters[0].id);
+      }
+    }))
   }, React.createElement("div", {
-    className: "flex aic g6"
-  }, Object.entries(SOP_SECTIONS).map(([key, doc]) => React.createElement("button", {
-    key: key,
-    className: `btn btn-sm ${docKey === key ? 'btn-lime' : 'btn-ghost'}`,
-    onClick: () => {
-      setActiveDoc(key);
-      setActiveChapter(doc.chapters[0].id);
+    style: {
+      marginTop: 12
     }
-  }, doc.icon, " ", doc.label))), React.createElement("input", {
+  }, React.createElement("input", {
     value: chapQ,
     onChange: e => setChapQ(e.target.value),
     placeholder: "Search chapters in both SOPs\u2026",
     style: {
-      width: 250,
-      background: 'var(--surface3)',
-      border: '1px solid var(--border2)',
-      borderRadius: 6,
-      color: 'var(--text)',
+      width: 'min(340px,100%)',
+      background: 'rgba(255,255,255,.08)',
+      border: '1px solid rgba(255,255,255,.22)',
+      borderRadius: 8,
+      color: '#eef8f2',
       fontSize: 13.5,
-      padding: '7px 11px',
+      padding: '8px 12px',
       outline: 'none'
     }
-  })), React.createElement("div", {
+  }))), React.createElement("div", {
     className: "sop-layout"
   }, React.createElement("div", {
     className: "sop-nav"
@@ -65664,32 +66213,55 @@ function SchedulePage({
     status
   } : m));
   const display = view === 'upcoming' ? upcoming : view === 'past' ? past : cancelled;
-  return React.createElement("div", null, React.createElement("div", {
-    className: "flex aic jsb",
-    style: {
-      marginBottom: 14
-    }
-  }, React.createElement("div", null, React.createElement("div", {
-    style: {
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 12.5,
-      letterSpacing: '2px',
-      textTransform: 'uppercase',
-      color: 'var(--g-aaa)',
-      marginBottom: 3
-    }
-  }, "Google Calendar \xB7 Google Meet Integration"), React.createElement("div", {
-    style: {
-      fontSize: 14,
-      color: 'var(--g-999)'
-    }
-  }, "Schedule a meeting to send Google Calendar invites + Meet links directly to Revibe staff Gmail accounts")), React.createElement("button", {
-    className: "btn btn-lime",
-    onClick: () => {
-      setEditMeeting(null);
-      setShowForm(true);
-    }
-  }, "+ Schedule Meeting")), upcoming.length > 0 && (() => {
+  return React.createElement("div", null, React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Google Calendar + Meet",
+    sub: "Invites and Meet links go straight to Revibe staff Gmail accounts \u2014 one place for who, when, and whether it happened.",
+    tiles: [{
+      lbl: 'Upcoming',
+      val: upcoming.length,
+      fill: true
+    }, {
+      lbl: 'This week',
+      val: upcoming.filter(m => {
+        const d = new Date(m.dateTime);
+        const wk = new Date();
+        wk.setDate(wk.getDate() + 7);
+        return d <= wk;
+      }).length,
+      sub: 'next 7 days'
+    }, {
+      lbl: 'Recurring',
+      val: meetings.filter(m => m.recurrence).length,
+      sub: 'repeat invites'
+    }, {
+      lbl: 'Total scheduled',
+      val: meetings.length
+    }],
+    pills: [{
+      k: 'upcoming',
+      label: 'Upcoming · ' + upcoming.length,
+      on: view === 'upcoming',
+      onClick: () => setView('upcoming')
+    }, {
+      k: 'past',
+      label: 'Past · ' + past.length,
+      on: view === 'past',
+      onClick: () => setView('past')
+    }, {
+      k: 'cancelled',
+      label: 'Cancelled · ' + cancelled.length,
+      on: view === 'cancelled',
+      onClick: () => setView('cancelled')
+    }, {
+      k: '__new',
+      label: '＋ Schedule Meeting',
+      onClick: () => {
+        setEditMeeting(null);
+        setShowForm(true);
+      },
+      title: 'Send a Google Calendar invite + Meet link'
+    }]
+  }), upcoming.length > 0 && (() => {
     const m = upcoming[0];
     const nmt = MEETING_TYPES.find(t => t.id === m.type) || MEETING_TYPES[5];
     const d = new Date(m.dateTime);
@@ -65763,66 +66335,7 @@ function SchedulePage({
         setShowForm(true);
       }
     }, "\u270E Edit")));
-  })(), React.createElement("div", {
-    className: "lt-grid",
-    style: {
-      gridTemplateColumns: 'repeat(4,1fr)',
-      marginBottom: 14
-    }
-  }, [{
-    label: 'Upcoming',
-    val: upcoming.length,
-    color: 'var(--c-blu2)'
-  }, {
-    label: 'This Week',
-    val: upcoming.filter(m => {
-      const d = new Date(m.dateTime);
-      const wk = new Date();
-      wk.setDate(wk.getDate() + 7);
-      return d <= wk;
-    }).length,
-    color: 'var(--c-lime2)'
-  }, {
-    label: 'Recurring',
-    val: meetings.filter(m => m.recurrence).length,
-    color: 'var(--c-pur)'
-  }, {
-    label: 'Total Scheduled',
-    val: meetings.length,
-    color: 'var(--g-aaa)'
-  }].map(s => React.createElement("div", {
-    key: s.label,
-    className: "lt-stat"
-  }, React.createElement("div", {
-    className: "lt-stat-num",
-    style: {
-      color: s.color
-    }
-  }, s.val), React.createElement("div", {
-    className: "lt-stat-lbl"
-  }, s.label)))), React.createElement("div", {
-    className: "filter-row"
-  }, React.createElement("div", {
-    className: "filter-grp flex aic g6"
-  }, [{
-    k: 'upcoming',
-    l: 'Upcoming'
-  }, {
-    k: 'past',
-    l: 'Past'
-  }, {
-    k: 'cancelled',
-    l: 'Cancelled'
-  }].map(t => React.createElement("button", {
-    key: t.k,
-    className: `btn btn-sm ${view === t.k ? 'btn-lime' : 'btn-ghost'}`,
-    onClick: () => setView(t.k)
-  }, t.l, " (", (t.k === 'upcoming' ? upcoming : t.k === 'past' ? past : cancelled).length, ")"))), React.createElement("div", {
-    style: {
-      fontSize: 14,
-      color: 'var(--g-888)'
-    }
-  }, "Click a meeting to edit or cancel \xB7 Invites sent via Google Calendar")), display.length === 0 ? React.createElement("div", {
+  })(), display.length === 0 ? React.createElement("div", {
     className: "rv-empty"
   }, React.createElement("div", {
     className: "rv-empty-t"
@@ -65841,13 +66354,10 @@ function SchedulePage({
     const attendeeNames = (m.attendeeIds || []).map(id => staff.find(s => s.id === id)?.name?.split(' ')[0] || id);
     return React.createElement("div", {
       key: m.id,
+      className: "gcard",
       style: {
-        background: 'var(--surface2)',
-        border: '1px solid var(--border)',
-        borderRadius: 6,
-        padding: '14px 16px',
-        marginBottom: 10,
-        borderLeft: `3px solid ${mt.color}`
+        '--gh': mt.color,
+        marginBottom: 10
       }
     }, React.createElement("div", {
       className: "flex aic jsb"
@@ -66976,67 +67486,37 @@ function ClinResourcesPage({
     saveResources(updated);
   };
   const typeInfo = t => RESOURCE_TYPES.find(x => x.id === t) || RESOURCE_TYPES[1];
-  return React.createElement("div", null, React.createElement("div", {
-    className: "flex aic",
-    style: {
-      justifyContent: 'flex-end',
-      marginBottom: 12
-    }
-  }, React.createElement("button", {
-    className: "btn btn-lime",
-    onClick: () => {
-      setEditRes(null);
-      setShowAdd(true);
-    }
-  }, "+ Add Resource")), React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(5,1fr)',
-      gap: 8,
-      marginBottom: 14
-    }
-  }, [{
-    label: 'Total Resources',
-    val: resources.length,
-    color: 'var(--c-lime2)'
-  }, {
-    label: 'Pinned',
-    val: resources.filter(r => r.pinned).length,
-    color: 'var(--c-yel)'
-  }, {
-    label: 'Articles',
-    val: resources.filter(r => r.type === 'article').length,
-    color: 'var(--lc1)'
-  }, {
-    label: 'Videos',
-    val: resources.filter(r => r.type === 'video').length,
-    color: 'var(--c-red)'
-  }, {
-    label: 'Tools & Templates',
-    val: resources.filter(r => ['tool', 'template', 'course'].includes(r.type)).length,
-    color: 'var(--c-pur)'
-  }].map(s => React.createElement("div", {
-    key: s.label,
-    style: {
-      background: 'var(--surface2)',
-      border: '1px solid var(--border)',
-      borderRadius: 5,
-      padding: '10px 12px'
-    }
-  }, React.createElement("div", {
-    style: {
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 22,
-      fontWeight: 800,
-      color: s.color
-    }
-  }, s.val), React.createElement("div", {
-    style: {
-      fontSize: 14,
-      color: 'var(--g-777)',
-      marginTop: 2
-    }
-  }, s.label)))), React.createElement("div", {
+  return React.createElement("div", null, React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Clinician Resources",
+    sub: "Curated articles, videos, tools and courses \u2014 searchable, taggable, and pinnable for the whole team.",
+    tiles: [{
+      lbl: 'Resources',
+      val: resources.length,
+      fill: true
+    }, {
+      lbl: 'Pinned',
+      val: resources.filter(r => r.pinned).length,
+      valCol: '#ffd166',
+      sub: 'front of the shelf'
+    }, {
+      lbl: 'Articles',
+      val: resources.filter(r => r.type === 'article').length
+    }, {
+      lbl: 'Videos',
+      val: resources.filter(r => r.type === 'video').length
+    }, {
+      lbl: 'Tools & templates',
+      val: resources.filter(r => ['tool', 'template', 'course'].includes(r.type)).length
+    }],
+    pills: [{
+      k: 'add',
+      label: '＋ Add Resource',
+      onClick: () => {
+        setEditRes(null);
+        setShowAdd(true);
+      }
+    }]
+  }), React.createElement("div", {
     style: {
       background: 'var(--surface2)',
       border: '1px solid var(--border)',
@@ -69650,24 +70130,35 @@ function GDRow({
       background: selected ? 'var(--surface3)' : 'var(--surface2)',
       border: `1px solid ${selected ? 'var(--border2)' : 'var(--border)'}`,
       borderLeft: `3px solid ${leftBorder}`,
-      borderRadius: 6,
+      borderRadius: 8,
       padding: '10px 13px',
       cursor: 'pointer',
-      transition: 'all .12s',
+      transition: 'all .14s',
       display: 'flex',
       alignItems: 'center',
       gap: 12
     },
     onMouseEnter: e => {
-      if (!selected) e.currentTarget.style.borderColor = 'var(--border2)';
+      if (!selected) {
+        e.currentTarget.style.borderColor = 'var(--border2)';
+        e.currentTarget.style.transform = 'translateY(-1px)';
+        e.currentTarget.style.boxShadow = '0 6px 16px rgba(0,0,0,.22)';
+      }
     },
     onMouseLeave: e => {
-      if (!selected) e.currentTarget.style.borderColor = 'var(--border)';
+      if (!selected) {
+        e.currentTarget.style.borderColor = 'var(--border)';
+        e.currentTarget.style.transform = '';
+        e.currentTarget.style.boxShadow = '';
+      }
     }
-  }, React.createElement("div", {
+  }, React.createElement(Av, {
+    name: r.name,
+    sz: "sm"
+  }), React.createElement("div", {
     style: {
-      minWidth: 160,
-      flex: '0 0 160px'
+      minWidth: 150,
+      flex: '0 0 150px'
     }
   }, React.createElement("div", {
     style: {
