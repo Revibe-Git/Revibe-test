@@ -1920,7 +1920,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L171';
+window.__BUILD = 'build L172';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -41114,6 +41114,408 @@ function RvSkillTree({
     }));
   }));
 }
+function RvNodeModal({
+  node,
+  onClose,
+  scale,
+  lvNoun = 'Level',
+  action
+}) {
+  useEffect(() => {
+    const h = e => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', h, true);
+    return () => window.removeEventListener('keydown', h, true);
+  }, [onClose]);
+  if (!node) return null;
+  const hue = node.hue || '#2fd6a8';
+  const pct = node.max ? Math.min(1, (node.level || 0) / node.max) : 0;
+  const C = 2 * Math.PI * 30;
+  const BANDC = ['#ff9d9d', '#ffd166', '#7ee0a3', '#c9f26f'];
+  const bandIdx = node.level > 0 ? node.level <= 4 ? 0 : node.level <= 6 ? 1 : node.level < 7.5 ? 2 : 3 : -1;
+  const ladder = node.bands ? node.bands.map((b, i) => ({
+    label: b.r,
+    txt: b.t,
+    col: BANDC[i],
+    here: i === bandIdx,
+    next: bandIdx >= 0 ? i === bandIdx + 1 : i === 2
+  })) : scale ? scale.map((tx, i) => ({
+    label: String(i + 1),
+    txt: tx,
+    col: i < 1 ? BANDC[0] : i < 2 ? BANDC[1] : i < scale.length - 1 ? BANDC[2] : BANDC[3],
+    here: node.level === i + 1,
+    next: node.level > 0 ? i + 1 === node.level + 1 : i === 0
+  })) : null;
+  return ReactDOM.createPortal(React.createElement("div", {
+    className: "overlay",
+    style: {
+      zIndex: 1300,
+      alignItems: 'center',
+      justifyContent: 'center'
+    },
+    onMouseDown: e => {
+      if (e.target === e.currentTarget) onClose();
+    }
+  }, React.createElement("div", {
+    className: "modal rvt",
+    style: {
+      maxWidth: 600,
+      width: 'min(600px,94vw)',
+      border: '1px solid rgba(201,242,111,.35)',
+      margin: 0,
+      maxHeight: '92vh',
+      overflowY: 'auto'
+    }
+  }, RvTreeCSS, React.createElement("div", {
+    style: {
+      padding: '20px 24px 22px'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 16,
+      alignItems: 'center',
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("svg", {
+    width: "74",
+    height: "74",
+    viewBox: "0 0 74 74",
+    style: {
+      flexShrink: 0
+    },
+    "aria-hidden": "true"
+  }, React.createElement("circle", {
+    cx: "37",
+    cy: "37",
+    r: "30",
+    fill: "#0b3529",
+    stroke: "rgba(255,255,255,.15)",
+    strokeWidth: "5"
+  }), node.level > 0 && React.createElement("circle", {
+    cx: "37",
+    cy: "37",
+    r: "30",
+    fill: "none",
+    stroke: hue,
+    strokeWidth: "5",
+    strokeLinecap: "round",
+    strokeDasharray: C * pct + ' 999',
+    transform: "rotate(-90 37 37)"
+  }), React.createElement("text", {
+    x: "37",
+    y: "36",
+    textAnchor: "middle",
+    fontFamily: "'Barlow Condensed',sans-serif",
+    fontWeight: "800",
+    fontSize: "23",
+    fill: node.level ? hue : 'rgba(255,255,255,.4)'
+  }, node.level || '—'), React.createElement("text", {
+    x: "37",
+    y: "50",
+    textAnchor: "middle",
+    fontFamily: "'Barlow Condensed',sans-serif",
+    fontWeight: "700",
+    fontSize: "10",
+    fill: "rgba(255,255,255,.5)"
+  }, "/ ", node.max)), React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 220
+    }
+  }, React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 24,
+      fontWeight: 800,
+      letterSpacing: '.5px',
+      textTransform: 'uppercase',
+      color: '#fff',
+      lineHeight: 1.1
+    }
+  }, node.label), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 10,
+      flexWrap: 'wrap',
+      marginTop: 5,
+      fontSize: 12.5,
+      color: 'rgba(238,248,242,.65)'
+    }
+  }, React.createElement("span", null, node.level ? lvNoun + ' ' + node.level + ' / ' + node.max : 'Not scored yet'), node.weightPct != null && React.createElement("span", null, "\xB7 ", node.weightPct, "% of the track score"), node.date && React.createElement("span", null, "\xB7 last scored ", node.date))), React.createElement("button", {
+    onClick: onClose,
+    "aria-label": "Close",
+    style: {
+      cursor: 'pointer',
+      background: 'rgba(255,255,255,.08)',
+      border: '1px solid rgba(255,255,255,.25)',
+      borderRadius: 8,
+      color: '#eef8f2',
+      fontSize: 14,
+      padding: '6px 11px'
+    }
+  }, "\u2715")), ladder && React.createElement("div", {
+    style: {
+      marginTop: 16
+    }
+  }, React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 12,
+      fontWeight: 800,
+      letterSpacing: '2.2px',
+      color: 'rgba(238,248,242,.55)',
+      textTransform: 'uppercase',
+      marginBottom: 8
+    }
+  }, "What each level stands for"), React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 6
+    }
+  }, ladder.map((b, i) => React.createElement("div", {
+    key: i,
+    style: {
+      display: 'flex',
+      gap: 11,
+      alignItems: 'flex-start',
+      padding: '9px 12px',
+      borderRadius: 9,
+      background: b.here ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.035)',
+      border: '1px solid ' + (b.here ? b.col : b.next ? 'rgba(255,209,102,.4)' : 'rgba(255,255,255,.09)')
+    }
+  }, React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      minWidth: 44,
+      textAlign: 'center',
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontWeight: 800,
+      fontSize: 13.5,
+      color: '#12250f',
+      background: b.col,
+      borderRadius: 6,
+      padding: '2px 8px'
+    }
+  }, b.label), React.createElement("span", {
+    style: {
+      flex: 1,
+      fontSize: 13.5,
+      color: b.here ? '#fff' : 'rgba(238,248,242,.78)',
+      lineHeight: 1.55
+    }
+  }, b.txt), b.here && React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 11,
+      fontWeight: 800,
+      letterSpacing: '1.2px',
+      color: b.col
+    }
+  }, "YOU ARE HERE"), !b.here && b.next && React.createElement("span", {
+    style: {
+      flexShrink: 0,
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 11,
+      fontWeight: 800,
+      letterSpacing: '1.2px',
+      color: '#ffd166'
+    }
+  }, "NEXT"))))), !ladder && node.desc && React.createElement("div", {
+    style: {
+      marginTop: 14,
+      fontSize: 13.5,
+      color: 'rgba(238,248,242,.8)',
+      lineHeight: 1.65
+    }
+  }, node.desc), (node.history || []).length > 0 && React.createElement("div", {
+    style: {
+      marginTop: 14,
+      fontSize: 12,
+      color: 'rgba(238,248,242,.55)'
+    }
+  }, "History: ", (node.history || []).slice(0, 4).map((h, i) => React.createElement("span", {
+    key: i,
+    style: {
+      marginRight: 12
+    }
+  }, h.date, " \u2192 ", h.v, h.why ? ' · ' + String(h.why).slice(0, 40) : ''))), action && React.createElement("button", {
+    onClick: () => {
+      onClose();
+      action.onClick();
+    },
+    style: {
+      marginTop: 16,
+      cursor: 'pointer',
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 13.5,
+      letterSpacing: '1.4px',
+      textTransform: 'uppercase',
+      fontWeight: 800,
+      color: '#06301f',
+      background: 'linear-gradient(135deg,#2fd6a8,#c9f26f)',
+      border: 'none',
+      borderRadius: 9,
+      padding: '9px 18px'
+    }
+  }, action.label, " ")))), document.body);
+}
+function RvStatSheet({
+  title,
+  sub,
+  nodes,
+  pointsNoun = 'rubric points',
+  lvNoun = 'Score',
+  action
+}) {
+  const [pop, setPop] = useState(null);
+  const earned = nodes.reduce((a, n) => a + (n.level || 0), 0),
+    maxPts = nodes.reduce((a, n) => a + n.max, 0);
+  return React.createElement("div", {
+    className: "rvt"
+  }, RvTreeCSS, React.createElement("div", {
+    className: "rvt-head"
+  }, React.createElement("span", {
+    className: "rvt-title"
+  }, title), React.createElement("span", {
+    className: "rvt-sub"
+  }, sub)), React.createElement("div", {
+    style: {
+      padding: '6px 20px 4px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 9
+    }
+  }, nodes.map(nd => {
+    const on = nd.level > 0;
+    const hue = nd.hue || 'rgba(255,255,255,.35)';
+    return React.createElement("div", {
+      key: nd.k,
+      onClick: () => setPop(nd),
+      title: nd.label + ' — ' + (on ? nd.level + ' / ' + nd.max : 'not scored yet') + ' · tap for the full breakdown',
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        padding: '10px 14px',
+        borderRadius: 10,
+        cursor: 'pointer',
+        background: 'rgba(255,255,255,.055)',
+        border: '1px solid rgba(255,255,255,.14)',
+        transition: 'all .14s'
+      },
+      onMouseEnter: e => {
+        e.currentTarget.style.background = 'rgba(255,255,255,.10)';
+        e.currentTarget.style.transform = 'translateY(-1px)';
+        e.currentTarget.style.borderColor = on ? hue : 'rgba(255,255,255,.3)';
+      },
+      onMouseLeave: e => {
+        e.currentTarget.style.background = 'rgba(255,255,255,.055)';
+        e.currentTarget.style.transform = '';
+        e.currentTarget.style.borderColor = 'rgba(255,255,255,.14)';
+      }
+    }, React.createElement("div", {
+      style: {
+        flexShrink: 0,
+        width: 58,
+        textAlign: 'center',
+        background: 'rgba(6,32,22,.75)',
+        border: '1px solid ' + (on ? hue : 'rgba(255,255,255,.18)'),
+        borderRadius: 8,
+        padding: '5px 0 4px'
+      }
+    }, React.createElement("div", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 21,
+        fontWeight: 800,
+        lineHeight: 1,
+        color: on ? hue : 'rgba(255,255,255,.35)'
+      }
+    }, on ? nd.level : '—'), React.createElement("div", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 9.5,
+        fontWeight: 700,
+        letterSpacing: '.8px',
+        color: 'rgba(255,255,255,.45)'
+      }
+    }, "/ ", nd.max)), React.createElement("div", {
+      style: {
+        flex: '1 1 40%',
+        minWidth: 150
+      }
+    }, React.createElement("div", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 15.5,
+        fontWeight: 800,
+        letterSpacing: '1.2px',
+        textTransform: 'uppercase',
+        color: on ? '#f0f8f3' : 'rgba(238,248,242,.55)',
+        lineHeight: 1.15
+      }
+    }, nd.label), nd.weightPct != null && React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: 'rgba(238,248,242,.45)',
+        marginTop: 2
+      }
+    }, nd.weightPct, "% of the track score")), React.createElement("div", {
+      style: {
+        flex: '1 1 30%',
+        minWidth: 110,
+        height: 10,
+        borderRadius: 5,
+        background: 'rgba(6,32,22,.7)',
+        border: '1px solid rgba(255,255,255,.12)',
+        overflow: 'hidden'
+      }
+    }, React.createElement("div", {
+      style: {
+        width: (nd.max ? Math.round((nd.level || 0) / nd.max * 100) : 0) + '%',
+        height: '100%',
+        borderRadius: 5,
+        background: on ? 'linear-gradient(90deg, color-mix(in srgb,' + hue + ' 55%, #2fd6a8), ' + hue + ')' : 'transparent',
+        transition: 'width .5s ease'
+      }
+    })), React.createElement("span", {
+      style: {
+        color: 'rgba(238,248,242,.4)',
+        fontSize: 14,
+        flexShrink: 0
+      }
+    }, "\u203A"));
+  })), React.createElement("div", {
+    className: "rvt-xp"
+  }, React.createElement("b", null, Math.round(earned * 10) / 10), React.createElement("span", {
+    className: "m"
+  }, "/ ", maxPts, " ", pointsNoun), React.createElement("div", {
+    className: "rvt-bar"
+  }, React.createElement("div", {
+    style: {
+      width: (maxPts ? Math.round(earned / maxPts * 100) : 0) + '%'
+    }
+  }))), React.createElement("div", {
+    style: {
+      padding: '0 20px 16px',
+      fontSize: 12,
+      color: 'rgba(238,248,242,.5)'
+    }
+  }, "Tap any category for what each band stands for", action ? ' — grading happens in Scores' : '', "."), pop && React.createElement(RvNodeModal, {
+    node: pop,
+    onClose: () => setPop(null),
+    lvNoun: lvNoun,
+    action: action
+  }));
+}
 function RvSkillCard({
   title,
   sub,
@@ -41128,6 +41530,7 @@ function RvSkillCard({
 }) {
   const all = groups.reduce((a, g) => a.concat(g.nodes), []);
   const [sel, setSel] = useState(all.find(n => n.level > 0 && n.level < n.max) ? all.find(n => n.level > 0 && n.level < n.max).k : all[0] && all[0].k);
+  const [pop, setPop] = useState(false);
   const node = all.find(n => n.k === sel) || null;
   const earned = all.reduce((a, n) => a + (n.level || 0), 0),
     maxPts = all.reduce((a, n) => a + n.max, 0);
@@ -41159,7 +41562,10 @@ function RvSkillCard({
   }, sub)), React.createElement(RvSkillTree, {
     groups: groups,
     selected: sel,
-    onSelect: setSel
+    onSelect: k => {
+      setSel(k);
+      setPop(true);
+    }
   }), React.createElement("div", {
     className: "rvt-xp"
   }, React.createElement("b", null, Math.round(earned * 10) / 10), React.createElement("span", {
@@ -41316,7 +41722,13 @@ function RvSkillCard({
     className: "rvt-fx-ring r2"
   }), React.createElement("div", {
     className: "rvt-fx-t"
-  }, fxLabel)));
+  }, fxLabel)), pop && node && React.createElement(RvNodeModal, {
+    node: node,
+    onClose: () => setPop(false),
+    scale: scale,
+    lvNoun: lvNoun,
+    action: action
+  }));
 }
 function RvRadar({
   axes,
@@ -42093,20 +42505,28 @@ function RvProfileTrees({
         level: v,
         max: 10,
         hue: RV_BAND(v) || undefined,
+        weightPct: c.weight,
+        bands: cd ? [{
+          r: '0–4',
+          t: cd.col04
+        }, {
+          r: '5–6',
+          t: cd.col56
+        }, {
+          r: '7',
+          t: cd.col7
+        }, {
+          r: '8–10',
+          t: cd.col810
+        }] : null,
         desc: (c.weight ? 'Weight ' + c.weight + '% of the ' + rs.label + ' score. ' : '') + (band ? v ? String(band) : 'What competent (7) looks like: ' + band : '')
       };
     });
-    const chunks = RV_CHUNK3(nodes);
-    blocks.push(React.createElement(RvSkillCard, {
+    blocks.push(React.createElement(RvStatSheet, {
       key: 'rub' + t,
-      title: rs.label + ' skill tree — ' + first,
-      sub: "A mirror of the G&D rubric \u2014 scores are set in Evaluations / the Scores tab, never on this chart.",
-      groups: chunks.map((ns, i) => ({
-        name: '',
-        hue: RV_SECT_HUES[i % 3],
-        nodes: ns
-      })),
-      canScore: false,
+      title: rs.label + ' stat sheet — ' + first,
+      sub: "A mirror of the G&D rubric \u2014 scores are set in Evaluations / the Scores tab, never here.",
+      nodes: nodes,
       lvNoun: "Score",
       pointsNoun: "rubric points",
       action: go ? {
@@ -42142,7 +42562,8 @@ function RvProfileTrees({
           })),
           canScore: false,
           lvNoun: "Grade",
-          pointsNoun: "framework points"
+          pointsNoun: "framework points",
+          scale: GX_SCALE.map(([t2, d2]) => t2 + ' — ' + d2)
         }));
       }
     }
