@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L184';
+window.__BUILD = 'build L185';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -42833,25 +42833,29 @@ function RvProfileTrees({
     const ap = (adb.people || {})[staff.id];
     if (ap && (AC_TOTXP(ap) > 0 || Object.keys(ap.done || {}).length)) {
       const f = AC_FLIP(ap);
-      const nodes = AC_SW.map(sw => ({
-        k: 'ac' + sw.id,
-        label: sw.name,
-        desc: sw.desc + ' Unlocks at: ' + AC_REQTEXT(sw.req) + '.',
-        level: f[sw.id] ? 1 : 0,
-        max: 1
-      }));
+      const nodes = AC_SW.map(sw => {
+        const g = AC_SWGRADE(ap, sw.id);
+        return {
+          k: 'ac' + sw.id,
+          label: sw.name,
+          level: g,
+          max: 5,
+          hue: g >= AC_SWEARN ? '#c9f26f' : g > 0 ? '#ffd166' : undefined,
+          desc: sw.desc + (g > 0 ? ' Current standard: ' + ((AC_SWSTD[sw.id] || [])[g - 1] || '') : ' Not scored yet — graded 1-5 against its standard, earned at ' + AC_SWEARN + '+.')
+        };
+      });
       blocks.push(React.createElement(RvSkillCard, {
         key: "ac",
         title: 'Academy switches — ' + first,
-        sub: 'Stage ' + AC_STAGEOF(ap) + ' · ' + AC_TRACKS.map(t => t.name + ' L' + AC_LEVEL((ap.xp || {})[t.id])).join(' · ') + ' — earned in Leadership → Academy, mirrored here.',
+        sub: 'Stage ' + AC_STAGEOF(ap) + ' · ' + AC_TRACKS.map(t => t.name + ' L' + AC_LEVEL((ap.xp || {})[t.id])).join(' · ') + ' — switches are graded in Leadership Growth, mirrored here.',
         groups: RV_CHUNK3(nodes).map((ns, i) => ({
           name: '',
           hue: RV_SECT_HUES[i % 3],
           nodes: ns
         })),
         canScore: false,
-        lvNoun: "Flipped",
-        pointsNoun: "switches flipped",
+        lvNoun: "Grade",
+        pointsNoun: "switch points",
         action: onNav ? {
           label: 'Earn it in Leadership Growth →',
           onClick: () => {
@@ -65470,6 +65474,24 @@ const AC_RSTAGE = {
     c: "PRF-CLL + PEO-TEA + BIZ-M1/M3, teaching at standard"
   }
 };
+const AC_SWEARN = 4;
+const AC_SWSTD = {
+  reliability: ["Needs chasing — commitments slip without follow-up.", "Keeps commitments when reminded; misses under load.", "Does what they said, without being chased, most weeks.", "Every time — under load, without being asked.", "Their reliability sets the bar; others calibrate to them."],
+  ownership: ["The circumstances are always the reason.", "Owns outcomes when they go well.", "Owns most outcomes, good or bad, without prompting.", "The outcome is theirs before anyone asks — including misses.", "Builds ownership in others; excuses die around them."],
+  confidence: ["Needs reassurance on routine calls.", "Sound on familiar cases; wobbles outside them.", "Makes sound calls without checking in, most of the time.", "Trusted to decide under uncertainty; escalates the right things.", "Their clinical judgement anchors the room."],
+  humility: ["Defensive when challenged.", "Accepts feedback when it arrives.", "Actively asks for feedback and acts on it.", "Names their own limits before others do; seeks the gap.", "Models being coachable — makes feedback safe for everyone."],
+  vibecarrier: ["Present for shifts, absent from the culture.", "Joins when invited.", "Trains, shows up, and brings energy regularly.", "The team feels them there — athlete-grade in how they carry themselves.", "They ARE the vibe — people join because of them."],
+  systems: ["Works around problems silently.", "Flags problems without proposals.", "Improves the process they work inside when it blocks them.", "Redesigns processes so the problem stops recurring.", "Builds systems other people adopt across sites."],
+  financial: ["Doesn't connect their work to the numbers.", "Knows their own numbers when shown.", "Tracks their own revenue, cost and impact unprompted.", "Makes decisions with the business case in view.", "Reads the clinic's economics and teaches others to."],
+  regulation: ["Stress leaks — the room feels it.", "Recovers after the moment has passed.", "Steady through normal friction.", "Handles conflict and pressure without destabilising anyone.", "Their calm resets the room; people borrow it."],
+  teaching: ["Helps only when asked.", "Shows people what to do.", "Develops others deliberately with a plan.", "People measurably improve under them, and can say why.", "Builds teachers — their people develop people."],
+  leading: ["Avoids the hard conversation.", "Holds standards inconsistently.", "Holds people accountable and keeps their trust, most of the time.", "Accountability AND trust, under weight, consistently.", "People follow them through change they didn't choose."],
+  strategic: ["This week is the whole picture.", "Sees the long game when it's pointed out.", "Balances this week against the quarter unprompted.", "Balances this week against the three-year picture in real decisions.", "Sets direction others plan around."]
+};
+const AC_SWGRADE = (p, swId) => {
+  const hh = (p && p.swg || {})[swId] || [];
+  return hh[0] ? +hh[0].v : 0;
+};
 const AC_LEVEL = xp => Math.min(AC_MAXLV, 1 + Math.floor((xp || 0) / AC_XPL));
 const AC_BLANK = () => ({
   xp: {
@@ -65480,6 +65502,7 @@ const AC_BLANK = () => ({
     character: 0,
     vibe: 0
   },
+  swg: {},
   done: {},
   log: [],
   age: null
@@ -65493,7 +65516,7 @@ const AC_REQMET = (p, req) => {
 const AC_FLIP = p => {
   const o = {};
   AC_SW.forEach(sw => {
-    o[sw.id] = AC_REQMET(p, sw.req);
+    o[sw.id] = AC_SWGRADE(p, sw.id) >= AC_SWEARN;
   });
   return o;
 };
@@ -65690,6 +65713,39 @@ function AcademyTab({
       }, ...(p.log || [])].slice(0, 80)
     });
   };
+  const gradeSw = async (swId, v) => {
+    if (!sel) return;
+    const sw = AC_SW.find(x => x.id === swId);
+    if (!sw) return;
+    const p = pOf(sel.id);
+    const cur = AC_SWGRADE(p, swId);
+    const note = await rvAsk({
+      label: sw.name + ' → ' + v + ' / 5 — evidence',
+      hint: 'What did you actually see? One line for the history.',
+      ok: 'Save grade'
+    });
+    if (note == null) return;
+    const stBefore = AC_STAGEOF(p);
+    const swg = {
+      ...(p.swg || {})
+    };
+    swg[swId] = [{
+      v,
+      date: GD_TODAY(),
+      by: typeof RV_ME === 'function' ? RV_ME().name || '—' : '—',
+      note: String(note || '')
+    }, ...(swg[swId] || [])].slice(0, 20);
+    const stAfter = AC_STAGEOF({
+      ...p,
+      swg
+    });
+    setP(sel.id, {
+      swg
+    });
+    try {
+      window.__RVFX && window.__RVFX(stAfter > stBefore ? 'STAGE UP — ' + (AC_STAGES.find(x => x.n === stAfter) || {}).name : v >= AC_SWEARN && cur < AC_SWEARN ? 'SWITCH EARNED — ' + sw.name.toUpperCase() : sw.name.toUpperCase() + ' — ' + v + ' / 5');
+    } catch (e) {}
+  };
   const editDoc = async k => {
     const d = docsOf()[k];
     const u = await rvAsk({
@@ -65732,38 +65788,25 @@ function AcademyTab({
   const rx = AC_SWRX[swNode.id] || {};
   const nextUp = (() => {
     if (!P) return null;
-    const unf = AC_SW.filter(sw => !F[sw.id]);
-    if (!unf.length) return null;
-    const gapOf = sw => {
-      let g = 0;
-      const need = {};
-      for (const k in sw.req) {
-        const nx = Math.max(0, (sw.req[k] - 1) * AC_XPL - ((P.xp || {})[k] || 0));
-        if (nx > 0) need[k] = nx;
-        g += nx;
-      }
+    const opts = AC_TRACKS.map(t => {
+      const xpv = (P.xp || {})[t.id] || 0;
+      const lv = AC_LEVEL(xpv);
+      if (lv >= AC_MAXLV) return null;
       return {
-        g,
-        need
+        t,
+        lv,
+        need: lv * AC_XPL - xpv
       };
-    };
-    const t = unf.map(sw => ({
-      sw,
-      ...gapOf(sw)
-    })).sort((a, b) => a.g - b.g)[0];
+    }).filter(Boolean).sort((a, b) => a.need - b.need);
+    if (!opts.length) return null;
+    const top = opts[0];
     const avail2 = AC_MIS.filter(m => m.s <= stage + 1 && !P.done[m.id]);
-    const recs = avail2.map(m => {
-      let sc = 0;
-      for (const k in m.xp) {
-        if (t.need[k]) sc += Math.min(m.xp[k], t.need[k]);
-      }
-      return {
-        m,
-        sc
-      };
-    }).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 3);
+    const recs = avail2.map(m => ({
+      m,
+      sc: Math.min((m.xp || {})[top.t.id] || 0, top.need)
+    })).filter(x => x.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 3);
     return {
-      ...t,
+      ...top,
       recs
     };
   })();
@@ -65800,7 +65843,7 @@ function AcademyTab({
       flex: 1,
       minWidth: 220
     }
-  }, "Missions are the only XP source. Levels flip switches, switches unlock stages. Same people as everywhere else \u2014 progress saves and syncs like the rest of the dashboard."), React.createElement("select", {
+  }, "Switches are graded 1\u20135 against written standards, with training modules attached \u2014 earned at 4+. Missions pay XP into the six tracks as the fun layer alongside. Same people as everywhere else \u2014 progress saves and syncs like the rest of the dashboard."), React.createElement("select", {
     value: selId,
     onChange: e => setSelId(e.target.value),
     style: {
@@ -65893,7 +65936,7 @@ function AcademyTab({
       color: 'var(--g-777)',
       marginTop: 5
     }
-  }, next ? 'Next switch: ' + next.name + ' — needs ' + AC_REQTEXT(next.req) : 'Every switch flipped.'))))), sel && P && React.createElement(React.Fragment, null, React.createElement("div", {
+  }, next ? 'Next switch to earn: ' + next.name + ' — at ' + AC_SWGRADE(p, next.id) + ' / 5' : 'Every switch earned.'))))), sel && P && React.createElement(React.Fragment, null, React.createElement("div", {
     className: "rvt",
     style: {
       marginBottom: 12
@@ -66050,7 +66093,7 @@ function AcademyTab({
   }), React.createElement(RvHeroTile, {
     lbl: "Switches",
     val: AC_SW.filter(sw => F[sw.id]).length + ' / ' + AC_SW.length,
-    sub: "flipped"
+    sub: "earned by grade"
   })), React.createElement("div", {
     style: {
       display: 'flex',
@@ -66105,38 +66148,19 @@ function AcademyTab({
       gap: 10,
       flexWrap: 'wrap'
     }
-  }, React.createElement(H, null, "\u26A1 Next unlock \u2014 ", nextUp.sw.name), React.createElement("span", {
+  }, React.createElement(H, null, "\u26A1 Next level \u2014 ", nextUp.t.name, " L", nextUp.lv + 1), React.createElement("span", {
     style: {
       fontSize: 12,
       color: 'var(--g-777)'
     }
-  }, nextUp.g, " XP away \u2014 the closest switch to flipping")), React.createElement("div", {
+  }, nextUp.need, " XP to go \u2014 the closest track to leveling")), React.createElement("div", {
     style: {
       fontSize: 12.5,
       color: 'var(--g-999)',
-      marginBottom: 9,
+      marginBottom: nextUp.recs.length ? 12 : 0,
       lineHeight: 1.55
     }
-  }, nextUp.sw.desc), React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 6,
-      flexWrap: 'wrap',
-      marginBottom: nextUp.recs.length ? 12 : 0
-    }
-  }, Object.keys(nextUp.need).map(k => React.createElement("span", {
-    key: k,
-    style: {
-      fontSize: 11.5,
-      fontFamily: "'Barlow Condensed',sans-serif",
-      letterSpacing: '.8px',
-      color: 'var(--c-yel)',
-      border: '1px solid color-mix(in srgb, var(--c-yel) 35%, transparent)',
-      background: 'color-mix(in srgb, var(--c-yel) 7%, transparent)',
-      borderRadius: 5,
-      padding: '1px 8px'
-    }
-  }, AC_TNAME(k), " \xB7 ", nextUp.need[k], " XP to go"))), nextUp.recs.map(({
+  }, nextUp.t.blurb), nextUp.recs.map(({
     m,
     sc
   }, i) => React.createElement("div", {
@@ -66184,7 +66208,7 @@ function AcademyTab({
       fontSize: 12.5,
       color: 'var(--g-777)'
     }
-  }, "No available mission feeds this switch yet \u2014 missions unlock as the stage rises.")), React.createElement("div", {
+  }, "No available mission pays this track yet \u2014 missions unlock as the stage rises.")), React.createElement("div", {
     className: "rvt",
     style: {
       marginBottom: 12
@@ -66195,7 +66219,7 @@ function AcademyTab({
     className: "rvt-title"
   }, "The six stages"), React.createElement("span", {
     className: "rvt-sub"
-  }, "Each stage unlocks when its switches are flipped. Age ranges are a guide, not a rule.")), React.createElement(RvPathRail, {
+  }, "Each stage unlocks when its switches are earned by grade. Age ranges are a guide, not a rule.")), React.createElement(RvPathRail, {
     steps: AC_STAGES.map(st => ({
       label: String(st.n),
       l1: st.name,
@@ -66216,15 +66240,19 @@ function AcademyTab({
     className: "rvt-title"
   }, "The switches"), React.createElement("span", {
     className: "rvt-sub"
-  }, "A switch flips itself the moment the track levels behind it are earned \u2014 nobody grades it directly.")), React.createElement(RvSkillTree, {
+  }, "Graded 1\u20135 against a written standard \u2014 evidence asked for, history kept. Earned at ", AC_SWEARN, "+. Training modules attached below.")), React.createElement(RvSkillTree, {
     height: 470,
-    groups: RV_CHUNK3(AC_SW.map(sw => ({
-      k: sw.id,
-      label: sw.name,
-      desc: sw.desc,
-      level: F[sw.id] ? 1 : 0,
-      max: 1
-    }))).map(ns => ({
+    groups: RV_CHUNK3(AC_SW.map(sw => {
+      const g = AC_SWGRADE(P, sw.id);
+      return {
+        k: sw.id,
+        label: sw.name,
+        desc: sw.desc,
+        level: g,
+        max: 5,
+        hue: g >= AC_SWEARN ? '#c9f26f' : g > 0 ? '#ffd166' : undefined
+      };
+    })).map(ns => ({
       name: '',
       hue: '#c9f26f',
       nodes: ns
@@ -66233,136 +66261,141 @@ function AcademyTab({
     onSelect: setSwSel
   }), React.createElement("div", {
     className: "rvt-panel"
-  }, React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'baseline',
-      gap: 12,
-      flexWrap: 'wrap'
-    }
-  }, React.createElement("span", {
-    className: "rvt-pn"
-  }, swNode.name), React.createElement("span", {
-    className: "rvt-pl"
-  }, F[swNode.id] ? 'FLIPPED' : 'not yet'), React.createElement("span", {
-    className: "rvt-ph"
-  }, "usual age ", swNode.age)), React.createElement("div", {
-    className: "rvt-pd",
-    style: {
-      marginTop: 5
-    }
-  }, swNode.desc), React.createElement("div", {
-    style: {
-      display: 'flex',
-      flexWrap: 'wrap',
-      gap: '12px 28px',
-      marginTop: 13
-    }
-  }, Object.keys(swNode.req).map(k => {
-    const need = swNode.req[k];
-    const xpv = (P.xp || {})[k] || 0;
-    const have = AC_LEVEL(xpv);
-    const needXp = (need - 1) * AC_XPL;
-    const pct = needXp ? Math.min(1, xpv / needXp) : 1;
-    const ok = have >= need;
-    const hue = ok ? '#c9f26f' : '#ffd166';
-    return React.createElement("div", {
-      key: k,
-      style: {
-        flex: '1 1 210px',
-        minWidth: 190
-      }
-    }, React.createElement("div", {
+  }, (() => {
+    const g = AC_SWGRADE(P, swNode.id);
+    const hh = (P.swg || {})[swNode.id] || [];
+    return React.createElement(React.Fragment, null, React.createElement("div", {
       style: {
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'baseline',
-        marginBottom: 4,
-        gap: 8
+        alignItems: 'center',
+        gap: 12,
+        flexWrap: 'wrap'
       }
     }, React.createElement("span", {
+      className: "rvt-pn"
+    }, swNode.name), React.createElement("span", {
+      className: "rvt-pl"
+    }, g >= AC_SWEARN ? 'EARNED' : g > 0 ? g + ' / 5' : 'not scored yet'), React.createElement("span", {
+      className: "rvt-ph"
+    }, "usual age ", swNode.age), React.createElement("span", {
+      style: {
+        marginLeft: 'auto',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        flexWrap: 'wrap'
+      }
+    }, React.createElement("span", {
+      className: "rvt-ph",
+      style: {
+        letterSpacing: '1.4px',
+        textTransform: 'uppercase'
+      }
+    }, "Score \u2014 evidence asked for, history kept"), React.createElement("span", {
+      style: {
+        display: 'flex',
+        gap: 6
+      }
+    }, [1, 2, 3, 4, 5].map(v => React.createElement("button", {
+      key: v,
+      onClick: () => gradeSw(swNode.id, v),
+      style: {
+        cursor: 'pointer',
+        width: 38,
+        height: 34,
+        borderRadius: 8,
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 15,
+        fontWeight: 800,
+        color: g === v ? '#12250f' : '#eef8f2',
+        background: g === v ? v >= AC_SWEARN ? '#c9f26f' : '#ffd166' : 'rgba(255,255,255,.07)',
+        border: '1px solid ' + (g === v ? 'transparent' : 'rgba(255,255,255,.22)')
+      }
+    }, v))))), React.createElement("div", {
+      className: "rvt-pd",
+      style: {
+        marginTop: 5
+      }
+    }, swNode.desc), React.createElement("div", {
+      style: {
+        marginTop: 13
+      }
+    }, React.createElement("div", {
       style: {
         fontSize: 11,
         letterSpacing: '1.6px',
         fontWeight: 700,
         color: '#9fd9c6',
-        textTransform: 'uppercase'
+        textTransform: 'uppercase',
+        marginBottom: 7
       }
-    }, AC_TNAME(k)), React.createElement("span", {
+    }, "The standard \u2014 what each grade means"), React.createElement("div", {
       style: {
-        fontSize: 12,
-        fontWeight: 800,
-        color: hue
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 5
       }
-    }, ok ? '✓ L' + have : 'L' + have + ' → needs L' + need + ' · ' + Math.max(0, needXp - xpv) + ' XP to go')), React.createElement("div", {
-      style: {
-        height: 8,
-        borderRadius: 4,
-        background: 'rgba(255,255,255,.08)',
-        overflow: 'hidden'
-      }
-    }, React.createElement("div", {
-      style: {
-        width: Math.round(pct * 100) + '%',
-        height: '100%',
-        background: hue,
-        borderRadius: 4,
-        transition: 'width .5s'
-      }
-    })));
-  })), (rx.m || []).length > 0 && React.createElement("div", {
-    style: {
-      marginTop: 14
-    }
-  }, React.createElement("div", {
-    style: {
-      fontSize: 11,
-      letterSpacing: '1.6px',
-      fontWeight: 700,
-      color: '#9fd9c6',
-      textTransform: 'uppercase',
-      marginBottom: 7
-    }
-  }, "Training \u2014 study for this switch"), React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 7,
-      flexWrap: 'wrap'
-    }
-  }, (rx.m || []).map(mid => {
-    const mod = AC_MODS.find(x => x.id === mid);
-    const dd = mod ? docsOf()[mod.doc] : null;
-    return React.createElement("span", {
-      key: mid,
-      style: {
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        fontSize: 12.5,
-        fontWeight: 600,
-        color: '#eef8f2',
-        background: 'rgba(47,214,168,.10)',
-        border: '1px solid rgba(47,214,168,.4)',
-        borderRadius: 999,
-        padding: '5px 13px'
-      }
-    }, AC_MODNAME(mid), dd && dd.u ? React.createElement("a", {
-      href: dd.u,
-      target: "_blank",
-      rel: "noreferrer",
-      style: {
-        color: 'var(--c-blu2)'
-      }
-    }, "doc \u2197") : null);
-  })), (rx.n || []).length > 0 && React.createElement("div", {
-    className: "rvt-ph",
-    style: {
-      marginTop: 6
-    }
-  }, "Nodes: ", (rx.n || []).map(AC_LESSON).join(', '), rx.note ? ' · ' + rx.note : '')), !F[swNode.id] && (() => {
-    const feed = AC_MIS.filter(m => !P.done[m.id] && Object.keys(m.xp).some(k => swNode.req[k] && AC_LEVEL((P.xp || {})[k]) < swNode.req[k]));
-    if (!feed.length) return null;
-    return React.createElement("div", {
+    }, (AC_SWSTD[swNode.id] || []).map((tx, i2) => {
+      const v = i2 + 1;
+      const here = g === v;
+      const next = g > 0 ? v === g + 1 : v === 1;
+      const col = v >= AC_SWEARN ? '#c9f26f' : v === 3 ? '#7ee0a3' : v === 2 ? '#ffd166' : '#ff9d9d';
+      return React.createElement("div", {
+        key: i2,
+        style: {
+          display: 'flex',
+          gap: 10,
+          alignItems: 'flex-start',
+          padding: '7px 11px',
+          borderRadius: 8,
+          background: here ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.03)',
+          border: '1px solid ' + (here ? col : next ? 'rgba(255,209,102,.4)' : 'rgba(255,255,255,.08)')
+        }
+      }, React.createElement("span", {
+        style: {
+          flexShrink: 0,
+          minWidth: 30,
+          textAlign: 'center',
+          fontFamily: "'Barlow Condensed',sans-serif",
+          fontWeight: 800,
+          fontSize: 13,
+          color: '#12250f',
+          background: col,
+          borderRadius: 6,
+          padding: '1px 6px'
+        }
+      }, v), React.createElement("span", {
+        style: {
+          flex: 1,
+          fontSize: 13,
+          color: here ? '#fff' : 'rgba(238,248,242,.75)',
+          lineHeight: 1.5
+        }
+      }, tx, v === AC_SWEARN ? React.createElement("span", {
+        style: {
+          color: '#c9f26f',
+          fontWeight: 700
+        }
+      }, " \u2014 earned here") : null), here && React.createElement("span", {
+        style: {
+          flexShrink: 0,
+          fontFamily: "'Barlow Condensed',sans-serif",
+          fontSize: 10.5,
+          fontWeight: 800,
+          letterSpacing: '1.2px',
+          color: col
+        }
+      }, "YOU ARE HERE"), !here && next && React.createElement("span", {
+        style: {
+          flexShrink: 0,
+          fontFamily: "'Barlow Condensed',sans-serif",
+          fontSize: 10.5,
+          fontWeight: 800,
+          letterSpacing: '1.2px',
+          color: '#ffd166'
+        }
+      }, "NEXT"));
+    }))), (rx.m || []).length > 0 && React.createElement("div", {
       style: {
         marginTop: 14
       }
@@ -66373,70 +66406,61 @@ function AcademyTab({
         fontWeight: 700,
         color: '#9fd9c6',
         textTransform: 'uppercase',
-        marginBottom: 3
+        marginBottom: 7
       }
-    }, "Grading \u2014 the missions that feed it"), feed.slice(0, 6).map(m => {
-      const locked = m.s > stage + 1;
-      return React.createElement("div", {
-        key: m.id,
+    }, "Training \u2014 modules for this switch"), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 7,
+        flexWrap: 'wrap'
+      }
+    }, (rx.m || []).map(mid => {
+      const mod = AC_MODS.find(x => x.id === mid);
+      const dd = mod ? docsOf()[mod.doc] : null;
+      return React.createElement("span", {
+        key: mid,
         style: {
-          display: 'flex',
-          gap: 10,
+          display: 'inline-flex',
           alignItems: 'center',
-          borderTop: '1px solid rgba(255,255,255,.08)',
-          padding: '8px 0'
+          gap: 8,
+          fontSize: 12.5,
+          fontWeight: 600,
+          color: '#eef8f2',
+          background: 'rgba(47,214,168,.10)',
+          border: '1px solid rgba(47,214,168,.4)',
+          borderRadius: 999,
+          padding: '5px 13px'
         }
-      }, React.createElement("span", {
+      }, AC_MODNAME(mid), dd && dd.u ? React.createElement("a", {
+        href: dd.u,
+        target: "_blank",
+        rel: "noreferrer",
         style: {
-          color: '#c9f26f',
-          flexShrink: 0
+          color: 'var(--c-blu2)'
         }
-      }, "\u26A1"), React.createElement("div", {
-        style: {
-          flex: 1,
-          minWidth: 170
-        }
-      }, React.createElement("span", {
-        style: {
-          fontSize: 13.5,
-          fontWeight: 700,
-          color: '#eef8f2'
-        }
-      }, m.t), React.createElement("span", {
-        style: {
-          fontSize: 11.5,
-          color: 'rgba(238,248,242,.55)',
-          marginLeft: 8
-        }
-      }, Object.keys(m.xp).map(k => '+' + m.xp[k] + ' ' + AC_TNAME(k)).join(' · '))), locked ? React.createElement("span", {
-        style: {
-          fontSize: 12,
-          color: 'rgba(238,248,242,.45)',
-          flexShrink: 0
-        }
-      }, "stage ", m.s, " \u2014 locked") : React.createElement("button", {
-        className: "btn btn-lime btn-xs",
-        onClick: () => complete(m.id)
-      }, "Complete"));
-    }), feed.length > 6 && React.createElement("div", {
+      }, "doc \u2197") : null);
+    })), (rx.n || []).length > 0 && React.createElement("div", {
       className: "rvt-ph",
       style: {
-        marginTop: 4
+        marginTop: 6
       }
-    }, "+", feed.length - 6, " more on the missions board"), React.createElement("button", {
-      className: "btn btn-ghost btn-sm",
+    }, "Nodes: ", (rx.n || []).map(AC_LESSON).join(', '), rx.note ? ' · ' + rx.note : '')), hh.length > 0 && React.createElement("div", {
       style: {
-        marginTop: 9
-      },
-      onClick: () => setAcView('missions')
-    }, "Open the full missions board \u2192"));
-  })(), F[swNode.id] && React.createElement("div", {
-    style: {
-      marginTop: 12,
-      fontSize: 13,
-      color: '#7ee0a3'
-    }
-  }, "\u2713 This switch is flipped \u2014 the track levels behind it are earned. The full history lives in XP & Log.")))), acView === 'missions' && React.createElement("div", {
+        marginTop: 12,
+        fontSize: 12,
+        color: 'rgba(238,248,242,.6)'
+      }
+    }, "History: ", hh.slice(0, 4).map((h, i2) => React.createElement("span", {
+      key: i2,
+      style: {
+        marginRight: 14
+      }
+    }, h.date, " \u2192 ", React.createElement("b", {
+      style: {
+        color: h.v >= AC_SWEARN ? '#c9f26f' : '#ffd166'
+      }
+    }, h.v, "/5"), h.note ? ' · ' + String(h.note).slice(0, 50) : '', h.by && h.by !== '—' ? ' · ' + h.by : ''))));
+  })()))), acView === 'missions' && React.createElement("div", {
     style: {
       ...C
     }
@@ -66446,7 +66470,7 @@ function AcademyTab({
       color: 'var(--g-777)',
       marginBottom: 12
     }
-  }, "Available up to one stage ahead. Completing one asks for a line of evidence and awards its XP; everything is logged and can be undone."), AC_STAGES.map(st => {
+  }, "The fun side \u2014 missions pay XP into the six tracks (never into switches; those are graded). Available up to one stage ahead; completing one asks for a line of evidence, and everything is logged and undoable."), AC_STAGES.map(st => {
     const ms = AC_MIS.filter(m => m.s === st.n);
     if (!ms.length) return null;
     const locked = st.n > stage + 1;
@@ -66833,7 +66857,7 @@ function AcademyTab({
     style: {
       color: 'var(--g-ccc)'
     }
-  }, "How it plays:"), " ", AC_XPL, " XP = one track level (max L", AC_MAXLV, "). Missions are the only XP source. Levels flip switches automatically; stages unlock when their switches are flipped. Utilization and earnings live in Performance & Revenue \u2014 this system never duplicates them."))));
+  }, "How it plays:"), " Switches are graded 1\u20135 against their standards (earned at 4+), and stages unlock as switches are earned. On the fun side, missions pay XP into the six tracks \u2014 ", AC_XPL, " XP = one level, max L", AC_MAXLV, ". Utilization and earnings live in Performance & Revenue \u2014 this system never duplicates them."))));
 }
 function LeadershipPage({
   staff,
