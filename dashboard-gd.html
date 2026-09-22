@@ -1920,7 +1920,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L177';
+window.__BUILD = 'build L178';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -57161,6 +57161,82 @@ function ProfileEditTab({
       });
     }
   };
+  const PLBL = {
+    fontFamily: 'Inter,Helvetica,Arial,sans-serif',
+    fontSize: 11,
+    letterSpacing: '1.6px',
+    fontWeight: 700,
+    color: '#9fd9c6',
+    textTransform: 'uppercase',
+    marginBottom: 5
+  };
+  const PVAL = {
+    fontFamily: 'Inter,Helvetica,Arial,sans-serif',
+    fontSize: 15.5,
+    fontWeight: 700,
+    color: '#f0f8f3',
+    lineHeight: 1.5
+  };
+  const PMUT = {
+    fontFamily: 'Inter,Helvetica,Arial,sans-serif',
+    fontSize: 15,
+    fontWeight: 500,
+    color: '#7da295',
+    lineHeight: 1.5
+  };
+  const PCARD = {
+    background: 'rgba(255,255,255,.05)',
+    border: '1px solid rgba(255,255,255,.10)',
+    borderRadius: 14,
+    padding: '18px 22px',
+    marginBottom: 14
+  };
+  const PHEAD = {
+    fontFamily: "'Barlow Condensed',sans-serif",
+    fontSize: 22,
+    fontWeight: 800,
+    letterSpacing: '2px',
+    color: '#fff',
+    textTransform: 'uppercase',
+    marginBottom: 14
+  };
+  const PItem = ({
+    l,
+    v
+  }) => {
+    const muted = v == null || v === '' || v === '—' || String(v).indexOf('Not set') === 0;
+    return React.createElement("div", {
+      style: {
+        flex: '1 1 200px',
+        minWidth: 170
+      }
+    }, React.createElement("div", {
+      style: PLBL
+    }, l), React.createElement("div", {
+      style: muted ? PMUT : PVAL
+    }, v == null || v === '' ? '—' : v));
+  };
+  const PChips = ({
+    items,
+    hue
+  }) => React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 7,
+      flexWrap: 'wrap'
+    }
+  }, items.map((x, i) => React.createElement("span", {
+    key: i,
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: '#eef8f2',
+      background: 'rgba(47,214,168,.10)',
+      border: '1px solid ' + (hue || 'rgba(47,214,168,.4)'),
+      borderRadius: 999,
+      padding: '5px 13px'
+    }
+  }, x)));
   if (!editing) return React.createElement("div", null, justSaved && React.createElement("div", {
     style: {
       background: 'rgba(68,204,170,.1)',
@@ -57177,34 +57253,44 @@ function ProfileEditTab({
       display: 'flex',
       justifyContent: 'flex-end',
       alignItems: 'center',
-      marginBottom: 10
+      marginBottom: 12
     }
   }, React.createElement("button", {
-    className: "btn btn-go btn-sm",
+    className: "btn btn-go",
     onClick: () => setEditing(true)
   }, "\u270E Edit Profile")), staff.notes && React.createElement("div", {
-    className: "hb hb-gray mb14"
+    style: {
+      ...PCARD,
+      borderLeft: '3px solid #c9f26f'
+    }
   }, React.createElement("div", {
     style: {
-      fontSize: 12,
-      letterSpacing: '2px',
-      textTransform: 'uppercase',
-      color: 'var(--lime)',
-      marginBottom: 5
+      ...PHEAD,
+      fontSize: 18,
+      marginBottom: 8
     }
   }, "Profile Summary"), React.createElement("div", {
-    className: "sm",
     style: {
-      lineHeight: 1.65
+      fontSize: 14.5,
+      color: '#dceee6',
+      lineHeight: 1.75
     }
   }, staff.notes)), staff.reflection && staff.reflection.length > 20 && React.createElement("div", {
-    className: "note-item mb14"
-  }, React.createElement("div", {
-    className: "note-date"
-  }, "Latest G&D Reflection"), React.createElement("div", {
-    className: "sm",
     style: {
-      lineHeight: 1.6
+      ...PCARD,
+      borderLeft: '3px solid #2fd6a8'
+    }
+  }, React.createElement("div", {
+    style: {
+      ...PHEAD,
+      fontSize: 18,
+      marginBottom: 8
+    }
+  }, "Latest G&D Reflection"), React.createElement("div", {
+    style: {
+      fontSize: 14.5,
+      color: '#dceee6',
+      lineHeight: 1.75
     }
   }, staff.reflection)), (() => {
     const mpData = mpFor(staff);
@@ -57212,11 +57298,9 @@ function ProfileEditTab({
     const seeded = !_hasMP(staff.match_profile);
     return React.createElement("div", {
       style: {
-        background: 'var(--surface2)',
-        border: '1px solid rgba(127,200,232,.25)',
-        borderRadius: 8,
-        padding: '14px 16px',
-        marginBottom: 14
+        ...PCARD,
+        border: '1px solid rgba(47,214,168,.30)',
+        background: 'radial-gradient(ellipse 80% 90% at 15% 0%, rgba(47,214,168,.10), transparent), rgba(255,255,255,.045)'
       }
     }, React.createElement("div", {
       style: {
@@ -57224,84 +57308,150 @@ function ProfileEditTab({
         justifyContent: 'space-between',
         alignItems: 'baseline',
         flexWrap: 'wrap',
-        gap: 6,
-        marginBottom: 8
+        gap: 6
       }
-    }, React.createElement("span", {
-      style: {
-        fontFamily: "'Barlow Condensed',sans-serif",
-        fontSize: 16,
-        fontWeight: 800,
-        letterSpacing: '.5px',
-        color: 'var(--c-blu2)'
-      }
+    }, React.createElement("div", {
+      style: PHEAD
     }, "\uD83E\uDDED Match Profile"), seeded && React.createElement("span", {
       style: {
-        fontSize: 11,
-        color: 'var(--g-888)',
+        fontSize: 11.5,
+        color: '#7da295',
         fontStyle: 'italic'
       }
     }, "pre-filled from GE data \u2014 Edit & Save to confirm")), (mpData.bird || mpData.birdSecondary) && React.createElement("div", {
       style: {
-        fontSize: 13,
-        color: 'var(--g-bbb)',
-        marginBottom: 6
+        marginBottom: 14
       }
-    }, "\uD83D\uDC26 ", React.createElement("b", {
+    }, React.createElement(PChips, {
+      hue: "rgba(244,219,113,.5)",
+      items: ['🐦 ' + [mpData.bird, mpData.birdSecondary].filter(Boolean).join(' / ')]
+    })), React.createElement("div", {
       style: {
-        color: 'var(--g-ddd)'
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '16px 26px'
       }
-    }, [mpData.bird, mpData.birdSecondary].filter(Boolean).join(' / '))), MATCH_FIELDS.filter(([k]) => mpData[k] && (!Array.isArray(mpData[k]) || mpData[k].length)).map(([k, lbl]) => React.createElement("div", {
+    }, MATCH_FIELDS.filter(([k]) => mpData[k] && (!Array.isArray(mpData[k]) || mpData[k].length)).map(([k, lbl]) => React.createElement("div", {
       key: k,
       style: {
-        marginBottom: 6,
-        fontSize: 13.5,
-        lineHeight: 1.5
+        flex: '1 1 44%',
+        minWidth: 250
       }
-    }, React.createElement("span", {
+    }, React.createElement("div", {
+      style: PLBL
+    }, lbl), Array.isArray(mpData[k]) ? React.createElement(PChips, {
+      items: mpData[k]
+    }) : React.createElement("div", {
       style: {
-        color: 'var(--g-888)'
+        fontSize: 14.5,
+        fontWeight: 500,
+        color: '#e6f2ec',
+        lineHeight: 1.65
       }
-    }, lbl, ":"), " ", React.createElement("span", {
-      style: {
-        color: 'var(--g-ccc)'
-      }
-    }, Array.isArray(mpData[k]) ? mpData[k].join(', ') : mpData[k]))));
-  })(), React.createElement("div", {
-    style: {
-      background: 'var(--surface2)',
-      border: '1px solid var(--border)',
-      borderRadius: 5,
-      padding: '12px 16px'
-    }
-  }, [['Name', staff.name], ['Email', staff.email || '—'], ['Discipline', DISC.find(d => d.id === staff.discipline)?.label || staff.discipline], ['Role', staff.role || '—'], ['Site', staff.site || '—'], ['Roadmap', staff.roadmap || '—'], ['Archetype', staff.archetype || '—'], ['Split %', staff.split ? staff.split + '%' : '—'], ['Stipend', staff.stipend ? 'Yes' : 'No'], ['Rate', staff.rate || '—'], ['Contract renewal', (() => {
-    if (!staff.contractRenewal) return 'Not set';
-    const d = Math.round((new Date(staff.contractRenewal) - new Date()) / 86400000);
-    return staff.contractRenewal + (d < 0 ? ' · OVERDUE by ' + Math.abs(d) + 'd' : d <= 60 ? ' · in ' + d + ' days' : '');
-  })()], ['Contract signed', staff.contractSigned || '—'], ...((staff.specializations || []).length > 0 ? [['Specializations', (staff.specializations || []).map(sid => SPECIALIZATIONS.find(s => s.id === sid)?.label).filter(Boolean).join(', ')]] : []), ['GVA', (() => {
-    const pd = perfData || {};
-    const gv = (pd.gva || {})[staff.id];
-    return gv ? gv + ' visits / active guest (365-day)' : 'Not set — log in Performance tab';
-  })()]].map(([k, v]) => React.createElement("div", {
-    key: k,
+    }, mpData[k])))));
+  })(), React.createElement("div", null, React.createElement("div", {
+    style: PCARD
+  }, React.createElement("div", {
+    style: PHEAD
+  }, "\uD83E\uDEAA Identity"), React.createElement("div", {
     style: {
       display: 'flex',
-      alignItems: 'center',
-      padding: '6px 0',
-      borderBottom: '1px solid var(--border)'
+      flexWrap: 'wrap',
+      gap: '16px 24px'
     }
-  }, React.createElement("span", {
+  }, React.createElement(PItem, {
+    l: "Name",
+    v: staff.name
+  }), React.createElement(PItem, {
+    l: "Email",
+    v: staff.email || '—'
+  }), React.createElement(PItem, {
+    l: "Discipline",
+    v: DISC.find(d => d.id === staff.discipline)?.label || staff.discipline
+  }), React.createElement(PItem, {
+    l: "Role",
+    v: staff.role || '—'
+  }), React.createElement(PItem, {
+    l: "Site",
+    v: staff.site || '—'
+  }))), React.createElement("div", {
+    style: PCARD
+  }, React.createElement("div", {
+    style: PHEAD
+  }, "\uD83C\uDF31 Growth & Craft"), React.createElement("div", {
     style: {
-      fontSize: 14,
-      color: 'var(--g-999)',
-      minWidth: 100
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '16px 24px'
     }
-  }, k), React.createElement("span", {
+  }, React.createElement(PItem, {
+    l: "Roadmap",
+    v: staff.roadmap || '—'
+  }), React.createElement(PItem, {
+    l: "Archetype",
+    v: staff.archetype || '—'
+  }), React.createElement(PItem, {
+    l: "GVA \xB7 guest visit average",
+    v: (() => {
+      const pd = perfData || {};
+      const gv = (pd.gva || {})[staff.id];
+      return gv ? gv + ' visits / active guest (365-day)' : 'Not set — log in Performance tab';
+    })()
+  }), React.createElement("div", {
     style: {
-      fontSize: 14,
-      color: 'var(--text)'
+      flex: '1 1 100%'
     }
-  }, v))), (() => {
+  }, React.createElement("div", {
+    style: PLBL
+  }, "Tracks"), React.createElement("div", {
+    className: "flex aic g5"
+  }, (staff.tracks || []).length ? (staff.tracks || []).map(t => React.createElement("span", {
+    key: t,
+    className: `track-pill tp-${t} active`
+  }, TRACK_META[t]?.label)) : React.createElement("span", {
+    style: PMUT
+  }, "\u2014"))), (staff.specializations || []).length > 0 && React.createElement("div", {
+    style: {
+      flex: '1 1 100%'
+    }
+  }, React.createElement("div", {
+    style: PLBL
+  }, "Specializations"), React.createElement(PChips, {
+    items: (staff.specializations || []).map(sid => SPECIALIZATIONS.find(sp => sp.id === sid)?.label).filter(Boolean)
+  })))), React.createElement("div", {
+    style: {
+      ...PCARD,
+      marginBottom: 0
+    }
+  }, React.createElement("div", {
+    style: PHEAD
+  }, "\uD83D\uDCC4 Contract & Compensation"), React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '16px 24px',
+      marginBottom: 6
+    }
+  }, React.createElement(PItem, {
+    l: "Split %",
+    v: staff.split ? staff.split + '%' : '—'
+  }), React.createElement(PItem, {
+    l: "Stipend",
+    v: staff.stipend ? 'Yes' : 'No'
+  }), React.createElement(PItem, {
+    l: "Rate",
+    v: staff.rate || '—'
+  }), React.createElement(PItem, {
+    l: "Contract renewal",
+    v: (() => {
+      if (!staff.contractRenewal) return 'Not set';
+      const d = Math.round((new Date(staff.contractRenewal) - new Date()) / 86400000);
+      return staff.contractRenewal + (d < 0 ? ' · OVERDUE by ' + Math.abs(d) + 'd' : d <= 60 ? ' · in ' + d + ' days' : '');
+    })()
+  }), React.createElement(PItem, {
+    l: "Contract signed",
+    v: staff.contractSigned || '—'
+  })), (() => {
     const ct = staff.contract;
     const ren = staff.contractRenewal;
     const dleft = ren ? Math.round((new Date(ren) - new Date()) / 86400000) : null;
@@ -57666,24 +57816,7 @@ function ProfileEditTab({
         marginTop: 3
       }
     }, lb, nm ? ' · ' + nm : '', " \u2014 signature & date")))))));
-  })(), React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      padding: '6px 0'
-    }
-  }, React.createElement("span", {
-    style: {
-      fontSize: 14,
-      color: 'var(--g-999)',
-      minWidth: 100
-    }
-  }, "Tracks"), React.createElement("div", {
-    className: "flex aic g5"
-  }, (staff.tracks || []).map(t => React.createElement("span", {
-    key: t,
-    className: `track-pill tp-${t} active`
-  }, TRACK_META[t]?.label))))), React.createElement("div", {
+  })())), React.createElement("div", {
     style: {
       display: 'flex',
       justifyContent: 'flex-end',
