@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L183';
+window.__BUILD = 'build L184';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -42851,7 +42851,18 @@ function RvProfileTrees({
         })),
         canScore: false,
         lvNoun: "Flipped",
-        pointsNoun: "switches flipped"
+        pointsNoun: "switches flipped",
+        action: onNav ? {
+          label: 'Earn it in Leadership Growth →',
+          onClick: () => {
+            try {
+              sessionStorage.setItem('rvgd3_ui_lt.tab', JSON.stringify('academy'));
+              sessionStorage.setItem('rvgd3_ui_academy.person', JSON.stringify(staff.id));
+              sessionStorage.setItem('rvgd3_ui_academy.view', JSON.stringify('map'));
+            } catch (e) {}
+            onNav('leadership');
+          }
+        } : null
       }));
     }
   } catch (e) {}
