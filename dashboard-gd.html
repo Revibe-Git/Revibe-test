@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L182';
+window.__BUILD = 'build L183';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -3916,6 +3916,55 @@ function RvAskHost() {
     onClick: () => done(val)
   }, q.ok || 'Save'))));
 }
+function RvFxHost() {
+  const [fx, setFx] = useState(null);
+  useEffect(() => {
+    window.__RVFX = label => {
+      try {
+        setFx({
+          label: String(label || ''),
+          k: Date.now()
+        });
+      } catch (e) {}
+    };
+    return () => {
+      if (window.__RVFX) window.__RVFX = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (!fx) return;
+    const t = setTimeout(() => setFx(null), 1900);
+    return () => clearTimeout(t);
+  }, [fx]);
+  if (!fx) return null;
+  return React.createElement("div", {
+    key: fx.k,
+    style: {
+      position: 'fixed',
+      inset: 0,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      pointerEvents: 'none',
+      zIndex: 3000
+    }
+  }, React.createElement("style", null, `
+        @keyframes rvgR{from{transform:scale(.4);opacity:1;}to{transform:scale(6);opacity:0;}}
+        @keyframes rvgT{0%{opacity:0;transform:scale(.85);}18%{opacity:1;transform:scale(1.04);}30%{transform:scale(1);}78%{opacity:1;}100%{opacity:0;transform:scale(.98);}}
+        .rvgfx-ring{position:absolute;width:70px;height:70px;border:2px solid rgba(201,242,111,.85);border-radius:50%;animation:rvgR 1.4s ease-out forwards;}
+        .rvgfx-ring.r2{animation-delay:.15s;border-color:rgba(47,214,168,.8);}
+        .rvgfx-t{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:800;letter-spacing:4px;text-transform:uppercase;color:#fff;
+          text-shadow:0 2px 18px rgba(0,0,0,.65), 0 0 34px rgba(201,242,111,.5);animation:rvgT 1.8s ease-out forwards;
+          background:rgba(6,32,22,.55);border:1px solid rgba(201,242,111,.35);border-radius:999px;padding:10px 26px;backdrop-filter:blur(3px);}
+        @media (prefers-reduced-motion:reduce){.rvgfx-ring{display:none;}.rvgfx-t{animation:rvgT 0.9s linear forwards;}}
+      `), React.createElement("div", {
+    className: "rvgfx-ring"
+  }), React.createElement("div", {
+    className: "rvgfx-ring r2"
+  }), React.createElement("div", {
+    className: "rvgfx-t"
+  }, fx.label));
+}
 function RvTipHost() {
   const [tip, setTip] = useState(null);
   useEffect(() => {
@@ -4837,7 +4886,10 @@ function App() {
   }, React.createElement(RvAskHost, null)), React.createElement(ChromeBoundary, {
     name: "RvTipHost",
     quiet: true
-  }, React.createElement(RvTipHost, null)), palette && React.createElement(ChromeBoundary, {
+  }, React.createElement(RvTipHost, null)), React.createElement(ChromeBoundary, {
+    name: "RvFxHost",
+    quiet: true
+  }, React.createElement(RvFxHost, null)), palette && React.createElement(ChromeBoundary, {
     name: "Palette",
     quiet: true
   }, React.createElement(CommandPalette, {
@@ -51378,6 +51430,9 @@ function AddStaffModal({
         ...f,
         scores: {}
       });
+      try {
+        window.__RVFX && window.__RVFX('WELCOME TO THE TEAM — ' + f.name.split(' ')[0].toUpperCase());
+      } catch (e) {}
       onClose();
     }
   }, "Create Profile")))));
@@ -51772,6 +51827,9 @@ function AddEvalModal({
         staffId: selectedStaff,
         track
       });
+      try {
+        window.__RVFX && window.__RVFX('EVALUATION LOGGED');
+      } catch (e) {}
       onClose();
     }
   }, "Save Evaluation")))));
@@ -51961,6 +52019,9 @@ function AddSessModal({
         return;
       }
       onSave(f);
+      try {
+        window.__RVFX && window.__RVFX('SESSION LOGGED — XP FOR EVERYONE THERE');
+      } catch (e) {}
       onClose();
     }
   }, "Save Session")))));
@@ -52521,6 +52582,9 @@ function FormsPage({
     };
     saveSubmissions([sub, ...submissions]);
     setView('submissions');
+    try {
+      window.__RVFX && window.__RVFX('CHECK-IN SUBMITTED');
+    } catch (e) {}
   };
   const filteredSubs = filterType === 'all' ? submissions : submissions.filter(s => s.formType === filterType);
   const isLead = !!me && (me.role === 'admin' || me.role === 'lead' || me.role === 'guest');
@@ -56665,6 +56729,9 @@ function ContractsTab({
         source: 'profile'
       });
     } catch (e) {}
+    try {
+      window.__RVFX && window.__RVFX('AMENDMENT SIGNED — ' + ct.from + ' → ' + ct.to);
+    } catch (e) {}
   };
   const manual = async kind => {
     const from = await rvAsk({
@@ -57615,6 +57682,9 @@ function ProfileEditTab({
           signedAt: d,
           source: 'profile'
         });
+        try {
+          window.__RVFX && window.__RVFX('AMENDMENT SIGNED — ' + ct.from + ' → ' + ct.to);
+        } catch (e) {}
       }
     }, "\u2713 Mark signed"))), ct && ct.status === 'signed' && React.createElement("div", {
       style: {
@@ -58280,6 +58350,14 @@ function ScoresEditTab({
     return isNaN(v) ? t : t + v * (c.weight / 100);
   }, 0) * 100) / 100 : null;
   const saveScores = () => {
+    const before = (() => {
+      try {
+        const t = parseFloat((staff.scores?.[activeTrack] || {}).total);
+        return isNaN(t) ? null : getLevel(t);
+      } catch (e) {
+        return null;
+      }
+    })();
     setStaff(prev => prev.map(s => s.id === staff.id ? {
       ...s,
       scores: {
@@ -58292,6 +58370,10 @@ function ScoresEditTab({
     } : s));
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
+    try {
+      const after = liveTotal != null ? getLevel(liveTotal) : null;
+      window.__RVFX && window.__RVFX(after && (!before || after.label !== before.label) ? 'LEVEL UP — ' + after.label : 'SCORES SAVED — ' + liveTotal + ' weighted');
+    } catch (e) {}
   };
   if (!rs) return React.createElement("div", {
     className: "empty"
