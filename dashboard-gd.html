@@ -349,20 +349,22 @@ tbody tr:hover td{background:var(--surface2);}
 .file-date{font-size:15px;color:var(--text3);}
 
 /* FORM */
-.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-.fg{display:flex;flex-direction:column;gap:4px;}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px 16px;}
+.fg{display:flex;flex-direction:column;gap:6px;}
 .fg.full{grid-column:1/-1;}
-label{font-family:'Barlow Condensed',sans-serif;font-size:12.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--g-888);font-weight:600;}
-input,select,textarea{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:7px 10px;font-size:15px;font-family:'Barlow',sans-serif;outline:none;transition:border-color .1s;width:100%;}
-input:focus,select:focus,textarea:focus{border-color:var(--go);}
+label{font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:#9fd9c6;font-weight:700;}
+input,select,textarea{background:var(--surface2);border:1px solid rgba(255,255,255,.14);color:var(--text);border-radius:9px;padding:9px 12px;font-size:15px;font-family:'Barlow',sans-serif;outline:none;transition:border-color .12s, box-shadow .12s;width:100%;}
+input:focus,select:focus,textarea:focus{border-color:#2fd6a8;box-shadow:0 0 0 3px rgba(47,214,168,.15);}
 select option{background:var(--surface2);}
 textarea{resize:vertical;min-height:60px;}
-.fsec{grid-column:1/-1;font-family:'Barlow Condensed',sans-serif;font-size:12px;letter-spacing:2.5px;text-transform:uppercase;color:var(--lime);padding-top:3px;}
+.fsec{grid-column:1/-1;font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:#fff;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);margin-top:4px;}
+.fsec:first-child{border-top:none;margin-top:0;padding-top:0;}
 .fdiv{grid-column:1/-1;height:1px;background:var(--border);}
 .score-in{width:66px!important;}
 .pill-wrap{display:flex;flex-wrap:wrap;gap:5px;padding:3px 0;}
-.pill{padding:4px 10px;border-radius:3px;font-size:15px;cursor:pointer;border:1px solid var(--border);color:var(--text2);background:var(--surface2);transition:all .1s;font-family:'Barlow',sans-serif;}
-.pill.on{background:var(--go-dim);border-color:var(--go-b);color:var(--lime);}
+.pill{padding:5px 13px;border-radius:999px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,.16);color:var(--text2);background:rgba(255,255,255,.05);transition:all .12s;font-family:'Barlow',sans-serif;}
+.pill:hover{border-color:rgba(47,214,168,.45);transform:translateY(-1px);}
+.pill.on{background:rgba(47,214,168,.14);border-color:rgba(47,214,168,.55);color:#c9f26f;}
 .score-preview{grid-column:1/-1;display:flex;align-items:center;gap:12px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:9px 12px;}
 
 /* HIGHLIGHTS */
@@ -1920,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L179';
+window.__BUILD = 'build L180';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -39113,7 +39115,7 @@ function SyncChip() {
       textTransform: 'uppercase',
       cursor: 'help'
     },
-    title: st.msg + (st.ok === false ? ' — run revibe-gd-setup.sql in Supabase SQL editor, then reload' : '')
+    title: st.msg + (st.ok === false ? /row-level security/i.test(st.msg || '') ? ' — that table has row-level security switched on (Supabase turns it on for tables made in its UI) and the dashboard has no sign-in yet, so writes are rejected. Run fix-rls-l180.sql in the Supabase SQL editor, then reload.' : ' — run revibe-gd-catchup-l143.sql in Supabase SQL editor, then reload' : '')
   }, st.ok ? '☁ DB SYNCED' : st.ok === false ? '⚠ DB NOT SYNCING' : '☁ checking…'), React.createElement("div", {
     style: {
       margin: '0 14px 10px',
