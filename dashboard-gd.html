@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L181';
+window.__BUILD = 'build L182';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -64466,6 +64466,10 @@ const AC_TRACKS = [{
   id: "character",
   name: "Character",
   blurb: "Integrity, humility, consistency, resilience"
+}, {
+  id: "vibe",
+  name: "Vibe",
+  blurb: "Revibe identity — training and competing together, team culture, athlete-grade energy"
 }];
 const AC_SW = [{
   id: "reliability",
@@ -64500,6 +64504,15 @@ const AC_SW = [{
   req: {
     character: 4,
     clinical: 4
+  }
+}, {
+  id: "vibecarrier",
+  name: "Culture carrier",
+  age: "23-27",
+  desc: "Lives the brand — trains, competes, and shows up so the team feels it. Athlete-grade in how they carry themselves, not just how they treat.",
+  req: {
+    vibe: 3,
+    community: 2
   }
 }, {
   id: "systems",
@@ -64644,6 +64657,24 @@ const AC_MIS = [{
     character: 50
   }
 }, {
+  id: "m110",
+  s: 1,
+  t: "Train with the team",
+  d: "Join a team workout, run, or sport night. Show up and sweat with the people you work with.",
+  xp: {
+    vibe: 50,
+    community: 20
+  }
+}, {
+  id: "m111",
+  s: 1,
+  t: "Be at the table",
+  d: "Team lunch or social \u2014 present, phone down, part of it.",
+  xp: {
+    vibe: 30,
+    character: 20
+  }
+}, {
   id: "m201",
   s: 2,
   t: "Track your own KPIs for 90 days",
@@ -64686,6 +64717,33 @@ const AC_MIS = [{
   d: "Ask for it. Write down what you changed. Report back in 30 days.",
   xp: {
     character: 70
+  }
+}, {
+  id: "m210",
+  s: 2,
+  t: "Co-treat with another discipline",
+  d: "Plan and deliver a case together, start to finish \u2014 two disciplines, one guest, one plan.",
+  xp: {
+    clinical: 50,
+    vibe: 40
+  }
+}, {
+  id: "m211",
+  s: 2,
+  t: "Train like a guest",
+  d: "Put yourself through a full session of your own programming. Feel what you prescribe.",
+  xp: {
+    vibe: 40,
+    clinical: 20
+  }
+}, {
+  id: "m212",
+  s: 2,
+  t: "Compete in something",
+  d: "Race, tournament, Hyrox, rec league \u2014 and bring the team into it: cheer squad, carpool, or teammates.",
+  xp: {
+    vibe: 60,
+    character: 20
   }
 }, {
   id: "m301",
@@ -64732,6 +64790,24 @@ const AC_MIS = [{
     community: 90
   }
 }, {
+  id: "m310",
+  s: 3,
+  t: "Deliver an athlete-grade session",
+  d: "A guest calls their care athlete-grade \u2014 in a review, a message, or to your face. Bring the receipt.",
+  xp: {
+    vibe: 60,
+    clinical: 30
+  }
+}, {
+  id: "m311",
+  s: 3,
+  t: "Host the team",
+  d: "Organize the sport night, workout, or lunch yourself. You set it up, people come.",
+  xp: {
+    vibe: 50,
+    leadership: 40
+  }
+}, {
   id: "m401",
   s: 4,
   t: "Run one-on-ones for a full quarter",
@@ -64775,6 +64851,15 @@ const AC_MIS = [{
   xp: {
     character: 100,
     leadership: 60
+  }
+}, {
+  id: "m410",
+  s: 4,
+  t: "Wear the brand out loud",
+  d: "Rep Revibe in gear at a public event or competition and bring the story back to the team.",
+  xp: {
+    vibe: 40,
+    community: 40
   }
 }, {
   id: "m501",
@@ -65299,7 +65384,8 @@ const AC_BLANK = () => ({
     business: 0,
     leadership: 0,
     community: 0,
-    character: 0
+    character: 0,
+    vibe: 0
   },
   done: {},
   log: [],
@@ -65352,7 +65438,8 @@ const AC_HUES = {
   business: '#ffd166',
   leadership: '#ff8a9d',
   community: '#8ec9ff',
-  character: '#d9a9ff'
+  character: '#d9a9ff',
+  vibe: '#2fd6a8'
 };
 function AcademyTab({
   staff,
@@ -66034,7 +66121,7 @@ function AcademyTab({
     className: "rvt-head"
   }, React.createElement("span", {
     className: "rvt-title"
-  }, "The ten switches"), React.createElement("span", {
+  }, "The switches"), React.createElement("span", {
     className: "rvt-sub"
   }, "A switch flips itself the moment the track levels behind it are earned \u2014 nobody grades it directly.")), React.createElement(RvSkillTree, {
     height: 470,
