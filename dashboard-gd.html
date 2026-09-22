@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L189';
+window.__BUILD = 'build L190';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -40882,7 +40882,7 @@ const RvTreeCSS = React.createElement("style", null, `
   .rvt-fx-ring.r2{animation-delay:.15s;}
   @keyframes rvtR{from{transform:scale(.4);opacity:1;}to{transform:scale(6);opacity:0;}}
   @keyframes rvtT{0%{opacity:0;transform:scale(.85);}18%{opacity:1;transform:scale(1.04);}30%{transform:scale(1);}78%{opacity:1;}100%{opacity:0;}}
-  .rvt-flow{stroke-dasharray:3 15;animation:rvtFlow 10s linear infinite;opacity:.6;}
+  .rvt-flow{stroke-dasharray:4 14;animation:rvtFlow 10s linear infinite;opacity:.8;}
   .rvt-flow-pot{stroke-dasharray:2 11;animation-duration:15s;opacity:.75;}
   @keyframes rvtFlow{to{stroke-dashoffset:-180;}}
   @media (prefers-reduced-motion:reduce){.rvt-fx-ring{display:none;}.rvt-fx-t{animation:rvtT 0.9s linear forwards;}.rvt-node,.rvh,.rvp-dot,.rvt-seg button{transition:none;}.rvt-flow{animation:none;}}
@@ -41085,18 +41085,18 @@ function RvSkillTree({
     key: 'l' + i,
     d: l.d,
     fill: "none",
-    stroke: l.lit ? 'rgba(255,255,255,.8)' : 'rgba(255,209,102,.20)',
+    stroke: l.lit ? 'rgba(155,232,183,.9)' : 'rgba(255,209,102,.20)',
     strokeWidth: l.lit ? 2.6 : 1.6,
     strokeLinecap: "round",
     style: l.lit ? {
-      filter: 'drop-shadow(0 0 5px rgba(255,255,255,.5))'
+      filter: 'drop-shadow(0 0 5px rgba(201,242,111,.55))'
     } : null
   })), React.createElement("path", {
     className: "rvt-flow",
     d: fullWave(0),
     fill: "none",
-    stroke: "rgba(201,242,111,.55)",
-    strokeWidth: "2"
+    stroke: "rgba(255,255,255,.95)",
+    strokeWidth: "2.3"
   }), (() => {
     const potD = links.filter(l => !l.lit).map(l => l.d).join(' ');
     return potD ? React.createElement("path", {
