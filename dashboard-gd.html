@@ -1920,7 +1920,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L178';
+window.__BUILD = 'build L179';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -22818,15 +22818,19 @@ function CallHistoryPage() {
       b: _mo[m].b
     }));
     const lblS = {
-      fontSize: 11,
-      color: '#9a9a9a',
-      marginBottom: 3
+      fontSize: 10.5,
+      letterSpacing: '1.3px',
+      fontWeight: 700,
+      color: '#9fd9c6',
+      textTransform: 'uppercase',
+      marginBottom: 4
     };
     const lblG = {
       fontSize: 11,
-      color: '#7a857d',
+      letterSpacing: '1.6px',
+      fontWeight: 800,
+      color: '#9fd9c6',
       textTransform: 'uppercase',
-      letterSpacing: '1px',
       margin: '14px 0 7px'
     };
     const COLS = '16px minmax(110px,1.4fr) 92px minmax(140px,1.5fr) 118px 134px 84px 24px';
@@ -26433,12 +26437,13 @@ function LineChart({
     }
   }, React.createElement("div", null, React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: 'var(--g-888)',
-      marginBottom: 2,
-      fontFamily: "'Barlow Condensed',sans-serif",
-      letterSpacing: '1px',
-      textTransform: 'uppercase'
+      fontSize: 11,
+      letterSpacing: '1.6px',
+      fontWeight: 700,
+      color: '#9fd9c6',
+      textTransform: 'uppercase',
+      marginBottom: 3,
+      fontFamily: 'Inter,Helvetica,Arial,sans-serif'
     }
   }, "Latest"), React.createElement("div", {
     style: {
@@ -26465,12 +26470,13 @@ function LineChart({
     }
   }, up ? '▲' : '▼', Math.abs(delta), "%"))), React.createElement("div", null, React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: 'var(--g-888)',
-      marginBottom: 2,
-      fontFamily: "'Barlow Condensed',sans-serif",
-      letterSpacing: '1px',
-      textTransform: 'uppercase'
+      fontSize: 11,
+      letterSpacing: '1.6px',
+      fontWeight: 700,
+      color: '#9fd9c6',
+      textTransform: 'uppercase',
+      marginBottom: 3,
+      fontFamily: 'Inter,Helvetica,Arial,sans-serif'
     }
   }, "Their Avg / mo"), React.createElement("span", {
     style: {
@@ -26482,12 +26488,13 @@ function LineChart({
     }
   }, fmt(Math.round(avg)))), clinicAvg != null && React.createElement("div", null, React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: 'var(--g-888)',
-      marginBottom: 2,
-      fontFamily: "'Barlow Condensed',sans-serif",
-      letterSpacing: '1px',
-      textTransform: 'uppercase'
+      fontSize: 11,
+      letterSpacing: '1.6px',
+      fontWeight: 700,
+      color: '#9fd9c6',
+      textTransform: 'uppercase',
+      marginBottom: 3,
+      fontFamily: 'Inter,Helvetica,Arial,sans-serif'
     }
   }, "Clinic Avg / mo"), React.createElement("span", {
     style: {
@@ -26756,12 +26763,13 @@ function ClinicLineChart({
     }
   }, React.createElement("div", null, React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: 'var(--g-888)',
-      marginBottom: 2,
-      fontFamily: "'Barlow Condensed',sans-serif",
-      letterSpacing: '1px',
-      textTransform: 'uppercase'
+      fontSize: 11,
+      letterSpacing: '1.6px',
+      fontWeight: 700,
+      color: '#9fd9c6',
+      textTransform: 'uppercase',
+      marginBottom: 3,
+      fontFamily: 'Inter,Helvetica,Arial,sans-serif'
     }
   }, "Latest"), React.createElement("div", {
     style: {
@@ -26788,12 +26796,13 @@ function ClinicLineChart({
     }
   }, up ? '▲' : '▼', Math.abs(delta), "%"))), React.createElement("div", null, React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: 'var(--g-888)',
-      marginBottom: 2,
-      fontFamily: "'Barlow Condensed',sans-serif",
-      letterSpacing: '1px',
-      textTransform: 'uppercase'
+      fontSize: 11,
+      letterSpacing: '1.6px',
+      fontWeight: 700,
+      color: '#9fd9c6',
+      textTransform: 'uppercase',
+      marginBottom: 3,
+      fontFamily: 'Inter,Helvetica,Arial,sans-serif'
     }
   }, agg === 'avg' ? 'Avg / mo' : 'Total Avg / mo'), React.createElement("span", {
     style: {
@@ -34339,11 +34348,12 @@ button.pf-chip{cursor:pointer;}
         }
       }, React.createElement("div", null, React.createElement("div", {
         style: {
-          fontSize: 12,
-          color: 'var(--g-888)',
-          fontFamily: "'Barlow Condensed',sans-serif",
-          letterSpacing: '1px',
+          fontSize: 11,
+          letterSpacing: '1.6px',
+          fontWeight: 700,
+          color: '#9fd9c6',
           textTransform: 'uppercase',
+          fontFamily: 'Inter,Helvetica,Arial,sans-serif',
           marginBottom: 2
         }
       }, "Monthly Avg"), React.createElement("span", {
@@ -34355,11 +34365,12 @@ button.pf-chip{cursor:pointer;}
         }
       }, monthlyAvg)), React.createElement("div", null, React.createElement("div", {
         style: {
-          fontSize: 12,
-          color: 'var(--g-888)',
-          fontFamily: "'Barlow Condensed',sans-serif",
-          letterSpacing: '1px',
+          fontSize: 11,
+          letterSpacing: '1.6px',
+          fontWeight: 700,
+          color: '#9fd9c6',
           textTransform: 'uppercase',
+          fontFamily: 'Inter,Helvetica,Arial,sans-serif',
           marginBottom: 2
         }
       }, "Total"), React.createElement("span", {
@@ -34371,11 +34382,12 @@ button.pf-chip{cursor:pointer;}
         }
       }, vals.reduce((a, b) => a + b, 0))), React.createElement("div", null, React.createElement("div", {
         style: {
-          fontSize: 12,
-          color: 'var(--g-888)',
-          fontFamily: "'Barlow Condensed',sans-serif",
-          letterSpacing: '1px',
+          fontSize: 11,
+          letterSpacing: '1.6px',
+          fontWeight: 700,
+          color: '#9fd9c6',
           textTransform: 'uppercase',
+          fontFamily: 'Inter,Helvetica,Arial,sans-serif',
           marginBottom: 2
         }
       }, "Best Month"), React.createElement("span", {
@@ -34539,11 +34551,12 @@ button.pf-chip{cursor:pointer;}
       }
     }, React.createElement("div", {
       style: {
-        fontSize: 12,
-        color: 'var(--g-888)',
+        fontSize: 11,
+        letterSpacing: '1.6px',
+        fontWeight: 700,
+        color: '#9fd9c6',
         textTransform: 'uppercase',
-        letterSpacing: '1px',
-        marginBottom: 4
+        marginBottom: 5
       }
     }, "Billed (Total)"), React.createElement("div", {
       style: {
@@ -34568,11 +34581,12 @@ button.pf-chip{cursor:pointer;}
       }
     }, React.createElement("div", {
       style: {
-        fontSize: 12,
-        color: 'var(--g-888)',
+        fontSize: 11,
+        letterSpacing: '1.6px',
+        fontWeight: 700,
+        color: '#9fd9c6',
         textTransform: 'uppercase',
-        letterSpacing: '1px',
-        marginBottom: 4
+        marginBottom: 5
       }
     }, "Collected"), React.createElement("div", {
       style: {
@@ -34597,11 +34611,12 @@ button.pf-chip{cursor:pointer;}
       }
     }, React.createElement("div", {
       style: {
-        fontSize: 12,
-        color: 'var(--g-888)',
+        fontSize: 11,
+        letterSpacing: '1.6px',
+        fontWeight: 700,
+        color: '#9fd9c6',
         textTransform: 'uppercase',
-        letterSpacing: '1px',
-        marginBottom: 4
+        marginBottom: 5
       }
     }, "Outstanding"), React.createElement("div", {
       style: {
@@ -34896,11 +34911,12 @@ button.pf-chip{cursor:pointer;}
         }
       }, React.createElement("div", {
         style: {
-          fontSize: 12,
-          color: 'var(--g-888)',
+          fontSize: 11,
+          letterSpacing: '1.6px',
+          fontWeight: 700,
+          color: '#9fd9c6',
           textTransform: 'uppercase',
-          letterSpacing: '1px',
-          marginBottom: 4
+          marginBottom: 5
         }
       }, "Sessions delivered"), React.createElement("div", {
         style: {
@@ -34925,11 +34941,12 @@ button.pf-chip{cursor:pointer;}
         }
       }, React.createElement("div", {
         style: {
-          fontSize: 12,
-          color: 'var(--g-888)',
+          fontSize: 11,
+          letterSpacing: '1.6px',
+          fontWeight: 700,
+          color: '#9fd9c6',
           textTransform: 'uppercase',
-          letterSpacing: '1px',
-          marginBottom: 4
+          marginBottom: 5
         }
       }, revWord), React.createElement("div", {
         style: {
@@ -42141,6 +42158,85 @@ const RvPill = ({
     color: on ? '#06301f' : 'rgba(238,248,242,.75)'
   }
 }, label);
+const RV_LBL = {
+  fontFamily: 'Inter,Helvetica,Arial,sans-serif',
+  fontSize: 11,
+  letterSpacing: '1.6px',
+  fontWeight: 700,
+  color: '#9fd9c6',
+  textTransform: 'uppercase',
+  marginBottom: 5
+};
+const RV_VAL = {
+  fontFamily: 'Inter,Helvetica,Arial,sans-serif',
+  fontSize: 15.5,
+  fontWeight: 700,
+  color: '#f0f8f3',
+  lineHeight: 1.5
+};
+const RV_MUT = {
+  fontFamily: 'Inter,Helvetica,Arial,sans-serif',
+  fontSize: 15,
+  fontWeight: 500,
+  color: '#7da295',
+  lineHeight: 1.5
+};
+const RV_CARD = {
+  background: 'rgba(255,255,255,.05)',
+  border: '1px solid rgba(255,255,255,.10)',
+  borderRadius: 14,
+  padding: '18px 22px',
+  marginBottom: 14
+};
+const RV_HEAD = {
+  fontFamily: "'Barlow Condensed',sans-serif",
+  fontSize: 22,
+  fontWeight: 800,
+  letterSpacing: '2px',
+  color: '#fff',
+  textTransform: 'uppercase',
+  marginBottom: 14
+};
+function RvField({
+  l,
+  v,
+  wide
+}) {
+  const muted = v == null || v === '' || v === '—' || String(v).indexOf('Not set') === 0;
+  return React.createElement("div", {
+    style: {
+      flex: wide ? '1 1 100%' : '1 1 200px',
+      minWidth: wide ? '100%' : 170
+    }
+  }, React.createElement("div", {
+    style: RV_LBL
+  }, l), React.createElement("div", {
+    style: muted ? RV_MUT : RV_VAL
+  }, v == null || v === '' ? '—' : v));
+}
+function RvChips({
+  items,
+  hue
+}) {
+  return React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 7,
+      flexWrap: 'wrap'
+    }
+  }, items.map((x, i) => React.createElement("span", {
+    key: i,
+    style: {
+      fontSize: 13,
+      fontWeight: 600,
+      color: '#eef8f2',
+      background: 'rgba(47,214,168,.10)',
+      border: '1px solid ' + (hue || 'rgba(47,214,168,.4)'),
+      borderRadius: 999,
+      padding: '5px 13px'
+    }
+  }, x)));
+}
 function RvPageHero({
   eyebrow,
   title,
@@ -49929,22 +50025,16 @@ function ProfileModal({
     onClick: () => setActiveTrack(t)
   }, TRACK_META[t]?.label))), React.createElement("div", {
     style: {
-      background: 'var(--surface2)',
-      border: '1px solid var(--border)',
-      borderRadius: 6,
-      padding: '13px 16px',
+      ...RV_CARD,
       marginBottom: 16,
       borderLeft: `3px solid ${TRACK_META[activeTrack]?.color || 'var(--go)'}`
     }
   }, React.createElement("div", {
     style: {
-      fontSize: 14,
-      letterSpacing: '2px',
-      textTransform: 'uppercase',
-      color: TRACK_META[activeTrack]?.color,
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontWeight: 700,
-      marginBottom: 4
+      ...RV_HEAD,
+      fontSize: 19,
+      marginBottom: 6,
+      color: TRACK_META[activeTrack]?.color
     }
   }, rs.label, " Rubric \u2014 Category Score Anchors"), React.createElement("div", {
     style: {
@@ -50186,22 +50276,16 @@ function ProfileModal({
     onClick: () => setActiveTrack(t)
   }, TRACK_META[t]?.label))), React.createElement("div", {
     style: {
-      background: 'var(--surface2)',
-      border: '1px solid var(--border)',
-      borderRadius: 6,
-      padding: '13px 16px',
+      ...RV_CARD,
       marginBottom: 16,
       borderLeft: `3px solid ${TRACK_META[activeTrack]?.color || 'var(--go)'}`
     }
   }, React.createElement("div", {
     style: {
-      fontSize: 14,
-      letterSpacing: '2px',
-      textTransform: 'uppercase',
-      color: TRACK_META[activeTrack]?.color,
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontWeight: 700,
-      marginBottom: 4
+      ...RV_HEAD,
+      fontSize: 19,
+      marginBottom: 6,
+      color: TRACK_META[activeTrack]?.color
     }
   }, rs.label, " \u2014 Growth Roadmap"), React.createElement("div", {
     style: {
@@ -50432,15 +50516,23 @@ function ProfileModal({
   }), tab === 'education' && React.createElement("div", null, sSess.length > 0 ? sSess.map(s => React.createElement("div", {
     key: s.id,
     style: {
-      background: 'var(--surface2)',
-      borderRadius: 4,
-      padding: 12,
-      marginBottom: 7
+      ...RV_CARD,
+      padding: '15px 20px',
+      marginBottom: 10
     }
   }, React.createElement("div", {
-    className: "flex aic jsb mb8"
+    className: "flex aic jsb mb8",
+    style: {
+      gap: 10,
+      flexWrap: 'wrap'
+    }
   }, React.createElement("span", {
-    className: "sm fw5"
+    style: {
+      fontFamily: 'Inter,Helvetica,Arial,sans-serif',
+      fontSize: 15.5,
+      fontWeight: 700,
+      color: '#f0f8f3'
+    }
   }, s.module), React.createElement("div", {
     className: "flex aic g5"
   }, React.createElement("span", {
@@ -50448,20 +50540,59 @@ function ProfileModal({
   }, s.period), React.createElement("span", {
     className: `badge ${s.type === '1-on-1' ? 'b-monthly' : 'b-quarterly'}`
   }, s.type))), React.createElement("div", {
-    className: "muted xs"
-  }, fmt(s.date), " \xB7 ", s.mentorName || '—'), s.development && React.createElement("div", {
     style: {
-      marginTop: 7,
-      fontSize: 14,
-      color: 'var(--yellow)'
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '12px 24px',
+      marginTop: 4
     }
-  }, "\u2192 ", s.development), s.actions && React.createElement("div", {
+  }, React.createElement("div", null, React.createElement("div", {
+    style: RV_LBL
+  }, "When"), React.createElement("div", {
     style: {
-      marginTop: 3,
       fontSize: 14,
-      color: 'var(--c-lime2)'
+      fontWeight: 600,
+      color: '#dceee6'
     }
-  }, "\u2713 ", s.actions))) : React.createElement("div", {
+  }, fmt(s.date))), React.createElement("div", null, React.createElement("div", {
+    style: RV_LBL
+  }, "Mentor"), React.createElement("div", {
+    style: {
+      fontSize: 14,
+      fontWeight: 600,
+      color: '#dceee6'
+    }
+  }, s.mentorName || '—'))), s.development && React.createElement("div", {
+    style: {
+      marginTop: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      ...RV_LBL,
+      color: '#e9dba0'
+    }
+  }, "Development focus"), React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: '#f4db71',
+      lineHeight: 1.6
+    }
+  }, s.development)), s.actions && React.createElement("div", {
+    style: {
+      marginTop: 8
+    }
+  }, React.createElement("div", {
+    style: {
+      ...RV_LBL,
+      color: '#cfe89f'
+    }
+  }, "Actions agreed"), React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: '#c9f26f',
+      lineHeight: 1.6
+    }
+  }, s.actions)))) : React.createElement("div", {
     className: "empty"
   }, React.createElement("div", {
     className: "empty-ico"
@@ -50470,26 +50601,21 @@ function ProfileModal({
     setStaff: setStaff
   }), tab === 'files' && React.createElement("div", null, React.createElement("div", {
     style: {
-      marginBottom: 14,
-      padding: '10px 14px',
-      background: 'rgba(68,204,170,.04)',
-      border: '1px solid rgba(68,204,170,.12)',
-      borderRadius: 6
+      ...RV_CARD,
+      border: '1px solid rgba(47,214,168,.30)',
+      background: 'radial-gradient(ellipse 80% 90% at 15% 0%, rgba(47,214,168,.10), transparent), rgba(255,255,255,.045)'
     }
   }, React.createElement("div", {
     style: {
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 14,
-      letterSpacing: '2px',
-      textTransform: 'uppercase',
-      color: 'var(--c-grn)',
-      marginBottom: 4
+      ...RV_HEAD,
+      fontSize: 18,
+      marginBottom: 6
     }
-  }, "Contracts & Agreements"), React.createElement("div", {
+  }, "\uD83D\uDCC1 Contracts & Agreements"), React.createElement("div", {
     style: {
       fontSize: 14,
-      color: 'var(--g-999)',
-      lineHeight: 1.5
+      color: '#a9c6ba',
+      lineHeight: 1.6
     }
   }, "Upload signed contracts, G&D agreements, renewals, and offer letters. Files are stored to this therapist's profile permanently.")), React.createElement("div", {
     className: `file-zone mb14`,
@@ -56565,11 +56691,7 @@ function ContractsTab({
     });
   };
   const CARD = {
-    background: 'var(--surface2)',
-    border: '1px solid var(--border)',
-    borderRadius: 9,
-    padding: '14px 17px',
-    marginBottom: 12
+    ...RV_CARD
   };
   return React.createElement("div", null, React.createElement("div", {
     style: CARD
@@ -56582,11 +56704,11 @@ function ContractsTab({
     }
   }, React.createElement("span", {
     style: {
-      fontSize: 16,
-      fontWeight: 800,
-      color: 'var(--text)'
+      ...RV_HEAD,
+      fontSize: 20,
+      marginBottom: 0
     }
-  }, "Agreement on file"), React.createElement("span", {
+  }, "\uD83D\uDCC4 Agreement on file"), React.createElement("span", {
     style: {
       flex: 1
     }
@@ -56601,10 +56723,7 @@ function ContractsTab({
       marginTop: 10
     }
   }, React.createElement("div", null, React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: 'var(--g-888)'
-    }
+    style: RV_LBL
   }, "Renewal date"), React.createElement("input", {
     type: "date",
     value: ren || '',
@@ -56627,10 +56746,7 @@ function ContractsTab({
       color: dleft < 0 ? 'var(--c-red)' : dleft <= 60 ? 'var(--c-amb)' : 'var(--g-999)'
     }
   }, dleft < 0 ? 'overdue by ' + Math.abs(dleft) + ' days' : 'in ' + dleft + ' days')), React.createElement("div", null, React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: 'var(--g-888)'
-    }
+    style: RV_LBL
   }, "Last signed"), React.createElement("input", {
     type: "date",
     value: staff.contractSigned || '',
@@ -56647,29 +56763,13 @@ function ContractsTab({
       marginTop: 3
     }
   })), React.createElement("div", null, React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: 'var(--g-888)'
-    }
+    style: RV_LBL
   }, "Current rate"), React.createElement("div", {
-    style: {
-      fontSize: 16,
-      fontWeight: 800,
-      color: 'var(--text)',
-      marginTop: 6
-    }
+    style: staff.rate ? RV_VAL : RV_MUT
   }, staff.rate || '—')), React.createElement("div", null, React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: 'var(--g-888)'
-    }
+    style: RV_LBL
   }, "Current split"), React.createElement("div", {
-    style: {
-      fontSize: 16,
-      fontWeight: 800,
-      color: 'var(--text)',
-      marginTop: 6
-    }
+    style: staff.split ? RV_VAL : RV_MUT
   }, staff.split ? staff.split + '%' : '—')))), !ct && React.createElement("div", {
     style: {
       ...CARD,
@@ -57161,82 +57261,13 @@ function ProfileEditTab({
       });
     }
   };
-  const PLBL = {
-    fontFamily: 'Inter,Helvetica,Arial,sans-serif',
-    fontSize: 11,
-    letterSpacing: '1.6px',
-    fontWeight: 700,
-    color: '#9fd9c6',
-    textTransform: 'uppercase',
-    marginBottom: 5
-  };
-  const PVAL = {
-    fontFamily: 'Inter,Helvetica,Arial,sans-serif',
-    fontSize: 15.5,
-    fontWeight: 700,
-    color: '#f0f8f3',
-    lineHeight: 1.5
-  };
-  const PMUT = {
-    fontFamily: 'Inter,Helvetica,Arial,sans-serif',
-    fontSize: 15,
-    fontWeight: 500,
-    color: '#7da295',
-    lineHeight: 1.5
-  };
-  const PCARD = {
-    background: 'rgba(255,255,255,.05)',
-    border: '1px solid rgba(255,255,255,.10)',
-    borderRadius: 14,
-    padding: '18px 22px',
-    marginBottom: 14
-  };
-  const PHEAD = {
-    fontFamily: "'Barlow Condensed',sans-serif",
-    fontSize: 22,
-    fontWeight: 800,
-    letterSpacing: '2px',
-    color: '#fff',
-    textTransform: 'uppercase',
-    marginBottom: 14
-  };
-  const PItem = ({
-    l,
-    v
-  }) => {
-    const muted = v == null || v === '' || v === '—' || String(v).indexOf('Not set') === 0;
-    return React.createElement("div", {
-      style: {
-        flex: '1 1 200px',
-        minWidth: 170
-      }
-    }, React.createElement("div", {
-      style: PLBL
-    }, l), React.createElement("div", {
-      style: muted ? PMUT : PVAL
-    }, v == null || v === '' ? '—' : v));
-  };
-  const PChips = ({
-    items,
-    hue
-  }) => React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 7,
-      flexWrap: 'wrap'
-    }
-  }, items.map((x, i) => React.createElement("span", {
-    key: i,
-    style: {
-      fontSize: 13,
-      fontWeight: 600,
-      color: '#eef8f2',
-      background: 'rgba(47,214,168,.10)',
-      border: '1px solid ' + (hue || 'rgba(47,214,168,.4)'),
-      borderRadius: 999,
-      padding: '5px 13px'
-    }
-  }, x)));
+  const PLBL = RV_LBL,
+    PVAL = RV_VAL,
+    PMUT = RV_MUT,
+    PCARD = RV_CARD,
+    PHEAD = RV_HEAD,
+    PItem = RvField,
+    PChips = RvChips;
   if (!editing) return React.createElement("div", null, justSaved && React.createElement("div", {
     style: {
       background: 'rgba(68,204,170,.1)',
@@ -61327,10 +61358,11 @@ function LtProfileModal({
     const lbl = (t, tip) => React.createElement("div", {
       style: {
         fontSize: 11,
-        color: 'var(--g-888)',
-        margin: '12px 0 4px',
+        letterSpacing: '1.6px',
+        fontWeight: 700,
+        color: '#9fd9c6',
         textTransform: 'uppercase',
-        letterSpacing: '.5px'
+        margin: '12px 0 5px'
       },
       title: tip || ''
     }, t);
@@ -62241,11 +62273,12 @@ function LeadDevTab({
     .ldcr:first-of-type{border-top:0}
   `);
   const lbl = {
-    fontSize: 12,
-    letterSpacing: '1.4px',
+    fontSize: 11,
+    letterSpacing: '1.6px',
+    fontWeight: 700,
+    color: '#9fd9c6',
     textTransform: 'uppercase',
-    color: 'var(--g-888)',
-    fontFamily: "'Barlow Condensed',sans-serif"
+    fontFamily: 'Inter,Helvetica,Arial,sans-serif'
   };
   const dot = c => ({
     width: 9,
