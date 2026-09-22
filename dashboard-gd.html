@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L188';
+window.__BUILD = 'build L189';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -40882,9 +40882,10 @@ const RvTreeCSS = React.createElement("style", null, `
   .rvt-fx-ring.r2{animation-delay:.15s;}
   @keyframes rvtR{from{transform:scale(.4);opacity:1;}to{transform:scale(6);opacity:0;}}
   @keyframes rvtT{0%{opacity:0;transform:scale(.85);}18%{opacity:1;transform:scale(1.04);}30%{transform:scale(1);}78%{opacity:1;}100%{opacity:0;}}
-  .rvt-flow{stroke-dasharray:3 15;animation:rvtFlow 10s linear infinite;opacity:.55;}
+  .rvt-flow{stroke-dasharray:3 15;animation:rvtFlow 10s linear infinite;opacity:.6;}
+  .rvt-flow-pot{stroke-dasharray:2 11;animation-duration:15s;opacity:.75;}
   @keyframes rvtFlow{to{stroke-dashoffset:-180;}}
-  @media (prefers-reduced-motion:reduce){.rvt-fx-ring{display:none;}.rvt-fx-t{animation:rvtT 0.9s linear forwards;}.rvt-node,.rvh,.rvp-dot,.rvt-seg button{transition:none;}.rvt-flow{animation:none;display:none;}}
+  @media (prefers-reduced-motion:reduce){.rvt-fx-ring{display:none;}.rvt-fx-t{animation:rvtT 0.9s linear forwards;}.rvt-node,.rvh,.rvp-dot,.rvt-seg button{transition:none;}.rvt-flow{animation:none;}}
   /* hero tiles (the Wins/Losses tiles from the reference) */
   .rvh{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.17);border-radius:14px;padding:10px 14px;min-width:104px;flex:1 1 104px;
     transition:transform .16s ease,box-shadow .16s ease,background .16s ease;}
@@ -41080,23 +41081,32 @@ function RvSkillTree({
     opacity: [0.10, 0.06, 0.035][i],
     strokeWidth: 2 - i * 0.4,
     strokeLinecap: "round"
-  })), React.createElement("path", {
-    className: "rvt-flow",
-    d: fullWave(0),
-    fill: "none",
-    stroke: "rgba(201,242,111,.5)",
-    strokeWidth: "2"
-  }), links.map((l, i) => React.createElement("path", {
+  })), links.map((l, i) => React.createElement("path", {
     key: 'l' + i,
     d: l.d,
     fill: "none",
-    stroke: l.lit ? 'rgba(255,255,255,.8)' : 'rgba(255,255,255,.16)',
+    stroke: l.lit ? 'rgba(255,255,255,.8)' : 'rgba(255,209,102,.20)',
     strokeWidth: l.lit ? 2.6 : 1.6,
     strokeLinecap: "round",
     style: l.lit ? {
       filter: 'drop-shadow(0 0 5px rgba(255,255,255,.5))'
     } : null
   })), React.createElement("path", {
+    className: "rvt-flow",
+    d: fullWave(0),
+    fill: "none",
+    stroke: "rgba(201,242,111,.55)",
+    strokeWidth: "2"
+  }), (() => {
+    const potD = links.filter(l => !l.lit).map(l => l.d).join(' ');
+    return potD ? React.createElement("path", {
+      className: "rvt-flow rvt-flow-pot",
+      d: potD,
+      fill: "none",
+      stroke: "rgba(255,209,102,.6)",
+      strokeWidth: "2.2"
+    }) : null;
+  })(), React.createElement("path", {
     d: lead.d,
     fill: "none",
     stroke: "rgba(255,255,255,.16)",
