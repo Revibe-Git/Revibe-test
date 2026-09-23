@@ -1922,7 +1922,32 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L194';
+window.__BUILD = 'build L196';
+try {
+  if (!sessionStorage.getItem('rvgd3_vchk')) {
+    sessionStorage.setItem('rvgd3_vchk', '1');
+    setTimeout(function () {
+      fetch(location.pathname + '?rvcb=' + Date.now(), {
+        cache: 'no-store'
+      }).then(function (r) {
+        return r.text();
+      }).then(function (txt) {
+        var srv = txt.match(/build L(\d+)/);
+        var cur = String(window.__BUILD || '').match(/L(\d+)/);
+        if (srv && cur && +srv[1] > +cur[1]) {
+          var b = document.createElement('div');
+          b.textContent = '⟳ A newer build is live (L' + srv[1] + ' — you\'re seeing L' + cur[1] + '). Tap to update.';
+          b.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:99999;background:#0f2b21;color:#c9f26f;border:1px solid #2fd6a8;border-radius:999px;padding:11px 24px;font:700 13.5px Barlow,sans-serif;cursor:pointer;box-shadow:0 8px 28px rgba(0,0,0,.55)';
+          b.onclick = function () {
+            sessionStorage.removeItem('rvgd3_vchk');
+            location.replace(location.pathname + '?v=' + Date.now() + location.hash);
+          };
+          document.body.appendChild(b);
+        }
+      }).catch(function () {});
+    }, 3500);
+  }
+} catch (e) {}
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -62524,13 +62549,13 @@ function RvRoadmapPlan({
   }, React.createElement("span", {
     style: {
       fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 23,
+      fontSize: 21,
       fontWeight: 800,
-      letterSpacing: '1.2px',
+      letterSpacing: '1.4px',
       textTransform: 'uppercase',
-      color: rm.title ? '#f0f8f3' : 'var(--g-666)'
+      color: rm.title ? 'var(--g-eee)' : 'var(--g-666)'
     }
-  }, rm.title || (who ? who.split(' ')[0] + "'s " : '') + 'roadmap — name it'), rm.target ? React.createElement("span", {
+  }, "\uD83D\uDDFA ", rm.title || (who ? who.split(' ')[0] + "'s " : '') + 'roadmap — name it'), rm.target ? React.createElement("span", {
     style: {
       fontSize: 12.5,
       fontWeight: 700,
@@ -62661,29 +62686,31 @@ function RvRoadmapPlan({
     }
   }, "Add the outcomes this roadmap commits to."))), !editHead && (rm.end || []).length > 0 && React.createElement("div", {
     style: {
-      display: 'flex',
-      gap: 6,
-      flexWrap: 'wrap',
-      alignItems: 'center',
+      fontSize: 12,
+      color: 'var(--g-999)',
+      lineHeight: 1.8,
       marginBottom: 2
     }
   }, React.createElement("span", {
     style: {
       ...RV_LBL,
       marginBottom: 0,
-      marginRight: 4
+      marginRight: 8
     }
   }, "End state"), (rm.end || []).map((t, i) => React.createElement("span", {
     key: i,
     style: {
-      fontSize: 12,
-      color: '#cfe8dc',
-      background: 'rgba(47,214,168,.08)',
-      border: '1px solid rgba(47,214,168,.28)',
-      borderRadius: 999,
-      padding: '3px 11px'
+      whiteSpace: 'nowrap'
     }
-  }, "\u2713 ", t))), React.createElement("div", {
+  }, i ? React.createElement("span", {
+    style: {
+      opacity: .4
+    }
+  }, "  \xB7  ") : null, React.createElement("span", {
+    style: {
+      color: '#9fd9c6'
+    }
+  }, "\u2713"), " ", t))), React.createElement("div", {
     style: {
       overflowX: 'auto',
       margin: '2px 0 12px'
@@ -63031,7 +63058,7 @@ function RvRoadmapPlan({
       marginTop: 8
     },
     onClick: () => addItem(ph)
-  }, "\uFF0B step")), React.createElement("div", {
+  }, "\uFF0B step")), editHead && React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -63604,11 +63631,11 @@ function LeadDevTab({
         flexWrap: 'wrap',
         marginTop: 12
       }
-    }, React.createElement("div", null, React.createElement("div", {
+    }, rev && rev.avg3 != null ? React.createElement("div", null, React.createElement("div", {
       style: lbl
-    }, "Revenue"), trendChip(rev)), React.createElement("div", null, React.createElement("div", {
+    }, "Revenue"), trendChip(rev)) : null, vis && vis.avg3 != null ? React.createElement("div", null, React.createElement("div", {
       style: lbl
-    }, "Completed visits"), trendChip(vis)), React.createElement("div", null, React.createElement("div", {
+    }, "Completed visits"), trendChip(vis)) : null, React.createElement("div", null, React.createElement("div", {
       style: lbl
     }, "Last check-in"), React.createElement("span", {
       style: {
@@ -63656,22 +63683,15 @@ function LeadDevTab({
       style: {
         '--h': '#2fd6a8'
       }
-    }, React.createElement("h4", null, "\uD83D\uDDFA ACTION PLAN ROADMAP"), React.createElement("div", {
-      className: "sub"
-    }, "The phased plan \u2014 every phase has a window, a theme and checkable steps; the current phase is always highlighted."), pl.roadmap ? React.createElement(RvRoadmapPlan, {
+    }, pl.roadmap ? React.createElement(RvRoadmapPlan, {
       rm: pl.roadmap,
       who: person.name,
       onSave: rm => setPlan(id, {
         roadmap: rm
       })
-    }) : React.createElement("div", null, React.createElement("div", {
-      style: {
-        fontSize: 13,
-        color: 'var(--g-999)',
-        marginBottom: 10,
-        lineHeight: 1.6
-      }
-    }, "No roadmap yet. Start from a template \u2014 every phase gets a name, a window, a theme and checkable steps; progress tracks itself and the current phase is always highlighted."), React.createElement("div", {
+    }) : React.createElement("div", null, React.createElement("h4", null, "\uD83D\uDDFA ACTION PLAN ROADMAP"), React.createElement("div", {
+      className: "sub"
+    }, "Start from a template \u2014 every phase gets a name, a window, a theme and checkable steps; progress tracks itself and the current phase stays highlighted."), React.createElement("div", {
       style: {
         display: 'flex',
         gap: 8,
@@ -63709,7 +63729,7 @@ function LeadDevTab({
         flex: 1,
         minWidth: 220
       }
-    }, React.createElement("h4", null, "\uD83C\uDFAF DEVELOPMENT PRIORITIES"), React.createElement("div", {
+    }, React.createElement("h4", null, "\uD83C\uDFAF DEVELOPMENT PRIORITIES"), !(pl.priorities || []).length && React.createElement("div", {
       className: "sub",
       style: {
         marginBottom: 6
@@ -64010,7 +64030,7 @@ function LeadDevTab({
         }
       }, React.createElement("h4", null, "\uD83D\uDCCD WHERE THEY STAND \u2014 FROM G&D"), React.createElement("div", {
         className: "sub"
-      }, "Read-only. Clinical competencies are graded once, in G&D \u2014 this roadmap builds on those scores instead of re-grading them here."), React.createElement("div", {
+      }, "Read-only \u2014 grading happens once, in G&D."), React.createElement("div", {
         style: {
           display: 'flex',
           gap: 22,
@@ -64141,12 +64161,7 @@ function LeadDevTab({
         flex: 1,
         minWidth: 220
       }
-    }, React.createElement("h4", null, "\uD83D\uDCDC EVIDENCE & HISTORY"), React.createElement("div", {
-      className: "sub",
-      style: {
-        marginBottom: 0
-      }
-    }, "Everything logged for this person \u2014 observations, numbers moved, concerns, check-ins.")), React.createElement("button", {
+    }, React.createElement("h4", null, "\uD83D\uDCDC EVIDENCE & HISTORY")), React.createElement("button", {
       className: "btn btn-ghost btn-xs",
       onClick: () => addEv('obs')
     }, "\uFF0B Observation"), React.createElement("button", {
