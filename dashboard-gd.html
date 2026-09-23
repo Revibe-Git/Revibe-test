@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L200';
+window.__BUILD = 'build L201';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -39369,6 +39369,7 @@ function MeetingTranscriber({
   const genAI = async en => {
     if (genBusy) return;
     setGenBusy(en.id);
+    en = await withLines(en);
     try {
       const names = (staff || []).map(x => x.name).filter(Boolean).join(', ');
       const prompt = 'You are summarizing a meeting at Revibe, a multi-site wellness & performance clinic. The transcript below is raw browser speech-to-text: no punctuation, speakers NOT separated, some words garbled — read past the noise to the meaning and do NOT quote garbled text verbatim.\n\nStaff names for attribution: ' + names + '\n\nWrite, in markdown:\n## Summary\nA detailed narrative of what was actually discussed — the topics, the context, the why (2–5 paragraphs).\n## Goals\n## Follow-ups / Action items\nBullets, owner name in [brackets] when identifiable.\n## Decisions\n## Concerns / friction\nOnly if present.\n\nBe specific and faithful to the conversation; mark genuinely unclear passages with (unclear).\n\nTRANSCRIPT (' + en.mtype + ' · ' + en.date + ' · ' + fmt(en.secs) + '):\n' + en.lines.map(l => '[' + fmt(l.t) + '] ' + l.txt).join('\n') + (en.notes ? '\n\nSESSION NOTES typed by the lead during the meeting:\n' + en.notes : '');
@@ -39525,10 +39526,10 @@ function MeetingTranscriber({
             data: e
           }).then(() => {}, () => {});
         });
-        setSaved(merged);
-        try {
-          localStorage.setItem('rvgd3_transcripts', JSON.stringify(merged));
-        } catch (e) {}
+        {
+          const fit = fitSave(merged);
+          setSaved(fit || merged);
+        }
       } catch (e) {
         window.__SYNC = {
           ok: false,
@@ -39569,14 +39570,49 @@ function MeetingTranscriber({
       ss = n % 60;
     return (m < 10 ? '0' : '') + m + ':' + (ss < 10 ? '0' : '') + ss;
   };
-  const persistSaved = arr => {
-    setSaved(arr);
+  const fitSave = arr => {
     try {
       localStorage.setItem('rvgd3_transcripts', JSON.stringify(arr));
-      return true;
-    } catch (e) {
-      return false;
+      return arr;
+    } catch (e) {}
+    const cur = arr.map(x => ({
+      ...x
+    }));
+    const byAge = [...cur].sort((a, b) => (a.at || 0) - (b.at || 0));
+    for (const en of byAge) {
+      if (!en.lines || !en.lines.length) continue;
+      en.lines = [];
+      en.linesDropped = true;
+      try {
+        localStorage.setItem('rvgd3_transcripts', JSON.stringify(cur));
+        return cur;
+      } catch (e) {}
     }
+    return null;
+  };
+  const persistSaved = arr => {
+    const fit = fitSave(arr);
+    setSaved(fit || arr);
+    return !!fit;
+  };
+  const hydrate = async id => {
+    const SB = window.__SB;
+    if (!SB) return null;
+    try {
+      const {
+        data
+      } = await SB.from('transcripts').select('data').eq('id', id).maybeSingle();
+      const full = data && data.data;
+      if (full && full.lines && full.lines.length) {
+        setSaved(pv => pv.map(x => x.id === id ? {
+          ...x,
+          lines: full.lines,
+          linesDropped: false
+        } : x));
+        return full;
+      }
+    } catch (e) {}
+    return null;
   };
   const mkRec = () => {
     const r = new SR();
@@ -39719,12 +39755,28 @@ function MeetingTranscriber({
     };
   };
   const smOf = en => en.summary || summarize(en.lines || []);
+  useEffect(() => {
+    const en = saved.find(x => x.id === open);
+    if (en && en.linesDropped && !(en.lines || []).length) hydrate(open);
+  }, [open]);
+  const withLines = async en => {
+    if (en.linesDropped && !(en.lines || []).length) {
+      const f = await hydrate(en.id);
+      if (f) return {
+        ...en,
+        lines: f.lines,
+        linesDropped: false
+      };
+    }
+    return en;
+  };
   const txtOf = en => {
     const sm = smOf(en);
     const sec = (h, arr, fx) => arr.length ? '\n' + h + '\n' + arr.map(fx).join('\n') + '\n' : '';
-    return en.title + '\n' + en.mtype + ' · ' + en.date + ' · ' + fmt(en.secs) + ' · ' + sm.words + ' words · Revibe G&D\nTopics: ' + sm.topics.join(', ') + '\n' + '—'.repeat(40) + (en.aiSummary ? '\nAI SUMMARY (' + en.aiSummary.model + ')\n' + en.aiSummary.text + '\n' + '—'.repeat(40) : '') + sec('QUOTED HIGHLIGHTS — KEY POINTS', sm.keyPoints, l => '• [' + fmt(l.t) + '] ' + l.txt) + sec('GOALS', sm.goals, l => '🎯 [' + fmt(l.t) + '] ' + l.txt) + sec('FOLLOW-UPS / ACTION ITEMS', sm.actions, l => '☐ [' + fmt(l.t) + '] ' + (l.owner ? '[' + l.owner + '] ' : '') + l.txt) + sec('DECISIONS', sm.decisions, l => '✔ [' + fmt(l.t) + '] ' + l.txt) + (en.notes ? '\n' + '—'.repeat(40) + '\nSESSION NOTES\n' + en.notes + '\n' : '') + '\n' + '—'.repeat(40) + '\nFULL TRANSCRIPT\n' + en.lines.map(l => '[' + fmt(l.t) + '] ' + l.txt).join('\n') + '\n';
+    return en.title + '\n' + en.mtype + ' · ' + en.date + ' · ' + fmt(en.secs) + ' · ' + sm.words + ' words · Revibe G&D\nTopics: ' + sm.topics.join(', ') + '\n' + '—'.repeat(40) + (en.aiSummary ? '\nAI SUMMARY (' + en.aiSummary.model + ')\n' + en.aiSummary.text + '\n' + '—'.repeat(40) : '') + sec('QUOTED HIGHLIGHTS — KEY POINTS', sm.keyPoints, l => '• [' + fmt(l.t) + '] ' + l.txt) + sec('GOALS', sm.goals, l => '🎯 [' + fmt(l.t) + '] ' + l.txt) + sec('FOLLOW-UPS / ACTION ITEMS', sm.actions, l => '☐ [' + fmt(l.t) + '] ' + (l.owner ? '[' + l.owner + '] ' : '') + l.txt) + sec('DECISIONS', sm.decisions, l => '✔ [' + fmt(l.t) + '] ' + l.txt) + (en.notes ? '\n' + '—'.repeat(40) + '\nSESSION NOTES\n' + en.notes + '\n' : '') + '\n' + '—'.repeat(40) + '\nFULL TRANSCRIPT\n' + (en.lines || []).map(l => '[' + fmt(l.t) + '] ' + l.txt).join('\n') + '\n';
   };
-  const dl = en => {
+  const dl = async en => {
+    en = await withLines(en);
     const blob = new Blob([txtOf(en)], {
       type: 'text/plain;charset=utf-8'
     });
@@ -39772,7 +39824,7 @@ function MeetingTranscriber({
     const ok = persistSaved([en, ...saved]);
     syncUp(en);
     if (!ok) {
-      window.alert('Could not save on this device (storage full) — downloading the transcript instead so it isn’t lost.');
+      window.alert('This device could not hold the transcript even after freeing space — downloading it so nothing is lost. If you are online it has also synced to the database.');
       dl(en);
     }
     setState('idle');
@@ -40096,9 +40148,10 @@ function MeetingTranscriber({
     onClick: () => dl(en)
   }, "\u2B07 .txt"), React.createElement("button", {
     className: "btn btn-ghost btn-xs",
-    onClick: () => {
+    onClick: async () => {
       try {
-        navigator.clipboard.writeText(txtOf(en));
+        const full = await withLines(en);
+        navigator.clipboard.writeText(txtOf(full));
       } catch (e) {}
     }
   }, "\uD83D\uDCCB Copy"), React.createElement("button", {
@@ -40228,7 +40281,7 @@ function MeetingTranscriber({
         color: 'var(--g-888)',
         userSelect: 'none'
       }
-    }, "\u25B8 Full transcript (", en.lines.length, " lines)"), React.createElement("div", {
+    }, "\u25B8 Full transcript ", (en.lines || []).length ? '(' + en.lines.length + ' lines)' : en.linesDropped ? '(loading from the database…)' : '(0 lines)'), React.createElement("div", {
       style: {
         marginTop: 6,
         maxHeight: 300,
@@ -40238,7 +40291,7 @@ function MeetingTranscriber({
         whiteSpace: 'pre-wrap',
         color: 'var(--g-ccc)'
       }
-    }, en.lines.map(l => '[' + fmt(l.t) + '] ' + l.txt).join('\n'))));
+    }, (en.lines || []).length ? en.lines.map(l => '[' + fmt(l.t) + '] ' + l.txt).join('\n') : en.linesDropped ? 'The full text of this older transcript lives in the database to keep space free on this device — it loads here in a moment.' : '')));
   })()))));
 }
 function MeetingsPage({
