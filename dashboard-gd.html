@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L192';
+window.__BUILD = 'build L193';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -62385,6 +62385,429 @@ const LD_FOCUS = {
   mike: [['See the readiness scorecard', 'Mike is tracked against the 13 Clinical Director dimensions rather than a discipline mandate']]
 };
 const LD_PHASES = [['Sept–Oct', 'PROVE', 'Master yourself + learn the business'], ['Oct–Nov', 'DEVELOP', 'Develop people + understand the machine'], ['Nov–Dec', 'BUILD', 'Build Oakville'], ['Dec–Jan', 'ESTABLISH', 'Build the operating system'], ['Jan–Feb', 'OPERATE', 'Launch Oakville'], ['Feb–Mar', 'OWN', 'Take responsibility for the business'], ['Mar–Apr', 'LEAD', 'Clinical Director']];
+function RvRoadmapPlan({
+  rm,
+  onSave,
+  who
+}) {
+  const upd = patch => onSave({
+    ...rm,
+    ...patch
+  });
+  const updPhase = (pid, patch) => upd({
+    phases: rm.phases.map(ph => ph.id === pid ? {
+      ...ph,
+      ...patch
+    } : ph)
+  });
+  const phasePct = ph => {
+    const n = (ph.items || []).length;
+    if (!n) return 0;
+    return Math.round(ph.items.filter(i => i.done).length / n * 100);
+  };
+  const withUndone = rm.phases.findIndex(ph => (ph.items || []).some(i => !i.done));
+  const notDone = rm.phases.findIndex(ph => {
+    const n = (ph.items || []).length;
+    return !(n > 0 && ph.items.every(i => i.done));
+  });
+  const current = withUndone !== -1 ? withUndone : notDone !== -1 ? notDone : rm.phases.length - 1;
+  const toggleItem = (ph, it) => {
+    const items = ph.items.map(x => x.id === it.id ? {
+      ...x,
+      done: !x.done,
+      doneAt: !x.done ? GD_TODAY() : null
+    } : x);
+    updPhase(ph.id, {
+      items
+    });
+    if (!it.done && items.every(x => x.done) && items.length) try {
+      window.__RVFX && window.__RVFX('PHASE COMPLETE — ' + (ph.name || '').toUpperCase());
+    } catch (e) {}
+  };
+  const addItem = async ph => {
+    const t = await rvAsk({
+      label: 'New step — ' + (ph.name || 'phase'),
+      hint: 'One concrete, checkable action.',
+      ok: 'Add'
+    });
+    if (!t) return;
+    updPhase(ph.id, {
+      items: [...(ph.items || []), {
+        id: 'i' + Date.now(),
+        t: String(t),
+        done: false
+      }]
+    });
+  };
+  const addEnd = async () => {
+    const t = await rvAsk({
+      label: 'End-state outcome',
+      hint: 'What is true when this roadmap is done? e.g. "Leads & develops people"',
+      ok: 'Add'
+    });
+    if (!t) return;
+    upd({
+      end: [...(rm.end || []), String(t)]
+    });
+  };
+  const addPhase = () => upd({
+    phases: [...rm.phases, {
+      id: 'ph' + Date.now(),
+      name: '',
+      range: '',
+      theme: '',
+      items: []
+    }]
+  });
+  const IN = {
+    background: 'rgba(255,255,255,.06)',
+    border: '1px solid rgba(255,255,255,.16)',
+    borderRadius: 8,
+    color: 'var(--text)',
+    fontSize: 13.5,
+    padding: '6px 10px',
+    outline: 'none'
+  };
+  return React.createElement("div", null, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: '12px 18px',
+      flexWrap: 'wrap',
+      alignItems: 'flex-end',
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: '2 1 300px'
+    }
+  }, React.createElement("div", {
+    style: RV_LBL
+  }, "Roadmap title"), React.createElement("input", {
+    style: {
+      ...IN,
+      width: '100%',
+      boxSizing: 'border-box',
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 20,
+      fontWeight: 800,
+      letterSpacing: '1px',
+      textTransform: 'uppercase'
+    },
+    value: rm.title || '',
+    onChange: e => upd({
+      title: e.target.value
+    }),
+    placeholder: (who ? who.split(' ')[0].toUpperCase() + ' — ' : '') + 'ROADMAP TITLE'
+  })), React.createElement("div", {
+    style: {
+      flex: '1 1 180px'
+    }
+  }, React.createElement("div", {
+    style: RV_LBL
+  }, "Target end"), React.createElement("input", {
+    style: {
+      ...IN,
+      width: '100%',
+      boxSizing: 'border-box'
+    },
+    value: rm.target || '',
+    onChange: e => upd({
+      target: e.target.value
+    }),
+    placeholder: "e.g. April 2027"
+  }))), React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 6
+    }
+  }, React.createElement("div", {
+    style: {
+      ...RV_LBL,
+      marginBottom: 0
+    }
+  }, "End state \u2014 what done looks like"), React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    onClick: addEnd
+  }, "\uFF0B outcome")), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 7,
+      flexWrap: 'wrap'
+    }
+  }, (rm.end || []).map((t, i) => React.createElement("span", {
+    key: i,
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 7,
+      fontSize: 13,
+      fontWeight: 600,
+      color: '#eef8f2',
+      background: 'rgba(47,214,168,.10)',
+      border: '1px solid rgba(47,214,168,.4)',
+      borderRadius: 999,
+      padding: '5px 13px'
+    }
+  }, "\u2713 ", t, React.createElement("span", {
+    style: {
+      cursor: 'pointer',
+      opacity: .6
+    },
+    onClick: () => upd({
+      end: rm.end.filter((_, j) => j !== i)
+    })
+  }, "\xD7"))), !(rm.end || []).length && React.createElement("span", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-777)'
+    }
+  }, "Add the outcomes this roadmap commits to."))), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6,
+      flexWrap: 'wrap',
+      marginBottom: 14
+    }
+  }, rm.phases.map((ph, i) => {
+    const pct = phasePct(ph);
+    const done = pct === 100 && (ph.items || []).length > 0;
+    const cur = i === current && !done;
+    return React.createElement("span", {
+      key: ph.id,
+      title: (ph.theme || '') + (pct ? ' · ' + pct + '%' : ''),
+      style: {
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 7,
+        fontSize: 12,
+        fontWeight: 700,
+        letterSpacing: '.6px',
+        borderRadius: 999,
+        padding: '5px 12px',
+        color: done ? '#12250f' : cur ? '#12250f' : 'var(--g-ccc)',
+        background: done ? '#c9f26f' : cur ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'rgba(255,255,255,.05)',
+        border: '1px solid ' + (done || cur ? 'transparent' : 'var(--border)')
+      }
+    }, React.createElement("b", null, i + 1), (ph.name || 'phase').toUpperCase(), ph.range ? React.createElement("span", {
+      style: {
+        fontWeight: 400,
+        opacity: .75
+      }
+    }, ph.range) : null, done ? '✓' : cur ? '← current' : null);
+  })), rm.phases.map((ph, i) => {
+    const pct = phasePct(ph);
+    const done = pct === 100 && (ph.items || []).length > 0;
+    const cur = i === current && !done;
+    return React.createElement("div", {
+      key: ph.id,
+      style: {
+        border: '1px solid ' + (cur ? 'rgba(201,242,111,.45)' : done ? 'rgba(201,242,111,.25)' : 'var(--border)'),
+        borderLeft: '3px solid ' + (done ? '#c9f26f' : cur ? '#2fd6a8' : 'var(--border)'),
+        borderRadius: 12,
+        padding: '13px 16px',
+        marginBottom: 10,
+        background: cur ? 'color-mix(in srgb, var(--surface2) 93%, #2fd6a8 7%)' : 'var(--surface2)'
+      }
+    }, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 10,
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: 8
+      }
+    }, React.createElement("span", {
+      style: {
+        flexShrink: 0,
+        width: 30,
+        height: 30,
+        borderRadius: '50%',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontWeight: 800,
+        fontSize: 15,
+        color: done || cur ? '#12250f' : 'var(--g-ccc)',
+        background: done ? '#c9f26f' : cur ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'rgba(255,255,255,.07)'
+      }
+    }, done ? '✓' : i + 1), React.createElement("input", {
+      style: {
+        ...IN,
+        flex: '1 1 170px',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 16,
+        fontWeight: 800,
+        letterSpacing: '1px',
+        textTransform: 'uppercase'
+      },
+      value: ph.name || '',
+      onChange: e => updPhase(ph.id, {
+        name: e.target.value
+      }),
+      placeholder: "PHASE NAME"
+    }), React.createElement("input", {
+      style: {
+        ...IN,
+        flex: '0 1 130px'
+      },
+      value: ph.range || '',
+      onChange: e => updPhase(ph.id, {
+        range: e.target.value
+      }),
+      placeholder: "Sept\u2013Oct"
+    }), React.createElement("input", {
+      style: {
+        ...IN,
+        flex: '2 1 220px'
+      },
+      value: ph.theme || '',
+      onChange: e => updPhase(ph.id, {
+        theme: e.target.value
+      }),
+      placeholder: "Theme \u2014 what this phase is about"
+    }), React.createElement("button", {
+      className: "btn btn-ghost btn-xs",
+      title: "Remove this phase",
+      onClick: () => {
+        if (window.confirm('Remove this phase and its steps?')) upd({
+          phases: rm.phases.filter(x => x.id !== ph.id)
+        });
+      }
+    }, "\u2715")), React.createElement("div", {
+      style: {
+        height: 6,
+        borderRadius: 3,
+        background: 'rgba(255,255,255,.08)',
+        marginBottom: 9,
+        overflow: 'hidden'
+      }
+    }, React.createElement("div", {
+      style: {
+        width: pct + '%',
+        height: '100%',
+        borderRadius: 3,
+        background: done ? '#c9f26f' : 'linear-gradient(90deg,#2fd6a8,#c9f26f)',
+        transition: 'width .4s'
+      }
+    })), (ph.items || []).map(it => React.createElement("div", {
+      key: it.id,
+      style: {
+        display: 'flex',
+        gap: 10,
+        alignItems: 'flex-start',
+        padding: '5px 0'
+      }
+    }, React.createElement("input", {
+      type: "checkbox",
+      checked: !!it.done,
+      onChange: () => toggleItem(ph, it),
+      style: {
+        width: 16,
+        height: 16,
+        minWidth: 16,
+        flex: '0 0 auto',
+        padding: 0,
+        marginTop: 3,
+        accentColor: '#2fd6a8',
+        cursor: 'pointer'
+      }
+    }), React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 13.5,
+        lineHeight: 1.55,
+        color: it.done ? 'var(--g-777)' : 'var(--g-ccc)',
+        textDecoration: it.done ? 'line-through' : 'none'
+      }
+    }, it.t, it.done && it.doneAt && React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: '#7ee0a3',
+        marginLeft: 8
+      }
+    }, "\u2713 ", it.doneAt)), React.createElement("span", {
+      style: {
+        cursor: 'pointer',
+        color: 'var(--g-666)',
+        fontSize: 12
+      },
+      title: "Remove step",
+      onClick: () => updPhase(ph.id, {
+        items: ph.items.filter(x => x.id !== it.id)
+      })
+    }, "\u2715"))), React.createElement("button", {
+      className: "btn btn-ghost btn-xs",
+      style: {
+        marginTop: 6
+      },
+      onClick: () => addItem(ph)
+    }, "\uFF0B step"));
+  }), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: addPhase
+  }, "\uFF0B Add phase"), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    title: "Delete the whole roadmap",
+    onClick: () => {
+      if (window.confirm('Delete this entire roadmap?')) onSave(null);
+    }
+  }, "\uD83D\uDDD1 delete roadmap")));
+}
+const RV_RM_TPL = {
+  blank: () => ({
+    title: '',
+    target: '',
+    end: [],
+    phases: [1, 2, 3].map(n => ({
+      id: 'ph' + n,
+      name: '',
+      range: '',
+      theme: '',
+      items: []
+    }))
+  }),
+  dev6: () => ({
+    title: '',
+    target: '6 months out',
+    end: ['Consistent at the standard', 'Owns their numbers', 'Develops the person beside them'],
+    phases: [['Foundations', 'Month 1', 'Get the basics right, every day'], ['Systems & Standards', 'Month 2', 'Work the way the clinic works'], ['Own It', 'Month 3', 'Full ownership of the role, no chasing'], ['Drive the Numbers', 'Month 4', 'Move the metrics that matter'], ['Lead Beside You', 'Month 5', 'Develop the person next to you'], ['Review & Level Up', 'Month 6', 'Prove it, grade it, step up']].map(([n, r, t], i) => ({
+      id: 'ph' + i,
+      name: n,
+      range: r,
+      theme: t,
+      items: []
+    }))
+  }),
+  director: () => ({
+    title: '',
+    target: 'April 2027',
+    end: ['Clinically excellent', 'Leads & develops people', 'Financially & operationally strong', 'Builds community & partnerships', 'Directs the clinic, not just the team'],
+    phases: [['Prove + Learn the Business', 'Sept–Oct', 'Get yourself right & learn how Revibe works'], ['Develop + Understand the Machine', 'Oct–Nov', 'Develop others & understand the system'], ['Build', 'Nov–Dec', 'Build the foundation of your clinic'], ['Pre-Launch', 'Dec–Jan', 'Set standards, systems & prepare to launch'], ['Launch + Operate', 'Jan–Feb', 'Launch & run the clinic'], ['Direct', 'Feb–Mar', 'Take responsibility & direct the business'], ['Operate', 'Mar–Apr', 'Operate smoothly & optimize the clinic'], ['Continue to Grow', 'April +', 'Scale, systemize & build legacy']].map(([n, r, t], i) => ({
+      id: 'ph' + i,
+      name: n,
+      range: r,
+      theme: t,
+      items: []
+    }))
+  })
+};
 function LeadDevTab({
   staff,
   perfData,
@@ -62960,6 +63383,65 @@ function LeadDevTab({
         })
       }, "\u2713 done"));
     })), React.createElement("div", {
+      style: {
+        ...C,
+        marginTop: 12,
+        borderLeft: '3px solid #2fd6a8'
+      }
+    }, React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 10,
+        flexWrap: 'wrap'
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 16,
+        fontWeight: 800,
+        color: 'var(--text)'
+      }
+    }, "\uD83D\uDDFA Action plan roadmap"), React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: 'var(--g-666)'
+      }
+    }, "phased, checkable, owned by the lead")), pl.roadmap ? React.createElement(RvRoadmapPlan, {
+      rm: pl.roadmap,
+      who: person.name,
+      onSave: rm => setPlan(id, {
+        roadmap: rm
+      })
+    }) : React.createElement("div", null, React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: 'var(--g-999)',
+        marginBottom: 10,
+        lineHeight: 1.6
+      }
+    }, "No roadmap yet. Start from a template \u2014 every phase gets a name, a window, a theme and checkable steps; progress tracks itself and the current phase is always highlighted."), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8,
+        flexWrap: 'wrap'
+      }
+    }, React.createElement("button", {
+      className: "btn btn-lime btn-sm",
+      onClick: () => setPlan(id, {
+        roadmap: RV_RM_TPL.director()
+      })
+    }, "Director track \xB7 8 phases"), React.createElement("button", {
+      className: "btn btn-ghost btn-sm",
+      onClick: () => setPlan(id, {
+        roadmap: RV_RM_TPL.dev6()
+      })
+    }, "6-month development"), React.createElement("button", {
+      className: "btn btn-ghost btn-sm",
+      onClick: () => setPlan(id, {
+        roadmap: RV_RM_TPL.blank()
+      })
+    }, "Blank")))), React.createElement("div", {
       style: {
         ...C,
         marginTop: 12
