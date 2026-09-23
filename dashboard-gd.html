@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L198';
+window.__BUILD = 'build L200';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -62410,6 +62410,258 @@ const LD_FOCUS = {
   mike: [['See the readiness scorecard', 'Mike is tracked against the 13 Clinical Director dimensions rather than a discipline mandate']]
 };
 const LD_PHASES = [['Sept–Oct', 'PROVE', 'Master yourself + learn the business'], ['Oct–Nov', 'DEVELOP', 'Develop people + understand the machine'], ['Nov–Dec', 'BUILD', 'Build Oakville'], ['Dec–Jan', 'ESTABLISH', 'Build the operating system'], ['Jan–Feb', 'OPERATE', 'Launch Oakville'], ['Feb–Mar', 'OWN', 'Take responsibility for the business'], ['Mar–Apr', 'LEAD', 'Clinical Director']];
+function RvInlineEdit({
+  value,
+  onSave,
+  placeholder,
+  style,
+  grow,
+  title,
+  multi
+}) {
+  const [ed, setEd] = useState(false);
+  const [v, setV] = useState('');
+  if (!ed) return React.createElement("span", {
+    title: title || 'Click to edit',
+    onClick: () => {
+      setV(value || '');
+      setEd(true);
+    },
+    style: {
+      cursor: 'text',
+      borderBottom: '1px dashed rgba(255,255,255,.16)',
+      ...style,
+      ...(grow ? {
+        flex: '1 1 auto',
+        minWidth: 160
+      } : {}),
+      ...(value ? {} : {
+        color: 'var(--g-666)'
+      })
+    }
+  }, value || placeholder);
+  const commit = () => {
+    setEd(false);
+    const t = v.trim();
+    if (t !== (value || '')) onSave(t);
+  };
+  const inSt = {
+    background: 'rgba(255,255,255,.07)',
+    border: '1px solid rgba(47,214,168,.55)',
+    borderRadius: 7,
+    color: 'var(--text)',
+    outline: 'none',
+    padding: '2px 9px',
+    boxSizing: 'border-box',
+    ...style,
+    ...(grow ? {
+      flex: '1 1 auto',
+      minWidth: 160,
+      width: '100%'
+    } : {})
+  };
+  if (multi) return React.createElement("textarea", {
+    autoFocus: true,
+    value: v,
+    onChange: e => setV(e.target.value),
+    rows: 4,
+    onKeyDown: e => {
+      if (e.key === 'Escape') {
+        setV(value || '');
+        setEd(false);
+      }
+    },
+    onBlur: commit,
+    style: {
+      ...inSt,
+      width: '100%',
+      resize: 'vertical',
+      fontFamily: 'inherit',
+      lineHeight: 1.6
+    }
+  });
+  return React.createElement("input", {
+    autoFocus: true,
+    value: v,
+    onChange: e => setV(e.target.value),
+    onKeyDown: e => {
+      if (e.key === 'Enter') e.target.blur();
+      if (e.key === 'Escape') {
+        setV(value || '');
+        setEd(false);
+      }
+    },
+    onBlur: commit,
+    style: {
+      ...inSt,
+      ...(grow ? {} : {
+        width: Math.max(110, String(v).length * 9 + 44)
+      })
+    }
+  });
+}
+function RvStepAdd({
+  onAdd,
+  placeholder
+}) {
+  const [v, setV] = useState('');
+  return React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 10,
+      marginTop: 8,
+      alignItems: 'center'
+    }
+  }, React.createElement("span", {
+    style: {
+      width: 16,
+      textAlign: 'center',
+      color: 'var(--g-555)',
+      fontSize: 14
+    }
+  }, "\uFF0B"), React.createElement("input", {
+    value: v,
+    onChange: e => setV(e.target.value),
+    placeholder: placeholder || 'Type a step and press Enter — keep typing to add more',
+    onKeyDown: e => {
+      if (e.key === 'Enter' && v.trim()) {
+        onAdd(v.trim());
+        setV('');
+      }
+    },
+    style: {
+      flex: 1,
+      background: 'rgba(255,255,255,.03)',
+      border: '1px dashed rgba(255,255,255,.2)',
+      borderRadius: 8,
+      color: 'var(--text)',
+      fontSize: 13.5,
+      padding: '7px 11px',
+      outline: 'none'
+    }
+  }));
+}
+function RvMiniCard({
+  title,
+  pts,
+  hue,
+  onTitle,
+  onPts,
+  numbered
+}) {
+  const [add, setAdd] = useState(false);
+  const [v, setV] = useState('');
+  return React.createElement("div", {
+    style: {
+      border: '1px solid var(--border)',
+      borderTop: '2px solid ' + hue,
+      borderRadius: 10,
+      padding: '10px 12px',
+      background: 'var(--surface3)'
+    }
+  }, React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 14.5,
+      fontWeight: 800,
+      letterSpacing: '1.2px',
+      textTransform: 'uppercase',
+      color: hue,
+      marginBottom: 6
+    }
+  }, React.createElement(RvInlineEdit, {
+    value: title,
+    onSave: onTitle,
+    placeholder: "name this",
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 14.5,
+      fontWeight: 800,
+      letterSpacing: '1.2px',
+      textTransform: 'uppercase',
+      color: hue,
+      borderBottom: 'none'
+    }
+  })), (pts || []).map((t, i) => React.createElement("div", {
+    key: i,
+    className: "rvrm-row",
+    style: {
+      display: 'flex',
+      gap: 7,
+      padding: '2.5px 4px 2.5px 0',
+      fontSize: 12.5,
+      lineHeight: 1.55,
+      alignItems: 'flex-start'
+    }
+  }, React.createElement("span", {
+    style: {
+      color: hue,
+      opacity: .75,
+      minWidth: numbered ? 14 : 'auto'
+    }
+  }, numbered ? i + 1 : '•'), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }, React.createElement(RvInlineEdit, {
+    value: t,
+    onSave: nv => onPts(pts.map((x, j) => j === i ? nv : x)),
+    style: {
+      fontSize: 12.5,
+      color: '#c3d5cc',
+      borderBottom: 'none',
+      display: 'inline'
+    }
+  })), React.createElement("span", {
+    className: "rvrm-x",
+    style: {
+      cursor: 'pointer',
+      color: 'var(--g-666)',
+      fontSize: 11
+    },
+    title: "Remove",
+    onClick: () => onPts(pts.filter((_, j) => j !== i))
+  }, "\u2715"))), add ? React.createElement("input", {
+    autoFocus: true,
+    value: v,
+    onChange: e => setV(e.target.value),
+    onKeyDown: e => {
+      if (e.key === 'Enter' && v.trim()) {
+        onPts([...(pts || []), v.trim()]);
+        setV('');
+      }
+      if (e.key === 'Escape') {
+        setAdd(false);
+        setV('');
+      }
+    },
+    onBlur: () => {
+      if (v.trim()) onPts([...(pts || []), v.trim()]);
+      setAdd(false);
+      setV('');
+    },
+    style: {
+      width: '100%',
+      boxSizing: 'border-box',
+      background: 'rgba(255,255,255,.04)',
+      border: '1px dashed rgba(255,255,255,.2)',
+      borderRadius: 7,
+      color: 'var(--text)',
+      fontSize: 12.5,
+      padding: '4px 8px',
+      outline: 'none',
+      marginTop: 4
+    }
+  }) : React.createElement("div", {
+    onClick: () => setAdd(true),
+    style: {
+      fontSize: 11.5,
+      color: 'var(--g-555)',
+      cursor: 'pointer',
+      marginTop: 4
+    }
+  }, "\uFF0B add"));
+}
 function RvRoadmapPlan({
   rm,
   onSave,
@@ -62440,8 +62692,7 @@ function RvRoadmapPlan({
   const [focusSel, setFocusSel] = useState(null);
   const fi = Math.min(focusSel == null ? current : focusSel, rm.phases.length - 1);
   const ph = rm.phases[fi];
-  const [editHead, setEditHead] = useState(false);
-  const [editPh, setEditPh] = useState(false);
+  const [manage, setManage] = useState(false);
   const toggleItem = (p, it) => {
     const items = p.items.map(x => x.id === it.id ? {
       ...x,
@@ -62455,32 +62706,12 @@ function RvRoadmapPlan({
       window.__RVFX && window.__RVFX('PHASE COMPLETE — ' + (p.name || 'PHASE ' + (fi + 1)).toUpperCase());
     } catch (e) {}
   };
-  const addItem = async p => {
-    const t = await rvAsk({
-      label: 'New step — ' + (p.name || 'this phase'),
-      hint: 'One concrete, checkable action.',
-      ok: 'Add'
-    });
-    if (!t) return;
-    updPhase(p.id, {
-      items: [...(p.items || []), {
-        id: 'i' + Date.now(),
-        t: String(t),
-        done: false
-      }]
-    });
-  };
-  const addEnd = async () => {
-    const t = await rvAsk({
-      label: 'End-state outcome',
-      hint: 'What is true when this roadmap is done?',
-      ok: 'Add'
-    });
-    if (!t) return;
-    upd({
-      end: [...(rm.end || []), String(t)]
-    });
-  };
+  const setItem = (p, iid, t) => updPhase(p.id, {
+    items: p.items.map(x => x.id === iid ? {
+      ...x,
+      t
+    } : x)
+  });
   const addPhase = () => {
     upd({
       phases: [...rm.phases, {
@@ -62492,16 +62723,6 @@ function RvRoadmapPlan({
       }]
     });
     setFocusSel(rm.phases.length);
-    setEditPh(true);
-  };
-  const IN = {
-    background: 'rgba(255,255,255,.06)',
-    border: '1px solid rgba(255,255,255,.16)',
-    borderRadius: 8,
-    color: 'var(--text)',
-    fontSize: 13.5,
-    padding: '6px 10px',
-    outline: 'none'
   };
   const N = rm.phases.length;
   const W = Math.max(720, N * 126 + 150),
@@ -62529,7 +62750,7 @@ function RvRoadmapPlan({
     w.forEach(x => {
       if ((a + ' ' + x).trim().length <= 17 && !b) a = (a + ' ' + x).trim();else b = (b + ' ' + x).trim();
     });
-    if (b.length > 22) b = b.slice(0, 21).replace(/\s+\S*$/, '') + '…';
+    if (b.length > 22) b = b.slice(0, 21).replace(/\s+\S*$/, '') + '\u2026';
     return [a, b];
   };
   const stColor = i => {
@@ -62538,7 +62759,12 @@ function RvRoadmapPlan({
   };
   const hue = isDone(ph) ? '#c9f26f' : fi === current ? '#2fd6a8' : 'rgba(255,209,102,.8)';
   const doneN = rm.phases.filter(isDone).length;
-  return React.createElement("div", null, !editHead ? React.createElement("div", {
+  const BARLOW = {
+    fontFamily: "'Barlow Condensed',sans-serif",
+    fontWeight: 800,
+    textTransform: 'uppercase'
+  };
+  return React.createElement("div", null, React.createElement("style", null, '.rvrm-row{border-radius:7px;transition:background .12s}.rvrm-row:hover{background:rgba(255,255,255,.03)}.rvrm-row .rvrm-x{opacity:0;transition:opacity .15s}.rvrm-row:hover .rvrm-x{opacity:.75}'), React.createElement("div", {
     style: {
       display: 'flex',
       gap: '6px 14px',
@@ -62548,14 +62774,23 @@ function RvRoadmapPlan({
     }
   }, React.createElement("span", {
     style: {
-      fontFamily: "'Barlow Condensed',sans-serif",
+      ...BARLOW,
       fontSize: 21,
-      fontWeight: 800,
       letterSpacing: '1.4px',
-      textTransform: 'uppercase',
-      color: rm.title ? 'var(--g-eee)' : 'var(--g-666)'
+      color: 'var(--g-eee)'
     }
-  }, "\uD83D\uDDFA ", rm.title || (who ? who.split(' ')[0] + "'s " : '') + 'roadmap — name it'), rm.target ? React.createElement("span", {
+  }, "\uD83D\uDDFA ", React.createElement(RvInlineEdit, {
+    value: rm.title,
+    onSave: t => upd({
+      title: t
+    }),
+    placeholder: (who ? who.split(' ')[0] + "'s " : '') + 'roadmap — click to name it',
+    style: {
+      ...BARLOW,
+      fontSize: 21,
+      letterSpacing: '1.4px'
+    }
+  })), React.createElement("span", {
     style: {
       fontSize: 12.5,
       fontWeight: 700,
@@ -62565,7 +62800,19 @@ function RvRoadmapPlan({
       padding: '3px 11px',
       whiteSpace: 'nowrap'
     }
-  }, "\u2192 ", rm.target) : null, React.createElement("span", {
+  }, "\u2192 ", React.createElement(RvInlineEdit, {
+    value: rm.target,
+    onSave: t => upd({
+      target: t
+    }),
+    placeholder: "set a target end",
+    style: {
+      fontSize: 12.5,
+      fontWeight: 700,
+      color: '#9fd9c6',
+      borderBottom: 'none'
+    }
+  })), React.createElement("span", {
     style: {
       fontSize: 12,
       color: 'var(--g-666)'
@@ -62576,9 +62823,27 @@ function RvRoadmapPlan({
     }
   }), React.createElement("button", {
     className: "btn btn-ghost btn-xs",
-    title: "Edit title, target & end state",
-    onClick: () => setEditHead(true)
-  }, "\u270E edit")) : React.createElement("div", {
+    title: "End-state outcomes, add or remove phases, delete roadmap",
+    onClick: () => setManage(!manage)
+  }, manage ? '✕ close' : '⚙ manage')), React.createElement("div", {
+    style: {
+      margin: '0 0 6px'
+    }
+  }, React.createElement(RvInlineEdit, {
+    value: rm.subtitle,
+    onSave: t => upd({
+      subtitle: t
+    }),
+    placeholder: "add the journey line \u2014 e.g. From Leading Himself, to Developing Others, to Directing an Entire Clinic",
+    grow: true,
+    style: {
+      fontSize: 13,
+      color: 'var(--g-999)',
+      fontStyle: 'italic',
+      display: 'inline-block',
+      borderBottom: 'none'
+    }
+  })), manage && React.createElement("div", {
     style: {
       border: '1px solid var(--border)',
       borderRadius: 10,
@@ -62588,74 +62853,15 @@ function RvRoadmapPlan({
     }
   }, React.createElement("div", {
     style: {
-      display: 'flex',
-      gap: '10px 14px',
-      flexWrap: 'wrap',
-      alignItems: 'flex-end',
-      marginBottom: 10
-    }
-  }, React.createElement("div", {
-    style: {
-      flex: '2 1 260px'
-    }
-  }, React.createElement("div", {
-    style: RV_LBL
-  }, "Roadmap title"), React.createElement("input", {
-    style: {
-      ...IN,
-      width: '100%',
-      boxSizing: 'border-box',
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 18,
-      fontWeight: 800,
-      letterSpacing: '1px',
-      textTransform: 'uppercase'
-    },
-    value: rm.title || '',
-    onChange: e => upd({
-      title: e.target.value
-    }),
-    placeholder: (who ? who.split(' ')[0].toUpperCase() + ' — ' : '') + 'ROADMAP TITLE'
-  })), React.createElement("div", {
-    style: {
-      flex: '1 1 150px'
-    }
-  }, React.createElement("div", {
-    style: RV_LBL
-  }, "Target end"), React.createElement("input", {
-    style: {
-      ...IN,
-      width: '100%',
-      boxSizing: 'border-box'
-    },
-    value: rm.target || '',
-    onChange: e => upd({
-      target: e.target.value
-    }),
-    placeholder: "e.g. April 2027"
-  })), React.createElement("button", {
-    className: "btn btn-lime btn-xs",
-    onClick: () => setEditHead(false)
-  }, "Done")), React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 8,
+      ...RV_LBL,
       marginBottom: 6
     }
-  }, React.createElement("div", {
-    style: {
-      ...RV_LBL,
-      marginBottom: 0
-    }
-  }, "End state \u2014 what done looks like"), React.createElement("button", {
-    className: "btn btn-ghost btn-xs",
-    onClick: addEnd
-  }, "\uFF0B outcome")), React.createElement("div", {
+  }, "End state \u2014 what done looks like"), React.createElement("div", {
     style: {
       display: 'flex',
       gap: 7,
-      flexWrap: 'wrap'
+      flexWrap: 'wrap',
+      marginBottom: 4
     }
   }, (rm.end || []).map((t, i) => React.createElement("span", {
     key: i,
@@ -62679,12 +62885,55 @@ function RvRoadmapPlan({
     onClick: () => upd({
       end: rm.end.filter((_, j) => j !== i)
     })
-  }, "\xD7"))), !(rm.end || []).length && React.createElement("span", {
+  }, "\xD7")))), React.createElement(RvStepAdd, {
+    placeholder: "Type an outcome and press Enter \u2014 e.g. Leads & develops people",
+    onAdd: t => upd({
+      end: [...(rm.end || []), t]
+    })
+  }), React.createElement("div", {
     style: {
-      fontSize: 12.5,
-      color: 'var(--g-777)'
+      display: 'flex',
+      gap: 8,
+      flexWrap: 'wrap',
+      marginTop: 12
     }
-  }, "Add the outcomes this roadmap commits to."))), !editHead && (rm.end || []).length > 0 && React.createElement("div", {
+  }, React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: addPhase
+  }, "\uFF0B Add phase"), React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    onClick: () => upd({
+      pillars: [...(rm.pillars || []), {
+        name: '',
+        pts: []
+      }]
+    })
+  }, "\uFF0B pillar"), !(rm.indicators || []).length && React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    onClick: () => upd({
+      indicators: ['']
+    })
+  }, "\uFF0B success indicators"), !(rm.review || []).length && React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    onClick: () => upd({
+      review: ['']
+    })
+  }, "\uFF0B weekly review"), rm.outcome == null && React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    onClick: () => upd({
+      outcome: ''
+    })
+  }, "\uFF0B role outcome"), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    title: "Delete the whole roadmap",
+    onClick: () => {
+      if (window.confirm('Delete this entire roadmap?')) onSave(null);
+    }
+  }, "\uD83D\uDDD1 delete roadmap"))), !manage && (rm.end || []).length > 0 && React.createElement("div", {
     style: {
       fontSize: 12,
       color: 'var(--g-999)',
@@ -62765,10 +63014,7 @@ function RvRoadmapPlan({
     const ly = up ? y - 27 - lh : y + 27;
     return React.createElement("g", {
       key: p.id,
-      onClick: () => {
-        setFocusSel(i);
-        setEditPh(false);
-      },
+      onClick: () => setFocusSel(i),
       style: {
         cursor: 'pointer'
       }
@@ -62858,35 +63104,95 @@ function RvRoadmapPlan({
     style: {
       display: 'flex',
       gap: 10,
-      alignItems: 'center',
+      alignItems: 'flex-start',
       flexWrap: 'wrap'
     }
   }, React.createElement("div", {
     style: {
-      flex: '1 1 240px'
+      flex: '1 1 260px'
     }
   }, React.createElement("div", {
     style: {
       ...RV_LBL,
-      marginBottom: 2
+      marginBottom: 2,
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: 6,
+      flexWrap: 'wrap'
     }
-  }, "Phase ", fi + 1, " of ", N, ph.range ? ' · ' + ph.range : '', isDone(ph) ? ' · complete ✓' : fi === current ? ' · current' : ''), !editPh ? React.createElement("div", {
+  }, React.createElement("span", null, "Phase ", fi + 1, " of ", N, " \xB7"), React.createElement(RvInlineEdit, {
+    value: ph.range,
+    onSave: t => updPhase(ph.id, {
+      range: t
+    }),
+    placeholder: "set the window",
+    title: "Click to edit the window (e.g. Sept\u2013Oct)",
     style: {
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 22,
-      fontWeight: 800,
-      letterSpacing: '1.2px',
-      textTransform: 'uppercase',
-      color: ph.name ? '#f0f8f3' : 'var(--g-666)'
+      ...RV_LBL,
+      marginBottom: 0
     }
-  }, ph.name || 'Name this phase') : null, !editPh && ph.theme ? React.createElement("div", {
+  }), React.createElement("span", null, isDone(ph) ? '· complete ✓' : fi === current ? '· current' : ''), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("span", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: '.8px',
+      textTransform: 'uppercase',
+      color: '#e9c08a',
+      border: '1px solid rgba(233,192,138,.35)',
+      borderRadius: 999,
+      padding: '2px 10px'
+    }
+  }, React.createElement(RvInlineEdit, {
+    value: ph.band,
+    onSave: t => updPhase(ph.id, {
+      band: t
+    }),
+    placeholder: "block label",
+    title: "The block this phase belongs to \u2014 e.g. Build the Clinic",
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: '.8px',
+      textTransform: 'uppercase',
+      color: '#e9c08a',
+      borderBottom: 'none'
+    }
+  }))), React.createElement("div", null, React.createElement(RvInlineEdit, {
+    value: ph.name,
+    onSave: t => updPhase(ph.id, {
+      name: t
+    }),
+    placeholder: "Click to name this phase",
+    grow: true,
+    style: {
+      ...BARLOW,
+      fontSize: 22,
+      letterSpacing: '1.2px',
+      color: '#f0f8f3',
+      display: 'inline-block'
+    }
+  })), React.createElement("div", {
+    style: {
+      marginTop: 3
+    }
+  }, React.createElement(RvInlineEdit, {
+    value: ph.theme,
+    onSave: t => updPhase(ph.id, {
+      theme: t
+    }),
+    placeholder: "add a theme \u2014 what this phase is about",
+    grow: true,
     style: {
       fontSize: 13,
       color: 'var(--g-999)',
-      marginTop: 2,
-      lineHeight: 1.55
+      lineHeight: 1.55,
+      display: 'inline-block'
     }
-  }, ph.theme) : null), React.createElement("div", {
+  }))), React.createElement("div", {
     style: {
       display: 'flex',
       gap: 6,
@@ -62898,79 +63204,26 @@ function RvRoadmapPlan({
     style: fi === 0 ? {
       opacity: .35
     } : null,
-    onClick: () => {
-      setFocusSel(fi - 1);
-      setEditPh(false);
-    }
+    onClick: () => setFocusSel(fi - 1)
   }, "\u2039"), React.createElement("button", {
     className: "btn btn-ghost btn-xs",
     disabled: fi >= N - 1,
     style: fi >= N - 1 ? {
       opacity: .35
     } : null,
-    onClick: () => {
-      setFocusSel(fi + 1);
-      setEditPh(false);
-    }
+    onClick: () => setFocusSel(fi + 1)
   }, "\u203A"), React.createElement("button", {
     className: "btn btn-ghost btn-xs",
-    title: "Edit this phase",
-    onClick: () => setEditPh(!editPh)
-  }, editPh ? '✕' : '✎'))), editPh && React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 8,
-      flexWrap: 'wrap',
-      margin: '10px 0 4px'
-    }
-  }, React.createElement("input", {
-    style: {
-      ...IN,
-      flex: '2 1 180px',
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 16,
-      fontWeight: 800,
-      letterSpacing: '1px',
-      textTransform: 'uppercase'
-    },
-    value: ph.name || '',
-    onChange: e => updPhase(ph.id, {
-      name: e.target.value
-    }),
-    placeholder: "PHASE NAME"
-  }), React.createElement("input", {
-    style: {
-      ...IN,
-      flex: '0 1 120px'
-    },
-    value: ph.range || '',
-    onChange: e => updPhase(ph.id, {
-      range: e.target.value
-    }),
-    placeholder: "Sept\u2013Oct"
-  }), React.createElement("input", {
-    style: {
-      ...IN,
-      flex: '3 1 220px'
-    },
-    value: ph.theme || '',
-    onChange: e => updPhase(ph.id, {
-      theme: e.target.value
-    }),
-    placeholder: "Theme \u2014 what this phase is about"
-  }), React.createElement("button", {
-    className: "btn btn-ghost btn-xs",
-    title: "Remove this phase",
+    title: "Remove this phase and its steps",
     onClick: () => {
       if (window.confirm('Remove this phase and its steps?')) {
         upd({
           phases: rm.phases.filter(x => x.id !== ph.id)
         });
         setFocusSel(null);
-        setEditPh(false);
       }
     }
-  }, "\uD83D\uDDD1 remove phase")), React.createElement("div", {
+  }, "\uD83D\uDDD1"))), React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
@@ -63001,11 +63254,12 @@ function RvRoadmapPlan({
     }
   }, (ph.items || []).filter(i => i.done).length, "/", (ph.items || []).length, " steps")), (ph.items || []).map(it => React.createElement("div", {
     key: it.id,
+    className: "rvrm-row",
     style: {
       display: 'flex',
       gap: 10,
       alignItems: 'flex-start',
-      padding: '5px 0'
+      padding: '5px 6px 5px 2px'
     }
   }, React.createElement("input", {
     type: "checkbox",
@@ -63025,19 +63279,31 @@ function RvRoadmapPlan({
     style: {
       flex: 1,
       fontSize: 13.5,
+      lineHeight: 1.55
+    }
+  }, React.createElement(RvInlineEdit, {
+    value: it.t,
+    onSave: t => setItem(ph, it.id, t),
+    placeholder: "step",
+    grow: true,
+    title: "Click to edit this step",
+    style: {
+      fontSize: 13.5,
       lineHeight: 1.55,
+      display: 'inline',
+      borderBottom: 'none',
       color: it.done ? 'var(--g-777)' : 'var(--g-ccc)',
       textDecoration: it.done ? 'line-through' : 'none'
     }
-  }, it.t, it.done && it.doneAt && React.createElement("span", {
+  }), it.done && it.doneAt && React.createElement("span", {
     style: {
       fontSize: 11,
       color: '#7ee0a3',
       marginLeft: 8,
-      textDecoration: 'none',
       display: 'inline-block'
     }
   }, "\u2713 ", it.doneAt)), React.createElement("span", {
+    className: "rvrm-x",
     style: {
       cursor: 'pointer',
       color: 'var(--g-666)',
@@ -63047,42 +63313,152 @@ function RvRoadmapPlan({
     onClick: () => updPhase(ph.id, {
       items: ph.items.filter(x => x.id !== it.id)
     })
-  }, "\u2715"))), !(ph.items || []).length && React.createElement("div", {
+  }, "\u2715"))), React.createElement(RvStepAdd, {
+    onAdd: t => updPhase(ph.id, {
+      items: [...(ph.items || []), {
+        id: 'i' + Date.now(),
+        t,
+        done: false
+      }]
+    })
+  })), (rm.pillars || []).length > 0 && React.createElement("div", {
     style: {
-      fontSize: 13,
-      color: 'var(--g-888)'
+      marginTop: 16
     }
-  }, "No steps yet \u2014 add the first concrete, checkable action for this phase."), React.createElement("button", {
-    className: "btn btn-ghost btn-xs",
+  }, React.createElement("div", {
     style: {
-      marginTop: 8
-    },
-    onClick: () => addItem(ph)
-  }, "\uFF0B step")), editHead && React.createElement("div", {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 15,
+      fontWeight: 800,
+      letterSpacing: '2.2px',
+      color: '#9fd9c6',
+      textTransform: 'uppercase',
+      marginBottom: 8
+    }
+  }, (rm.pillars || []).length, " PILLARS ", who ? who.split(' ')[0].toUpperCase() : '', " WILL DEVELOP & OWN"), React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill,minmax(225px,1fr))',
+      gap: 10
+    }
+  }, (rm.pillars || []).map((p, pi) => {
+    const HUES = ['#8fd0a8', '#e9c08a', '#7db8d8', '#c9f26f', '#d8a97d', '#9fd9c6', '#7ac490', '#e0b3a0'];
+    return React.createElement(RvMiniCard, {
+      key: pi,
+      title: p.name,
+      pts: p.pts || [],
+      hue: HUES[pi % HUES.length],
+      onTitle: t => upd({
+        pillars: rm.pillars.map((x, j) => j === pi ? {
+          ...x,
+          name: t
+        } : x)
+      }),
+      onPts: pts => upd({
+        pillars: rm.pillars.map((x, j) => j === pi ? {
+          ...x,
+          pts
+        } : x)
+      })
+    });
+  }))), ((rm.indicators || []).length > 0 || (rm.review || []).length > 0 || rm.outcome) && React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))',
+      gap: 10,
+      marginTop: 14
+    }
+  }, (rm.indicators || []).length > 0 && React.createElement(RvMiniCard, {
+    title: 'Key success indicators' + (rm.target ? ' by ' + rm.target : ''),
+    pts: rm.indicators,
+    hue: "#c9f26f",
+    onTitle: () => {},
+    onPts: pts => upd({
+      indicators: pts
+    })
+  }), (rm.review || []).length > 0 && React.createElement(RvMiniCard, {
+    title: 'Weekly director review ' + (who ? who.split(' ')[0] : 'they') + ' will lead',
+    pts: rm.review,
+    hue: "#7db8d8",
+    numbered: true,
+    onTitle: () => {},
+    onPts: pts => upd({
+      review: pts
+    })
+  }), rm.outcome != null && React.createElement("div", {
+    style: {
+      border: '1px solid var(--border)',
+      borderTop: '2px solid #e9c08a',
+      borderRadius: 10,
+      padding: '10px 12px',
+      background: 'var(--surface3)'
+    }
+  }, React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 14.5,
+      fontWeight: 800,
+      letterSpacing: '1.2px',
+      textTransform: 'uppercase',
+      color: '#e9c08a',
+      marginBottom: 6
+    }
+  }, "Role outcome", rm.target ? ' by ' + rm.target : ''), React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: '#c3d5cc',
+      lineHeight: 1.65
+    }
+  }, React.createElement(RvInlineEdit, {
+    value: rm.outcome,
+    onSave: t => upd({
+      outcome: t
+    }),
+    multi: true,
+    grow: true,
+    placeholder: "What does the finished role look like, in one paragraph?",
+    style: {
+      fontSize: 12.5,
+      color: '#c3d5cc',
+      borderBottom: 'none',
+      display: 'inline'
+    }
+  })), (rm.identity || []).length > 0 && React.createElement("div", {
     style: {
       display: 'flex',
-      gap: 8,
+      gap: 5,
       flexWrap: 'wrap',
-      marginTop: 10
+      marginTop: 8
     }
-  }, React.createElement("button", {
-    className: "btn btn-ghost btn-sm",
-    onClick: addPhase
-  }, "\uFF0B Add phase"), React.createElement("span", {
+  }, (rm.identity || []).map((t, i) => React.createElement("span", {
+    key: i,
+    className: "rvrm-row",
     style: {
-      flex: 1
+      fontSize: 10.5,
+      fontWeight: 700,
+      letterSpacing: '.6px',
+      textTransform: 'uppercase',
+      color: '#9fd9c6',
+      border: '1px solid rgba(47,214,168,.3)',
+      borderRadius: 999,
+      padding: '2px 9px'
     }
-  }), React.createElement("button", {
-    className: "btn btn-ghost btn-xs",
-    title: "Delete the whole roadmap",
-    onClick: () => {
-      if (window.confirm('Delete this entire roadmap?')) onSave(null);
-    }
-  }, "\uD83D\uDDD1 delete roadmap")));
+  }, t, React.createElement("span", {
+    className: "rvrm-x",
+    style: {
+      cursor: 'pointer',
+      marginLeft: 5,
+      color: 'var(--g-666)'
+    },
+    onClick: () => upd({
+      identity: rm.identity.filter((_, j) => j !== i)
+    })
+  }, "\xD7")))))));
 }
 const RV_RM_TPL = {
   blank: () => ({
     title: '',
+    subtitle: '',
     target: '',
     end: [],
     phases: [1, 2, 3].map(n => ({
@@ -63090,11 +63466,18 @@ const RV_RM_TPL = {
       name: '',
       range: '',
       theme: '',
+      band: '',
       items: []
-    }))
+    })),
+    pillars: [],
+    indicators: [],
+    review: [],
+    outcome: null,
+    identity: []
   }),
   dev6: () => ({
     title: '',
+    subtitle: '',
     target: '6 months out',
     end: ['Consistent at the standard', 'Owns their numbers', 'Develops the person beside them'],
     phases: [['Foundations', 'Month 1', 'Get the basics right, every day'], ['Systems & Standards', 'Month 2', 'Work the way the clinic works'], ['Own It', 'Month 3', 'Full ownership of the role, no chasing'], ['Drive the Numbers', 'Month 4', 'Move the metrics that matter'], ['Lead Beside You', 'Month 5', 'Develop the person next to you'], ['Review & Level Up', 'Month 6', 'Prove it, grade it, step up']].map(([n, r, t], i) => ({
@@ -63102,21 +63485,65 @@ const RV_RM_TPL = {
       name: n,
       range: r,
       theme: t,
+      band: '',
       items: []
-    }))
+    })),
+    pillars: [],
+    indicators: [],
+    review: [],
+    outcome: null,
+    identity: []
   }),
-  director: () => ({
-    title: '',
-    target: 'April 2027',
-    end: ['Clinically excellent', 'Leads & develops people', 'Financially & operationally strong', 'Builds community & partnerships', 'Directs the clinic, not just the team'],
-    phases: [['Prove + Learn the Business', 'Sept–Oct', 'Get yourself right & learn how Revibe works'], ['Develop + Understand the Machine', 'Oct–Nov', 'Develop others & understand the system'], ['Build', 'Nov–Dec', 'Build the foundation of your clinic'], ['Pre-Launch', 'Dec–Jan', 'Set standards, systems & prepare to launch'], ['Launch + Operate', 'Jan–Feb', 'Launch & run the clinic'], ['Direct', 'Feb–Mar', 'Take responsibility & direct the business'], ['Operate', 'Mar–Apr', 'Operate smoothly & optimize the clinic'], ['Continue to Grow', 'April +', 'Scale, systemize & build legacy']].map(([n, r, t], i) => ({
-      id: 'ph' + i,
+  director: () => {
+    const P = (n, r, t, band, items) => ({
+      id: 'ph' + n.replace(/[^a-z]/gi, '').slice(0, 10) + Math.random().toString(36).slice(2, 6),
       name: n,
       range: r,
       theme: t,
-      items: []
-    }))
-  })
+      band,
+      items: items.map((x, i) => ({
+        id: 'i' + i + '_' + Math.random().toString(36).slice(2, 6),
+        t: x,
+        done: false
+      }))
+    });
+    return {
+      title: '',
+      subtitle: 'From Leading Himself, to Developing Others, to Directing an Entire Clinic',
+      target: 'April 2027',
+      end: ['Clinically excellent', 'Leads & develops people', 'Financially & operationally strong', 'Builds community & partnerships', 'Directs the clinic, not just the team'],
+      phases: [P('Prove + Learn the Business', 'Sept–Oct', 'Get Yourself Right & Learn How Revibe Works', 'Self Development + Business Exposure', ['Continue improving clinical performance & KPIs', 'Strengthen leadership behaviors (initiative, follow-through, communication)', 'Exposure to GE, operations, finances & systems', 'Financial literacy & clinic economics (revenue, costs, profitability)', 'Understand how each area impacts clinic success']), P('Develop + Understand the Machine', 'Oct–Nov', 'Develop Others & Understand the System', 'Develop People + Learn the System', ['Mentor 1–2 clinicians with clear development goals', 'Learn to coach, give feedback & follow up', 'Deepen understanding of GE operations & KPIs', 'Review dashboards, reports & clinic data', 'Learn how GE impacts clinical performance & revenue', 'Understand backend systems & key processes']), P('Build Oakville', 'Nov–Dec', 'Build the Foundation of Your Clinic', 'Build the Clinic', ['Design Oakville clinic model (disciplines, capacity, schedules)', 'Identify core clinician hiring needs & interview', 'Work with GE on staffing, hours & workflows', 'Review clinic & equipment needs from clinical & guest flow perspective', 'Build community relationships & referral network', 'Understand initial financial model & targets']), P('Pre-Launch', 'Dec–Jan', 'Set Standards, Systems & Prepare to Launch', 'Pre-Launch Preparation', ['Onboard team & set expectations', 'Establish clinical standards, Care Map, internal referrals & guest experience standards', 'Train team on workflows, SOPs & escalation structure', 'Review clinic readiness: equipment, supplies, rooms, guest flow', 'Review opening budget, payroll & labour model & staffing costs', 'Walk through guest journey with GE', 'Conduct soft-launch & operational stress test & validate SOPs', 'Gather feedback & iterate']), P('Launch + Operate', 'Jan–Feb', 'Launch Oakville & Run the Clinic', 'Launch & Operate', ['Support community launch & activation', 'Build your caseload & help clinicians build theirs', 'Monitor lead → booking → treatment conversion', 'Watch guest flow closely with GE', 'Identify operational breakdowns & fix quickly', 'Track utilization, retention, revenue & capacity', 'Continue community & referral activation']), P('Direct', 'Feb–Mar', 'Take Responsibility & Direct the Business', 'Direct the Business', ['Lead weekly Oakville review (People, Clinical, GE, Finance, Ops, Growth)', 'Identify root causes & act through the right people', 'Understand labour & staffing needs at a high level', 'Strengthen community pipeline & referral sources', 'Bring problems with solutions, not just updates']), P('Operate', 'Mar–Apr', 'Operate Smoothly & Optimize the Clinic', 'Operate the Clinic', ['Clinic metrics trending in the right direction', 'Develop people & future leaders', 'Operations run smoothly with strong systems', 'Finances optimized', 'Staffing aligned to utilization & capacity', 'Community & growth consistently producing leads & opportunities']), P('Continue to Grow', 'April +', 'Scale, Systemize & Build Legacy', 'Scale & Multiply', ['Scale Oakville performance', 'Build systems that can be replicated', 'Develop leaders across disciplines', 'Expand community impact & partnerships', 'Continue improving profitability & sustainability'])],
+      pillars: [{
+        name: 'Self / Clinical',
+        pts: ['Maintain high clinical performance', 'Hit & improve personal KPIs', 'Model standards & communication', 'Continue personal growth']
+      }, {
+        name: 'Clinical Team',
+        pts: ['Develop clinicians', 'Coach & mentor', 'Set & protect standards', 'Hold people accountable', 'Build a strong clinical culture']
+      }, {
+        name: 'Guest Experience',
+        pts: ['Understand GE operations end-to-end', 'Lead with GE leadership', 'Improve calls, leads, scheduling, conversions', 'Solve front-desk challenges together']
+      }, {
+        name: 'Business & Finance',
+        pts: ['Read & understand P&L', 'Revenue targets & performance', 'Costs, margins & profitability', 'Make data-informed decisions']
+      }, {
+        name: 'Payroll & Labour',
+        pts: ['Review payroll & labour reports', 'Understand commission models & splits', 'GE labour & scheduling costs', 'Labour efficiency & capacity planning']
+      }, {
+        name: 'Backend Operations',
+        pts: ['Understand systems & processes', 'Reporting & dashboards', 'SOPs & workflow optimization', 'Projects & continuous improvement']
+      }, {
+        name: 'Hiring & People',
+        pts: ['Workforce planning', 'Interview & assess', 'Onboard & integrate', 'Performance management', 'Build & maintain culture']
+      }, {
+        name: 'Community & Growth',
+        pts: ['Build local relationships', 'Create referral sources', 'Partnerships & events', 'Corporate & sports relationships', 'Grow leads & opportunities']
+      }],
+      indicators: ['CLINICAL — Utilization, retention, GVA, revenue all trending positive', 'PEOPLE — Clinicians developed, engaged, and held accountable', 'GE — High call conversion, strong rebooking, excellent guest experience', 'FINANCE — Revenue on target, healthy profit margin, costs controlled', 'OPERATIONS — Systems in place, processes documented & followed', 'GROWTH — Strong referral sources, partnerships & lead pipeline'],
+      review: ['People — team updates, development, concerns', 'Clinical — standards, performance, education needs', 'Guest Experience — KPIs, challenges, improvements', 'Financial — revenue, targets, costs, profitability', 'Operations — systems, processes, projects, issues', 'Labour — staffing, capacity, labour efficiency', 'Growth & Community — relationships, leads, opportunities', 'Actions & Support — priorities, action plan, what I need'],
+      outcome: 'Mike operates Oakville with confidence, competence and accountability — delivering clinical excellence, strong guest experience, financial health, and sustainable growth while developing people and building a culture that lasts.',
+      identity: ['Clinically Excellent', 'People Developer', 'Business Director', 'Operational Leader', 'Community Builder', 'Growth Driver']
+    };
+  }
 };
 function LD_PersonView({
   person,
