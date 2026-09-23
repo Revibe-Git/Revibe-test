@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L196';
+window.__BUILD = 'build L197';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -62504,11 +62504,11 @@ function RvRoadmapPlan({
     outline: 'none'
   };
   const N = rm.phases.length;
-  const W = Math.max(720, N * 118 + 150),
-    H = 214,
-    PAD = 88,
-    midY = 106,
-    AMPY = 27;
+  const W = Math.max(720, N * 126 + 150),
+    H = 252,
+    PAD = 90,
+    midY = 126,
+    AMPY = 34;
   const xs = i => N > 1 ? PAD + i * (W - 2 * PAD) / (N - 1) : W / 2;
   const ys = i => midY + (i % 2 ? AMPY : -AMPY);
   const seg = i => {
@@ -62760,9 +62760,9 @@ function RvRoadmapPlan({
       sel = i === fi;
     const lines = splitName(p.name, i);
     const up = !(i % 2);
-    const lw = Math.max(...lines.map(l => l.length)) * 6.4 + 18;
-    const lh = lines.length * 13 + (p.range ? 12 : 0) + 10;
-    const ly = up ? y - 24 - lh : y + 24;
+    const lw = Math.max(...lines.map(l => l.length)) * 7.0 + 20;
+    const lh = lines.length * 15 + (p.range ? 13 : 0) + 11;
+    const ly = up ? y - 27 - lh : y + 27;
     return React.createElement("g", {
       key: p.id,
       onClick: () => {
@@ -62774,7 +62774,7 @@ function RvRoadmapPlan({
       }
     }, React.createElement("line", {
       x1: x,
-      y1: up ? y - 13 : y + 13,
+      y1: up ? y - 15 : y + 15,
       x2: x,
       y2: up ? ly + lh - 2 : ly + 2,
       stroke: "rgba(255,255,255,.18)",
@@ -62791,18 +62791,18 @@ function RvRoadmapPlan({
     }), lines.map((l, li) => React.createElement("text", {
       key: li,
       x: x,
-      y: ly + 15 + li * 13,
+      y: ly + 17 + li * 15,
       textAnchor: "middle",
       style: {
         fontFamily: "'Barlow Condensed',sans-serif",
-        fontSize: 12.5,
+        fontSize: 13.5,
         fontWeight: 800,
         letterSpacing: '.8px',
         fill: dn ? '#c9f26f' : cur ? '#fff' : '#cbb98a'
       }
     }, l)), p.range && React.createElement("text", {
       x: x,
-      y: ly + 15 + lines.length * 13 - 1 + 12,
+      y: ly + 17 + lines.length * 15 - 2 + 13,
       textAnchor: "middle",
       style: {
         fontSize: 10,
@@ -62811,14 +62811,14 @@ function RvRoadmapPlan({
     }, p.range), cur && !dn && React.createElement("circle", {
       cx: x,
       cy: y,
-      r: "17",
+      r: "20",
       fill: "none",
       stroke: "rgba(255,255,255,.5)",
       strokeWidth: "1.4"
     }), React.createElement("circle", {
       cx: x,
       cy: y,
-      r: "13",
+      r: "15",
       fill: dn ? '#c9f26f' : cur ? '#10231b' : 'rgba(255,255,255,.06)',
       stroke: dn ? '#c9f26f' : cur ? '#fff' : 'rgba(255,209,102,.5)',
       strokeWidth: cur && !dn ? 1.8 : 1.2,
@@ -62829,18 +62829,18 @@ function RvRoadmapPlan({
       } : null
     }), React.createElement("text", {
       x: x,
-      y: y + 4.5,
+      y: y + 5,
       textAnchor: "middle",
       style: {
         fontFamily: "'Barlow Condensed',sans-serif",
-        fontSize: 13,
+        fontSize: 14.5,
         fontWeight: 800,
         fill: dn ? '#12250f' : cur ? '#fff' : 'rgba(255,255,255,.65)'
       }
     }, dn ? '✓' : i + 1), sel && React.createElement("circle", {
       cx: x,
       cy: y,
-      r: "21",
+      r: "24",
       fill: "none",
       stroke: stColor(i),
       strokeWidth: "1",
@@ -63378,6 +63378,7 @@ function LeadDevTab({
     const rev = PERF_STAT(perfData, id, 'revenue'),
       vis = PERF_STAT(perfData, id, 'completed');
     const [pf, setPf] = useState(null);
+    const [planTab, setPlanTab] = useState('map');
     const blankPf = () => ({
       area: '',
       type: 'behaviour',
@@ -63675,10 +63676,30 @@ function LeadDevTab({
     }, "\uFF0B Action"), React.createElement("button", {
       className: "btn btn-lime btn-sm",
       onClick: checkin
-    }, "\u2713 Check-in")), React.createElement(SecLbl, {
-      t: "The plan",
-      d: "where they're going \u2014 roadmap, priorities, actions"
-    }), React.createElement("div", {
+    }, "\u2713 Check-in")), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 7,
+        flexWrap: 'wrap',
+        margin: '16px 0 12px'
+      }
+    }, [['map', '🗺 ROADMAP'], ['work', '🎯 PRIORITIES & ACTIONS' + (act.length + openActions(id).length ? ' · ' + (act.length + openActions(id).length) : '')], ['record', '📜 THE RECORD']].map(([k, l2]) => React.createElement("button", {
+      key: k,
+      onClick: () => setPlanTab(k),
+      style: {
+        cursor: 'pointer',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 14.5,
+        fontWeight: 800,
+        letterSpacing: '1.6px',
+        padding: '8px 18px',
+        borderRadius: 9,
+        transition: 'all .14s',
+        border: '1px solid ' + (planTab === k ? '#c9f26f' : 'rgba(255,255,255,.22)'),
+        background: planTab === k ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'rgba(255,255,255,.05)',
+        color: planTab === k ? '#06301f' : 'rgba(238,248,242,.72)'
+      }
+    }, l2))), planTab === 'map' && React.createElement("div", {
       className: "ldsec",
       style: {
         '--h': '#2fd6a8'
@@ -63712,7 +63733,7 @@ function LeadDevTab({
       onClick: () => setPlan(id, {
         roadmap: RV_RM_TPL.blank()
       })
-    }, "Blank")))), React.createElement("div", {
+    }, "Blank")))), planTab === 'work' && React.createElement(React.Fragment, null, React.createElement("div", {
       className: "ldsec",
       style: {
         '--h': '#c9f26f'
@@ -63999,10 +64020,7 @@ function LeadDevTab({
           done: today()
         })
       }, "\u2713 done"));
-    })), React.createElement(SecLbl, {
-      t: "The record",
-      d: "how it's going \u2014 standing from G&D, everything logged"
-    }), !embed && (() => {
+    }))), planTab === 'record' && React.createElement(React.Fragment, null, !embed && (() => {
       const st = (staff || []).find(x => x.id === id) || person || {};
       const best = typeof getBestScore === 'function' ? getBestScore(st) : null;
       const myEvals = (evals || []).filter(e => e && e.staffId === id).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
@@ -64221,7 +64239,7 @@ function LeadDevTab({
           color: 'var(--g-666)'
         }
       }, e.by || '')));
-    })()));
+    })())));
   };
   if (view.person) {
     const p = (staff || []).find(x => x.id === view.person);
