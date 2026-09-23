@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L197';
+window.__BUILD = 'build L198';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -63118,6 +63118,1099 @@ const RV_RM_TPL = {
     }))
   })
 };
+function LD_PersonView({
+  person,
+  lead,
+  back,
+  embed,
+  hue,
+  ctx
+}) {
+  const {
+    planOf,
+    setPlan,
+    openActions,
+    overdueActions,
+    daysSince,
+    today,
+    trendChip,
+    lbl,
+    C,
+    dot,
+    LDCSS,
+    staff,
+    perfData,
+    evals,
+    openProfile
+  } = ctx;
+  const id = person.id;
+  const pl = planOf(id);
+  const act = (pl.priorities || []).filter(x => x.status !== 'done');
+  const rev = PERF_STAT(perfData, id, 'revenue'),
+    vis = PERF_STAT(perfData, id, 'completed');
+  const [pf, setPf] = useState(null);
+  const [planTab, setPlanTab] = useState('map');
+  const [logWho, setLogWho] = useState('all');
+  const blankPf = () => ({
+    area: '',
+    type: 'behaviour',
+    gap: '',
+    baseline: '',
+    target: '',
+    action: '',
+    measure: '',
+    review: new Date(Date.now() + 2592e6).toISOString().slice(0, 10)
+  });
+  const savePf = () => {
+    if (!pf || !pf.area || !pf.review) return;
+    setPlan(id, {
+      priorities: [{
+        id: 'p' + Date.now(),
+        area: pf.area,
+        gap: pf.gap,
+        baseline: pf.baseline,
+        target: pf.target,
+        action: pf.action,
+        measure: pf.measure,
+        review: pf.review,
+        type: pf.type,
+        status: 'inprogress',
+        created: today()
+      }, ...(pl.priorities || [])]
+    });
+    setPf(null);
+  };
+  const ldflbl = {
+    fontSize: 11,
+    letterSpacing: '1.2px',
+    textTransform: 'uppercase',
+    color: 'var(--g-777)',
+    fontFamily: "'Barlow Condensed',sans-serif",
+    marginBottom: 3
+  };
+  const ldfinp = {
+    width: '100%',
+    boxSizing: 'border-box',
+    background: 'var(--surface2)',
+    border: '1px solid var(--border)',
+    borderRadius: 6,
+    color: 'var(--text)',
+    fontSize: 13,
+    padding: '6px 9px',
+    outline: 'none'
+  };
+  const setPrio = (pid, patch) => setPlan(id, {
+    priorities: (pl.priorities || []).map(x => x.id === pid ? {
+      ...x,
+      ...patch
+    } : x)
+  });
+  const completePrio = x => {
+    const ev = (pl.evidence || []).filter(e => e.prio === x.id).length;
+    if (!ev) {
+      window.alert('A priority cannot be completed without evidence. Log at least one piece of evidence against it first.');
+      return;
+    }
+    setPrio(x.id, {
+      status: 'done',
+      closed: today()
+    });
+  };
+  const addEv = async (kind, prio, asSelf) => {
+    const first = (person.name || '').split(' ')[0];
+    const t = await rvAsk({
+      label: (kind === 'kpi' ? 'Number moved' : kind === 'concern' ? 'Log a concern' : 'Log a note') + (asSelf ? ' — ' + first + ' (self)' : lead ? ' — ' + lead.short : ''),
+      hint: kind === 'kpi' ? 'What moved, and by how much?' : kind === 'concern' ? 'What is the concern?' : asSelf ? 'In their own words — what did they do, learn, or push through?' : 'What did you observe?',
+      ok: 'Log'
+    });
+    if (!t) return;
+    setPlan(id, {
+      evidence: [{
+        date: today(),
+        by: asSelf ? first : lead ? lead.short : 'Lead',
+        role: asSelf ? 'self' : 'lead',
+        kind,
+        t,
+        prio: prio || null
+      }, ...(pl.evidence || [])]
+    });
+  };
+  const addAction = async () => {
+    const t = await rvAsk({
+      label: 'New action · 1/3',
+      hint: 'What specifically will be done?',
+      ok: 'Next'
+    });
+    if (!t) return;
+    const owner = await rvAsk({
+      label: 'New action · 2/3 — owner',
+      hint: 'Who owns this action?',
+      value: lead ? lead.short : '',
+      ok: 'Next'
+    });
+    if (owner === null) return;
+    const due = await rvAsk({
+      label: 'New action · 3/3 — due date',
+      hint: 'YYYY-MM-DD',
+      value: new Date(Date.now() + 1209600000).toISOString().slice(0, 10),
+      ok: 'Add action'
+    });
+    if (!due) return;
+    setPlan(id, {
+      actions: [{
+        id: 'a' + Date.now(),
+        t,
+        owner,
+        due,
+        status: 'Open',
+        created: today()
+      }, ...(pl.actions || [])]
+    });
+  };
+  const setAct = (aid, patch) => setPlan(id, {
+    actions: (pl.actions || []).map(a => a.id === aid ? {
+      ...a,
+      ...patch
+    } : a)
+  });
+  const checkin = async () => {
+    const wins = await rvAsk({
+      label: 'Check-in · 1/3 — wins',
+      hint: 'Since last check-in — what went well?',
+      ok: 'Next'
+    });
+    if (wins === null) return;
+    const chal = await rvAsk({
+      label: 'Check-in · 2/3 — challenges',
+      hint: 'Challenges / missed commitments?',
+      ok: 'Next'
+    });
+    if (chal === null) return;
+    const nxt = await rvAsk({
+      label: 'Check-in · 3/3 — next date',
+      hint: 'YYYY-MM-DD',
+      value: new Date(Date.now() + 2592e6).toISOString().slice(0, 10),
+      ok: 'Log check-in'
+    });
+    if (!nxt) return;
+    setPlan(id, {
+      checkins: [{
+        date: today(),
+        by: lead ? lead.short : 'Lead',
+        wins,
+        chal,
+        next: nxt
+      }, ...(pl.checkins || [])]
+    });
+  };
+  const setComp = async (key, label, n) => {
+    const h = (pl.comp || {})[key] || [];
+    if (h[0] && h[0].v === n) return;
+    const why = await rvAsk({
+      label: label + ' → ' + n,
+      hint: LD_SCALE[n - 1] + ' — what evidence shows this?',
+      placeholder: 'Evidence',
+      ok: 'Score'
+    });
+    if (why === null) return;
+    setPlan(id, {
+      comp: {
+        ...(pl.comp || {}),
+        [key]: [{
+          v: n,
+          date: today(),
+          why,
+          by: lead ? lead.short : 'Lead'
+        }, ...h]
+      }
+    });
+  };
+  const last = (pl.checkins || [])[0];
+  const SecLbl = ({
+    t,
+    d
+  }) => React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      margin: '26px 0 10px'
+    }
+  }, React.createElement("span", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 15,
+      fontWeight: 800,
+      letterSpacing: '2.6px',
+      color: '#9fd9c6',
+      textTransform: 'uppercase',
+      whiteSpace: 'nowrap'
+    }
+  }, t), d ? React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      color: 'var(--g-666)'
+    }
+  }, d) : null, React.createElement("span", {
+    style: {
+      flex: 1,
+      height: 1,
+      background: 'linear-gradient(90deg,var(--border),transparent)'
+    }
+  }));
+  return React.createElement("div", {
+    style: {
+      maxWidth: 1020,
+      '--h': hue || 'var(--c-grn)'
+    }
+  }, LDCSS, !embed && React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: back
+  }, "\u2190 back"), !embed && React.createElement("div", {
+    style: {
+      ...C,
+      marginTop: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 14,
+      alignItems: 'baseline',
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 21,
+      fontWeight: 800,
+      color: 'var(--text)'
+    }
+  }, person.name), React.createElement("span", {
+    style: {
+      fontSize: 13.5,
+      color: 'var(--g-999)'
+    }
+  }, person.discipline || person.role || '', lead ? ' · lead: ' + lead.short : ''), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: addAction
+  }, "\uFF0B Action"), React.createElement("button", {
+    className: "btn btn-lime btn-sm",
+    onClick: checkin
+  }, "\u2713 Check-in")), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 26,
+      flexWrap: 'wrap',
+      marginTop: 12
+    }
+  }, rev && rev.avg3 != null ? React.createElement("div", null, React.createElement("div", {
+    style: lbl
+  }, "Revenue"), trendChip(rev)) : null, vis && vis.avg3 != null ? React.createElement("div", null, React.createElement("div", {
+    style: lbl
+  }, "Completed visits"), trendChip(vis)) : null, React.createElement("div", null, React.createElement("div", {
+    style: lbl
+  }, "Last check-in"), React.createElement("span", {
+    style: {
+      fontSize: 12.5,
+      color: last ? daysSince(last.date) > 45 ? 'var(--c-red)' : 'var(--g-ccc)' : 'var(--c-amb)'
+    }
+  }, last ? last.date + ' · ' + daysSince(last.date) + 'd ago' : 'never')), React.createElement("div", null, React.createElement("div", {
+    style: lbl
+  }, "Next check-in"), React.createElement("span", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-ccc)'
+    }
+  }, last && last.next ? last.next : '—')), React.createElement("div", null, React.createElement("div", {
+    style: lbl
+  }, "Open actions"), React.createElement("span", {
+    style: {
+      fontSize: 12.5,
+      color: overdueActions(id).length ? 'var(--c-red)' : 'var(--g-ccc)'
+    }
+  }, openActions(id).length, overdueActions(id).length ? ' · ' + overdueActions(id).length + ' overdue' : ''))), rev.lastMonth && React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: 'var(--g-666)',
+      marginTop: 8
+    }
+  }, "Jane import through ", rev.lastMonth, " \xB7 same source as Numbers & Performance")), embed && React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      justifyContent: 'flex-end',
+      marginBottom: 10
+    }
+  }, React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: addAction
+  }, "\uFF0B Action"), React.createElement("button", {
+    className: "btn btn-lime btn-sm",
+    onClick: checkin
+  }, "\u2713 Check-in")), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 7,
+      flexWrap: 'wrap',
+      margin: '16px 0 12px'
+    }
+  }, [['map', '🗺 ROADMAP'], ['checkins', '✓ CHECK-INS' + ((pl.checkins || []).length ? ' · ' + (pl.checkins || []).length : '')], ['work', '🎯 PRIORITIES' + (act.length + openActions(id).length ? ' · ' + (act.length + openActions(id).length) : '')], ['log', '📓 PROGRESS LOG'], ['measure', '📊 MEASURABLES']].map(([k, l2]) => React.createElement("button", {
+    key: k,
+    onClick: () => setPlanTab(k),
+    style: {
+      cursor: 'pointer',
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 14.5,
+      fontWeight: 800,
+      letterSpacing: '1.6px',
+      padding: '8px 18px',
+      borderRadius: 9,
+      transition: 'all .14s',
+      border: '1px solid ' + (planTab === k ? '#c9f26f' : 'rgba(255,255,255,.22)'),
+      background: planTab === k ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'rgba(255,255,255,.05)',
+      color: planTab === k ? '#06301f' : 'rgba(238,248,242,.72)'
+    }
+  }, l2))), planTab === 'map' && React.createElement("div", {
+    className: "ldsec",
+    style: {
+      '--h': '#2fd6a8'
+    }
+  }, pl.roadmap ? React.createElement(RvRoadmapPlan, {
+    rm: pl.roadmap,
+    who: person.name,
+    onSave: rm => setPlan(id, {
+      roadmap: rm
+    })
+  }) : React.createElement("div", null, React.createElement("h4", null, "\uD83D\uDDFA ACTION PLAN ROADMAP"), React.createElement("div", {
+    className: "sub"
+  }, "Start from a template \u2014 every phase gets a name, a window, a theme and checkable steps; progress tracks itself and the current phase stays highlighted."), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("button", {
+    className: "btn btn-lime btn-sm",
+    onClick: () => setPlan(id, {
+      roadmap: RV_RM_TPL.director()
+    })
+  }, "Director track \xB7 8 phases"), React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: () => setPlan(id, {
+      roadmap: RV_RM_TPL.dev6()
+    })
+  }, "6-month development"), React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: () => setPlan(id, {
+      roadmap: RV_RM_TPL.blank()
+    })
+  }, "Blank")))), planTab === 'work' && React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "ldsec",
+    style: {
+      '--h': '#c9f26f'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'flex-start',
+      gap: 10,
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: 1,
+      minWidth: 220
+    }
+  }, React.createElement("h4", null, "\uD83C\uDFAF DEVELOPMENT PRIORITIES"), !(pl.priorities || []).length && React.createElement("div", {
+    className: "sub",
+    style: {
+      marginBottom: 6
+    }
+  }, "Max 3 active \u2014 the few gaps being worked right now, each with a baseline, a target and a review date.")), React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    disabled: act.length >= 3,
+    style: act.length >= 3 ? {
+      opacity: .45,
+      cursor: 'not-allowed'
+    } : null,
+    title: act.length >= 3 ? 'Three active priorities is the maximum — close one first. That limit is the point.' : 'Set a development priority',
+    onClick: () => setPf(pf ? null : blankPf())
+  }, pf ? '✕ Cancel' : '＋ Add priority')), pf && React.createElement("div", {
+    style: {
+      border: '1px solid var(--border)',
+      borderLeft: '3px solid var(--h,var(--c-grn))',
+      borderRadius: 8,
+      padding: '12px 14px',
+      margin: '4px 0 10px',
+      background: 'var(--surface3)'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 10,
+      flexWrap: 'wrap',
+      marginBottom: 10
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: '2 1 220px'
+    }
+  }, React.createElement("div", {
+    style: ldflbl
+  }, "Development area ", React.createElement("span", {
+    style: {
+      color: 'var(--c-red)'
+    }
+  }, "*")), React.createElement("select", {
+    value: pf.area,
+    onChange: e => setPf({
+      ...pf,
+      area: e.target.value
+    }),
+    style: {
+      ...ldfinp,
+      cursor: 'pointer'
+    }
+  }, React.createElement("option", {
+    value: ""
+  }, "Choose\u2026"), LD_AREAS.map(a => React.createElement("option", {
+    key: a
+  }, a)))), React.createElement("div", {
+    style: {
+      flex: '1 1 170px'
+    }
+  }, React.createElement("div", {
+    style: ldflbl
+  }, "Type"), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 4
+    }
+  }, LD_TYPES.map(([v, l2, tip]) => React.createElement("button", {
+    key: v,
+    title: tip,
+    onClick: () => setPf({
+      ...pf,
+      type: v
+    }),
+    className: `btn btn-xs ${pf.type === v ? 'btn-go' : 'btn-ghost'}`
+  }, l2)))), React.createElement("div", {
+    style: {
+      flex: '0 1 150px'
+    }
+  }, React.createElement("div", {
+    style: ldflbl
+  }, "Review date"), React.createElement("input", {
+    type: "date",
+    value: pf.review,
+    onChange: e => setPf({
+      ...pf,
+      review: e.target.value
+    }),
+    style: ldfinp
+  }))), React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
+      gap: '8px 10px'
+    }
+  }, [['gap', 'Gap', 'What exactly is inconsistent?'], ['baseline', 'Baseline', 'Where are they now?'], ['target', 'Target', 'What does improved actually look like?'], ['action', 'Action', 'What will specifically be done?'], ['measure', 'Measured by', 'Observation, referral count, rebooking %, case review…']].map(([k, l2, ph]) => React.createElement("div", {
+    key: k
+  }, React.createElement("div", {
+    style: ldflbl
+  }, l2), React.createElement("input", {
+    value: pf[k],
+    onChange: e => setPf({
+      ...pf,
+      [k]: e.target.value
+    }),
+    placeholder: ph,
+    style: ldfinp
+  })))), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      justifyContent: 'flex-end',
+      marginTop: 10
+    }
+  }, React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
+    onClick: () => setPf(null)
+  }, "Cancel"), React.createElement("button", {
+    className: "btn btn-lime btn-sm",
+    disabled: !pf.area,
+    style: !pf.area ? {
+      opacity: .45,
+      cursor: 'not-allowed'
+    } : null,
+    title: pf.area ? '' : 'Choose a development area first',
+    onClick: savePf
+  }, "Add priority"))), !pf && !(pl.priorities || []).length && React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      color: 'var(--g-888)'
+    }
+  }, "Nothing set yet. ", React.createElement("b", {
+    style: {
+      color: 'var(--g-ccc)',
+      cursor: 'pointer'
+    },
+    onClick: () => setPf(blankPf())
+  }, "Add one"), " \u2014 it takes about a minute."), (pl.priorities || []).map(x => {
+    const evs = (pl.evidence || []).filter(e => e.prio === x.id);
+    return React.createElement("div", {
+      key: x.id,
+      style: {
+        borderTop: '1px solid var(--border)',
+        padding: '11px 0',
+        opacity: x.status === 'done' ? .55 : 1
+      }
+    }, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 10,
+        alignItems: 'center',
+        flexWrap: 'wrap'
+      }
+    }, React.createElement("span", {
+      style: dot(LD_STCOL[x.status] || 'var(--g-666)')
+    }), React.createElement("span", {
+      style: {
+        fontSize: 15,
+        fontWeight: 700,
+        color: 'var(--text)'
+      }
+    }, x.area), React.createElement("span", {
+      style: {
+        fontSize: 11,
+        padding: '1px 7px',
+        borderRadius: 5,
+        border: '1px solid var(--border)',
+        color: 'var(--g-999)'
+      }
+    }, (LD_TYPES.find(t => t[0] === x.type) || [])[1] || 'Behaviour'), React.createElement("span", {
+      style: {
+        flex: 1
+      }
+    }), React.createElement("select", {
+      value: x.status,
+      onChange: e => setPrio(x.id, {
+        status: e.target.value
+      }),
+      style: {
+        background: 'var(--surface3)',
+        border: '1px solid var(--border)',
+        borderRadius: 5,
+        color: 'var(--g-ccc)',
+        fontSize: 12,
+        padding: '3px 6px'
+      }
+    }, LD_STATUS.filter(st => st[0] !== 'done').map(([v, l]) => React.createElement("option", {
+      key: v,
+      value: v
+    }, l))), React.createElement("span", {
+      style: {
+        fontSize: 12.5,
+        color: x.review && new Date(x.review) < new Date() && x.status !== 'done' ? 'var(--c-red)' : 'var(--g-888)'
+      }
+    }, "review ", x.review || '—'), React.createElement("button", {
+      className: "btn btn-ghost btn-xs",
+      onClick: () => addEv('obs', x.id)
+    }, "\uFF0B evidence"), x.status !== 'done' && React.createElement("button", {
+      className: "btn btn-ghost btn-xs",
+      title: evs.length ? 'Complete this priority' : 'Needs evidence before it can be completed',
+      onClick: () => completePrio(x)
+    }, "complete")), React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',
+        gap: '2px 18px',
+        marginTop: 6,
+        paddingLeft: 19
+      }
+    }, [['Gap', x.gap], ['Baseline', x.baseline], ['Target', x.target], ['Action', x.action], ['Measured by', x.measure]].map(([k, v]) => React.createElement("div", {
+      key: k,
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-aaa)',
+        lineHeight: 1.55
+      }
+    }, React.createElement("span", {
+      style: {
+        color: 'var(--g-666)'
+      }
+    }, k, ": "), v || '—'))), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: evs.length ? 'var(--c-grn)' : 'var(--c-amb)',
+        paddingLeft: 19,
+        marginTop: 4
+      }
+    }, evs.length ? evs.length + ' piece' + (evs.length > 1 ? 's' : '') + ' of evidence' : 'no evidence yet'));
+  })), openActions(id).length > 0 && React.createElement("div", {
+    className: "ldsec",
+    style: {
+      '--h': '#e9c08a'
+    }
+  }, React.createElement("h4", null, "\u26A1 OPEN ACTIONS"), React.createElement("div", {
+    className: "sub"
+  }, "Commitments in flight \u2014 who owns what, and when it's due."), openActions(id).map((a, i) => {
+    const od = a.due && new Date(a.due) < new Date();
+    return React.createElement("div", {
+      key: a.id,
+      style: {
+        display: 'flex',
+        gap: 12,
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        padding: '7px 0',
+        borderTop: i ? '1px solid var(--border)' : 'none'
+      }
+    }, React.createElement("span", {
+      style: dot(od ? 'var(--c-red)' : 'var(--c-blu2)')
+    }), React.createElement("span", {
+      style: {
+        fontSize: 13.5,
+        color: 'var(--g-ccc)',
+        flex: 1
+      }
+    }, a.t), React.createElement("span", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-888)'
+      }
+    }, a.owner), React.createElement("span", {
+      style: {
+        fontSize: 12.5,
+        color: od ? 'var(--c-red)' : 'var(--g-888)'
+      }
+    }, "due ", a.due), React.createElement("button", {
+      className: "btn btn-ghost btn-xs",
+      onClick: () => setAct(a.id, {
+        status: 'Complete',
+        done: today()
+      })
+    }, "\u2713 done"));
+  }))), planTab === 'checkins' && React.createElement("div", {
+    className: "ldsec",
+    style: {
+      '--h': '#7ac490'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      flexWrap: 'wrap',
+      marginBottom: 6
+    }
+  }, React.createElement("h4", {
+    style: {
+      margin: 0
+    }
+  }, "\u2713 CHECK-INS"), last && last.next && React.createElement("span", {
+    style: {
+      fontSize: 12.5,
+      fontWeight: 700,
+      borderRadius: 999,
+      padding: '4px 12px',
+      border: '1px solid ' + (new Date(last.next) < new Date() ? 'rgba(224,90,90,.5)' : 'rgba(47,214,168,.35)'),
+      color: new Date(last.next) < new Date() ? 'var(--c-red)' : '#9fd9c6'
+    }
+  }, "next: ", last.next, new Date(last.next) < new Date() ? ' · overdue' : ''), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("button", {
+    className: "btn btn-lime btn-sm",
+    onClick: checkin
+  }, "\u2713 Log check-in")), !(pl.checkins || []).length && React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      color: 'var(--g-888)'
+    }
+  }, "No check-ins logged yet \u2014 ", React.createElement("b", {
+    style: {
+      color: 'var(--g-ccc)'
+    }
+  }, "\u2713 Log check-in"), " captures wins, challenges and the next date in three quick prompts, and every one lands here, dated."), (pl.checkins || []).map((c, i) => React.createElement("div", {
+    key: i,
+    style: {
+      borderTop: i ? '1px solid var(--border)' : 'none',
+      padding: '12px 0'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 12,
+      alignItems: 'baseline',
+      flexWrap: 'wrap',
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 16,
+      fontWeight: 800,
+      letterSpacing: '1px',
+      color: 'var(--g-eee)'
+    }
+  }, c.date), React.createElement("span", {
+    style: {
+      fontSize: 12,
+      color: 'var(--g-666)'
+    }
+  }, "by ", c.by || 'lead'), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), c.next && React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      color: 'var(--g-777)'
+    }
+  }, "next agreed: ", c.next)), React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))',
+      gap: '6px 22px'
+    }
+  }, React.createElement("div", null, React.createElement("div", {
+    style: RV_LBL
+  }, "Wins"), React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      color: 'var(--g-ccc)',
+      lineHeight: 1.6
+    }
+  }, c.wins || '—')), React.createElement("div", null, React.createElement("div", {
+    style: RV_LBL
+  }, "Challenges"), React.createElement("div", {
+    style: {
+      fontSize: 13.5,
+      color: 'var(--g-ccc)',
+      lineHeight: 1.6
+    }
+  }, c.chal || '—')))))), planTab === 'measure' && React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "ldsec",
+    style: {
+      '--h': '#e9c08a'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      flexWrap: 'wrap',
+      marginBottom: 8
+    }
+  }, React.createElement("h4", {
+    style: {
+      margin: 0
+    }
+  }, "\uD83D\uDCCA MEASURABLES"), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    onClick: () => addEv('kpi')
+  }, "\uFF0B Number moved")), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 26,
+      flexWrap: 'wrap',
+      marginBottom: 10
+    }
+  }, React.createElement("div", null, React.createElement("div", {
+    style: lbl
+  }, "Revenue"), trendChip(rev)), React.createElement("div", null, React.createElement("div", {
+    style: lbl
+  }, "Completed visits"), trendChip(vis))), (() => {
+    const ks = (pl.evidence || []).filter(e => e.kind === 'kpi');
+    if (!ks.length) return React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: 'var(--g-888)'
+      }
+    }, "No numbers logged yet \u2014 ", React.createElement("b", {
+      style: {
+        color: 'var(--g-ccc)'
+      }
+    }, "\uFF0B Number moved"), " records a measurable the moment it changes (rebooking %, referrals, caseload\u2026), dated.");
+    return ks.map((e, i) => React.createElement("div", {
+      key: i,
+      style: {
+        display: 'flex',
+        gap: 12,
+        padding: '6px 0',
+        borderTop: i ? '1px solid var(--border)' : 'none',
+        fontSize: 13.5
+      }
+    }, React.createElement("span", {
+      style: {
+        color: 'var(--g-666)',
+        minWidth: 88
+      }
+    }, e.date), React.createElement("span", {
+      style: {
+        color: 'var(--c-grn)',
+        minWidth: 64
+      }
+    }, "number"), React.createElement("span", {
+      style: {
+        color: 'var(--g-ccc)',
+        flex: 1
+      }
+    }, e.t), React.createElement("span", {
+      style: {
+        color: 'var(--g-666)'
+      }
+    }, e.by || '')));
+  })()), !embed && (() => {
+    const st = (staff || []).find(x => x.id === id) || person || {};
+    const best = typeof getBestScore === 'function' ? getBestScore(st) : null;
+    const myEvals = (evals || []).filter(e => e && e.staffId === id).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+    const lastEv = myEvals[0];
+    let gxRow = null;
+    try {
+      const g = ld('gx', {
+        people: {}
+      });
+      const rec = (g.people || {})[st.name] || Object.values(g.people || {}).find(r => r && r.sid === id);
+      if (rec && rec.payLevel != null) {
+        const E = GX_ENGINE(rec);
+        gxRow = {
+          pay: GX_PAY[rec.payLevel][0],
+          earned: GX_PAY[E.earnedIdx][0],
+          higher: E.earnedIdx > rec.payLevel
+        };
+      }
+    } catch (e) {}
+    const legacy = Object.entries(pl.comp || {}).filter(([, h]) => h && h.length);
+    return React.createElement("div", {
+      className: "ldsec",
+      style: {
+        '--h': '#7db8d8'
+      }
+    }, React.createElement("h4", null, "\uD83D\uDCCD WHERE THEY STAND \u2014 FROM G&D"), React.createElement("div", {
+      className: "sub"
+    }, "Read-only \u2014 grading happens once, in G&D."), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 22,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        padding: '6px 0 2px'
+      }
+    }, React.createElement("div", null, React.createElement("div", {
+      style: {
+        fontSize: 11,
+        letterSpacing: '1.1px',
+        textTransform: 'uppercase',
+        color: 'var(--g-777)',
+        fontWeight: 700
+      }
+    }, "Best rubric score"), React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 2
+      }
+    }, React.createElement("span", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 26,
+        fontWeight: 800,
+        color: best != null ? 'var(--c-grn)' : 'var(--g-666)'
+      }
+    }, best != null ? best : '—'), best != null && React.createElement(LvBadge, {
+      score: best
+    }))), React.createElement("div", null, React.createElement("div", {
+      style: {
+        fontSize: 11,
+        letterSpacing: '1.1px',
+        textTransform: 'uppercase',
+        color: 'var(--g-777)',
+        fontWeight: 700
+      }
+    }, "Latest evaluation"), React.createElement("div", {
+      style: {
+        fontSize: 13.5,
+        color: 'var(--g-ccc)',
+        marginTop: 2
+      }
+    }, lastEv ? (lastEv.type || 'Evaluation') + ' · ' + (lastEv.date || '') : 'none logged yet')), gxRow && React.createElement("div", null, React.createElement("div", {
+      style: {
+        fontSize: 11,
+        letterSpacing: '1.1px',
+        textTransform: 'uppercase',
+        color: 'var(--g-777)',
+        fontWeight: 700
+      }
+    }, "Guest Experience"), React.createElement("div", {
+      style: {
+        fontSize: 13.5,
+        color: gxRow.higher ? 'var(--c-yel)' : 'var(--g-ccc)',
+        marginTop: 2
+      }
+    }, "at ", gxRow.pay, gxRow.higher ? ' · grades support ' + gxRow.earned : '')), React.createElement("span", {
+      style: {
+        flex: 1
+      }
+    }), typeof openProfile === 'function' && React.createElement("button", {
+      className: "btn btn-ghost btn-xs",
+      onClick: () => openProfile(id)
+    }, "Open profile \u2197"), typeof openProfile === 'function' && React.createElement("button", {
+      className: "btn btn-lime btn-xs",
+      onClick: () => openProfile(id),
+      title: "Grading happens in G&D \u2014 the profile's evaluation and scores tabs \u2014 never here."
+    }, "Grade in G&D \u2192")), !myEvals.length && best == null && React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--c-amb)',
+        marginTop: 6
+      }
+    }, "No G&D scores yet \u2014 log an evaluation from their profile and it shows here automatically."), legacy.length > 0 && React.createElement("details", {
+      style: {
+        marginTop: 8
+      }
+    }, React.createElement("summary", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-777)',
+        cursor: 'pointer'
+      }
+    }, "Scores recorded on this page before grading moved to G&D (", legacy.length, ") \u2014 kept for history"), React.createElement("div", {
+      style: {
+        marginTop: 6
+      }
+    }, legacy.map(([k, h]) => {
+      const a = LD_AREAS.find(x => x.toLowerCase().replace(/[^a-z]/g, '') === k) || k;
+      const cur = h[0];
+      return React.createElement("div", {
+        key: k,
+        style: {
+          display: 'flex',
+          gap: 10,
+          fontSize: 12.5,
+          color: 'var(--g-999)',
+          padding: '2px 0'
+        }
+      }, React.createElement("span", {
+        style: {
+          flex: 1
+        }
+      }, a), React.createElement("span", null, cur.v, " / 5"), React.createElement("span", {
+        style: {
+          color: 'var(--g-666)'
+        }
+      }, cur.date));
+    }))));
+  })()), planTab === 'log' && React.createElement("div", {
+    className: "ldsec",
+    style: {
+      '--h': '#8fd0a8'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      flexWrap: 'wrap',
+      marginBottom: 6
+    }
+  }, React.createElement("h4", {
+    style: {
+      margin: 0
+    }
+  }, "\uD83D\uDCD3 PROGRESS LOG"), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("button", {
+    className: "btn btn-lime btn-xs",
+    onClick: () => addEv('obs', null, true)
+  }, "\uFF0B ", (person.name || '').split(' ')[0], " logs"), React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    onClick: () => addEv('obs', null, false)
+  }, "\uFF0B ", lead ? lead.short : 'Lead', " logs"), React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    onClick: () => addEv('concern', null, false)
+  }, "\uFF0B Concern")), React.createElement("div", {
+    className: "sub",
+    style: {
+      marginBottom: 8
+    }
+  }, "Both sides write here \u2014 ", (person.name || '').split(' ')[0], " logs their own progression, the lead logs what they see. Every entry is tagged and dated."), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 6,
+      marginBottom: 8,
+      flexWrap: 'wrap'
+    }
+  }, [['all', 'All'], ['self', (person.name || '').split(' ')[0]], ['lead', lead ? lead.short : 'Lead']].map(([k, l2]) => React.createElement("button", {
+    key: k,
+    onClick: () => setLogWho(k),
+    className: 'btn btn-xs ' + (logWho === k ? 'btn-go' : 'btn-ghost')
+  }, l2))), (() => {
+    const rows = (pl.evidence || []).filter(e => e.kind !== 'kpi').filter(e => logWho === 'all' || (logWho === 'self' ? e.role === 'self' : e.role !== 'self'));
+    if (!rows.length) return React.createElement("div", {
+      style: {
+        fontSize: 13.5,
+        color: 'var(--g-888)'
+      }
+    }, "Nothing in the log yet", logWho !== 'all' ? ' from this side' : '', ".");
+    return rows.slice(0, 60).map((e, i) => {
+      const self = e.role === 'self';
+      return React.createElement("div", {
+        key: i,
+        style: {
+          display: 'flex',
+          gap: 12,
+          padding: '7px 0',
+          borderTop: i ? '1px solid var(--border)' : 'none',
+          fontSize: 13.5,
+          lineHeight: 1.6,
+          alignItems: 'flex-start'
+        }
+      }, React.createElement("span", {
+        style: {
+          color: 'var(--g-666)',
+          minWidth: 88
+        }
+      }, e.date), React.createElement("span", {
+        style: {
+          minWidth: 74,
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: '1px',
+          textTransform: 'uppercase',
+          borderRadius: 5,
+          padding: '2px 8px',
+          textAlign: 'center',
+          color: self ? '#0b2a3a' : '#12250f',
+          background: self ? '#7db8d8' : '#c9f26f'
+        }
+      }, self ? (person.name || '').split(' ')[0] : e.by || 'lead'), e.kind === 'concern' && React.createElement("span", {
+        style: {
+          color: 'var(--c-red)',
+          fontSize: 12,
+          minWidth: 56
+        }
+      }, "concern"), React.createElement("span", {
+        style: {
+          color: 'var(--g-ccc)',
+          flex: 1
+        }
+      }, e.t));
+    });
+  })()));
+}
 function LeadDevTab({
   staff,
   perfData,
@@ -63136,6 +64229,7 @@ function LeadDevTab({
     person: null
   });
   const [leadTab, setLeadTab] = useState('plan');
+  const [mikeTab, setMikeTab] = useState('dev');
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem('rvgd3_ld_open');
@@ -63149,6 +64243,7 @@ function LeadDevTab({
           person: null
         });
         if (o.tab) setLeadTab(o.tab);
+        if (L.id === 'mike') setMikeTab(o.tab === 'tree' ? 'tree' : 'dev');
       }
     } catch (e) {}
   }, []);
@@ -63365,886 +64460,28 @@ function LeadDevTab({
       }
     }, "3-mo avg", st.prev3 != null ? ' · was ' + Math.round(st.prev3).toLocaleString() : ''));
   };
-  const PersonView = ({
-    person,
-    lead,
-    back,
-    embed,
-    hue
-  }) => {
-    const id = person.id;
-    const pl = planOf(id);
-    const act = (pl.priorities || []).filter(x => x.status !== 'done');
-    const rev = PERF_STAT(perfData, id, 'revenue'),
-      vis = PERF_STAT(perfData, id, 'completed');
-    const [pf, setPf] = useState(null);
-    const [planTab, setPlanTab] = useState('map');
-    const blankPf = () => ({
-      area: '',
-      type: 'behaviour',
-      gap: '',
-      baseline: '',
-      target: '',
-      action: '',
-      measure: '',
-      review: new Date(Date.now() + 2592e6).toISOString().slice(0, 10)
-    });
-    const savePf = () => {
-      if (!pf || !pf.area || !pf.review) return;
-      setPlan(id, {
-        priorities: [{
-          id: 'p' + Date.now(),
-          area: pf.area,
-          gap: pf.gap,
-          baseline: pf.baseline,
-          target: pf.target,
-          action: pf.action,
-          measure: pf.measure,
-          review: pf.review,
-          type: pf.type,
-          status: 'inprogress',
-          created: today()
-        }, ...(pl.priorities || [])]
-      });
-      setPf(null);
-    };
-    const ldflbl = {
-      fontSize: 11,
-      letterSpacing: '1.2px',
-      textTransform: 'uppercase',
-      color: 'var(--g-777)',
-      fontFamily: "'Barlow Condensed',sans-serif",
-      marginBottom: 3
-    };
-    const ldfinp = {
-      width: '100%',
-      boxSizing: 'border-box',
-      background: 'var(--surface2)',
-      border: '1px solid var(--border)',
-      borderRadius: 6,
-      color: 'var(--text)',
-      fontSize: 13,
-      padding: '6px 9px',
-      outline: 'none'
-    };
-    const setPrio = (pid, patch) => setPlan(id, {
-      priorities: (pl.priorities || []).map(x => x.id === pid ? {
-        ...x,
-        ...patch
-      } : x)
-    });
-    const completePrio = x => {
-      const ev = (pl.evidence || []).filter(e => e.prio === x.id).length;
-      if (!ev) {
-        window.alert('A priority cannot be completed without evidence. Log at least one piece of evidence against it first.');
-        return;
-      }
-      setPrio(x.id, {
-        status: 'done',
-        closed: today()
-      });
-    };
-    const addEv = async (kind, prio) => {
-      const t = await rvAsk({
-        label: kind === 'kpi' ? 'Number moved' : kind === 'concern' ? 'Log a concern' : 'Log an observation',
-        hint: kind === 'kpi' ? 'What moved, and by how much?' : kind === 'concern' ? 'What is the concern?' : 'What did you observe?',
-        ok: 'Log'
-      });
-      if (!t) return;
-      setPlan(id, {
-        evidence: [{
-          date: today(),
-          by: lead ? lead.short : 'Lead',
-          kind,
-          t,
-          prio: prio || null
-        }, ...(pl.evidence || [])]
-      });
-    };
-    const addAction = async () => {
-      const t = await rvAsk({
-        label: 'New action · 1/3',
-        hint: 'What specifically will be done?',
-        ok: 'Next'
-      });
-      if (!t) return;
-      const owner = await rvAsk({
-        label: 'New action · 2/3 — owner',
-        hint: 'Who owns this action?',
-        value: lead ? lead.short : '',
-        ok: 'Next'
-      });
-      if (owner === null) return;
-      const due = await rvAsk({
-        label: 'New action · 3/3 — due date',
-        hint: 'YYYY-MM-DD',
-        value: new Date(Date.now() + 1209600000).toISOString().slice(0, 10),
-        ok: 'Add action'
-      });
-      if (!due) return;
-      setPlan(id, {
-        actions: [{
-          id: 'a' + Date.now(),
-          t,
-          owner,
-          due,
-          status: 'Open',
-          created: today()
-        }, ...(pl.actions || [])]
-      });
-    };
-    const setAct = (aid, patch) => setPlan(id, {
-      actions: (pl.actions || []).map(a => a.id === aid ? {
-        ...a,
-        ...patch
-      } : a)
-    });
-    const checkin = async () => {
-      const wins = await rvAsk({
-        label: 'Check-in · 1/3 — wins',
-        hint: 'Since last check-in — what went well?',
-        ok: 'Next'
-      });
-      if (wins === null) return;
-      const chal = await rvAsk({
-        label: 'Check-in · 2/3 — challenges',
-        hint: 'Challenges / missed commitments?',
-        ok: 'Next'
-      });
-      if (chal === null) return;
-      const nxt = await rvAsk({
-        label: 'Check-in · 3/3 — next date',
-        hint: 'YYYY-MM-DD',
-        value: new Date(Date.now() + 2592e6).toISOString().slice(0, 10),
-        ok: 'Log check-in'
-      });
-      if (!nxt) return;
-      setPlan(id, {
-        checkins: [{
-          date: today(),
-          by: lead ? lead.short : 'Lead',
-          wins,
-          chal,
-          next: nxt
-        }, ...(pl.checkins || [])]
-      });
-    };
-    const setComp = async (key, label, n) => {
-      const h = (pl.comp || {})[key] || [];
-      if (h[0] && h[0].v === n) return;
-      const why = await rvAsk({
-        label: label + ' → ' + n,
-        hint: LD_SCALE[n - 1] + ' — what evidence shows this?',
-        placeholder: 'Evidence',
-        ok: 'Score'
-      });
-      if (why === null) return;
-      setPlan(id, {
-        comp: {
-          ...(pl.comp || {}),
-          [key]: [{
-            v: n,
-            date: today(),
-            why,
-            by: lead ? lead.short : 'Lead'
-          }, ...h]
-        }
-      });
-    };
-    const last = (pl.checkins || [])[0];
-    const SecLbl = ({
-      t,
-      d
-    }) => React.createElement("div", {
-      style: {
-        display: 'flex',
-        alignItems: 'center',
-        gap: 12,
-        margin: '26px 0 10px'
-      }
-    }, React.createElement("span", {
-      style: {
-        fontFamily: "'Barlow Condensed',sans-serif",
-        fontSize: 15,
-        fontWeight: 800,
-        letterSpacing: '2.6px',
-        color: '#9fd9c6',
-        textTransform: 'uppercase',
-        whiteSpace: 'nowrap'
-      }
-    }, t), d ? React.createElement("span", {
-      style: {
-        fontSize: 11.5,
-        color: 'var(--g-666)'
-      }
-    }, d) : null, React.createElement("span", {
-      style: {
-        flex: 1,
-        height: 1,
-        background: 'linear-gradient(90deg,var(--border),transparent)'
-      }
-    }));
-    return React.createElement("div", {
-      style: {
-        maxWidth: 1020,
-        '--h': hue || 'var(--c-grn)'
-      }
-    }, LDCSS, !embed && React.createElement("button", {
-      className: "btn btn-ghost btn-sm",
-      onClick: back
-    }, "\u2190 back"), !embed && React.createElement("div", {
-      style: {
-        ...C,
-        marginTop: 12
-      }
-    }, React.createElement("div", {
-      style: {
-        display: 'flex',
-        gap: 14,
-        alignItems: 'baseline',
-        flexWrap: 'wrap'
-      }
-    }, React.createElement("span", {
-      style: {
-        fontSize: 21,
-        fontWeight: 800,
-        color: 'var(--text)'
-      }
-    }, person.name), React.createElement("span", {
-      style: {
-        fontSize: 13.5,
-        color: 'var(--g-999)'
-      }
-    }, person.discipline || person.role || '', lead ? ' · lead: ' + lead.short : ''), React.createElement("span", {
-      style: {
-        flex: 1
-      }
-    }), React.createElement("button", {
-      className: "btn btn-ghost btn-sm",
-      onClick: addAction
-    }, "\uFF0B Action"), React.createElement("button", {
-      className: "btn btn-lime btn-sm",
-      onClick: checkin
-    }, "\u2713 Check-in")), React.createElement("div", {
-      style: {
-        display: 'flex',
-        gap: 26,
-        flexWrap: 'wrap',
-        marginTop: 12
-      }
-    }, rev && rev.avg3 != null ? React.createElement("div", null, React.createElement("div", {
-      style: lbl
-    }, "Revenue"), trendChip(rev)) : null, vis && vis.avg3 != null ? React.createElement("div", null, React.createElement("div", {
-      style: lbl
-    }, "Completed visits"), trendChip(vis)) : null, React.createElement("div", null, React.createElement("div", {
-      style: lbl
-    }, "Last check-in"), React.createElement("span", {
-      style: {
-        fontSize: 12.5,
-        color: last ? daysSince(last.date) > 45 ? 'var(--c-red)' : 'var(--g-ccc)' : 'var(--c-amb)'
-      }
-    }, last ? last.date + ' · ' + daysSince(last.date) + 'd ago' : 'never')), React.createElement("div", null, React.createElement("div", {
-      style: lbl
-    }, "Next check-in"), React.createElement("span", {
-      style: {
-        fontSize: 12.5,
-        color: 'var(--g-ccc)'
-      }
-    }, last && last.next ? last.next : '—')), React.createElement("div", null, React.createElement("div", {
-      style: lbl
-    }, "Open actions"), React.createElement("span", {
-      style: {
-        fontSize: 12.5,
-        color: overdueActions(id).length ? 'var(--c-red)' : 'var(--g-ccc)'
-      }
-    }, openActions(id).length, overdueActions(id).length ? ' · ' + overdueActions(id).length + ' overdue' : ''))), rev.lastMonth && React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: 'var(--g-666)',
-        marginTop: 8
-      }
-    }, "Jane import through ", rev.lastMonth, " \xB7 same source as Numbers & Performance")), embed && React.createElement("div", {
-      style: {
-        display: 'flex',
-        gap: 8,
-        justifyContent: 'flex-end',
-        marginBottom: 10
-      }
-    }, React.createElement("button", {
-      className: "btn btn-ghost btn-sm",
-      onClick: addAction
-    }, "\uFF0B Action"), React.createElement("button", {
-      className: "btn btn-lime btn-sm",
-      onClick: checkin
-    }, "\u2713 Check-in")), React.createElement("div", {
-      style: {
-        display: 'flex',
-        gap: 7,
-        flexWrap: 'wrap',
-        margin: '16px 0 12px'
-      }
-    }, [['map', '🗺 ROADMAP'], ['work', '🎯 PRIORITIES & ACTIONS' + (act.length + openActions(id).length ? ' · ' + (act.length + openActions(id).length) : '')], ['record', '📜 THE RECORD']].map(([k, l2]) => React.createElement("button", {
-      key: k,
-      onClick: () => setPlanTab(k),
-      style: {
-        cursor: 'pointer',
-        fontFamily: "'Barlow Condensed',sans-serif",
-        fontSize: 14.5,
-        fontWeight: 800,
-        letterSpacing: '1.6px',
-        padding: '8px 18px',
-        borderRadius: 9,
-        transition: 'all .14s',
-        border: '1px solid ' + (planTab === k ? '#c9f26f' : 'rgba(255,255,255,.22)'),
-        background: planTab === k ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'rgba(255,255,255,.05)',
-        color: planTab === k ? '#06301f' : 'rgba(238,248,242,.72)'
-      }
-    }, l2))), planTab === 'map' && React.createElement("div", {
-      className: "ldsec",
-      style: {
-        '--h': '#2fd6a8'
-      }
-    }, pl.roadmap ? React.createElement(RvRoadmapPlan, {
-      rm: pl.roadmap,
-      who: person.name,
-      onSave: rm => setPlan(id, {
-        roadmap: rm
-      })
-    }) : React.createElement("div", null, React.createElement("h4", null, "\uD83D\uDDFA ACTION PLAN ROADMAP"), React.createElement("div", {
-      className: "sub"
-    }, "Start from a template \u2014 every phase gets a name, a window, a theme and checkable steps; progress tracks itself and the current phase stays highlighted."), React.createElement("div", {
-      style: {
-        display: 'flex',
-        gap: 8,
-        flexWrap: 'wrap'
-      }
-    }, React.createElement("button", {
-      className: "btn btn-lime btn-sm",
-      onClick: () => setPlan(id, {
-        roadmap: RV_RM_TPL.director()
-      })
-    }, "Director track \xB7 8 phases"), React.createElement("button", {
-      className: "btn btn-ghost btn-sm",
-      onClick: () => setPlan(id, {
-        roadmap: RV_RM_TPL.dev6()
-      })
-    }, "6-month development"), React.createElement("button", {
-      className: "btn btn-ghost btn-sm",
-      onClick: () => setPlan(id, {
-        roadmap: RV_RM_TPL.blank()
-      })
-    }, "Blank")))), planTab === 'work' && React.createElement(React.Fragment, null, React.createElement("div", {
-      className: "ldsec",
-      style: {
-        '--h': '#c9f26f'
-      }
-    }, React.createElement("div", {
-      style: {
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 10,
-        flexWrap: 'wrap'
-      }
-    }, React.createElement("div", {
-      style: {
-        flex: 1,
-        minWidth: 220
-      }
-    }, React.createElement("h4", null, "\uD83C\uDFAF DEVELOPMENT PRIORITIES"), !(pl.priorities || []).length && React.createElement("div", {
-      className: "sub",
-      style: {
-        marginBottom: 6
-      }
-    }, "Max 3 active \u2014 the few gaps being worked right now, each with a baseline, a target and a review date.")), React.createElement("button", {
-      className: "btn btn-ghost btn-sm",
-      disabled: act.length >= 3,
-      style: act.length >= 3 ? {
-        opacity: .45,
-        cursor: 'not-allowed'
-      } : null,
-      title: act.length >= 3 ? 'Three active priorities is the maximum — close one first. That limit is the point.' : 'Set a development priority',
-      onClick: () => setPf(pf ? null : blankPf())
-    }, pf ? '✕ Cancel' : '＋ Add priority')), pf && React.createElement("div", {
-      style: {
-        border: '1px solid var(--border)',
-        borderLeft: '3px solid var(--h,var(--c-grn))',
-        borderRadius: 8,
-        padding: '12px 14px',
-        margin: '4px 0 10px',
-        background: 'var(--surface3)'
-      }
-    }, React.createElement("div", {
-      style: {
-        display: 'flex',
-        gap: 10,
-        flexWrap: 'wrap',
-        marginBottom: 10
-      }
-    }, React.createElement("div", {
-      style: {
-        flex: '2 1 220px'
-      }
-    }, React.createElement("div", {
-      style: ldflbl
-    }, "Development area ", React.createElement("span", {
-      style: {
-        color: 'var(--c-red)'
-      }
-    }, "*")), React.createElement("select", {
-      value: pf.area,
-      onChange: e => setPf({
-        ...pf,
-        area: e.target.value
-      }),
-      style: {
-        ...ldfinp,
-        cursor: 'pointer'
-      }
-    }, React.createElement("option", {
-      value: ""
-    }, "Choose\u2026"), LD_AREAS.map(a => React.createElement("option", {
-      key: a
-    }, a)))), React.createElement("div", {
-      style: {
-        flex: '1 1 170px'
-      }
-    }, React.createElement("div", {
-      style: ldflbl
-    }, "Type"), React.createElement("div", {
-      style: {
-        display: 'flex',
-        gap: 4
-      }
-    }, LD_TYPES.map(([v, l2, tip]) => React.createElement("button", {
-      key: v,
-      title: tip,
-      onClick: () => setPf({
-        ...pf,
-        type: v
-      }),
-      className: `btn btn-xs ${pf.type === v ? 'btn-go' : 'btn-ghost'}`
-    }, l2)))), React.createElement("div", {
-      style: {
-        flex: '0 1 150px'
-      }
-    }, React.createElement("div", {
-      style: ldflbl
-    }, "Review date"), React.createElement("input", {
-      type: "date",
-      value: pf.review,
-      onChange: e => setPf({
-        ...pf,
-        review: e.target.value
-      }),
-      style: ldfinp
-    }))), React.createElement("div", {
-      style: {
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))',
-        gap: '8px 10px'
-      }
-    }, [['gap', 'Gap', 'What exactly is inconsistent?'], ['baseline', 'Baseline', 'Where are they now?'], ['target', 'Target', 'What does improved actually look like?'], ['action', 'Action', 'What will specifically be done?'], ['measure', 'Measured by', 'Observation, referral count, rebooking %, case review…']].map(([k, l2, ph]) => React.createElement("div", {
-      key: k
-    }, React.createElement("div", {
-      style: ldflbl
-    }, l2), React.createElement("input", {
-      value: pf[k],
-      onChange: e => setPf({
-        ...pf,
-        [k]: e.target.value
-      }),
-      placeholder: ph,
-      style: ldfinp
-    })))), React.createElement("div", {
-      style: {
-        display: 'flex',
-        gap: 8,
-        justifyContent: 'flex-end',
-        marginTop: 10
-      }
-    }, React.createElement("button", {
-      className: "btn btn-ghost btn-sm",
-      onClick: () => setPf(null)
-    }, "Cancel"), React.createElement("button", {
-      className: "btn btn-lime btn-sm",
-      disabled: !pf.area,
-      style: !pf.area ? {
-        opacity: .45,
-        cursor: 'not-allowed'
-      } : null,
-      title: pf.area ? '' : 'Choose a development area first',
-      onClick: savePf
-    }, "Add priority"))), !pf && !(pl.priorities || []).length && React.createElement("div", {
-      style: {
-        fontSize: 13.5,
-        color: 'var(--g-888)'
-      }
-    }, "Nothing set yet. ", React.createElement("b", {
-      style: {
-        color: 'var(--g-ccc)',
-        cursor: 'pointer'
-      },
-      onClick: () => setPf(blankPf())
-    }, "Add one"), " \u2014 it takes about a minute."), (pl.priorities || []).map(x => {
-      const evs = (pl.evidence || []).filter(e => e.prio === x.id);
-      return React.createElement("div", {
-        key: x.id,
-        style: {
-          borderTop: '1px solid var(--border)',
-          padding: '11px 0',
-          opacity: x.status === 'done' ? .55 : 1
-        }
-      }, React.createElement("div", {
-        style: {
-          display: 'flex',
-          gap: 10,
-          alignItems: 'center',
-          flexWrap: 'wrap'
-        }
-      }, React.createElement("span", {
-        style: dot(LD_STCOL[x.status] || 'var(--g-666)')
-      }), React.createElement("span", {
-        style: {
-          fontSize: 15,
-          fontWeight: 700,
-          color: 'var(--text)'
-        }
-      }, x.area), React.createElement("span", {
-        style: {
-          fontSize: 11,
-          padding: '1px 7px',
-          borderRadius: 5,
-          border: '1px solid var(--border)',
-          color: 'var(--g-999)'
-        }
-      }, (LD_TYPES.find(t => t[0] === x.type) || [])[1] || 'Behaviour'), React.createElement("span", {
-        style: {
-          flex: 1
-        }
-      }), React.createElement("select", {
-        value: x.status,
-        onChange: e => setPrio(x.id, {
-          status: e.target.value
-        }),
-        style: {
-          background: 'var(--surface3)',
-          border: '1px solid var(--border)',
-          borderRadius: 5,
-          color: 'var(--g-ccc)',
-          fontSize: 12,
-          padding: '3px 6px'
-        }
-      }, LD_STATUS.filter(st => st[0] !== 'done').map(([v, l]) => React.createElement("option", {
-        key: v,
-        value: v
-      }, l))), React.createElement("span", {
-        style: {
-          fontSize: 12.5,
-          color: x.review && new Date(x.review) < new Date() && x.status !== 'done' ? 'var(--c-red)' : 'var(--g-888)'
-        }
-      }, "review ", x.review || '—'), React.createElement("button", {
-        className: "btn btn-ghost btn-xs",
-        onClick: () => addEv('obs', x.id)
-      }, "\uFF0B evidence"), x.status !== 'done' && React.createElement("button", {
-        className: "btn btn-ghost btn-xs",
-        title: evs.length ? 'Complete this priority' : 'Needs evidence before it can be completed',
-        onClick: () => completePrio(x)
-      }, "complete")), React.createElement("div", {
-        style: {
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))',
-          gap: '2px 18px',
-          marginTop: 6,
-          paddingLeft: 19
-        }
-      }, [['Gap', x.gap], ['Baseline', x.baseline], ['Target', x.target], ['Action', x.action], ['Measured by', x.measure]].map(([k, v]) => React.createElement("div", {
-        key: k,
-        style: {
-          fontSize: 12.5,
-          color: 'var(--g-aaa)',
-          lineHeight: 1.55
-        }
-      }, React.createElement("span", {
-        style: {
-          color: 'var(--g-666)'
-        }
-      }, k, ": "), v || '—'))), React.createElement("div", {
-        style: {
-          fontSize: 12,
-          color: evs.length ? 'var(--c-grn)' : 'var(--c-amb)',
-          paddingLeft: 19,
-          marginTop: 4
-        }
-      }, evs.length ? evs.length + ' piece' + (evs.length > 1 ? 's' : '') + ' of evidence' : 'no evidence yet'));
-    })), openActions(id).length > 0 && React.createElement("div", {
-      className: "ldsec",
-      style: {
-        '--h': '#e9c08a'
-      }
-    }, React.createElement("h4", null, "\u26A1 OPEN ACTIONS"), React.createElement("div", {
-      className: "sub"
-    }, "Commitments in flight \u2014 who owns what, and when it's due."), openActions(id).map((a, i) => {
-      const od = a.due && new Date(a.due) < new Date();
-      return React.createElement("div", {
-        key: a.id,
-        style: {
-          display: 'flex',
-          gap: 12,
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          padding: '7px 0',
-          borderTop: i ? '1px solid var(--border)' : 'none'
-        }
-      }, React.createElement("span", {
-        style: dot(od ? 'var(--c-red)' : 'var(--c-blu2)')
-      }), React.createElement("span", {
-        style: {
-          fontSize: 13.5,
-          color: 'var(--g-ccc)',
-          flex: 1
-        }
-      }, a.t), React.createElement("span", {
-        style: {
-          fontSize: 12.5,
-          color: 'var(--g-888)'
-        }
-      }, a.owner), React.createElement("span", {
-        style: {
-          fontSize: 12.5,
-          color: od ? 'var(--c-red)' : 'var(--g-888)'
-        }
-      }, "due ", a.due), React.createElement("button", {
-        className: "btn btn-ghost btn-xs",
-        onClick: () => setAct(a.id, {
-          status: 'Complete',
-          done: today()
-        })
-      }, "\u2713 done"));
-    }))), planTab === 'record' && React.createElement(React.Fragment, null, !embed && (() => {
-      const st = (staff || []).find(x => x.id === id) || person || {};
-      const best = typeof getBestScore === 'function' ? getBestScore(st) : null;
-      const myEvals = (evals || []).filter(e => e && e.staffId === id).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-      const lastEv = myEvals[0];
-      let gxRow = null;
-      try {
-        const g = ld('gx', {
-          people: {}
-        });
-        const rec = (g.people || {})[st.name] || Object.values(g.people || {}).find(r => r && r.sid === id);
-        if (rec && rec.payLevel != null) {
-          const E = GX_ENGINE(rec);
-          gxRow = {
-            pay: GX_PAY[rec.payLevel][0],
-            earned: GX_PAY[E.earnedIdx][0],
-            higher: E.earnedIdx > rec.payLevel
-          };
-        }
-      } catch (e) {}
-      const legacy = Object.entries(pl.comp || {}).filter(([, h]) => h && h.length);
-      return React.createElement("div", {
-        className: "ldsec",
-        style: {
-          '--h': '#7db8d8'
-        }
-      }, React.createElement("h4", null, "\uD83D\uDCCD WHERE THEY STAND \u2014 FROM G&D"), React.createElement("div", {
-        className: "sub"
-      }, "Read-only \u2014 grading happens once, in G&D."), React.createElement("div", {
-        style: {
-          display: 'flex',
-          gap: 22,
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          padding: '6px 0 2px'
-        }
-      }, React.createElement("div", null, React.createElement("div", {
-        style: {
-          fontSize: 11,
-          letterSpacing: '1.1px',
-          textTransform: 'uppercase',
-          color: 'var(--g-777)',
-          fontWeight: 700
-        }
-      }, "Best rubric score"), React.createElement("div", {
-        style: {
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          marginTop: 2
-        }
-      }, React.createElement("span", {
-        style: {
-          fontFamily: "'Barlow Condensed',sans-serif",
-          fontSize: 26,
-          fontWeight: 800,
-          color: best != null ? 'var(--c-grn)' : 'var(--g-666)'
-        }
-      }, best != null ? best : '—'), best != null && React.createElement(LvBadge, {
-        score: best
-      }))), React.createElement("div", null, React.createElement("div", {
-        style: {
-          fontSize: 11,
-          letterSpacing: '1.1px',
-          textTransform: 'uppercase',
-          color: 'var(--g-777)',
-          fontWeight: 700
-        }
-      }, "Latest evaluation"), React.createElement("div", {
-        style: {
-          fontSize: 13.5,
-          color: 'var(--g-ccc)',
-          marginTop: 2
-        }
-      }, lastEv ? (lastEv.type || 'Evaluation') + ' · ' + (lastEv.date || '') : 'none logged yet')), gxRow && React.createElement("div", null, React.createElement("div", {
-        style: {
-          fontSize: 11,
-          letterSpacing: '1.1px',
-          textTransform: 'uppercase',
-          color: 'var(--g-777)',
-          fontWeight: 700
-        }
-      }, "Guest Experience"), React.createElement("div", {
-        style: {
-          fontSize: 13.5,
-          color: gxRow.higher ? 'var(--c-yel)' : 'var(--g-ccc)',
-          marginTop: 2
-        }
-      }, "at ", gxRow.pay, gxRow.higher ? ' · grades support ' + gxRow.earned : '')), React.createElement("span", {
-        style: {
-          flex: 1
-        }
-      }), typeof openProfile === 'function' && React.createElement("button", {
-        className: "btn btn-ghost btn-xs",
-        onClick: () => openProfile(id)
-      }, "Open profile \u2197"), typeof openProfile === 'function' && React.createElement("button", {
-        className: "btn btn-lime btn-xs",
-        onClick: () => openProfile(id),
-        title: "Grading happens in G&D \u2014 the profile's evaluation and scores tabs \u2014 never here."
-      }, "Grade in G&D \u2192")), !myEvals.length && best == null && React.createElement("div", {
-        style: {
-          fontSize: 12.5,
-          color: 'var(--c-amb)',
-          marginTop: 6
-        }
-      }, "No G&D scores yet \u2014 log an evaluation from their profile and it shows here automatically."), legacy.length > 0 && React.createElement("details", {
-        style: {
-          marginTop: 8
-        }
-      }, React.createElement("summary", {
-        style: {
-          fontSize: 12.5,
-          color: 'var(--g-777)',
-          cursor: 'pointer'
-        }
-      }, "Scores recorded on this page before grading moved to G&D (", legacy.length, ") \u2014 kept for history"), React.createElement("div", {
-        style: {
-          marginTop: 6
-        }
-      }, legacy.map(([k, h]) => {
-        const a = LD_AREAS.find(x => x.toLowerCase().replace(/[^a-z]/g, '') === k) || k;
-        const cur = h[0];
-        return React.createElement("div", {
-          key: k,
-          style: {
-            display: 'flex',
-            gap: 10,
-            fontSize: 12.5,
-            color: 'var(--g-999)',
-            padding: '2px 0'
-          }
-        }, React.createElement("span", {
-          style: {
-            flex: 1
-          }
-        }, a), React.createElement("span", null, cur.v, " / 5"), React.createElement("span", {
-          style: {
-            color: 'var(--g-666)'
-          }
-        }, cur.date));
-      }))));
-    })(), React.createElement("div", {
-      className: "ldsec",
-      style: {
-        '--h': '#8fd0a8'
-      }
-    }, React.createElement("div", {
-      style: {
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 10,
-        flexWrap: 'wrap',
-        marginBottom: 4
-      }
-    }, React.createElement("div", {
-      style: {
-        flex: 1,
-        minWidth: 220
-      }
-    }, React.createElement("h4", null, "\uD83D\uDCDC EVIDENCE & HISTORY")), React.createElement("button", {
-      className: "btn btn-ghost btn-xs",
-      onClick: () => addEv('obs')
-    }, "\uFF0B Observation"), React.createElement("button", {
-      className: "btn btn-ghost btn-xs",
-      onClick: () => addEv('kpi')
-    }, "\uFF0B Number moved"), React.createElement("button", {
-      className: "btn btn-ghost btn-xs",
-      onClick: () => addEv('concern')
-    }, "\uFF0B Concern")), (() => {
-      const rows = [...(pl.evidence || []).map(e => ({
-        ...e,
-        _t: e.kind
-      })), ...(pl.checkins || []).map(c => ({
-        date: c.date,
-        by: c.by,
-        _t: 'checkin',
-        t: 'Check-in — ' + (c.wins || '') + (c.chal ? ' · Challenges: ' + c.chal : '')
-      })), ...Object.keys(pl.comp || {}).reduce((a, k) => a.concat((pl.comp[k] || []).map(x => ({
-        date: x.date,
-        by: x.by,
-        _t: 'comp',
-        t: 'Competency → ' + x.v + (x.why ? ' · ' + x.why : '')
-      }))), [])].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-      if (!rows.length) return React.createElement("div", {
-        style: {
-          fontSize: 13.5,
-          color: 'var(--g-888)'
-        }
-      }, "Nothing logged yet.");
-      return rows.slice(0, 30).map((e, i) => React.createElement("div", {
-        key: i,
-        style: {
-          display: 'flex',
-          gap: 12,
-          padding: '6px 0',
-          borderTop: i ? '1px solid var(--border)' : 'none',
-          fontSize: 13.5,
-          lineHeight: 1.6
-        }
-      }, React.createElement("span", {
-        style: {
-          color: 'var(--g-666)',
-          minWidth: 88
-        }
-      }, e.date), React.createElement("span", {
-        style: {
-          minWidth: 78,
-          color: e._t === 'kpi' ? 'var(--c-grn)' : e._t === 'checkin' ? 'var(--c-blu2)' : e._t === 'concern' ? 'var(--c-red)' : e._t === 'comp' ? 'var(--c-lime2)' : 'var(--g-888)'
-        }
-      }, e._t === 'kpi' ? 'number' : e._t === 'checkin' ? 'check-in' : e._t === 'concern' ? 'concern' : e._t === 'comp' ? 'competency' : 'observed'), React.createElement("span", {
-        style: {
-          color: 'var(--g-ccc)',
-          flex: 1
-        }
-      }, e.t), React.createElement("span", {
-        style: {
-          color: 'var(--g-666)'
-        }
-      }, e.by || '')));
-    })())));
+  const LDPV_CTX = {
+    planOf,
+    setPlan,
+    openActions,
+    overdueActions,
+    daysSince,
+    today,
+    trendChip,
+    lbl,
+    C,
+    dot,
+    LDCSS,
+    staff,
+    perfData,
+    evals,
+    openProfile
   };
   if (view.person) {
     const p = (staff || []).find(x => x.id === view.person);
     const lead = LD_LEADS.find(l => l.id === view.lead);
-    if (p) return React.createElement(PersonView, {
+    if (p) return React.createElement(LD_PersonView, {
+      ctx: LDPV_CTX,
       person: p,
       lead: lead,
       back: () => setView({
@@ -64368,7 +64605,30 @@ function LeadDevTab({
         color: 'var(--g-666)',
         marginTop: 7
       }
-    }, "Stage moves on evidence, not time.")), LDCSS, (() => {
+    }, "Stage moves on evidence, not time.")), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 7,
+        flexWrap: 'wrap',
+        margin: '16px 0 4px'
+      }
+    }, [['dev', '🗺 DEVELOPMENT'], ['tree', '⬡ SKILL TREE & READINESS'], ['team', '◐ MENTORING' + (mentees.length ? ' · ' + mentees.length : '')]].map(([k, l2]) => React.createElement("button", {
+      key: k,
+      onClick: () => setMikeTab(k),
+      style: {
+        cursor: 'pointer',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 14.5,
+        fontWeight: 800,
+        letterSpacing: '1.6px',
+        padding: '8px 18px',
+        borderRadius: 9,
+        transition: 'all .14s',
+        border: '1px solid ' + (mikeTab === k ? '#c9f26f' : 'rgba(255,255,255,.22)'),
+        background: mikeTab === k ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'rgba(255,255,255,.05)',
+        color: mikeTab === k ? '#06301f' : 'rgba(238,248,242,.72)'
+      }
+    }, l2))), mikeTab === 'tree' && React.createElement(React.Fragment, null, LDCSS, (() => {
       const mk = idx => idx.map(i => {
         const [k, label, desc] = LD_READY[i];
         const h = (pl.comp || {})[k] || [];
@@ -64419,7 +64679,7 @@ function LeadDevTab({
         color: 'var(--text)',
         marginBottom: 8
       }
-    }, "Sept \u2192 April roadmap"), React.createElement("div", {
+    }, "Stage reference \u2014 Sept \u2192 April"), React.createElement("div", {
       style: {
         display: 'flex',
         gap: 6,
@@ -64454,7 +64714,7 @@ function LeadDevTab({
         lineHeight: 1.5,
         marginTop: 2
       }
-    }, what))))), React.createElement("div", {
+    }, what)))))), mikeTab === 'team' && React.createElement("div", {
       style: {
         ...C,
         marginTop: 12
@@ -64496,11 +64756,12 @@ function LeadDevTab({
       style: {
         color: 'var(--g-666)'
       }
-    }, "\u203A")))), React.createElement("div", {
+    }, "\u203A")))), mikeTab === 'dev' && React.createElement("div", {
       style: {
-        marginTop: 12
+        marginTop: 8
       }
-    }, React.createElement(PersonView, {
+    }, React.createElement(LD_PersonView, {
+      ctx: LDPV_CTX,
       person: {
         id: 'mike',
         name: 'Mike Ross — leadership plan',
@@ -64826,7 +65087,8 @@ function LeadDevTab({
       }
     }, React.createElement("h4", null, "THEIR DEVELOPMENT PLAN"), React.createElement("div", {
       className: "sub"
-    }, "Priorities, actions and evidence \u2014 the same discipline they apply to their people."), React.createElement(PersonView, {
+    }, "Priorities, actions and evidence \u2014 the same discipline they apply to their people."), React.createElement(LD_PersonView, {
+      ctx: LDPV_CTX,
       person: {
         id: lead.id,
         name: lead.name,
