@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L191';
+window.__BUILD = 'build L192';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -42754,18 +42754,18 @@ function RvProfileHero({
       flexWrap: 'wrap'
     }
   }, geE && geE.payLevel != null && React.createElement(React.Fragment, null, React.createElement(RvHeroTile, {
-    lbl: "Pay step",
-    val: GX_PAY[geE.payLevel][0],
-    sub: GX_PAY[geE.payLevel][1] + ' · ' + GX_ROLEBYPAY[geE.payLevel]
+    lbl: "Phase",
+    val: GX_STAGE_OF[geE.payLevel],
+    sub: GX_ROLEBYPAY[geE.payLevel] + ' · ' + GX_PAY[geE.payLevel][1]
   }), React.createElement(RvHeroTile, {
-    lbl: "Next step",
-    val: geE.nextIdx != null ? GX_PAY[geE.nextIdx][0] : 'TOP',
+    lbl: "Next phase",
+    val: geE.nextIdx != null ? GX_STAGE_OF[geE.nextIdx] + ' · ' + GX_ROLEBYPAY[geE.nextIdx] : 'TOP',
     sub: geE.nextIdx != null ? geE.gateRows.filter(g => g.met).length + ' / ' + geE.gateRows.length + ' gates met' : 'of the ladder',
     valCol: geE.nextIdx != null && geE.gateRows.length && geE.gateRows.every(g => g.met) ? '#c9f26f' : null
   }), geE.earnedIdx > geE.payLevel && React.createElement(RvHeroTile, {
-    lbl: "Grades support",
-    val: GX_PAY[geE.earnedIdx][0],
-    sub: "move happens at a review",
+    lbl: "Graded at",
+    val: GX_STAGE_OF[geE.earnedIdx] + ' · ' + GX_ROLEBYPAY[geE.earnedIdx],
+    sub: "per the grading \u2014 move happens at a review",
     valCol: "#c9f26f"
   }), React.createElement(RvHeroTile, {
     lbl: "Graded",
@@ -49597,7 +49597,7 @@ function RvCharacterPage({
     }));
     pts = E.graded && E.graded.graded != null ? E.graded.graded : null;
     ptsMax = E.graded && E.graded.total || GX_CATS.length * 3;
-    lvlChip = pd.payLevel != null ? GX_PAY[pd.payLevel][0] + ' · ' + GX_STAGE_OF[pd.payLevel] : 'ladder not placed';
+    lvlChip = pd.payLevel != null ? GX_STAGE_OF[pd.payLevel] + ' · ' + GX_ROLEBYPAY[pd.payLevel] : E.earnedIdx > 0 ? 'Graded at ' + GX_STAGE_OF[E.earnedIdx] + ' · ' + GX_ROLEBYPAY[E.earnedIdx] : 'ladder not placed';
   } else if (rs) {
     bars = (rs.cats || []).map(c => ({
       label: c.label.split('(')[0].split('&')[0].trim(),
@@ -49821,7 +49821,7 @@ function RvCharacterPage({
       letterSpacing: '1.5px',
       color: '#e9dba0'
     }
-  }, useGE ? 'PAY STEP' : 'CURRENT LEVEL'), React.createElement("b", {
+  }, useGE ? 'PROGRESSION' : 'CURRENT LEVEL'), React.createElement("b", {
     style: {
       fontSize: 17,
       color: '#fff'
