@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L190';
+window.__BUILD = 'build L191';
 window.addEventListener('beforeprint', () => {
   if (document.querySelector('.evrpt-print-area')) document.body.classList.add('evrpt-print');
 });
@@ -3122,6 +3122,9 @@ const sv = (k, v) => {
     const m = JSON.parse(localStorage.getItem('rvgd3__ts') || '{}');
     m[k] = Date.now();
     localStorage.setItem('rvgd3__ts', JSON.stringify(m));
+  } catch (e) {}
+  try {
+    window.dispatchEvent(new Event('rvgd3-ch'));
   } catch (e) {}
   try {
     sv._dirty = sv._dirty || {};
@@ -49454,6 +49457,98 @@ function GapsPage({
     className: "muted xs"
   }, "No staff match \u201C", MATRIX_FILTERS[mFilter].lbl, "\u201D right now \u2014 clear the filter above."))))))));
 }
+function RvThemeSong({
+  link,
+  name
+}) {
+  const [auto, setAuto] = useState(() => {
+    try {
+      return localStorage.getItem('rvgd3_theme_autoplay') !== '0';
+    } catch (e) {
+      return true;
+    }
+  });
+  const setA = v => {
+    setAuto(v);
+    try {
+      localStorage.setItem('rvgd3_theme_autoplay', v ? '1' : '0');
+    } catch (e) {}
+  };
+  const u = String(link || '').trim();
+  if (!u) return null;
+  const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{6,20})/);
+  const sp = u.match(/open\.spotify\.com\/(track|album|playlist|episode)\/([A-Za-z0-9]+)/);
+  const isAudio = /\.(mp3|m4a|ogg|wav|aac)(\?|$)/i.test(u);
+  return React.createElement("div", {
+    style: {
+      marginTop: 14,
+      width: 'min(330px,92%)'
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 6
+    }
+  }, React.createElement("span", {
+    style: {
+      fontSize: 11,
+      letterSpacing: '1.6px',
+      fontWeight: 700,
+      color: '#9fd9c6',
+      textTransform: 'uppercase'
+    }
+  }, "\u266A Theme song"), React.createElement("button", {
+    className: "btn btn-ghost btn-xs",
+    style: {
+      marginLeft: 'auto'
+    },
+    title: "Play automatically when a profile opens \u2014 remembered on this device",
+    onClick: () => setA(!auto)
+  }, auto ? '🔊 autoplay on' : '🔇 autoplay off')), yt ? React.createElement("iframe", {
+    key: auto ? 'a' : 'm',
+    width: "100%",
+    height: "90",
+    style: {
+      border: 'none',
+      borderRadius: 10,
+      display: 'block'
+    },
+    src: 'https://www.youtube-nocookie.com/embed/' + yt[1] + '?autoplay=' + (auto ? 1 : 0) + '&loop=1&playlist=' + yt[1],
+    allow: "autoplay; encrypted-media",
+    title: (name || '') + ' theme song'
+  }) : sp ? React.createElement("iframe", {
+    key: auto ? 'a' : 'm',
+    width: "100%",
+    height: "80",
+    style: {
+      border: 'none',
+      borderRadius: 10,
+      display: 'block'
+    },
+    src: 'https://open.spotify.com/embed/' + sp[1] + '/' + sp[2],
+    allow: "autoplay; encrypted-media",
+    title: (name || '') + ' theme song'
+  }) : isAudio ? React.createElement("audio", {
+    key: auto ? 'a' : 'm',
+    controls: true,
+    autoPlay: auto,
+    loop: true,
+    src: u,
+    style: {
+      width: '100%'
+    }
+  }) : React.createElement("a", {
+    href: u,
+    target: "_blank",
+    rel: "noreferrer",
+    style: {
+      fontSize: 13,
+      color: 'var(--c-blu2)'
+    }
+  }, "Open theme song \u2197"));
+}
 function RvCharacterPage({
   staff,
   tracks,
@@ -49883,7 +49978,10 @@ function RvCharacterPage({
   }, "\uD83D\uDCCA Numbers"), go && React.createElement("button", {
     className: "btn btn-ghost btn-sm",
     onClick: () => go('profile')
-  }, "\u270E Edit profile"))), React.createElement("div", {
+  }, "\u270E Edit profile")), staff.themeSong && React.createElement(RvThemeSong, {
+    link: staff.themeSong,
+    name: staff.name
+  })), React.createElement("div", {
     style: {
       flex: '1 1 280px',
       minWidth: 250,
@@ -49978,6 +50076,16 @@ function ProfileModal({
   perfData
 }) {
   const [tabRaw, setTab] = usePersist('staff.profileTab', 'character');
+  const [, __storeTick] = useState(0);
+  useEffect(() => {
+    const h = () => __storeTick(t => t + 1);
+    window.addEventListener('rvgd3-ch', h);
+    window.addEventListener('storage', h);
+    return () => {
+      window.removeEventListener('rvgd3-ch', h);
+      window.removeEventListener('storage', h);
+    };
+  }, []);
   useEffect(() => {
     let d = null;
     try {
@@ -57362,6 +57470,7 @@ function ProfileEditTab({
     site: staff.site || 'Markham',
     roadmap: staff.roadmap || '',
     archetype: staff.archetype || '',
+    themeSong: staff.themeSong || '',
     notes: staff.notes || '',
     reflection: staff.reflection || '',
     tracks: staff.tracks || [],
@@ -58178,6 +58287,12 @@ function ProfileEditTab({
     value: f.archetype,
     onChange: e => set('archetype', e.target.value),
     placeholder: "Anchor / Builder / Mentor\u2026"
+  })), React.createElement("div", {
+    className: "fg full"
+  }, React.createElement("label", null, "\u266A Theme song"), React.createElement("input", {
+    value: f.themeSong,
+    onChange: e => set('themeSong', e.target.value),
+    placeholder: "Paste a YouTube, Spotify, or audio file link \u2014 plays on your character page"
   })), React.createElement("div", {
     className: "fg"
   }, React.createElement("label", null, "Contract Renewal Date"), React.createElement("input", {
@@ -62311,6 +62426,7 @@ function LeadDevTab({
       const m = JSON.parse(localStorage.getItem('rvgd3__ts') || '{}');
       m['leaddev'] = Date.now();
       localStorage.setItem('rvgd3__ts', JSON.stringify(m));
+      window.dispatchEvent(new Event('rvgd3-ch'));
       if (window.__SB && window.__GDSYNC && window.__GDSYNC.ready) window.__SB.from('gd_store').upsert({
         id: 'leaddev',
         data: {
@@ -64820,6 +64936,7 @@ const AC_STAGES = [{
 }];
 const AC_MIS = [{
   id: "m101",
+  aud: "clin",
   s: 1,
   t: "Run a perfect week",
   d: "Five days: no late arrivals, every chart closed same day.",
@@ -64829,6 +64946,7 @@ const AC_MIS = [{
   }
 }, {
   id: "m102",
+  aud: "clin",
   s: 1,
   t: "Present a case to the team",
   d: "One patient, start to finish, in front of peers.",
@@ -64882,6 +65000,87 @@ const AC_MIS = [{
     character: 20
   }
 }, {
+  id: "g110",
+  aud: "ge",
+  s: 1,
+  t: "Master every booking flow",
+  d: "Book, rebook, reschedule, insurance, phone \u2014 cold, no help.",
+  xp: {
+    business: 60,
+    character: 20
+  }
+}, {
+  id: "g111",
+  aud: "ge",
+  s: 1,
+  t: "Know every provider's who-for",
+  d: "Route any guest to the right clinician \u2014 niche, style, availability \u2014 without checking.",
+  xp: {
+    business: 40,
+    community: 20,
+    vibe: 20
+  }
+}, {
+  id: "g210",
+  aud: "ge",
+  s: 2,
+  t: "Turn an unhappy guest around",
+  d: "From complaint to rebooked \u2014 story logged, relationship intact.",
+  xp: {
+    character: 60,
+    vibe: 30
+  }
+}, {
+  id: "g211",
+  aud: "ge",
+  s: 2,
+  t: "Fill a dead schedule gap",
+  d: "Waitlist, recalls, outreach \u2014 fill a same-week hole in the book.",
+  xp: {
+    business: 70,
+    leadership: 20
+  }
+}, {
+  id: "g212",
+  aud: "ge",
+  s: 2,
+  t: "Bring in five golden reviews",
+  d: "Five named guest reviews that mention the care, not just the vibe.",
+  xp: {
+    community: 60,
+    business: 30
+  }
+}, {
+  id: "g310",
+  aud: "ge",
+  s: 3,
+  t: "Run the desk solo, athlete-grade",
+  d: "Open to close, no escalations, energy the guests can feel.",
+  xp: {
+    leadership: 60,
+    vibe: 40
+  }
+}, {
+  id: "g311",
+  aud: "ge",
+  s: 3,
+  t: "Design one guest-experience upgrade",
+  d: "Spot the friction, fix it, document it \u2014 still in use 30 days later.",
+  xp: {
+    business: 60,
+    leadership: 50
+  }
+}, {
+  id: "g410",
+  aud: "ge",
+  s: 4,
+  t: "Train the next GE hire",
+  d: "Onboard them to standard through their first month.",
+  xp: {
+    leadership: 90,
+    character: 40
+  }
+}, {
   id: "m201",
   s: 2,
   t: "Track your own KPIs for 90 days",
@@ -64910,6 +65109,7 @@ const AC_MIS = [{
   }
 }, {
   id: "m204",
+  aud: "clin",
   s: 2,
   t: "Deliver a clinical education session",
   d: "Teach the team something they don't already know.",
@@ -64927,6 +65127,7 @@ const AC_MIS = [{
   }
 }, {
   id: "m210",
+  aud: "clin",
   s: 2,
   t: "Co-treat with another discipline",
   d: "Plan and deliver a case together, start to finish \u2014 two disciplines, one guest, one plan.",
@@ -64998,6 +65199,7 @@ const AC_MIS = [{
   }
 }, {
   id: "m310",
+  aud: "clin",
   s: 3,
   t: "Deliver an athlete-grade session",
   d: "A guest calls their care athlete-grade \u2014 in a review, a message, or to your face. Bring the receipt.",
@@ -65115,6 +65317,7 @@ const AC_MIS = [{
   }
 }, {
   id: "m602",
+  aud: "clin",
   s: 6,
   t: "Own a discipline's standards across Revibe",
   d: "Every location practising to a bar you set.",
@@ -65659,6 +65862,14 @@ const AC_MODNAME = mid => {
   return m ? m.t : mid;
 };
 const AC_TOTXP = p => AC_TRACKS.reduce((a, t) => a + ((p.xp || {})[t.id] || 0), 0);
+const AC_FOR = (m, st) => {
+  if (!m.aud) return true;
+  try {
+    return m.aud === 'ge' === !!RV_IS_GE(st);
+  } catch (e) {
+    return true;
+  }
+};
 const AC_HUES = {
   clinical: '#7ee0a3',
   business: '#ffd166',
@@ -65685,6 +65896,7 @@ function AcademyTab({
       const m = JSON.parse(localStorage.getItem('rvgd3__ts') || '{}');
       m['academy'] = Date.now();
       localStorage.setItem('rvgd3__ts', JSON.stringify(m));
+      window.dispatchEvent(new Event('rvgd3-ch'));
     } catch (e) {}
     if (window.__SB && window.__GDSYNC && window.__GDSYNC.ready) window.__SB.from('gd_store').upsert({
       id: 'academy',
@@ -65893,7 +66105,8 @@ function AcademyTab({
   const stage = P ? AC_STAGEOF(P) : null;
   const exp = P ? AC_EXPECTED(P.age) : null;
   const doneCount = P ? Object.keys(P.done || {}).length : 0;
-  const avail = P ? AC_MIS.filter(m => m.s <= stage + 1) : [];
+  const misFor = sel ? AC_MIS.filter(m => AC_FOR(m, sel)) : AC_MIS;
+  const avail = P ? misFor.filter(m => m.s <= stage + 1) : [];
   const swNode = AC_SW.find(x => x.id === swSel) || AC_SW[0];
   const rx = AC_SWRX[swNode.id] || {};
   const nextUp = (() => {
@@ -65910,7 +66123,7 @@ function AcademyTab({
     }).filter(Boolean).sort((a, b) => a.need - b.need);
     if (!opts.length) return null;
     const top = opts[0];
-    const avail2 = AC_MIS.filter(m => m.s <= stage + 1 && !P.done[m.id]);
+    const avail2 = misFor.filter(m => m.s <= stage + 1 && !P.done[m.id]);
     const recs = avail2.map(m => ({
       m,
       sc: Math.min((m.xp || {})[top.t.id] || 0, top.need)
@@ -66212,7 +66425,7 @@ function AcademyTab({
     }
   }, React.createElement(RvHeroTile, {
     lbl: "Missions",
-    val: doneCount + ' / ' + AC_MIS.length,
+    val: doneCount + ' / ' + misFor.length,
     sub: "completed"
   }), (() => {
     const nx = AC_STAGES.find(x => x.n === stage + 1);
@@ -66581,7 +66794,7 @@ function AcademyTab({
       marginBottom: 12
     }
   }, "The fun side \u2014 missions pay XP into the six tracks (never into switches; those are graded). Available up to one stage ahead; completing one asks for a line of evidence, and everything is logged and undoable."), AC_STAGES.map(st => {
-    const ms = AC_MIS.filter(m => m.s === st.n);
+    const ms = misFor.filter(m => m.s === st.n);
     if (!ms.length) return null;
     const locked = st.n > stage + 1;
     return React.createElement("div", {
@@ -66743,7 +66956,7 @@ function AcademyTab({
     fill: true
   }), React.createElement(RvHeroTile, {
     lbl: "Missions",
-    val: doneCount + ' / ' + AC_MIS.length,
+    val: doneCount + ' / ' + misFor.length,
     sub: "completed"
   }), React.createElement(RvHeroTile, {
     lbl: "Stage",
