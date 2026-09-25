@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L204';
+window.__BUILD = 'build L205';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -64764,6 +64764,13 @@ function LeadDevTab({
       if (!raw) return;
       sessionStorage.removeItem('rvgd3_ld_open');
       const o = JSON.parse(raw);
+      if (o.person) {
+        setView({
+          lead: o.lead || null,
+          person: o.person
+        });
+        return;
+      }
       const L = LD_LEADS.find(x => x.id === o.lead);
       if (L) {
         setView({
@@ -67782,6 +67789,18 @@ function AcademyTab({
     onClick: () => openProfile && openProfile(sel.id)
   }, "Open profile \u2197"), sel && React.createElement("button", {
     className: "btn btn-ghost btn-sm",
+    title: "Their roadmap, check-ins, priorities, progress log & measurables",
+    onClick: () => {
+      try {
+        sessionStorage.setItem('rvgd3_ld_open', JSON.stringify({
+          person: sel.id
+        }));
+        sessionStorage.setItem('rvgd3_ui_lt.tab', JSON.stringify('develop'));
+      } catch (e) {}
+      window.location.reload();
+    }
+  }, "\uD83D\uDDFA Development home \u2192"), sel && React.createElement("button", {
+    className: "btn btn-ghost btn-sm",
     onClick: () => setSelId('')
   }, "\u2190 Squad board"))), !sel && React.createElement("div", {
     style: {
@@ -68791,6 +68810,54 @@ function LeadershipPage({
   });
   const [activeTab, setActiveTab] = usePersist('lt.tab', 'develop');
   const [selectedPerson, setSelectedPerson] = useState(null);
+  const stIdOf = p => {
+    const n = String(p && p.name || '').toLowerCase().trim();
+    const st = (staff || []).find(x => x && x.name && x.name.toLowerCase().trim() === n);
+    return st ? st.id : null;
+  };
+  const goDev = p => {
+    const sid = stIdOf(p) || p.id;
+    try {
+      sessionStorage.setItem('rvgd3_ld_open', JSON.stringify({
+        person: sid
+      }));
+    } catch (e) {}
+    setActiveTab('develop');
+  };
+  const PLink = ({
+    p,
+    stop
+  }) => React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      gap: 7,
+      alignItems: 'center'
+    },
+    onClick: stop ? e => e.stopPropagation() : undefined
+  }, React.createElement("span", {
+    title: "Open profile",
+    style: {
+      cursor: 'pointer',
+      fontSize: 12,
+      opacity: .55
+    },
+    onClick: e => {
+      e.stopPropagation();
+      const sid = stIdOf(p) || p.id;
+      openProfile && openProfile(sid);
+    }
+  }, "\uD83D\uDC64"), React.createElement("span", {
+    title: "Open development home \u2014 roadmap, check-ins, log",
+    style: {
+      cursor: 'pointer',
+      fontSize: 12,
+      opacity: .55
+    },
+    onClick: e => {
+      e.stopPropagation();
+      goDev(p);
+    }
+  }, "\uD83D\uDDFA"));
   const [filterLoc, setFilterLoc] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDisc, setFilterDisc] = useState('all');
@@ -69043,7 +69110,7 @@ function LeadershipPage({
     }
   }, React.createElement("table", {
     className: "lt-table"
-  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Name"), React.createElement("th", null, "Disc."), React.createElement("th", null, "Location"), React.createElement("th", null, "Level"), React.createElement("th", null, "Score /100"), React.createElement("th", null, "Lead Avg"), React.createElement("th", null, "Gate"), React.createElement("th", null, "Flags"), React.createElement("th", null, "Category"), React.createElement("th", null, "Status"), React.createElement("th", null))), React.createElement("tbody", null, filtered.sort((a, b) => b.r.total - a.r.total).map(p => {
+  }, React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Name"), React.createElement("th", null, "Disc."), React.createElement("th", null, "Location"), React.createElement("th", null, "Level"), React.createElement("th", null, "Score /100"), React.createElement("th", null, "Lead Avg"), React.createElement("th", null, "Gate"), React.createElement("th", null, "Flags"), React.createElement("th", null, "Category"), React.createElement("th", null, "Status"), React.createElement("th", null), React.createElement("th", null))), React.createElement("tbody", null, filtered.sort((a, b) => b.r.total - a.r.total).map(p => {
     const sm = STATUS_META[p.r.status];
     return React.createElement("tr", {
       key: p.id,
@@ -69097,11 +69164,14 @@ function LeadershipPage({
     }, p.r.flagCount)), React.createElement("td", null, React.createElement("span", {
       style: {
         fontSize: 14,
-        color: 'var(--c-pur)'
+        color: '#e9c08a'
       }
     }, p.r.locCat)), React.createElement("td", null, React.createElement("span", {
       className: `lt-badge ${sm.cls}`
-    }, sm.label)), React.createElement("td", {
+    }, sm.label)), React.createElement("td", null, React.createElement(PLink, {
+      p: p,
+      stop: true
+    })), React.createElement("td", {
       onClick: ev => {
         ev.stopPropagation();
         if (window.confirm(`Remove ${p.name}?`)) removePerson(p.id);
@@ -69181,12 +69251,14 @@ function LeadershipPage({
   }, React.createElement("div", {
     style: {
       fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 14,
-      letterSpacing: '1px',
-      color: 'var(--g-999)',
+      fontSize: 15,
+      fontWeight: 800,
+      letterSpacing: '2.2px',
+      color: '#9fd9c6',
+      textTransform: 'uppercase',
       marginBottom: 8
     }
-  }, "TEAM BALANCE \u2014 ENERGY BY LOCATION"), (() => {
+  }, "Team balance \u2014 energy by location"), (() => {
     const locs = [...new Set(computed.map(p => p.primaryLoc).filter(Boolean))];
     return React.createElement("div", {
       style: {
@@ -69273,18 +69345,21 @@ function LeadershipPage({
   }, React.createElement("div", {
     style: {
       fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 14,
-      letterSpacing: '1px',
-      color: 'var(--g-999)'
+      fontSize: 15,
+      fontWeight: 800,
+      letterSpacing: '2.2px',
+      color: '#9fd9c6',
+      textTransform: 'uppercase'
     }
-  }, "ARCHETYPES ", React.createElement("span", {
+  }, "Archetypes ", React.createElement("span", {
     style: {
       fontSize: 11,
       color: 'var(--g-666)',
       fontWeight: 400,
-      letterSpacing: 0
+      letterSpacing: 0,
+      textTransform: 'none'
     }
-  }, "\xB7 click a name to edit")), React.createElement("div", {
+  }, "\xB7 click a name to edit \xB7 \uD83D\uDC64 profile \xB7 \uD83D\uDDFA development")), React.createElement("div", {
     style: {
       display: 'flex',
       gap: 4
@@ -69331,6 +69406,12 @@ function LeadershipPage({
         fontSize: 13.5,
         fontWeight: 700,
         color: 'var(--g-eee)',
+        display: 'inline-flex',
+        gap: 8,
+        alignItems: 'baseline'
+      }
+    }, React.createElement("span", {
+      style: {
         cursor: 'pointer'
       },
       onClick: () => setSelectedPerson(p)
@@ -69339,7 +69420,9 @@ function LeadershipPage({
         color: 'var(--c-amb)'
       },
       title: a.prov === 'roleVerify' ? 'Role verification required' : a.prov === 'insufficient' ? 'Insufficient data — baseline required' : 'Provisional — limited evidence'
-    }, " *") : null), a.core ? chip(a.core.replace('The ', ''), 'rgba(68,204,170,.14)', 'var(--c-grn)', 'rgba(68,204,170,.5)', 'CORE — ' + ARCH_DEFS[a.core].v) : React.createElement("span", {
+    }, " *") : null), React.createElement(PLink, {
+      p: p
+    })), a.core ? chip(a.core.replace('The ', ''), 'rgba(68,204,170,.14)', 'var(--c-grn)', 'rgba(68,204,170,.5)', 'CORE — ' + ARCH_DEFS[a.core].v) : React.createElement("span", {
       style: {
         fontSize: 12,
         color: 'var(--c-amb)'
@@ -69489,12 +69572,14 @@ function LeadershipPage({
   }, React.createElement("div", {
     style: {
       fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 14,
-      letterSpacing: '1px',
-      color: 'var(--g-999)',
+      fontSize: 15,
+      fontWeight: 800,
+      letterSpacing: '2.2px',
+      color: '#9fd9c6',
+      textTransform: 'uppercase',
       marginBottom: 8
     }
-  }, "DATA QUALITY \u2014 INCOMPLETE PROFILES"), (() => {
+  }, "Data quality \u2014 incomplete profiles"), (() => {
     const flagged = computed.map(p => ({
       p,
       f: archFlags(p)
@@ -69553,19 +69638,22 @@ function LeadershipPage({
   }, React.createElement("div", {
     style: {
       fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 14,
-      letterSpacing: '1px',
-      color: 'var(--g-999)',
+      fontSize: 15,
+      fontWeight: 800,
+      letterSpacing: '2.2px',
+      color: '#9fd9c6',
+      textTransform: 'uppercase',
       marginBottom: 8
     }
-  }, "RISK MATRIX ", React.createElement("span", {
+  }, "Risk matrix ", React.createElement("span", {
     style: {
       fontSize: 11,
       color: 'var(--g-666)',
       fontWeight: 400,
-      letterSpacing: 0
+      letterSpacing: 0,
+      textTransform: 'none'
     }
-  }, "\xB7 highest active severity per category (Resolved excluded) \xB7 click a name to edit")), React.createElement("div", {
+  }, "\xB7 highest active severity per category (Resolved excluded) \xB7 click a name to edit \xB7 \uD83D\uDC64 profile \xB7 \uD83D\uDDFA development")), React.createElement("div", {
     style: {
       overflowX: 'auto'
     }
@@ -69610,11 +69698,16 @@ function LeadershipPage({
       style: {
         padding: '5px 8px',
         color: 'var(--g-ddd)',
-        cursor: 'pointer',
         whiteSpace: 'nowrap'
+      }
+    }, React.createElement("span", {
+      style: {
+        cursor: 'pointer'
       },
       onClick: () => setSelectedPerson(p)
-    }, p.name), React.createElement("td", {
+    }, p.name), " ", React.createElement(PLink, {
+      p: p
+    })), React.createElement("td", {
       style: {
         padding: '5px 8px',
         textAlign: 'center'
@@ -69760,7 +69853,10 @@ function LeadershipPage({
         style: {
           fontSize: 14
         }
-      }, sm.label)));
+      }, sm.label), React.createElement(PLink, {
+        p: p,
+        stop: true
+      })));
     }));
   })), activeTab === 'doctrine' && React.createElement("div", {
     style: {
@@ -69822,7 +69918,7 @@ function LeadershipPage({
     }, {
       sub: 'Categories',
       text: '📍 Contributor → ⭐ Location Lead → 🔄 Regional Support → 🌐 Multi-Loc Operator → 🚀 Expansion Leader',
-      color: 'var(--c-pur)'
+      color: '#e9c08a'
     }, {
       sub: 'Core Standard',
       text: '"Leadership = Stability Under Weight" — Can they hold the team when things get hard?',
