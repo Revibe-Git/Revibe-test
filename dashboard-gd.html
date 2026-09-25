@@ -86,12 +86,12 @@ window.__loadXLSX=function(){
   --go:#00584D;--go-dim:rgba(0,88,77,.13);--go-b:rgba(0,88,77,.28);
   --wellness:#12492F;--lime:#CAE8C1;--lime-dim:rgba(202,232,193,.08);--lime-b:rgba(202,232,193,.18);
   --yellow:#F4DB71;--yellow-dim:rgba(244,219,113,.1);
-  --purple:#BB99FF;--purple-dim:rgba(187,153,255,.1);
+  --purple:#7FC8E8;--purple-dim:rgba(127,200,232,.1); /* L211 — Dave: no purple anywhere; token kept, hue remapped */
   --gray:#969696;--red:#E05252;
   --text:#f4f4f4;--text2:#bbb;--text3:#888;
   --lc1:#6B9FD4;--lc2:#F4DB71;--lc3:#44ccaa;--lc4:#CAE8C1;
   --g-eee:#eee;--g-ddd:#ddd;--g-ccc:#ccc;--g-bbb:#bbb;--g-aaa:#aaa;--g-999:#999;--g-888:#888;--g-777:#777;--g-666:#7d7d7d;--g-555:#6b6b6b; /* L140: were #666/#555 — 3.3:1 and 2.5:1 on this surface, failing for sentence-length text */
-  --c-grn:#44CCAA;--c-red:#E05252;--c-amb:#E0A052;--c-blu2:#7FC8E8;--c-yel:#F4DB71;--c-lime2:#CAE8C1;--c-mint:#8FE0C0;--c-pur:#BB99FF;--c-grn2:#66C08A;--c-org2:#E0806A;--c-pink:#D98BB0;
+  --c-grn:#44CCAA;--c-red:#E05252;--c-amb:#E0A052;--c-blu2:#7FC8E8;--c-yel:#F4DB71;--c-lime2:#CAE8C1;--c-mint:#8FE0C0;--c-pur:#7FC8E8;--c-grn2:#66C08A;--c-org2:#E0806A;--c-pink:#D98BB0;
   --stripe:rgba(255,255,255,.025);
 }
 html.light{
@@ -99,7 +99,7 @@ html.light{
   --border:#d7ded9;--border2:#c2ccc6;
   --text:#1a221e;--text2:#3d4944;--text3:#5e6b65;
   --g-eee:#1d2622;--g-ddd:#26302b;--g-ccc:#303b35;--g-bbb:#3b4741;--g-aaa:#46534d;--g-999:#525f59;--g-888:#5e6b65;--g-777:#6b7872;--g-666:#5f6c66;--g-555:#71807a;
-  --c-grn:#0c8a6b;--c-red:#c23b3b;--c-amb:#a5641c;--c-blu2:#146e9e;--c-yel:#9a7d08;--c-lime2:#3d7a35;--c-mint:#1f8a63;--c-pur:#7444d4;--c-grn2:#2e8a55;--c-org2:#b34c36;--c-pink:#ad4f7a;
+  --c-grn:#0c8a6b;--c-red:#c23b3b;--c-amb:#a5641c;--c-blu2:#146e9e;--c-yel:#9a7d08;--c-lime2:#3d7a35;--c-mint:#1f8a63;--c-pur:#146e9e;--c-grn2:#2e8a55;--c-org2:#b34c36;--c-pink:#ad4f7a;
   --stripe:rgba(0,0,0,.035);
 }
 
@@ -205,7 +205,7 @@ body{background:var(--black);color:var(--text);font-family:'Barlow',sans-serif;f
 /* CARD */
 .card{background:var(--surface);border:1px solid var(--border2);border-radius:5px;padding:15px 17px;}
 .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.card-lbl{font-family:'Barlow Condensed',sans-serif;font-size:12.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--g-aaa);font-weight:600;}
+.card-lbl{font-family:'Barlow Condensed',sans-serif;font-size:12.5px;letter-spacing:1.8px;text-transform:uppercase;color:#9fd9c6;font-weight:700;}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
 
@@ -218,14 +218,14 @@ body{background:var(--black);color:var(--text);font-family:'Barlow',sans-serif;f
 .b-pt{background:rgba(202,232,193,.1);color:#CAE8C1;}
 .b-chiro{background:rgba(107,159,212,.1);color:#6B9FD4;}
 .b-rmt{background:rgba(244,219,113,.1);color:#F4DB71;}
-.b-osteo{background:rgba(170,119,255,.1);color:#BB99FF;}
+.b-osteo{background:rgba(127,200,232,.1);color:#7FC8E8;}
 .b-naturo{background:rgba(0,88,77,.15);color:#44ccaa;}
 .b-guest{background:rgba(224,82,82,.1);color:#F08080;}
-.b-mgmt{background:rgba(187,153,255,.12);color:#BB99FF;border-color:rgba(187,153,255,.25);}
+.b-mgmt{background:rgba(127,200,232,.12);color:#7FC8E8;border-color:rgba(127,200,232,.25);}
 .b-edu{background:rgba(202,232,193,.12);color:#CAE8C1;border-color:rgba(202,232,193,.25);}
 .b-ops{background:rgba(107,159,212,.12);color:#6B9FD4;border-color:rgba(107,159,212,.25);}
 .b-clinical{background:rgba(202,232,193,.12);color:#CAE8C1;}
-.b-spa{background:rgba(187,153,255,.12);color:#BB99FF;}
+.b-spa{background:rgba(127,200,232,.12);color:#7FC8E8;}
 .b-sc{background:rgba(244,219,113,.12);color:#F4DB71;}
 
 /* SCORE BAR */
@@ -259,7 +259,7 @@ tbody tr:hover td{background:var(--surface2);}
 .gcard.gclick{cursor:pointer;}
 .gcard.gclick:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(0,0,0,.28);border-left-color:var(--gh,var(--c-grn));}
 .gcard-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px;}
-.gwash{background:color-mix(in srgb, var(--surface2) 91%, #2fd6a8 9%);border-color:color-mix(in srgb, var(--border) 72%, #2fd6a8 28%);}
+.gwash{background:var(--surface2);border-color:var(--border);} /* L211 — green-wash retired */
 .grow{display:flex;gap:12px;align-items:center;padding:9px 12px;border-radius:10px;cursor:pointer;transition:background .13s,padding-left .13s;}
 .grow:hover{background:var(--surface3);padding-left:16px;}
 .gchip{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);border-radius:9px;padding:4px 12px 4px 5px;cursor:pointer;transition:all .13s;color:#eef8f2;font-size:13px;font-weight:700;}
@@ -291,8 +291,8 @@ tbody tr:hover td{background:var(--surface2);}
 .track-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:12px;font-size:15px;font-weight:600;font-family:'Barlow Condensed',sans-serif;letter-spacing:.8px;text-transform:uppercase;cursor:pointer;border:1px solid transparent;transition:all .12s;}
 .tp-clinical{background:rgba(202,232,193,.08);color:#CAE8C1;border-color:rgba(202,232,193,.2);}
 .tp-clinical.active{background:rgba(202,232,193,.18);border-color:var(--lime);}
-.tp-spa{background:rgba(187,153,255,.08);color:#BB99FF;border-color:rgba(187,153,255,.2);}
-.tp-spa.active{background:rgba(187,153,255,.18);border-color:var(--purple);}
+.tp-spa{background:rgba(127,200,232,.08);color:#7FC8E8;border-color:rgba(127,200,232,.2);}
+.tp-spa.active{background:rgba(127,200,232,.18);border-color:var(--purple);}
 .tp-sc{background:rgba(244,219,113,.08);color:#F4DB71;border-color:rgba(244,219,113,.2);}
 .tp-sc.active{background:rgba(244,219,113,.18);border-color:var(--yellow);}
 
@@ -372,7 +372,7 @@ textarea{resize:vertical;min-height:60px;}
 .hb-green{background:rgba(0,88,77,.1);border:1px solid rgba(0,88,77,.25);color:#44ccaa;}
 .hb-yellow{background:var(--yellow-dim);border:1px solid rgba(244,219,113,.2);color:var(--yellow);}
 .hb-gray{background:var(--surface2);border:1px solid var(--border);color:var(--text2);}
-.hb-purple{background:var(--purple-dim);border:1px solid rgba(187,153,255,.2);color:var(--purple);}
+.hb-purple{background:var(--purple-dim);border:1px solid rgba(127,200,232,.2);color:var(--purple);}
 
 /* NOTE */
 .note-item{padding:11px 13px;background:var(--surface2);border-radius:4px;border-left:2px solid var(--go);margin-bottom:7px;}
@@ -489,7 +489,7 @@ textarea{resize:vertical;min-height:60px;}
 .phase-2{background:rgba(244,219,113,.1);color:#F4DB71;}
 .phase-3{background:rgba(0,88,77,.15);color:#44ccaa;}
 .phase-4{background:rgba(202,232,193,.12);color:#CAE8C1;}
-.phase-5{background:rgba(187,153,255,.12);color:#BB99FF;}
+.phase-5{background:rgba(127,200,232,.12);color:#7FC8E8;}
 .sop-principle-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0;}
 .sop-principle{background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:13px 15px;}
 .sop-principle-ico{font-size:18px;margin-bottom:7px;}
@@ -546,7 +546,7 @@ textarea{resize:vertical;min-height:60px;}
 .lt-stat-sub{font-size:15px;color:var(--g-888);}
 .lt-section{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;margin-bottom:14px;}
 .lt-section-hdr{padding:11px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface2);}
-.lt-section-title{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--g-aaa);}
+.lt-section-title{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;letter-spacing:2.2px;text-transform:uppercase;color:#9fd9c6;}
 .lt-table{width:100%;border-collapse:collapse;}
 .lt-table th{background:var(--surface2);padding:8px 12px;text-align:left;font-family:'Barlow Condensed',sans-serif;font-size:14px;letter-spacing:1.5px;text-transform:uppercase;color:var(--g-999);font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap;}
 .lt-table td{padding:9px 12px;border-bottom:1px solid var(--border);font-size:15px;color:var(--g-aaa);vertical-align:middle;}
@@ -576,7 +576,7 @@ textarea{resize:vertical;min-height:60px;}
 .lt-tab.active{background:var(--go);color:var(--lime);}
 .lt-heat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .lt-heat-card{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:16px 18px;}
-.lt-heat-title{font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:800;color:var(--lime);letter-spacing:1px;margin-bottom:12px;}
+.lt-heat-title{font-family:'Barlow Condensed',sans-serif;font-size:15px;font-weight:800;color:#9fd9c6;letter-spacing:2.2px;text-transform:uppercase;margin-bottom:12px;}
 .lt-heat-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);}
 .lt-heat-row:last-child{border-bottom:none;}
 .lt-profile-modal{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:20px;}
@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L207';
+window.__BUILD = 'build L211';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -24563,10 +24563,10 @@ function CallHistoryPage() {
       Markham: 'var(--c-blue)'
     };
     return React.createElement(React.Fragment, null, React.createElement("style", null, `
-.creport-print-area{--c-ink:#fff;--c-strong:#eee;--c-body:#ddd;--c-body2:#ccc;--c-sec:#bbb;--c-label:#aaa;--c-mut9:#999;--c-mut8:#888;--c-mut7:#777;--c-faint:#666;--c-d55:#555;--c-grid:#444;--c-bdk:#1e1e1e;--c-rbd:#5a2a2a;--c-sep:rgba(255,255,255,.05);--c-grn:#CAE8C1;--c-gold:#F4DB71;--c-blue:#7FC8E8;--c-pur:#BB99FF;--c-red:#E05252;--c-org:#E0A052;--c-pink:#E0A0C0;}
+.creport-print-area{--c-ink:#fff;--c-strong:#eee;--c-body:#ddd;--c-body2:#ccc;--c-sec:#bbb;--c-label:#aaa;--c-mut9:#999;--c-mut8:#888;--c-mut7:#777;--c-faint:#666;--c-d55:#555;--c-grid:#444;--c-bdk:#1e1e1e;--c-rbd:#5a2a2a;--c-sep:rgba(255,255,255,.05);--c-grn:#CAE8C1;--c-gold:#F4DB71;--c-blue:#7FC8E8;--c-pur:#7FC8E8;--c-red:#E05252;--c-org:#E0A052;--c-pink:#E0A0C0;}
 .creport-print-area .rpt-stripe{display:none;}
 .creport-print-area tbody tr:hover td{background:rgba(255,255,255,.06);}
-@media print{@page{margin:14mm;}html,body{background:#ffffff!important;}body *{visibility:hidden!important;}.creport-print-area,.creport-print-area *{visibility:visible!important;}.creport-print-area{position:absolute!important;left:0;top:0;width:100%!important;border:none!important;border-radius:0!important;padding:0!important;background:#ffffff!important;color:#1a2620;--surface:#ffffff;--surface2:#f5f9f6;--surface3:#eaf1ec;--border:#dde7e1;--border2:#cbd9d1;--go:#00aa88;--c-ink:#0E2A22;--c-strong:#16231d;--c-body:#243029;--c-body2:#34423a;--c-sec:#44524b;--c-label:#4c584f;--c-mut9:#56625a;--c-mut8:#5a655d;--c-mut7:#5f6a62;--c-faint:#6b766e;--c-d55:#79847c;--c-grid:#aab4ad;--c-bdk:#e7eee9;--c-rbd:#e6b3ab;--c-sep:rgba(0,0,0,.08);--c-grn:#0B6E54;--c-gold:#9A6B00;--c-blue:#1F6F9B;--c-pur:#6A45C0;--c-red:#C0392B;--c-org:#B5791F;--c-pink:#A24E7A;}.creport-print-area .rpt-stripe{display:block!important;}.no-print{display:none!important;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}}
+@media print{@page{margin:14mm;}html,body{background:#ffffff!important;}body *{visibility:hidden!important;}.creport-print-area,.creport-print-area *{visibility:visible!important;}.creport-print-area{position:absolute!important;left:0;top:0;width:100%!important;border:none!important;border-radius:0!important;padding:0!important;background:#ffffff!important;color:#1a2620;--surface:#ffffff;--surface2:#f5f9f6;--surface3:#eaf1ec;--border:#dde7e1;--border2:#cbd9d1;--go:#00aa88;--c-ink:#0E2A22;--c-strong:#16231d;--c-body:#243029;--c-body2:#34423a;--c-sec:#44524b;--c-label:#4c584f;--c-mut9:#56625a;--c-mut8:#5a655d;--c-mut7:#5f6a62;--c-faint:#6b766e;--c-d55:#79847c;--c-grid:#aab4ad;--c-bdk:#e7eee9;--c-rbd:#e6b3ab;--c-sep:rgba(0,0,0,.08);--c-grn:#0B6E54;--c-gold:#9A6B00;--c-blue:#1F6F9B;--c-pur:#1F6F9B;--c-red:#C0392B;--c-org:#B5791F;--c-pink:#A24E7A;}.creport-print-area .rpt-stripe{display:block!important;}.no-print{display:none!important;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}}
 `), React.createElement("div", {
       className: "no-print"
     }, React.createElement("div", {
@@ -31302,10 +31302,10 @@ function PerformancePage({
       };
     })();
     return React.createElement("div", null, React.createElement("style", null, `
-.report-print-area{--c-ink:#fff;--c-strong:#eee;--c-body:#ddd;--c-body2:#ccc;--c-sec:#bbb;--c-label:#aaa;--c-mut9:#999;--c-mut8:#888;--c-mut7:#777;--c-faint:#666;--c-d55:#555;--c-grid:#444;--c-bdk:#1e1e1e;--c-rbd:#5a2a2a;--c-sep:rgba(255,255,255,.05);--c-grn:#CAE8C1;--c-gold:#F4DB71;--c-blue:#7FC8E8;--c-pur:#BB99FF;--c-red:#E05252;--c-org:#E0A052;--c-pink:#E0A0C0;}
+.report-print-area{--c-ink:#fff;--c-strong:#eee;--c-body:#ddd;--c-body2:#ccc;--c-sec:#bbb;--c-label:#aaa;--c-mut9:#999;--c-mut8:#888;--c-mut7:#777;--c-faint:#666;--c-d55:#555;--c-grid:#444;--c-bdk:#1e1e1e;--c-rbd:#5a2a2a;--c-sep:rgba(255,255,255,.05);--c-grn:#CAE8C1;--c-gold:#F4DB71;--c-blue:#7FC8E8;--c-pur:#7FC8E8;--c-red:#E05252;--c-org:#E0A052;--c-pink:#E0A0C0;}
 .report-print-area .rpt-stripe{display:none;}
 .report-print-area tbody tr:hover td{background:rgba(255,255,255,.06);}
-@media print{@page{margin:14mm;}html,body{background:#ffffff!important;}body *{visibility:hidden!important;}.report-print-area,.report-print-area *{visibility:visible!important;}.report-print-area{position:absolute!important;left:0;top:0;width:100%!important;border:none!important;border-radius:0!important;padding:0!important;background:#ffffff!important;color:#1a2620;--surface:#ffffff;--surface2:#f5f9f6;--surface3:#eaf1ec;--border:#dde7e1;--border2:#cbd9d1;--go:#00aa88;--c-ink:#0E2A22;--c-strong:#16231d;--c-body:#243029;--c-body2:#34423a;--c-sec:#44524b;--c-label:#4c584f;--c-mut9:#56625a;--c-mut8:#5a655d;--c-mut7:#5f6a62;--c-faint:#6b766e;--c-d55:#79847c;--c-grid:#aab4ad;--c-bdk:#e7eee9;--c-rbd:#e6b3ab;--c-sep:rgba(0,0,0,.08);--c-grn:#0B6E54;--c-gold:#9A6B00;--c-blue:#1F6F9B;--c-pur:#6A45C0;--c-red:#C0392B;--c-org:#B5791F;--c-pink:#A24E7A;}.report-print-area .rpt-stripe{display:block!important;}.no-print{display:none!important;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}}
+@media print{@page{margin:14mm;}html,body{background:#ffffff!important;}body *{visibility:hidden!important;}.report-print-area,.report-print-area *{visibility:visible!important;}.report-print-area{position:absolute!important;left:0;top:0;width:100%!important;border:none!important;border-radius:0!important;padding:0!important;background:#ffffff!important;color:#1a2620;--surface:#ffffff;--surface2:#f5f9f6;--surface3:#eaf1ec;--border:#dde7e1;--border2:#cbd9d1;--go:#00aa88;--c-ink:#0E2A22;--c-strong:#16231d;--c-body:#243029;--c-body2:#34423a;--c-sec:#44524b;--c-label:#4c584f;--c-mut9:#56625a;--c-mut8:#5a655d;--c-mut7:#5f6a62;--c-faint:#6b766e;--c-d55:#79847c;--c-grid:#aab4ad;--c-bdk:#e7eee9;--c-rbd:#e6b3ab;--c-sep:rgba(0,0,0,.08);--c-grn:#0B6E54;--c-gold:#9A6B00;--c-blue:#1F6F9B;--c-pur:#1F6F9B;--c-red:#C0392B;--c-org:#B5791F;--c-pink:#A24E7A;}.report-print-area .rpt-stripe{display:block!important;}.no-print{display:none!important;}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}}
 `), React.createElement("div", {
       className: "no-print"
     }, React.createElement("div", {
@@ -33853,7 +33853,7 @@ button.pf-chip{cursor:pointer;}
     onClick: e => e.stopPropagation(),
     style: {
       background: 'var(--surface2)',
-      border: '1px solid #BB99FF55',
+      border: '1px solid #7FC8E855',
       borderRadius: 12,
       padding: '24px 26px',
       width: 380,
@@ -33883,7 +33883,7 @@ button.pf-chip{cursor:pointer;}
     style: {
       width: '100%',
       background: 'var(--surface3)',
-      border: '1px solid #BB99FF55',
+      border: '1px solid #7FC8E855',
       borderRadius: 6,
       color: 'var(--text)',
       fontSize: 18,
@@ -38368,9 +38368,9 @@ function Overview({
         key: sid,
         style: {
           fontSize: 10,
-          background: 'rgba(187,153,255,.08)',
+          background: 'rgba(127,200,232,.08)',
           color: 'var(--c-pur)',
-          border: '1px solid rgba(187,153,255,.2)',
+          border: '1px solid rgba(127,200,232,.2)',
           borderRadius: 3,
           padding: '1px 6px'
         }
@@ -42711,7 +42711,7 @@ function RvProfileHero({
     return sp ? React.createElement(RvHeroChip, {
       key: sid,
       txt: sp.label,
-      col: "#c9aef0"
+      col: "#7db8d8"
     }) : null;
   }), staff.roadmap ? React.createElement(RvHeroChip, {
     txt: staff.roadmap
@@ -51106,7 +51106,7 @@ function MdLite({
         color: 'var(--c-pur)',
         margin: '22px 0 8px',
         paddingBottom: 5,
-        borderBottom: '1px solid rgba(187,153,255,.25)'
+        borderBottom: '1px solid rgba(127,200,232,.25)'
       }
     }, inline(b.slice(4), bi));
     if (b.startsWith('## ')) return React.createElement("div", {
@@ -51972,7 +51972,7 @@ function AddEvalModal({
       style: {
         padding: '8px 12px',
         borderBottom: '1px solid var(--border)',
-        background: 'rgba(187,153,255,.06)'
+        background: 'rgba(127,200,232,.06)'
       }
     }, React.createElement("span", {
       style: {
@@ -58316,8 +58316,8 @@ function ProfileEditTab({
           fontSize: 14,
           padding: '4px 10px',
           borderRadius: 4,
-          border: '1px solid ' + (on ? 'rgba(187,153,255,.4)' : 'var(--border2)'),
-          background: on ? 'rgba(187,153,255,.12)' : 'var(--surface3)',
+          border: '1px solid ' + (on ? 'rgba(127,200,232,.4)' : 'var(--border2)'),
+          background: on ? 'rgba(127,200,232,.12)' : 'var(--surface3)',
           color: on ? 'var(--c-pur)' : 'var(--g-555)',
           cursor: 'pointer',
           fontFamily: "'Barlow Condensed',sans-serif",
@@ -59096,7 +59096,7 @@ function EvalDetailModal({
       style: {
         padding: '7px 12px',
         borderBottom: '1px solid var(--border)',
-        background: 'rgba(187,153,255,.06)'
+        background: 'rgba(127,200,232,.06)'
       }
     }, React.createElement("span", {
       style: {
@@ -59225,7 +59225,7 @@ function EvalDetailList({
     }, fmt(ev.date)), hasRoadmap && React.createElement("span", {
       style: {
         fontSize: 14,
-        background: 'rgba(187,153,255,.15)',
+        background: 'rgba(127,200,232,.15)',
         color: 'var(--c-pur)',
         padding: '2px 6px',
         borderRadius: 3,
@@ -65191,7 +65191,7 @@ function LeadDevTab({
         nodes: mk([4, 5, 6, 7])
       }, {
         name: 'THE DIRECTOR',
-        hue: '#c9aef0',
+        hue: '#7db8d8',
         nodes: mk([8, 9, 10, 11, 12])
       }];
       return React.createElement(RvSkillCard, {
@@ -67512,6 +67512,8 @@ function AcademyTab({
   const sel = roster.find(x => x.id === selId) || null;
   const [swSel, setSwSel] = useState(AC_SW[0].id);
   const [acView, setAcView] = usePersist('academy.view', 'map');
+  const [acQ, setAcQ] = useState('');
+  const [acAll, setAcAll] = useState(false);
   const [fx, setFx] = useState(null);
   const pOf = id => {
     const raw = (db.people || {})[id] || {};
@@ -67543,10 +67545,11 @@ function AcademyTab({
     return d;
   };
   const C = {
-    background: 'color-mix(in srgb, var(--surface2) 91%, #2fd6a8 9%)',
-    border: '1px solid color-mix(in srgb, var(--border) 72%, #2fd6a8 28%)',
-    borderRadius: 10,
-    padding: '16px 18px',
+    background: 'var(--surface2)',
+    border: '1px solid var(--border)',
+    borderLeft: '3px solid #2fd6a8',
+    borderRadius: 11,
+    padding: '15px 18px',
     marginBottom: 12
   };
   const H = ({
@@ -67554,12 +67557,12 @@ function AcademyTab({
   }) => React.createElement("div", {
     style: {
       fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 16,
-      letterSpacing: '1.4px',
+      fontSize: 15,
+      letterSpacing: '2.2px',
       textTransform: 'uppercase',
       fontWeight: 800,
-      color: 'var(--g-ddd)',
-      marginBottom: 10
+      color: '#9fd9c6',
+      marginBottom: 8
     }
   }, children);
   const complete = async mid => {
@@ -67755,10 +67758,11 @@ function AcademyTab({
   }, React.createElement("div", {
     style: {
       fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 20,
+      fontSize: 17,
       fontWeight: 800,
-      letterSpacing: '1.5px',
-      textTransform: 'uppercase'
+      letterSpacing: '2.2px',
+      textTransform: 'uppercase',
+      color: '#9fd9c6'
     }
   }, "\uD83C\uDF93 Leadership Academy"), React.createElement("div", {
     style: {
@@ -67806,73 +67810,100 @@ function AcademyTab({
     style: {
       ...C
     }
-  }, React.createElement(H, null, "Squad board \u2014 where everyone stands"), React.createElement("div", {
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      flexWrap: 'wrap',
+      marginBottom: 6
+    }
+  }, React.createElement(H, null, "Squad board \u2014 where everyone stands"), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("input", {
+    value: acQ,
+    onChange: e => setAcQ(e.target.value),
+    placeholder: "Search a name\u2026",
+    style: {
+      background: 'rgba(255,255,255,.05)',
+      border: '1px solid var(--border)',
+      borderRadius: 9,
+      color: 'var(--text)',
+      fontSize: 13,
+      padding: '7px 12px',
+      outline: 'none',
+      width: 170
+    }
+  }), React.createElement("button", {
+    className: 'btn btn-xs ' + (acAll ? 'btn-go' : 'btn-ghost'),
+    onClick: () => setAcAll(!acAll)
+  }, acAll ? 'Hide everyone' : 'Show everyone · ' + board.length)), React.createElement("div", {
     style: {
       fontSize: 12.5,
       color: 'var(--g-777)',
       marginBottom: 10
     }
-  }, "Fresh start: everyone begins at Stage 1 with zero XP \u2014 progress is earned mission by mission. Click a row to open their character sheet."), React.createElement("div", {
+  }, "Fresh start: everyone begins at Stage 1 with zero XP \u2014 progress is earned mission by mission. Click a card to open their character sheet."), !acAll && !acQ.trim() && React.createElement("div", {
+    className: "rv-empty",
     style: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))',
-      gap: 10
+      margin: '2px 0 4px'
     }
-  }, board.map(({
-    st,
-    p,
-    flips,
-    stage: sg,
-    next,
-    txp
-  }) => React.createElement("div", {
-    key: st.id,
-    onClick: () => setSelId(st.id),
-    style: {
-      cursor: 'pointer',
-      border: '1px solid var(--border)',
-      borderLeft: '3px solid var(--c-grn)',
-      borderRadius: 10,
-      padding: '11px 13px',
-      background: 'var(--surface3)',
-      transition: 'transform .15s'
-    },
-    onMouseEnter: e => e.currentTarget.style.transform = 'translateY(-2px)',
-    onMouseLeave: e => e.currentTarget.style.transform = ''
   }, React.createElement("div", {
-    style: {
-      display: 'flex',
-      alignItems: 'baseline',
-      gap: 8
-    }
-  }, React.createElement("span", {
-    style: {
-      fontSize: 14.5,
-      fontWeight: 700,
-      color: 'var(--g-eee)'
-    }
-  }, st.name), React.createElement("span", {
-    style: {
-      marginLeft: 'auto',
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 12,
-      letterSpacing: '1px',
-      textTransform: 'uppercase',
-      color: 'var(--c-grn)'
-    }
-  }, "Stage ", sg, " \xB7 ", (AC_STAGES.find(x => x.n === sg) || {}).name)), React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: 'var(--g-888)',
-      marginTop: 3
-    }
-  }, flips, "/", AC_SW.length, " switches \xB7 ", Object.keys(p.done || {}).length, " missions \xB7 ", txp, " XP"), React.createElement("div", {
-    style: {
-      fontSize: 12,
-      color: 'var(--g-777)',
-      marginTop: 5
-    }
-  }, next ? 'Next switch to earn: ' + next.name + ' — at ' + AC_SWGRADE(p, next.id) + ' / 5' : 'Every switch earned.'))))), sel && P && React.createElement(React.Fragment, null, React.createElement("div", {
+    className: "rv-empty-t"
+  }, "Pick a person above, search a name, or show everyone"), React.createElement("div", {
+    className: "rv-empty-p"
+  }, "The board stays quiet until you ask \u2014 same as the roster.")), (acAll || acQ.trim()) && React.createElement("div", null, AC_STAGES.map(stg => {
+    const ppl = board.filter(({
+      st,
+      stage: sg
+    }) => sg === stg.n && (!acQ.trim() || st.name.toLowerCase().includes(acQ.trim().toLowerCase())));
+    if (!ppl.length) return null;
+    return React.createElement("div", {
+      key: stg.n,
+      style: {
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: {
+        ...RV_LBL,
+        marginBottom: 6
+      }
+    }, "Stage ", stg.n, " \xB7 ", stg.name, " \xB7 ", ppl.length), React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 7
+      }
+    }, ppl.map(({
+      st,
+      flips,
+      txp
+    }) => React.createElement("span", {
+      key: st.id,
+      onClick: () => setSelId(st.id),
+      title: flips + ' switches earned · ' + txp + ' XP — open character sheet',
+      style: {
+        cursor: 'pointer',
+        fontSize: 12.5,
+        color: 'var(--g-ccc)',
+        border: '1px solid var(--border)',
+        borderRadius: 999,
+        padding: '5px 13px',
+        background: 'rgba(255,255,255,.03)',
+        transition: 'border-color .12s'
+      },
+      onMouseEnter: e => e.currentTarget.style.borderColor = 'rgba(47,214,168,.55)',
+      onMouseLeave: e => e.currentTarget.style.borderColor = ''
+    }, st.name, flips > 0 ? React.createElement("span", {
+      style: {
+        color: '#9fd9c6',
+        marginLeft: 6,
+        fontSize: 11
+      }
+    }, "\u26A1", flips) : null))));
+  }))), sel && P && React.createElement(React.Fragment, null, React.createElement("div", {
     className: "rvt",
     style: {
       marginBottom: 12
@@ -68064,14 +68095,26 @@ function AcademyTab({
   }, fx))), React.createElement("div", {
     style: {
       display: 'flex',
-      gap: 8,
+      gap: 7,
       flexWrap: 'wrap',
       margin: '2px 0 14px'
     }
-  }, [['map', '🗺 Growth Map'], ['missions', '⚡ Missions'], ['xp', '📈 XP & Log']].map(([k, l]) => React.createElement("button", {
+  }, [['map', '🗺 GROWTH MAP'], ['missions', '⚡ MISSIONS'], ['xp', '📈 XP & LOG']].map(([k, l]) => React.createElement("button", {
     key: k,
-    className: 'btn btn-sm ' + (acView === k ? 'btn-lime' : 'btn-ghost'),
-    onClick: () => setAcView(k)
+    onClick: () => setAcView(k),
+    style: {
+      cursor: 'pointer',
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 14.5,
+      fontWeight: 800,
+      letterSpacing: '1.6px',
+      padding: '8px 18px',
+      borderRadius: 9,
+      transition: 'all .14s',
+      border: '1px solid ' + (acView === k ? '#c9f26f' : 'rgba(255,255,255,.22)'),
+      background: acView === k ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'rgba(255,255,255,.05)',
+      color: acView === k ? '#06301f' : 'rgba(238,248,242,.72)'
+    }
   }, l))), acView === 'map' && React.createElement(React.Fragment, null, nextUp && React.createElement("div", {
     style: {
       ...C,
@@ -69642,7 +69685,7 @@ function LeadershipPage({
       People: 'rgba(68,204,170,.07)',
       Business: 'rgba(127,200,232,.07)',
       Strategic: 'rgba(244,219,113,.07)',
-      Operational: 'rgba(187,153,255,.07)',
+      Operational: 'rgba(127,200,232,.07)',
       'Comm/Authority': 'rgba(224,130,176,.07)'
     };
     return React.createElement("div", {
@@ -70396,7 +70439,7 @@ function SchedulePage({
         fontSize: 14,
         padding: '2px 6px',
         borderRadius: 3,
-        background: 'rgba(187,153,255,.15)',
+        background: 'rgba(127,200,232,.15)',
         color: 'var(--c-pur)',
         fontFamily: "'Barlow Condensed',sans-serif",
         fontWeight: 700
@@ -72046,8 +72089,8 @@ function ResourceDetailModal({
       display: 'inline-flex',
       alignItems: 'center',
       gap: 7,
-      background: 'rgba(187,153,255,.08)',
-      border: '1px solid rgba(187,153,255,.2)',
+      background: 'rgba(127,200,232,.08)',
+      border: '1px solid rgba(127,200,232,.2)',
       color: 'var(--c-pur)',
       borderRadius: 5,
       padding: '8px 14px',
@@ -72841,8 +72884,8 @@ function ResourceThreadModal({
         display: 'inline-flex',
         alignItems: 'center',
         gap: 6,
-        background: 'rgba(187,153,255,.08)',
-        border: '1px solid rgba(187,153,255,.2)',
+        background: 'rgba(127,200,232,.08)',
+        border: '1px solid rgba(127,200,232,.2)',
         color: 'var(--c-pur)',
         borderRadius: 4,
         padding: '5px 10px',
@@ -73088,8 +73131,8 @@ function ResourceThreadModal({
     }
   }, "\u2715")), attachFile && React.createElement("div", {
     style: {
-      background: 'rgba(187,153,255,.06)',
-      border: '1px solid rgba(187,153,255,.2)',
+      background: 'rgba(127,200,232,.06)',
+      border: '1px solid rgba(127,200,232,.2)',
       borderRadius: 4,
       padding: '6px 10px',
       marginBottom: 8,
@@ -75587,7 +75630,7 @@ function SystematicPage({
     open: true,
     style: {
       background: 'var(--surface2)',
-      border: '1px solid rgba(187,153,255,.35)',
+      border: '1px solid rgba(127,200,232,.35)',
       borderRadius: 8,
       overflow: 'hidden'
     }
@@ -75599,7 +75642,7 @@ function SystematicPage({
       fontWeight: 800,
       color: 'var(--c-pur)',
       userSelect: 'none',
-      background: 'rgba(187,153,255,.08)',
+      background: 'rgba(127,200,232,.08)',
       letterSpacing: '.3px'
     }
   }, "\uD83D\uDCC4 Full document \u2014 complete meeting notes, word for word ", React.createElement("span", {
@@ -75613,7 +75656,7 @@ function SystematicPage({
       maxHeight: 560,
       overflowY: 'auto',
       padding: '6px 22px 20px',
-      borderTop: '1px solid rgba(187,153,255,.2)'
+      borderTop: '1px solid rgba(127,200,232,.2)'
     }
   }, React.createElement(MdLite, {
     text: active.sourceDocText
@@ -77107,7 +77150,7 @@ function SystematicPage({
       label: "Lifestyle / goal \u2014 select all that apply",
       opts: MC_LIFE,
       k: "lifestyle",
-      col: ['rgba(187,153,255,.45)', 'rgba(187,153,255,.14)', 'var(--c-pur)']
+      col: ['rgba(127,200,232,.45)', 'rgba(127,200,232,.14)', 'var(--c-pur)']
     })), React.createElement("div", {
       style: {
         marginBottom: 18
@@ -77466,9 +77509,9 @@ function SystematicPage({
           key: sid,
           style: {
             fontSize: 11,
-            background: 'rgba(187,153,255,.08)',
+            background: 'rgba(127,200,232,.08)',
             color: 'var(--c-pur)',
-            border: '1px solid rgba(187,153,255,.22)',
+            border: '1px solid rgba(127,200,232,.22)',
             borderRadius: 3,
             padding: '1px 6px'
           }
