@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L211';
+window.__BUILD = 'build L212';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -49191,80 +49191,66 @@ function MentorsPage({
       color: 'rgba(238,248,242,.45)'
     }
   }, "+", unassigned.length - 4, " more below"))), React.createElement("style", null, `.mtx-name:hover{color:var(--c-lime2);text-decoration:underline;cursor:pointer;}`), React.createElement("div", {
-    className: "grid2 mb18"
-  }, MENTORS.map(m => {
+    className: "card mb18",
+    style: {
+      padding: '6px 16px'
+    }
+  }, MENTORS.map((m, mi) => {
     const mSess = sessions.filter(s => s.mentorId === m.id);
     const mStaff = new Set(mSess.flatMap(s => s.attendees || []));
     const last = mSess.map(s => s.date).filter(Boolean).sort().reverse()[0] || null;
     const ms = byName(m.name);
     return React.createElement("div", {
       key: m.id,
-      className: "card"
-    }, React.createElement("div", {
-      className: "flex aic jsb mb14"
-    }, React.createElement("div", {
-      className: "flex aic g12",
-      style: ms ? {
-        cursor: 'pointer'
-      } : undefined,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        flexWrap: 'wrap',
+        padding: '9px 0',
+        borderTop: mi ? '1px solid var(--border)' : 'none',
+        cursor: ms ? 'pointer' : 'default'
+      },
       title: ms ? 'Open profile' : undefined,
       onClick: () => {
         if (ms) openProfile(ms.id);
       }
     }, React.createElement(Av, {
       name: m.name,
-      sz: "md"
-    }), React.createElement("div", null, React.createElement("div", {
-      className: `bc fw6${ms ? ' mtx-name' : ''}`,
+      sz: "sm"
+    }), React.createElement("div", {
       style: {
-        fontSize: 17
-      }
-    }, m.name), React.createElement("div", {
-      className: "muted"
-    }, m.role))), React.createElement(DBadge, {
-      d: m.discipline
-    })), React.createElement("div", {
-      className: "grid3",
-      style: {
-        gap: 8,
-        marginBottom: 10
-      }
-    }, [{
-      l: 'Sessions',
-      v: mSess.length
-    }, {
-      l: 'Staff',
-      v: mStaff.size
-    }, {
-      l: 'Group',
-      v: mSess.filter(s => s.type === 'Group').length
-    }].map(c => React.createElement("div", {
-      key: c.l,
-      style: {
-        background: 'var(--surface2)',
-        borderRadius: 4,
-        padding: 8,
-        textAlign: 'center'
+        minWidth: 180
       }
     }, React.createElement("div", {
       className: "bc fw6",
       style: {
-        fontSize: 20
+        fontSize: 14.5
       }
-    }, c.v), React.createElement("div", {
+    }, m.name), React.createElement("div", {
+      className: "muted",
       style: {
-        fontSize: 12,
-        color: 'var(--text3)',
-        textTransform: 'uppercase',
-        letterSpacing: '1.5px',
-        marginTop: 2
+        fontSize: 12
       }
-    }, c.l)))), React.createElement("div", {
+    }, m.role)), React.createElement(DBadge, {
+      d: m.discipline
+    }), React.createElement("span", {
+      style: {
+        flex: 1
+      }
+    }), React.createElement("span", {
       style: {
         fontSize: 12.5,
-        color: 'var(--g-777)'
+        color: 'var(--g-888)'
       }
-    }, last ? `Last session ${fmt(last)}` : 'No sessions logged yet'));
+    }, mSess.length, " session", mSess.length !== 1 ? 's' : '', " \xB7 ", mStaff.size, " staff \xB7 ", mSess.filter(s => s.type === 'Group').length, " group"), React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: 'var(--g-666)',
+        minWidth: 150,
+        textAlign: 'right'
+      }
+    }, last ? 'last ' + fmt(last) : 'no sessions yet'));
   })), unassigned.length > 0 && React.createElement("div", {
     className: "att"
   }, React.createElement("div", {
@@ -73852,6 +73838,7 @@ function GDTrackerPage({
   const [filterStatus, setFilterStatus] = useState('all');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const [gdtAll, setGdtAll] = useState(false);
   const KEYS = ['q1', 'q2', 'q3', 'q4', 'annual'];
   const KEY_LABELS = {
     q1: 'Q1',
@@ -74014,7 +74001,10 @@ function GDTrackerPage({
       fontSize: 12.5,
       color: 'var(--g-777)'
     }
-  }, filtered.length, " therapist", filtered.length !== 1 ? 's' : ''), (search || filterSite !== 'all' || filterStatus !== 'all') && React.createElement("button", {
+  }, filtered.length, " therapist", filtered.length !== 1 ? 's' : ''), React.createElement("button", {
+    className: 'btn btn-xs ' + (gdtAll ? 'btn-go' : 'btn-ghost'),
+    onClick: () => setGdtAll(!gdtAll)
+  }, gdtAll ? 'Hide everyone' : 'Show everyone'), (search || filterSite !== 'all' || filterStatus !== 'all') && React.createElement("button", {
     className: "btn btn-ghost btn-xs",
     onClick: () => {
       setSearch('');
@@ -74061,7 +74051,16 @@ function GDTrackerPage({
     onToggleDone: k => updateRecord(r.id, {
       ['done_' + k]: !r['done_' + k]
     })
-  })))), siteGroups(restRows).map(([site, rows]) => React.createElement("div", {
+  })))), !gdtAll && !search.trim() && filterSite === 'all' && filterStatus === 'all' && React.createElement("div", {
+    className: "rv-empty",
+    style: {
+      margin: '4px 0 14px'
+    }
+  }, React.createElement("div", {
+    className: "rv-empty-t"
+  }, "Search a name, pick a site, or show everyone"), React.createElement("div", {
+    className: "rv-empty-p"
+  }, "Anyone overdue always appears above on their own \u2014 the full schedule stays quiet until you ask for it.")), (gdtAll || search.trim() || filterSite !== 'all' || filterStatus !== 'all') && siteGroups(restRows).map(([site, rows]) => React.createElement("div", {
     key: site,
     style: {
       marginBottom: 20
