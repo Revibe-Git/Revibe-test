@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L205';
+window.__BUILD = 'build L207';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -68861,6 +68861,8 @@ function LeadershipPage({
   const [filterLoc, setFilterLoc] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterDisc, setFilterDisc] = useState('all');
+  const [rosterView, setRosterView] = useState('cards');
+  const [rosterQ, setRosterQ] = useState('');
   const [archView, setArchView] = useState('list');
   const [showAdd, setShowAdd] = useState(false);
   useEffect(() => {
@@ -68989,27 +68991,27 @@ function LeadershipPage({
   }, [{
     label: 'Total Tracked',
     val: ltData.length,
-    color: 'var(--g-aaa)'
+    color: 'var(--g-eee)'
   }, {
     label: 'Expansion Ready',
     val: counts['expansion'] || 0,
-    color: 'var(--c-lime2)'
+    color: '#9fd9c6'
   }, {
     label: 'Ready Now',
     val: counts['ready-now'] || 0,
-    color: 'var(--c-grn)'
+    color: '#9fd9c6'
   }, {
     label: 'Ready 3–6 Mo',
     val: counts['ready-36'] || 0,
-    color: 'var(--c-yel)'
+    color: '#9fd9c6'
   }, {
     label: 'Emerging',
     val: counts['emerging'] || 0,
-    color: 'var(--lc1)'
+    color: '#9fd9c6'
   }, {
-    label: 'Blocked/Not Ready',
+    label: 'In Development',
     val: (counts['blocked'] || 0) + (counts['not-ready'] || 0),
-    color: 'var(--c-red)'
+    color: '#9fd9c6'
   }].map(s => React.createElement("div", {
     key: s.label,
     className: "lt-stat"
@@ -69040,6 +69042,59 @@ function LeadershipPage({
             .ltr-x{color:var(--g-999);font-size:14px;cursor:pointer;opacity:.25;transition:opacity .12s}
             .ltr .lt-table tr:hover .ltr-x{opacity:1}
           `), React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      rowGap: 6,
+      alignItems: 'center',
+      marginBottom: 10
+    }
+  }, [['all', 'EVERYONE'], ['expansion', 'EXPANSION'], ['ready-now', 'READY NOW'], ['ready-36', 'READY 3–6 MO'], ['emerging', 'EMERGING'], ['not-ready', 'NOT READY'], ['blocked', 'BLOCKED']].map(([k, lb], i, arr) => {
+    const n = k === 'all' ? computed.length : computed.filter(p => p.r.status === k).length;
+    const on = filterStatus === k;
+    return React.createElement("button", {
+      key: k,
+      onClick: () => setFilterStatus(k),
+      style: {
+        cursor: 'pointer',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 12.5,
+        fontWeight: 800,
+        letterSpacing: '1px',
+        padding: '7px 13px',
+        marginRight: -1,
+        borderRadius: i === 0 ? '9px 0 0 9px' : i === arr.length - 1 ? '0 9px 9px 0' : 0,
+        border: '1px solid ' + (on ? '#c9f26f' : 'var(--border)'),
+        position: on ? 'relative' : 'static',
+        zIndex: on ? 1 : 0,
+        background: on ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'rgba(255,255,255,.03)',
+        color: on ? '#06301f' : 'rgba(238,248,242,.62)',
+        transition: 'all .13s'
+      }
+    }, lb, n ? ' · ' + n : '');
+  }), React.createElement("span", {
+    style: {
+      flex: 1
+    }
+  }), React.createElement("input", {
+    value: rosterQ,
+    onChange: e => setRosterQ(e.target.value),
+    placeholder: "Search a name\u2026",
+    style: {
+      background: 'rgba(255,255,255,.05)',
+      border: '1px solid var(--border)',
+      borderRadius: 9,
+      color: 'var(--text)',
+      fontSize: 13,
+      padding: '7px 12px',
+      outline: 'none',
+      width: 170
+    }
+  }), [['cards', '▦ Cards'], ['table', '☰ Table']].map(([k, lb]) => React.createElement("button", {
+    key: k,
+    className: 'btn btn-xs ' + (rosterView === k ? 'btn-go' : 'btn-ghost'),
+    onClick: () => setRosterView(k)
+  }, lb))), React.createElement("div", {
     className: "filter-row"
   }, React.createElement("div", {
     className: "filter-grp flex aic g6"
@@ -69096,7 +69151,125 @@ function LeadershipPage({
       setFilterDisc('all');
       setFilterStatus('all');
     }
-  }, "clear filters"))), React.createElement("div", {
+  }, "clear filters"))), rosterView === 'cards' && React.createElement("div", null, React.createElement("style", null, '.rvros-card .rvros-x{opacity:0;transition:opacity .15s}.rvros-card:hover .rvros-x{opacity:.7}.rvros-card{transition:border-color .13s}.rvros-card:hover{border-color:rgba(47,214,168,.45)}'), filterStatus === 'all' && !rosterQ.trim() ? React.createElement("div", {
+    className: "rv-empty",
+    style: {
+      margin: '4px 0 14px'
+    }
+  }, React.createElement("div", {
+    className: "rv-empty-t"
+  }, "Pick a lane above, or search a name"), React.createElement("div", {
+    className: "rv-empty-p"
+  }, "The board stays quiet until you ask for someone \u2014 EVERYONE is one click away when you want the full picture.")) : React.createElement("div", {
+    style: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill,minmax(248px,1fr))',
+      gap: 10,
+      marginBottom: 14
+    }
+  }, filtered.filter(p => !rosterQ.trim() || p.name.toLowerCase().includes(rosterQ.trim().toLowerCase())).sort((a, b) => b.r.total - a.r.total).map(p => {
+    const sm = STATUS_META[p.r.status];
+    return React.createElement("div", {
+      key: p.id,
+      className: "rvros-card",
+      onClick: () => setSelectedPerson(p),
+      style: {
+        cursor: 'pointer',
+        background: 'var(--surface2)',
+        border: '1px solid var(--border)',
+        borderRadius: 11,
+        padding: '12px 14px'
+      }
+    }, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8,
+        alignItems: 'baseline'
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 14.5,
+        fontWeight: 700,
+        color: 'var(--text)',
+        flex: 1,
+        minWidth: 0,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    }, p.name), React.createElement(PLink, {
+      p: p,
+      stop: true
+    })), React.createElement("div", {
+      style: {
+        fontSize: 11.5,
+        color: 'var(--g-777)',
+        margin: '1px 0 9px'
+      }
+    }, p.disc, " \xB7 ", p.primaryLoc, " \xB7 Lv ", p.level), React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 9
+      }
+    }, React.createElement("span", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 24,
+        fontWeight: 800,
+        color: 'var(--g-eee)',
+        lineHeight: 1
+      }
+    }, p.r.total), React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, React.createElement(LtScoreBar, {
+      score: p.r.total,
+      max: 100,
+      color: "#2fd6a8"
+    }))), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8,
+        flexWrap: 'wrap',
+        marginTop: 9,
+        alignItems: 'center'
+      }
+    }, React.createElement("span", {
+      style: {
+        fontSize: 11.5,
+        color: '#9fd9c6'
+      }
+    }, sm.label.replace(/^[^A-Za-z]+/, '')), React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: 'var(--g-666)'
+      }
+    }, "gate ", p.r.gateScore, "/7"), p.r.flagCount > 0 && React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: 'var(--c-amb)'
+      }
+    }, "\u2691 ", p.r.flagCount), React.createElement("span", {
+      style: {
+        flex: 1
+      }
+    }), React.createElement("span", {
+      className: "rvros-x",
+      style: {
+        cursor: 'pointer',
+        color: 'var(--g-666)',
+        fontSize: 12
+      },
+      title: 'Remove ' + p.name + ' from the tracker',
+      onClick: ev => {
+        ev.stopPropagation();
+        if (window.confirm('Remove ' + p.name + '?')) removePerson(p.id);
+      }
+    }, "\u2715")));
+  }))), rosterView === 'table' && React.createElement("div", {
     className: "lt-section"
   }, React.createElement("div", {
     className: "ltr-hdr"
@@ -69927,19 +70100,20 @@ function LeadershipPage({
   }].map(section => React.createElement("div", {
     key: section.title,
     style: {
-      background: 'var(--surface)',
+      background: 'var(--surface2)',
       border: '1px solid var(--border)',
-      borderRadius: 6,
+      borderLeft: '3px solid #2fd6a8',
+      borderRadius: 11,
       padding: '16px 18px'
     }
   }, React.createElement("div", {
     style: {
       fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 14,
-      letterSpacing: '2px',
+      fontSize: 15,
+      letterSpacing: '2.2px',
       textTransform: 'uppercase',
-      color: 'var(--lime)',
-      fontWeight: 700,
+      color: '#9fd9c6',
+      fontWeight: 800,
       marginBottom: 14
     }
   }, section.title), section.items.map(item => React.createElement("div", {
