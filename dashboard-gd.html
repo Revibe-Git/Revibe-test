@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L201';
+window.__BUILD = 'build L202';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -62594,63 +62594,36 @@ function RvStepAdd({
     }
   }));
 }
-function RvMiniCard({
-  title,
+function RvPtList({
   pts,
-  hue,
-  onTitle,
   onPts,
-  numbered
+  numbered,
+  cols
 }) {
   const [add, setAdd] = useState(false);
   const [v, setV] = useState('');
-  return React.createElement("div", {
-    style: {
-      border: '1px solid var(--border)',
-      borderTop: '2px solid ' + hue,
-      borderRadius: 10,
-      padding: '10px 12px',
-      background: 'var(--surface3)'
-    }
-  }, React.createElement("div", {
-    style: {
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 14.5,
-      fontWeight: 800,
-      letterSpacing: '1.2px',
-      textTransform: 'uppercase',
-      color: hue,
-      marginBottom: 6
-    }
-  }, React.createElement(RvInlineEdit, {
-    value: title,
-    onSave: onTitle,
-    placeholder: "name this",
-    style: {
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 14.5,
-      fontWeight: 800,
-      letterSpacing: '1.2px',
-      textTransform: 'uppercase',
-      color: hue,
-      borderBottom: 'none'
-    }
-  })), (pts || []).map((t, i) => React.createElement("div", {
+  return React.createElement("div", null, React.createElement("div", {
+    style: cols ? {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit,minmax(250px,1fr))',
+      gap: '2px 26px'
+    } : null
+  }, (pts || []).map((t, i) => React.createElement("div", {
     key: i,
     className: "rvrm-row",
     style: {
       display: 'flex',
-      gap: 7,
-      padding: '2.5px 4px 2.5px 0',
+      gap: 8,
+      padding: '3px 4px 3px 0',
       fontSize: 12.5,
       lineHeight: 1.55,
       alignItems: 'flex-start'
     }
   }, React.createElement("span", {
     style: {
-      color: hue,
-      opacity: .75,
-      minWidth: numbered ? 14 : 'auto'
+      color: '#9fd9c6',
+      opacity: .8,
+      minWidth: numbered ? 15 : 'auto'
     }
   }, numbered ? i + 1 : '•'), React.createElement("span", {
     style: {
@@ -62674,7 +62647,7 @@ function RvMiniCard({
     },
     title: "Remove",
     onClick: () => onPts(pts.filter((_, j) => j !== i))
-  }, "\u2715"))), add ? React.createElement("input", {
+  }, "\u2715")))), add ? React.createElement("input", {
     autoFocus: true,
     value: v,
     onChange: e => setV(e.target.value),
@@ -62746,6 +62719,7 @@ function RvRoadmapPlan({
   const fi = Math.min(focusSel == null ? current : focusSel, rm.phases.length - 1);
   const ph = rm.phases[fi];
   const [manage, setManage] = useState(false);
+  const [pilSel, setPilSel] = useState(0);
   const toggleItem = (p, it) => {
     const items = p.items.map(x => x.id === it.id ? {
       ...x,
@@ -63374,87 +63348,161 @@ function RvRoadmapPlan({
         done: false
       }]
     })
-  })), (rm.pillars || []).length > 0 && React.createElement("div", {
-    style: {
-      marginTop: 16
-    }
-  }, React.createElement("div", {
-    style: {
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 15,
-      fontWeight: 800,
-      letterSpacing: '2.2px',
-      color: '#9fd9c6',
-      textTransform: 'uppercase',
-      marginBottom: 8
-    }
-  }, (rm.pillars || []).length, " PILLARS ", who ? who.split(' ')[0].toUpperCase() : '', " WILL DEVELOP & OWN"), React.createElement("div", {
-    style: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fill,minmax(225px,1fr))',
-      gap: 10
-    }
-  }, (rm.pillars || []).map((p, pi) => {
-    const HUES = ['#8fd0a8', '#e9c08a', '#7db8d8', '#c9f26f', '#d8a97d', '#9fd9c6', '#7ac490', '#e0b3a0'];
-    return React.createElement(RvMiniCard, {
-      key: pi,
-      title: p.name,
-      pts: p.pts || [],
-      hue: HUES[pi % HUES.length],
-      onTitle: t => upd({
-        pillars: rm.pillars.map((x, j) => j === pi ? {
-          ...x,
-          name: t
-        } : x)
-      }),
-      onPts: pts => upd({
-        pillars: rm.pillars.map((x, j) => j === pi ? {
-          ...x,
-          pts
-        } : x)
-      })
+  })), (rm.pillars || []).length > 0 && (() => {
+    const pi = Math.min(pilSel, rm.pillars.length - 1);
+    const P = rm.pillars[pi];
+    const setP = patch => upd({
+      pillars: rm.pillars.map((x, j) => j === pi ? {
+        ...x,
+        ...patch
+      } : x)
     });
-  }))), ((rm.indicators || []).length > 0 || (rm.review || []).length > 0 || rm.outcome) && React.createElement("div", {
+    return React.createElement("div", {
+      style: {
+        marginTop: 16,
+        border: '1px solid var(--border)',
+        borderRadius: 12,
+        background: 'var(--surface3)',
+        padding: '14px 17px'
+      }
+    }, React.createElement("div", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 15,
+        fontWeight: 800,
+        letterSpacing: '2.2px',
+        color: '#9fd9c6',
+        textTransform: 'uppercase',
+        marginBottom: 10
+      }
+    }, rm.pillars.length, " pillars ", who ? who.split(' ')[0].toUpperCase() : '', " will develop & own"), React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexWrap: 'wrap',
+        rowGap: 6,
+        marginBottom: 13
+      }
+    }, rm.pillars.map((p, i) => React.createElement("button", {
+      key: i,
+      onClick: () => setPilSel(i),
+      style: {
+        cursor: 'pointer',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 12.5,
+        fontWeight: 800,
+        letterSpacing: '1px',
+        textTransform: 'uppercase',
+        padding: '7px 14px',
+        marginRight: -1,
+        borderRadius: i === 0 ? '9px 0 0 9px' : i === rm.pillars.length - 1 ? '0 9px 9px 0' : 0,
+        border: '1px solid ' + (i === pi ? '#c9f26f' : 'var(--border)'),
+        position: i === pi ? 'relative' : 'static',
+        zIndex: i === pi ? 1 : 0,
+        background: i === pi ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'rgba(255,255,255,.03)',
+        color: i === pi ? '#06301f' : 'rgba(238,248,242,.62)',
+        transition: 'all .13s'
+      }
+    }, (p.name || 'pillar ' + (i + 1)).toUpperCase()))), React.createElement("div", {
+      className: "rvrm-row",
+      style: {
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: 10,
+        flexWrap: 'wrap',
+        marginBottom: 6,
+        padding: '0 4px 0 0'
+      }
+    }, React.createElement("span", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 19,
+        fontWeight: 800,
+        letterSpacing: '1.2px',
+        textTransform: 'uppercase',
+        color: '#f0f8f3'
+      }
+    }, React.createElement(RvInlineEdit, {
+      value: P.name,
+      onSave: t => setP({
+        name: t
+      }),
+      placeholder: "name this pillar",
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 19,
+        fontWeight: 800,
+        letterSpacing: '1.2px',
+        textTransform: 'uppercase',
+        color: '#f0f8f3'
+      }
+    })), React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: 'var(--g-666)'
+      }
+    }, "\xB7 will learn to"), React.createElement("span", {
+      style: {
+        flex: 1
+      }
+    }), React.createElement("span", {
+      className: "rvrm-x",
+      style: {
+        cursor: 'pointer',
+        color: 'var(--g-666)',
+        fontSize: 12
+      },
+      title: "Remove this pillar",
+      onClick: () => {
+        if (window.confirm('Remove the ' + (P.name || 'selected') + ' pillar?')) {
+          upd({
+            pillars: rm.pillars.filter((_, j) => j !== pi)
+          });
+          setPilSel(0);
+        }
+      }
+    }, "\uD83D\uDDD1")), React.createElement(RvPtList, {
+      cols: true,
+      pts: P.pts || [],
+      onPts: pts => setP({
+        pts
+      })
+    }));
+  })(), ((rm.indicators || []).length > 0 || (rm.review || []).length > 0 || rm.outcome != null) && React.createElement("div", {
     style: {
+      marginTop: 12,
+      border: '1px solid var(--border)',
+      borderRadius: 12,
+      background: 'var(--surface3)',
+      padding: '14px 17px',
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))',
-      gap: 10,
-      marginTop: 14
+      gridTemplateColumns: 'repeat(auto-fit,minmax(270px,1fr))',
+      gap: '14px 34px'
     }
-  }, (rm.indicators || []).length > 0 && React.createElement(RvMiniCard, {
-    title: 'Key success indicators' + (rm.target ? ' by ' + rm.target : ''),
+  }, (rm.indicators || []).length > 0 && React.createElement("div", null, React.createElement("div", {
+    style: {
+      ...RV_LBL,
+      marginBottom: 7
+    }
+  }, "Key success indicators", rm.target ? ' by ' + rm.target : ''), React.createElement(RvPtList, {
     pts: rm.indicators,
-    hue: "#c9f26f",
-    onTitle: () => {},
     onPts: pts => upd({
       indicators: pts
     })
-  }), (rm.review || []).length > 0 && React.createElement(RvMiniCard, {
-    title: 'Weekly director review ' + (who ? who.split(' ')[0] : 'they') + ' will lead',
-    pts: rm.review,
-    hue: "#7db8d8",
+  })), (rm.review || []).length > 0 && React.createElement("div", null, React.createElement("div", {
+    style: {
+      ...RV_LBL,
+      marginBottom: 7
+    }
+  }, "Weekly director review ", who ? who.split(' ')[0] : 'they', " will lead"), React.createElement(RvPtList, {
     numbered: true,
-    onTitle: () => {},
+    pts: rm.review,
     onPts: pts => upd({
       review: pts
     })
-  }), rm.outcome != null && React.createElement("div", {
+  })), rm.outcome != null && React.createElement("div", null, React.createElement("div", {
     style: {
-      border: '1px solid var(--border)',
-      borderTop: '2px solid #e9c08a',
-      borderRadius: 10,
-      padding: '10px 12px',
-      background: 'var(--surface3)'
-    }
-  }, React.createElement("div", {
-    style: {
-      fontFamily: "'Barlow Condensed',sans-serif",
-      fontSize: 14.5,
-      fontWeight: 800,
-      letterSpacing: '1.2px',
-      textTransform: 'uppercase',
-      color: '#e9c08a',
-      marginBottom: 6
+      ...RV_LBL,
+      marginBottom: 7
     }
   }, "Role outcome", rm.target ? ' by ' + rm.target : ''), React.createElement("div", {
     style: {
@@ -63481,7 +63529,7 @@ function RvRoadmapPlan({
       display: 'flex',
       gap: 5,
       flexWrap: 'wrap',
-      marginTop: 8
+      marginTop: 9
     }
   }, (rm.identity || []).map((t, i) => React.createElement("span", {
     key: i,
