@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L202';
+window.__BUILD = 'build L203';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -65501,7 +65501,7 @@ function LeadDevTab({
         marginTop: 14,
         flexWrap: 'wrap'
       }
-    }, [['plan', 'THEIR OWN PLAN'], ['tree', 'SKILL TREE'], ['team', 'THEIR TEAM · ' + team.length], ['eff', 'EFFECTIVENESS']].map(([k, l2]) => React.createElement("button", {
+    }, [['plan', '🗺 DEVELOPMENT'], ['tree', '⬡ SKILL TREE'], ['team', '◐ THEIR TEAM · ' + team.length], ['eff', '📈 EFFECTIVENESS']].map(([k, l2]) => React.createElement("button", {
       key: k,
       onClick: () => setLeadTab(k),
       style: {
@@ -65521,12 +65521,28 @@ function LeadDevTab({
       style: {
         marginTop: 12
       }
-    }, React.createElement("div", {
+    }, React.createElement(LD_PersonView, {
+      ctx: LDPV_CTX,
+      person: {
+        id: lead.id,
+        name: lead.name,
+        discipline: lead.area
+      },
+      lead: {
+        short: 'Dave'
+      },
+      hue: hue,
+      back: () => setView({
+        lead: null,
+        person: null
+      })
+    }), React.createElement("div", {
       style: {
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit,minmax(430px,1fr))',
         gap: 12,
-        alignItems: 'start'
+        alignItems: 'start',
+        marginTop: 14
       }
     }, React.createElement("div", {
       className: "ldsec",
@@ -65608,27 +65624,7 @@ function LeadDevTab({
         lineHeight: 1.55,
         marginTop: 1
       }
-    }, d)))))), React.createElement("div", {
-      className: "ldsec",
-      style: {
-        '--h': hue
-      }
-    }, React.createElement("h4", null, "THEIR DEVELOPMENT PLAN"), React.createElement("div", {
-      className: "sub"
-    }, "Priorities, actions and evidence \u2014 the same discipline they apply to their people."), React.createElement(LD_PersonView, {
-      ctx: LDPV_CTX,
-      person: {
-        id: lead.id,
-        name: lead.name,
-        discipline: lead.area
-      },
-      lead: {
-        short: 'Dave'
-      },
-      embed: true,
-      hue: hue,
-      back: () => setLeadTab('team')
-    }))), leadTab === 'tree' && React.createElement("div", {
+    }, d))))))), leadTab === 'tree' && React.createElement("div", {
       style: {
         marginTop: 12
       }
