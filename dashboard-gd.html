@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L203';
+window.__BUILD = 'build L204';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -4309,7 +4309,7 @@ function App() {
               const a = L.plans[id],
                 b = plans[id];
               const w = x => x ? (x.priorities || []).length * 100 + (x.evidence || []).length * 10 + (x.checkins || []).length : -1;
-              plans[id] = w(a) >= w(b) ? a : b;
+              plans[id] = w(a) > w(b) ? a : w(b) > w(a) ? b : (a && a._t || 0) >= (b && b._t || 0) ? a : b;
             });
             return {
               ...S,
@@ -64805,7 +64805,8 @@ function LeadDevTab({
       ...(db.plans || {}),
       [id]: {
         ...planOf(id),
-        ...patch
+        ...patch,
+        _t: Date.now()
       }
     }
   });
