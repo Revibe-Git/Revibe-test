@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L213';
+window.__BUILD = 'build L214';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -58297,7 +58297,15 @@ function ProfileEditTab({
     style: {
       color: 'var(--c-red)'
     }
-  }, "*"), " are required.")), React.createElement("div", {
+  }, "*"), " are required.")), React.createElement("style", null, `
+        .pecard{background:var(--surface2);border:1px solid var(--border);border-left:3px solid #2fd6a8;border-radius:12px;padding:16px 18px;margin-bottom:14px;}
+        .pehead{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#fff;margin-bottom:12px;}
+        .pecard .fgrid label{color:#9fd9c6;}
+      `), React.createElement("div", {
+    className: "pecard"
+  }, React.createElement("div", {
+    className: "pehead"
+  }, "\uD83E\uDEAA Identity"), React.createElement("div", {
     className: "fgrid"
   }, React.createElement("div", {
     className: "fg full"
@@ -58396,7 +58404,13 @@ function ProfileEditTab({
   }, React.createElement("label", null, "Site(s)"), React.createElement(SiteMultiSelect, {
     value: f.site,
     onChange: v => set('site', v)
-  })), React.createElement("div", {
+  })))), React.createElement("div", {
+    className: "pecard"
+  }, React.createElement("div", {
+    className: "pehead"
+  }, "\uD83C\uDF31 Growth & Craft"), React.createElement("div", {
+    className: "fgrid"
+  }, React.createElement("div", {
     className: "fg"
   }, React.createElement("label", null, "Roadmap Phase"), React.createElement("select", {
     value: f.roadmap,
@@ -58415,9 +58429,13 @@ function ProfileEditTab({
     value: f.themeSong,
     onChange: e => set('themeSong', e.target.value),
     placeholder: "Paste a YouTube, Spotify, or audio file link \u2014 plays on your character page"
-  })), React.createElement("div", {
-    className: "fsec"
+  })))), React.createElement("div", {
+    className: "pecard"
+  }, React.createElement("div", {
+    className: "pehead"
   }, "\uD83C\uDF93 Foundation"), React.createElement("div", {
+    className: "fgrid"
+  }, React.createElement("div", {
     className: "fg full"
   }, React.createElement("label", null, "Education / background"), React.createElement("input", {
     value: (f.foundation || {}).edu || '',
@@ -58453,7 +58471,13 @@ function ProfileEditTab({
       mentors: e.target.value
     }),
     placeholder: "Comma-separated \u2014 e.g. Scott, Winson"
-  })), React.createElement("div", {
+  })))), React.createElement("div", {
+    className: "pecard"
+  }, React.createElement("div", {
+    className: "pehead"
+  }, "\uD83D\uDCC4 Contract & Compensation"), React.createElement("div", {
+    className: "fgrid"
+  }, React.createElement("div", {
     className: "fg"
   }, React.createElement("label", null, "Contract Renewal Date"), React.createElement("input", {
     type: "date",
@@ -58518,7 +58542,13 @@ function ProfileEditTab({
     style: {
       accentColor: 'var(--go)'
     }
-  }), " Receives monthly stipend")), React.createElement("div", {
+  }), " Receives monthly stipend")))), React.createElement("div", {
+    className: "pecard"
+  }, React.createElement("div", {
+    className: "pehead"
+  }, "\uD83D\uDCDD Tracks, Coaching & Reflection"), React.createElement("div", {
+    className: "fgrid"
+  }, React.createElement("div", {
     className: "fg full"
   }, React.createElement("label", null, "Rubric Tracks"), React.createElement("div", {
     className: "flex aic g6",
@@ -58545,26 +58575,22 @@ function ProfileEditTab({
     style: {
       minHeight: 70
     }
-  })), React.createElement("div", {
-    className: "fg full",
+  })))), React.createElement("div", {
+    className: "pecard"
+  }, React.createElement("div", {
+    className: "pehead"
+  }, "\uD83E\uDDED Match Profile"), React.createElement("div", {
+    className: "fgrid"
+  }, React.createElement("div", {
+    className: "fg full"
+  }, React.createElement("div", {
     style: {
-      borderTop: '1px solid var(--border)',
-      paddingTop: 14,
-      marginTop: 4
-    }
-  }, React.createElement("label", {
-    style: {
-      color: 'var(--c-blu2)'
-    }
-  }, "\uD83E\uDDED Match Profile ", React.createElement("span", {
-    style: {
-      fontSize: 13,
-      fontWeight: 400,
+      fontSize: 12.5,
       color: 'var(--g-777)',
-      letterSpacing: 0,
-      textTransform: 'none'
+      marginBottom: 8,
+      marginTop: -6
     }
-  }, "\u2014 used to suggest the right clinician for a case")), React.createElement("div", {
+  }, "Used to suggest the right clinician for a case."), React.createElement("div", {
     style: {
       display: 'flex',
       gap: 10,
@@ -58681,7 +58707,7 @@ function ProfileEditTab({
       minHeight: k === 'matchNotes' || k === 'personality' ? 60 : 42
     },
     placeholder: k === 'matchNotes' ? 'e.g. Reach for them when the guest is an athlete or wants a direct, no-fluff approach' : ''
-  })))), React.createElement("div", {
+  }))))), React.createElement("div", {
     className: "flex aic g8",
     style: {
       marginTop: 14,
