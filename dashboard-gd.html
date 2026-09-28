@@ -1922,7 +1922,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L212';
+window.__BUILD = 'build L213';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -57535,6 +57535,12 @@ function ProfileEditTab({
     roadmap: staff.roadmap || '',
     archetype: staff.archetype || '',
     themeSong: staff.themeSong || '',
+    foundation: staff.foundation || {
+      edu: '',
+      system: '',
+      courses: [],
+      mentors: []
+    },
     notes: staff.notes || '',
     reflection: staff.reflection || '',
     tracks: staff.tracks || [],
@@ -57564,6 +57570,16 @@ function ProfileEditTab({
       ...staff,
       ...f
     };
+    if (updated.foundation) {
+      const F = updated.foundation;
+      const arr = x => Array.isArray(x) ? x : String(x || '').split(',').map(t => t.trim()).filter(Boolean);
+      updated.foundation = {
+        edu: F.edu || '',
+        system: F.system || '',
+        courses: arr(F.courses),
+        mentors: arr(F.mentors)
+      };
+    }
     const oldSplit = staff.split == null || staff.split === '' ? null : String(staff.split);
     const newSplit = f.split == null || f.split === '' ? null : String(f.split);
     if (newSplit && oldSplit !== newSplit) {
@@ -57801,6 +57817,48 @@ function ProfileEditTab({
   }, "Specializations"), React.createElement(PChips, {
     items: (staff.specializations || []).map(sid => SPECIALIZATIONS.find(sp => sp.id === sid)?.label).filter(Boolean)
   })))), React.createElement("div", {
+    style: PCARD
+  }, React.createElement("div", {
+    style: PHEAD
+  }, "\uD83C\uDF93 Foundation"), (() => {
+    const F = staff.foundation || {};
+    const has = F.edu || F.system || (F.courses || []).length || (F.mentors || []).length;
+    if (!has) return React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-777)'
+      }
+    }, "Not recorded yet \u2014 education, courses taken, the treatment system they work from, and their mentors live here. Add them in \u270E Edit profile; their competency grading builds on this base.");
+    return React.createElement("div", {
+      style: {
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '16px 24px'
+      }
+    }, React.createElement(PItem, {
+      l: "Education",
+      v: F.edu || '—'
+    }), React.createElement(PItem, {
+      l: "Treatment foundation \xB7 system",
+      v: F.system || 'not set'
+    }), (F.courses || []).length > 0 && React.createElement("div", {
+      style: {
+        flex: '1 1 100%'
+      }
+    }, React.createElement("div", {
+      style: PLBL
+    }, "Courses taken"), React.createElement(PChips, {
+      items: F.courses
+    })), (F.mentors || []).length > 0 && React.createElement("div", {
+      style: {
+        flex: '1 1 100%'
+      }
+    }, React.createElement("div", {
+      style: PLBL
+    }, "Mentors"), React.createElement(PChips, {
+      items: F.mentors
+    })));
+  })()), React.createElement("div", {
     style: {
       ...PCARD,
       marginBottom: 0
@@ -58357,6 +58415,44 @@ function ProfileEditTab({
     value: f.themeSong,
     onChange: e => set('themeSong', e.target.value),
     placeholder: "Paste a YouTube, Spotify, or audio file link \u2014 plays on your character page"
+  })), React.createElement("div", {
+    className: "fsec"
+  }, "\uD83C\uDF93 Foundation"), React.createElement("div", {
+    className: "fg full"
+  }, React.createElement("label", null, "Education / background"), React.createElement("input", {
+    value: (f.foundation || {}).edu || '',
+    onChange: e => set('foundation', {
+      ...f.foundation,
+      edu: e.target.value
+    }),
+    placeholder: "Degrees, schools, designations \u2014 e.g. MScPT, University of Toronto"
+  })), React.createElement("div", {
+    className: "fg"
+  }, React.createElement("label", null, "Treatment foundation \xB7 their system"), React.createElement("input", {
+    value: (f.foundation || {}).system || '',
+    onChange: e => set('foundation', {
+      ...f.foundation,
+      system: e.target.value
+    }),
+    placeholder: "The base they treat from \u2014 e.g. ISS"
+  })), React.createElement("div", {
+    className: "fg"
+  }, React.createElement("label", null, "Courses taken"), React.createElement("input", {
+    value: Array.isArray((f.foundation || {}).courses) ? f.foundation.courses.join(', ') : (f.foundation || {}).courses || '',
+    onChange: e => set('foundation', {
+      ...f.foundation,
+      courses: e.target.value
+    }),
+    placeholder: "Comma-separated \u2014 e.g. ISS Level 1, McKenzie A"
+  })), React.createElement("div", {
+    className: "fg full"
+  }, React.createElement("label", null, "Mentors"), React.createElement("input", {
+    value: Array.isArray((f.foundation || {}).mentors) ? f.foundation.mentors.join(', ') : (f.foundation || {}).mentors || '',
+    onChange: e => set('foundation', {
+      ...f.foundation,
+      mentors: e.target.value
+    }),
+    placeholder: "Comma-separated \u2014 e.g. Scott, Winson"
   })), React.createElement("div", {
     className: "fg"
   }, React.createElement("label", null, "Contract Renewal Date"), React.createElement("input", {
@@ -64589,7 +64685,28 @@ function LD_PersonView({
         color: 'var(--c-amb)',
         marginTop: 6
       }
-    }, "No G&D scores yet \u2014 log an evaluation from their profile and it shows here automatically."), legacy.length > 0 && React.createElement("details", {
+    }, "No G&D scores yet \u2014 log an evaluation from their profile and it shows here automatically."), (() => {
+      const F = st.foundation || {};
+      if (!(F.system || (F.mentors || []).length)) return null;
+      return React.createElement("div", {
+        style: {
+          fontSize: 12.5,
+          color: 'var(--g-999)',
+          marginTop: 8,
+          paddingTop: 8,
+          borderTop: '1px solid var(--border)'
+        }
+      }, "\uD83C\uDF93 Foundation: ", React.createElement("span", {
+        style: {
+          color: '#9fd9c6',
+          fontWeight: 700
+        }
+      }, F.system || 'not set'), (F.mentors || []).length > 0 && React.createElement("span", null, " \xB7 mentors: ", F.mentors.join(', ')), React.createElement("span", {
+        style: {
+          color: 'var(--g-666)'
+        }
+      }, " \u2014 the base their competency grading builds on"));
+    })(), legacy.length > 0 && React.createElement("details", {
       style: {
         marginTop: 8
       }
