@@ -1927,7 +1927,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L217';
+window.__BUILD = 'build L220';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -4305,7 +4305,7 @@ function App() {
             t: Date.now()
           }
         }).then(() => {}, () => {});
-        ['staff', 'evals', 'sessions', 'gx', 'comp', 'leaddev', 'academy'].forEach(k => {
+        ['staff', 'evals', 'sessions', 'gx', 'comp', 'leaddev', 'academy', 'assign'].forEach(k => {
           const sRow = srv[k];
           let localV = null;
           try {
@@ -4333,6 +4333,22 @@ function App() {
                 ...(S.assign || {}),
                 ...(L.assign || {})
               }
+            };
+          })() : k === 'assign' ? (() => {
+            const L = localV || {},
+              S = (sRow ? sRow.v : null) || {};
+            const tasks = {
+              ...(S.tasks || {})
+            };
+            Object.keys(L.tasks || {}).forEach(id => {
+              const a = L.tasks[id],
+                b = tasks[id];
+              tasks[id] = !b || (a && a._t || 0) >= (b && b._t || 0) ? a : b;
+            });
+            return {
+              ...S,
+              ...L,
+              tasks
             };
           })() : k === 'academy' ? (() => {
             const L = localV || {},
@@ -42651,6 +42667,7 @@ const GP_ST_META = {
   lapsed: 'Lapsed · 90d+ quiet'
 };
 function GP_AGG(evs, staffList) {
+  const isRec = e => e.disc === 'Recovery';
   evs.sort((a, b) => a.d.localeCompare(b.d));
   const arrDates = evs.filter(e => e.st === 'arrived').map(e => e.d);
   const dataEnd = arrDates.length ? arrDates[arrDates.length - 1] : '';
@@ -42662,31 +42679,46 @@ function GP_AGG(evs, staffList) {
       name: e.nm,
       num: e.num,
       v: 0,
+      vr: 0,
       ns: 0,
       cx: 0,
       up: 0,
       nextD: '',
       dates: [],
+      rdates: [],
       prs: {},
+      prsClin: {},
       txs: {},
+      rtxs: {},
       discs: {},
       locs: {},
       online: 0,
       months: {},
+      rmonths: {},
       crs: {}
     });
     if (e.nm && e.nm.length > x.name.length) x.name = e.nm;
     if (e.num && !x.num) x.num = e.num;
     if (e.st === 'arrived') {
-      x.v++;
-      x.dates.push(e.d);
+      const rec = isRec(e);
+      if (rec) {
+        x.vr++;
+        x.rdates.push(e.d);
+        if (e.tx) x.rtxs[e.tx] = (x.rtxs[e.tx] || 0) + 1;
+        const mo = e.d.slice(0, 7);
+        x.rmonths[mo] = (x.rmonths[mo] || 0) + 1;
+      } else {
+        x.v++;
+        x.dates.push(e.d);
+        if (e.pr) x.prsClin[e.pr] = (x.prsClin[e.pr] || 0) + 1;
+        if (e.tx) x.txs[e.tx] = (x.txs[e.tx] || 0) + 1;
+        const mo = e.d.slice(0, 7);
+        x.months[mo] = (x.months[mo] || 0) + 1;
+      }
       if (e.pr) x.prs[e.pr] = (x.prs[e.pr] || 0) + 1;
-      if (e.tx) x.txs[e.tx] = (x.txs[e.tx] || 0) + 1;
       x.discs[e.disc] = (x.discs[e.disc] || 0) + 1;
       x.locs[e.loc] = (x.locs[e.loc] || 0) + 1;
       if (e.on) x.online++;
-      const mo = e.d.slice(0, 7);
-      x.months[mo] = (x.months[mo] || 0) + 1;
     } else if (e.st === 'no_show') x.ns++;else if (e.st === 'cancelled') {
       x.cx++;
       if (e.cr) x.crs[e.cr] = (x.crs[e.cr] || 0) + 1;
@@ -42695,24 +42727,28 @@ function GP_AGG(evs, staffList) {
       if (!x.nextD || e.d < x.nextD) x.nextD = e.d;
     }
   });
-  const guests = Object.values(byId).filter(x => x.v > 0);
+  const guests = Object.values(byId).filter(x => x.v > 0 || x.vr > 0);
   guests.forEach(x => {
-    x.first = x.dates[0];
-    x.last = x.dates[x.dates.length - 1];
+    x.recOnly = x.v === 0 && x.vr > 0;
+    const base = x.v > 0 ? x.dates : x.rdates;
+    x.first = base[0];
+    x.last = base[base.length - 1];
     x.dsl = endDay - GP_DAY(x.last);
     let gs = 0;
-    for (let i = 1; i < x.dates.length; i++) gs += GP_DAY(x.dates[i]) - GP_DAY(x.dates[i - 1]);
-    x.gap = x.dates.length > 1 ? Math.round(gs / (x.dates.length - 1)) : null;
+    for (let i = 1; i < base.length; i++) gs += GP_DAY(base[i]) - GP_DAY(base[i - 1]);
+    x.gap = base.length > 1 ? Math.round(gs / (base.length - 1)) : null;
     x.span = GP_DAY(x.last) - GP_DAY(x.first);
-    x.nPr = Object.keys(x.prs).length;
+    x.nPr = Object.keys(x.prsClin).length;
     x.nSvc = Object.keys(x.discs).length;
+    x.both = x.v > 0 && x.vr > 0;
     x.status = x.up > 0 ? 'booked' : x.dsl <= 30 ? 'active' : x.dsl <= 60 ? 'cooling' : x.dsl <= 90 ? 'falling' : 'lapsed';
     x.oneDone = x.v === 1 && x.up === 0 && x.dsl > 30;
   });
-  guests.sort((a, b) => b.v - a.v || a.name.localeCompare(b.name));
+  guests.sort((a, b) => b.v - a.v || b.vr - a.vr || a.name.localeCompare(b.name));
   const prs = {};
   evs.forEach(e => {
     if (!e.pr || /relax spa|guest experience|^revibe|^ge\s/i.test(e.pr)) return;
+    if (isRec(e)) return;
     if (e.st !== 'arrived' && e.st !== 'no_show') return;
     const p = prs[e.pr] || (prs[e.pr] = {
       name: e.pr,
@@ -42750,6 +42786,7 @@ function GP_AGG(evs, staffList) {
       topDisc: Object.entries(p.discs).sort((a, b) => b[1] - a[1]).map(x => x[0])[0] || ''
     };
   }).sort((a, b) => b.ng - a.ng);
+  const clinArr = evs.filter(e => e.st === 'arrived' && !isRec(e)).length;
   return {
     evs,
     guests,
@@ -42757,7 +42794,8 @@ function GP_AGG(evs, staffList) {
     prl,
     dataEnd,
     dataStart: arrDates[0] || '',
-    visits: arrDates.length
+    visits: clinArr,
+    rvisits: arrDates.length - clinArr
   };
 }
 function GP_BUILD(rows, staffList) {
@@ -42779,8 +42817,10 @@ function GP_BUILD(rows, staffList) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
     const pr0 = (r.staff_member_name || '').trim();
     if (pr0 && geDrop(pr0)) return;
+    if (/ge\s*shift/i.test(r.treatment_name || '')) return;
     const fn = (r.patient_preferred_name || '').trim() || (r.patient_first_name || '').trim();
     const nm = (fn + ' ' + (r.patient_last_name || '').trim()).trim() || 'Guest ' + ((r.patient_number || '').trim() || g.slice(0, 6));
+    if (/^GE\s/.test(nm)) return;
     evs.push({
       d,
       g,
@@ -42825,7 +42865,7 @@ function GuestsPage({
   const [sel, setSel] = useState(null);
   const [lane, setLane] = useState(null);
   const [q, setQ] = useState('');
-  const [showAll, setShowAll] = useState(false);
+  const [showAll, setShowAll] = useState(true);
   const [clinSel, setClinSel] = useState(null);
   const [gpFull, setGpFull] = useState(window.__gpData || null);
   const [gpMsg, setGpMsg] = useState('');
@@ -42895,7 +42935,9 @@ function GuestsPage({
   }, [gpFull, gFrom, gTo]);
   const roll = useMemo(() => {
     if (!gp) return null;
-    const g = gp.guests;
+    const all = gp.guests;
+    const g = all.filter(x => x.v > 0);
+    const rg = all.filter(x => x.vr > 0);
     const n = g.length || 1;
     const st = {
       booked: 0,
@@ -42910,16 +42952,11 @@ function GuestsPage({
       oneDone = 0,
       ns = 0,
       cx = 0,
-      online = 0,
-      sumV = 0;
+      online = 0;
     const singleV = [],
       multiV = [];
     g.forEach(x => {
       st[x.status]++;
-      sumV += x.v;
-      ns += x.ns;
-      cx += x.cx;
-      online += x.online;
       if (x.nPr > 1) {
         multi++;
         multiV.push(x.v);
@@ -42929,6 +42966,11 @@ function GuestsPage({
       }
       if (x.nSvc > 1) multiSvc++;
       if (x.oneDone) oneDone++;
+    });
+    all.forEach(x => {
+      ns += x.ns;
+      cx += x.cx;
+      online += x.online;
     });
     const avg = a => a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length * 10) / 10 : 0;
     const funnel = [1, 2, 3, 5, 8, 12].map(k => ({
@@ -42942,7 +42984,7 @@ function GuestsPage({
           nw: 0,
           ret: 0
         });
-        if (x.first.slice(0, 7) === mo) m.nw++;else m.ret++;
+        if (x.dates[0].slice(0, 7) === mo) m.nw++;else m.ret++;
       });
     });
     const moList = Object.keys(months).sort().map(mo => ({
@@ -42952,7 +42994,7 @@ function GuestsPage({
     const cohorts = moList.map(({
       mo
     }) => {
-      const c = g.filter(x => x.first.slice(0, 7) === mo);
+      const c = g.filter(x => x.dates[0].slice(0, 7) === mo);
       return {
         mo,
         n: c.length,
@@ -42973,12 +43015,43 @@ function GuestsPage({
     gaps.sort((a, b) => a - b);
     const tx = {};
     gp.evs.forEach(e => {
-      if (e.st === 'arrived' && e.tx) tx[e.tx] = (tx[e.tx] || 0) + 1;
+      if (e.st === 'arrived' && e.disc !== 'Recovery' && e.tx) tx[e.tx] = (tx[e.tx] || 0) + 1;
     });
+    const rGaps = [];
+    rg.forEach(x => {
+      for (let i = 1; i < x.rdates.length; i++) rGaps.push(GP_DAY(x.rdates[i]) - GP_DAY(x.rdates[i - 1]));
+    });
+    rGaps.sort((a, b) => a - b);
+    const rtx = {};
+    gp.evs.forEach(e => {
+      if (e.st === 'arrived' && e.disc === 'Recovery' && e.tx) rtx[e.tx] = (rtx[e.tx] || 0) + 1;
+    });
+    const endD = gp.dataEnd ? GP_DAY(gp.dataEnd) : 0;
+    const rec = {
+      n: rg.length,
+      visits: gp.rvisits,
+      avgV: rg.length ? Math.round(gp.rvisits / rg.length * 10) / 10 : 0,
+      medGap: rGaps.length ? rGaps[Math.floor(rGaps.length / 2)] : 0,
+      recOnly: all.filter(x => x.recOnly).length,
+      active: rg.filter(x => {
+        const rl = x.rdates[x.rdates.length - 1];
+        return rl && endD - GP_DAY(rl) <= 30;
+      }).length,
+      topTx: Object.entries(rtx).sort((a, b) => b[1] - a[1]).slice(0, 6)
+    };
+    const both = all.filter(x => x.both);
+    const clinOnly = g.filter(x => !x.both);
+    const cross = {
+      both: both.length,
+      pctOfClin: g.length ? Math.round(both.length / g.length * 100) : 0,
+      pctOfRec: rg.length ? Math.round(both.length / rg.length * 100) : 0,
+      bothClinAvg: avg(both.map(x => x.v)),
+      clinOnlyAvg: avg(clinOnly.map(x => x.v))
+    };
     return {
       n: g.length,
       visits: gp.visits,
-      avgV: Math.round(gp.visits / n * 10) / 10,
+      avgV: g.length ? Math.round(gp.visits / g.length * 10) / 10 : 0,
       st,
       single,
       multi,
@@ -42992,10 +43065,13 @@ function GuestsPage({
       comebacks,
       stillOut,
       medGap: gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0,
-      nsRate: Math.round(ns / (gp.visits + ns || 1) * 100),
-      cxRate: Math.round(cx / (gp.visits + cx || 1) * 100),
-      onlineRate: Math.round(online / (gp.visits || 1) * 100),
-      topTx: Object.entries(tx).sort((a, b) => b[1] - a[1]).slice(0, 8)
+      nsRate: Math.round(ns / (gp.visits + gp.rvisits + ns || 1) * 100),
+      cxRate: Math.round(cx / (gp.visits + gp.rvisits + cx || 1) * 100),
+      onlineRate: Math.round(online / (gp.visits + gp.rvisits || 1) * 100),
+      topTx: Object.entries(tx).sort((a, b) => b[1] - a[1]).slice(0, 8),
+      rec,
+      cross,
+      totalGuests: all.length
     };
   }, [gp]);
   const selG = sel && gp ? gp.byId[sel] : null;
@@ -43049,7 +43125,8 @@ function GuestsPage({
         d.setMonth(d.getMonth() + 1);
       }
     }
-    const maxMo = Math.max(1, ...monthsAll.map(mo => x.months[mo] || 0));
+    const moSrc = x.recOnly ? x.rmonths : x.months;
+    const maxMo = Math.max(1, ...monthsAll.map(mo => moSrc[mo] || 0));
     const recent = gp.evs.filter(e => e.g === x.id && e.st !== 'booked').slice(-14).reverse();
     const upcoming = gp.evs.filter(e => e.g === x.id && e.st === 'booked' && e.d >= gp.dataEnd);
     return React.createElement("div", null, React.createElement("button", {
@@ -43094,9 +43171,13 @@ function GuestsPage({
         marginTop: 12
       }
     }, React.createElement(Stat, {
-      l: "Visits",
+      l: "Clinical visits",
       v: x.v,
-      sub: x.span > 0 ? 'over ' + x.span + ' days' : 'single visit'
+      sub: x.span > 0 ? 'over ' + x.span + ' days' : x.recOnly ? 'recovery only' : 'single visit'
+    }), React.createElement(Stat, {
+      l: "Recovery visits",
+      v: x.vr,
+      sub: x.vr ? 'sauna · plunge · boots' : '—'
     }), React.createElement(Stat, {
       l: "First visit",
       v: GP_FMT(x.first)
@@ -43105,14 +43186,14 @@ function GuestsPage({
       v: GP_FMT(x.last),
       sub: x.dsl + 'd ago'
     }), React.createElement(Stat, {
-      l: "Usual rhythm",
+      l: x.recOnly ? 'Recovery rhythm' : 'Clinical rhythm',
       v: x.gap != null ? 'every ~' + x.gap + 'd' : '—'
     }), React.createElement(Stat, {
       l: "No-shows / cancels",
       v: x.ns + ' / ' + x.cx
     }), React.createElement(Stat, {
       l: "Books online",
-      v: x.v ? Math.round(x.online / x.v * 100) + '%' : '—'
+      v: x.v + x.vr ? Math.round(x.online / (x.v + x.vr) * 100) + '%' : '—'
     }), React.createElement(Stat, {
       l: "Location",
       v: Object.entries(x.locs).sort((a, b) => b[1] - a[1]).map(e2 => e2[0]).join(' + ')
@@ -43133,7 +43214,7 @@ function GuestsPage({
         color: 'var(--g-777)',
         letterSpacing: 0
       }
-    }, "\xB7 ", x.nPr)), React.createElement("div", {
+    }, "\xB7 ", prsSorted.length)), React.createElement("div", {
       style: {
         display: 'flex',
         gap: 6,
@@ -43204,7 +43285,7 @@ function GuestsPage({
         marginBottom: 6
       }
     }, monthsAll.map(mo => {
-      const c = x.months[mo] || 0;
+      const c = moSrc[mo] || 0;
       return React.createElement("div", {
         key: mo,
         style: {
@@ -43245,7 +43326,13 @@ function GuestsPage({
       }
     }, new Date(mo + '-01T12:00').toLocaleDateString('en-CA', {
       month: 'short'
-    })))), upcoming.length > 0 && React.createElement("div", {
+    })))), x.vr > 0 && !x.recOnly && React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-888)',
+        marginBottom: 8
+      }
+    }, "bars show clinical visits \xB7 \uD83E\uDDCA ", x.vr, " recovery visit", x.vr !== 1 ? 's' : '', " alongside, last ", GP_FMT(x.rdates[x.rdates.length - 1])), upcoming.length > 0 && React.createElement("div", {
       style: {
         fontSize: 13,
         color: '#9fd9c6',
@@ -43330,15 +43417,15 @@ function GuestsPage({
   };
   const renderDir = () => {
     if (selG) return renderGuest(selG);
-    const lanes = [['booked', 'Booked ahead'], ['active', 'Active'], ['cooling', 'Cooling'], ['falling', 'Falling off'], ['lapsed', 'Lapsed'], ['one', 'One visit only'], ['multi', 'Sees 2+ practitioners']];
+    const lanes = [['booked', 'Booked ahead'], ['active', 'Active'], ['cooling', 'Cooling'], ['falling', 'Falling off'], ['lapsed', 'Lapsed'], ['one', 'One visit only'], ['multi', 'Sees 2+ practitioners'], ['both', 'Clinical + recovery'], ['reconly', 'Recovery only']].filter(([k]) => k !== 'booked' || lane === 'booked' || gp.guests.some(x => x.status === 'booked'));
     const engaged = !!(q.trim() || lane || showAll);
     let list = gp.guests;
-    if (lane === 'one') list = list.filter(x => x.oneDone);else if (lane === 'multi') list = list.filter(x => x.nPr > 1);else if (lane) list = list.filter(x => x.status === lane);
+    if (lane === 'one') list = list.filter(x => x.oneDone);else if (lane === 'multi') list = list.filter(x => x.nPr > 1);else if (lane === 'both') list = list.filter(x => x.both);else if (lane === 'reconly') list = list.filter(x => x.recOnly);else if (lane) list = list.filter(x => x.status === lane);
     if (q.trim()) {
       const s = q.trim().toLowerCase();
       list = list.filter(x => x.name.toLowerCase().includes(s) || x.num === s.replace('#', ''));
     }
-    const laneCount = k => k === 'one' ? gp.guests.filter(x => x.oneDone).length : k === 'multi' ? gp.guests.filter(x => x.nPr > 1).length : gp.guests.filter(x => x.status === k).length;
+    const laneCount = k => k === 'one' ? gp.guests.filter(x => x.oneDone).length : k === 'multi' ? gp.guests.filter(x => x.nPr > 1).length : k === 'both' ? gp.guests.filter(x => x.both).length : k === 'reconly' ? gp.guests.filter(x => x.recOnly).length : gp.guests.filter(x => x.status === k).length;
     return React.createElement("div", null, React.createElement("div", {
       style: {
         display: 'flex',
@@ -43440,12 +43527,12 @@ function GuestsPage({
       }
     }, x.name), React.createElement("div", {
       style: {
-        width: 70,
+        width: 128,
         fontSize: 13,
         color: '#9fd9c6',
         textAlign: 'right'
       }
-    }, x.v, " visit", x.v !== 1 ? 's' : ''), React.createElement("div", {
+    }, x.v ? x.v + ' clinical' + (x.vr ? ' · ' + x.vr + ' rec' : '') : x.vr + ' recovery'), React.createElement("div", {
       style: {
         width: 110,
         fontSize: 12.5,
@@ -43469,8 +43556,9 @@ function GuestsPage({
     }, GP_ST_META[x.status].split(' ·')[0])))));
   };
   const renderTop = () => {
-    const consistent = gp.guests.filter(x => x.v >= 8 && x.gap != null).sort((a, b) => a.gap - b.gap).slice(0, 10);
+    const consistent = gp.guests.filter(x => x.v >= 8 && x.gap != null && !x.recOnly).sort((a, b) => a.gap - b.gap).slice(0, 10);
     const cross = gp.guests.filter(x => x.nSvc >= 2).sort((a, b) => b.nSvc - a.nSvc || b.v - a.v).slice(0, 10);
+    const recReg = gp.guests.filter(x => x.vr > 0).sort((a, b) => b.vr - a.vr || b.v - a.v).slice(0, 10);
     const Row = ({
       i,
       x,
@@ -43508,24 +43596,44 @@ function GuestsPage({
     }, right));
     return React.createElement("div", {
       className: "grid2"
+    }, React.createElement("div", null, React.createElement("div", {
+      style: {
+        ...GPC,
+        marginBottom: 12
+      }
     }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "Most clinical visits"), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginBottom: 8
+      }
+    }, "the guests carrying the clinic \u2014 every one deserves to be known by name"), gp.guests.filter(x => x.v > 0).slice(0, 20).map((x, i) => React.createElement(Row, {
+      key: x.id,
+      i: i,
+      x: x,
+      right: x.v + ' clinical · ' + x.nPr + ' practitioner' + (x.nPr !== 1 ? 's' : '')
+    }))), React.createElement("div", {
       style: GPC
     }, React.createElement("div", {
       style: {
         ...GPH,
         marginBottom: 4
       }
-    }, "Most visits"), React.createElement("div", {
+    }, "Recovery regulars"), React.createElement("div", {
       style: {
         ...MUT,
         marginBottom: 8
       }
-    }, "the guests carrying the clinic \u2014 every one deserves to be known by name"), gp.guests.slice(0, 20).map((x, i) => React.createElement(Row, {
+    }, "sauna, plunge & boots \u2014 ranked by recovery visits alone"), recReg.map((x, i) => React.createElement(Row, {
       key: x.id,
       i: i,
       x: x,
-      right: x.v + ' visits · ' + x.nPr + ' practitioner' + (x.nPr !== 1 ? 's' : '')
-    }))), React.createElement("div", null, React.createElement("div", {
+      right: x.vr + ' recovery' + (x.v ? ' · ' + x.v + ' clinical' : ' · recovery only')
+    })))), React.createElement("div", null, React.createElement("div", {
       style: {
         ...GPC,
         marginBottom: 12
@@ -43544,7 +43652,7 @@ function GuestsPage({
       key: x.id,
       i: i,
       x: x,
-      right: 'every ~' + x.gap + 'd · ' + x.v + ' visits'
+      right: 'every ~' + x.gap + 'd · ' + x.v + ' clinical'
     }))), React.createElement("div", {
       style: GPC
     }, React.createElement("div", {
@@ -43581,7 +43689,7 @@ function GuestsPage({
         ...MUT,
         marginBottom: 10
       }
-    }, "Arrived visits only, ", GP_FMT(gp.dataStart), " \u2013 ", GP_FMT(gp.dataEnd), ". Click a row for that clinician's guest list. GE staff are left out \u2014 their Jane entries are shift logs, not treatments."), React.createElement("div", {
+    }, "Arrived visits only, ", GP_FMT(gp.dataStart), " \u2013 ", GP_FMT(gp.dataEnd), ". Click a row for that clinician's guest list. GE staff and recovery amenity visits are left out \u2014 this reads clinical care only."), React.createElement("div", {
       style: {
         display: 'flex',
         gap: 10,
@@ -43768,11 +43876,12 @@ function GuestsPage({
     const r = roll;
     const maxF = r.funnel[0].n || 1;
     const insights = [];
-    insights.push(Math.round(r.oneDone / r.n * 100) + '% of guests (' + r.oneDone + ') came once and never returned — the biggest single leak in the journey. Visit two is the battle.');
-    if (r.multi && r.single) insights.push('Guests who see 2+ practitioners average ' + r.multiAvg + ' visits vs ' + r.singleAvg + ' for single-practitioner guests — cross-referrals roughly ' + (r.singleAvg ? Math.round(r.multiAvg / r.singleAvg * 10) / 10 : '—') + '× the relationship. Co-treatment is a retention engine, not a courtesy.');
-    if (r.comebacks + r.stillOut > 0) insights.push('The clinic rhythm is a visit every ~' + r.medGap + ' days. ' + r.stillOut + ' guests are 30+ days quiet right now with nothing booked; historically only ' + Math.round(r.comebacks / (r.comebacks + r.stillOut) * 100) + '% of 30-day silences have been broken (' + r.comebacks + ' comebacks vs ' + r.stillOut + ' still out) — the follow-up window is those first quiet weeks.');
+    insights.push(Math.round(r.oneDone / r.n * 100) + '% of clinical guests (' + r.oneDone + ') came once and never returned — the biggest single leak in the journey. Visit two is the battle.');
+    if (r.multi && r.single) insights.push('Guests who see 2+ practitioners average ' + r.multiAvg + ' clinical visits vs ' + r.singleAvg + ' for single-practitioner guests — cross-referrals roughly ' + (r.singleAvg ? Math.round(r.multiAvg / r.singleAvg * 10) / 10 : '—') + '× the relationship. Co-treatment is a retention engine, not a courtesy.');
+    if (r.cross.both) insights.push(r.cross.both + ' guests use both sides of the building (' + r.cross.pctOfClin + '% of clinical guests, ' + r.cross.pctOfRec + '% of recovery guests). They average ' + r.cross.bothClinAvg + ' clinical visits vs ' + r.cross.clinOnlyAvg + ' for clinical-only guests' + (r.cross.clinOnlyAvg && r.cross.bothClinAvg >= r.cross.clinOnlyAvg * 1.2 ? ' — the recovery habit travels with retention. Getting a clinical guest into the plunge is not a side sale.' : '.'));
+    if (r.comebacks + r.stillOut > 0) insights.push('The clinical rhythm is a visit every ~' + r.medGap + ' days. ' + r.stillOut + ' clinical guests are 30+ days quiet right now with nothing booked; historically only ' + Math.round(r.comebacks / (r.comebacks + r.stillOut) * 100) + '% of 30-day silences have been broken (' + r.comebacks + ' comebacks vs ' + r.stillOut + ' still out) — the follow-up window is those first quiet weeks.');
     const fal = r.st.cooling + r.st.falling;
-    if (fal) insights.push(fal + ' guests are 31–90 days quiet right now (cooling + falling off) — the recoverable middle. The ' + r.st.lapsed + ' lapsed are much harder to win back.');
+    if (fal) insights.push(fal + ' clinical guests are 31–90 days quiet right now (cooling + falling off) — the recoverable middle. The ' + r.st.lapsed + ' lapsed are much harder to win back.');
     if (r.onlineRate) insights.push(r.onlineRate + '% of visits are booked online; the desk still creates most bookings — rebooking before the guest leaves remains the strongest habit.');
     return React.createElement("div", null, React.createElement("div", {
       style: {
@@ -43814,12 +43923,12 @@ function GuestsPage({
         ...GPH,
         marginBottom: 4
       }
-    }, "The retention funnel"), React.createElement("div", {
+    }, "The retention funnel \u2014 clinical"), React.createElement("div", {
       style: {
         ...MUT,
         marginBottom: 10
       }
-    }, "of ", r.n.toLocaleString(), " guests, how many made it to each milestone"), r.funnel.map(f => React.createElement("div", {
+    }, "of ", r.n.toLocaleString(), " clinical guests, how many made it to each milestone (recovery visits don't count here)"), r.funnel.map(f => React.createElement("div", {
       key: f.k,
       style: {
         display: 'flex',
@@ -43862,12 +43971,12 @@ function GuestsPage({
         ...GPH,
         marginBottom: 4
       }
-    }, "Where everyone stands"), React.createElement("div", {
+    }, "Where everyone stands \u2014 clinical"), React.createElement("div", {
       style: {
         ...MUT,
         marginBottom: 10
       }
-    }, "by days since their last arrived visit"), React.createElement("div", {
+    }, "clinical guests, by days since their last arrived clinical visit"), React.createElement("div", {
       style: {
         display: 'grid',
         gridTemplateColumns: '1fr 1fr',
@@ -43910,6 +44019,110 @@ function GuestsPage({
         ...GPH,
         marginBottom: 4
       }
+    }, "\uD83E\uDDCA Recovery \u2014 same stats, own bucket"), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginBottom: 8
+      }
+    }, "sauna, cold plunge & boots \u2014 kept fully out of the clinical averages"), React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '12px 16px'
+      }
+    }, React.createElement(Stat, {
+      l: "Recovery guests",
+      v: r.rec.n,
+      sub: r.rec.recOnly + ' use recovery only'
+    }), React.createElement(Stat, {
+      l: "Recovery visits",
+      v: r.rec.visits,
+      sub: 'avg ' + r.rec.avgV + ' / guest'
+    }), React.createElement(Stat, {
+      l: "Recovery rhythm",
+      v: r.rec.medGap ? 'every ~' + r.rec.medGap + 'd' : '—',
+      sub: "median return gap"
+    }), React.createElement(Stat, {
+      l: "Active \xB7 \u226430d",
+      v: r.rec.active,
+      sub: "by last recovery visit"
+    })), r.rec.topTx.length > 0 && React.createElement("div", {
+      style: {
+        marginTop: 12
+      }
+    }, React.createElement("div", {
+      style: RV_LBL
+    }, "What they book"), r.rec.topTx.map(([t, c]) => React.createElement("div", {
+      key: t,
+      style: {
+        display: 'flex',
+        gap: 10,
+        alignItems: 'baseline',
+        padding: '3px 0',
+        borderTop: '1px solid var(--border)'
+      }
+    }, React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 12.5,
+        color: 'var(--g-ccc)'
+      }
+    }, t), React.createElement("span", {
+      style: {
+        fontSize: 12.5,
+        color: '#9fd9c6'
+      }
+    }, c.toLocaleString()))))), React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "Who does both"), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginBottom: 8
+      }
+    }, "the crossover \u2014 measured on its own, never mixed into either side's numbers"), React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '12px 16px'
+      }
+    }, React.createElement(Stat, {
+      l: "Clinical + recovery",
+      v: r.cross.both,
+      sub: "guests doing both"
+    }), React.createElement(Stat, {
+      l: "Of clinical guests",
+      v: r.cross.pctOfClin + '%',
+      sub: "also use recovery"
+    }), React.createElement(Stat, {
+      l: "Of recovery guests",
+      v: r.cross.pctOfRec + '%',
+      sub: "also see a clinician"
+    }), React.createElement(Stat, {
+      l: "Clinical visits, compared",
+      v: r.cross.bothClinAvg + ' vs ' + r.cross.clinOnlyAvg,
+      sub: "both-guests vs clinical-only"
+    })), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginTop: 10
+      }
+    }, "Tap the Clinical + recovery or Recovery only lanes in the directory to see exactly who they are."))), React.createElement("div", {
+      className: "grid2",
+      style: {
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
     }, "One practitioner, or the whole building"), React.createElement("div", {
       style: {
         display: 'grid',
@@ -43920,18 +44133,19 @@ function GuestsPage({
     }, React.createElement(Stat, {
       l: "See one practitioner",
       v: r.single,
-      sub: 'avg ' + r.singleAvg + ' visits'
+      sub: 'avg ' + r.singleAvg + ' clinical visits'
     }), React.createElement(Stat, {
       l: "See 2+ practitioners",
       v: r.multi,
-      sub: 'avg ' + r.multiAvg + ' visits'
+      sub: 'avg ' + r.multiAvg + ' clinical visits'
     }), React.createElement(Stat, {
       l: "Use 2+ services",
       v: r.multiSvc,
-      sub: Math.round(r.multiSvc / r.n * 100) + '% of guests'
+      sub: Math.round(r.multiSvc / r.n * 100) + '% of clinical guests'
     }), React.createElement(Stat, {
       l: "Median return gap",
-      v: '~' + r.medGap + ' days'
+      v: '~' + r.medGap + ' days',
+      sub: "clinical visits"
     }))), React.createElement("div", {
       style: GPC
     }, React.createElement("div", {
@@ -43958,8 +44172,9 @@ function GuestsPage({
       v: r.onlineRate + '%',
       sub: "rest booked at the desk"
     }), React.createElement(Stat, {
-      l: "Arrived visits",
-      v: r.visits.toLocaleString()
+      l: "Clinical visits",
+      v: r.visits.toLocaleString(),
+      sub: '+ ' + r.rec.visits.toLocaleString() + ' recovery'
     })))), React.createElement("div", {
       className: "grid2"
     }, React.createElement("div", {
@@ -43969,12 +44184,12 @@ function GuestsPage({
         ...GPH,
         marginBottom: 4
       }
-    }, "New vs returning, by month"), React.createElement("div", {
+    }, "New vs returning, by month \u2014 clinical"), React.createElement("div", {
       style: {
         ...MUT,
         marginBottom: 10
       }
-    }, "guests seen each month \u2014 lime = first-ever month, teal = returning"), r.moList.map(m => {
+    }, "clinical guests seen each month \u2014 lime = first-ever month, teal = returning"), r.moList.map(m => {
       const tot = m.nw + m.ret || 1;
       const coh = r.cohorts.find(c => c.mo === m.mo);
       return React.createElement("div", {
@@ -44031,12 +44246,12 @@ function GuestsPage({
         ...GPH,
         marginBottom: 4
       }
-    }, "What guests come in for"), React.createElement("div", {
+    }, "What guests come in for \u2014 clinical"), React.createElement("div", {
       style: {
         ...MUT,
         marginBottom: 10
       }
-    }, "top treatments by arrived visits"), r.topTx.map(([t, c]) => React.createElement("div", {
+    }, "top clinical treatments by arrived visits \u2014 recovery bookings live in their own card above"), r.topTx.map(([t, c]) => React.createElement("div", {
       key: t,
       style: {
         display: 'flex',
@@ -44059,20 +44274,26 @@ function GuestsPage({
     }, c.toLocaleString()))))));
   };
   const tiles = gp && roll ? [{
-    lbl: 'Guests',
+    lbl: 'Clinical guests',
     val: roll.n,
     hue: '#c9f26f',
     fill: true
   }, {
-    lbl: 'Arrived visits',
-    val: roll.visits
+    lbl: 'Clinical visits',
+    val: roll.visits,
+    sub: 'avg ' + roll.avgV + ' / guest'
   }, {
-    lbl: 'Avg visits / guest',
-    val: roll.avgV
+    lbl: 'Recovery visits',
+    val: roll.rec.visits,
+    sub: roll.rec.n + ' guests · avg ' + roll.rec.avgV
+  }, {
+    lbl: 'Do both',
+    val: roll.cross.both,
+    sub: 'clinical + recovery'
   }, {
     lbl: 'Active or booked',
     val: roll.st.active + roll.st.booked,
-    sub: 'of ' + roll.n
+    sub: 'of ' + roll.n + ' clinical'
   }] : [];
   return React.createElement("div", null, React.createElement(RvPageHero, {
     eyebrow: "Revibe \xB7 Guest Journey",
@@ -59551,6 +59772,103 @@ function ProfileEditTab({
       items: F.mentors
     })));
   })()), React.createElement("div", {
+    style: PCARD
+  }, React.createElement("div", {
+    style: PHEAD
+  }, "\uD83D\uDCCB Leadership assignments"), (() => {
+    let adb = {};
+    try {
+      adb = JSON.parse(localStorage.getItem('rvgd3_assign') || '{}');
+    } catch (e) {}
+    const mine = Object.values(adb.tasks || {}).filter(t => (t.who || []).includes(staff.id));
+    const goBoard = () => {
+      try {
+        sessionStorage.setItem('rvgd3_ui_lt.tab', JSON.stringify('assignments'));
+      } catch (e) {}
+      try {
+        onClose && onClose();
+      } catch (e) {}
+      window.location.hash = '#leadership';
+    };
+    if (!mine.length) return React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-777)'
+      }
+    }, "Nothing assigned yet \u2014 tasks from leadership meetings (group or 1-on-1) land here with their owner, horizon and due date. ", React.createElement("span", {
+      onClick: goBoard,
+      style: {
+        cursor: 'pointer',
+        color: '#9fd9c6'
+      }
+    }, "Open the assignments board \u2192"));
+    const aOpen = mine.filter(t => t.status === 'open').sort((a, b) => String(a.due || '9999').localeCompare(String(b.due || '9999')));
+    const aDone = mine.filter(t => t.status === 'done');
+    const tdy = GD_TODAY();
+    return React.createElement("div", null, aOpen.length === 0 && React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-999)',
+        marginBottom: 6
+      }
+    }, "All caught up \u2014 nothing open."), aOpen.slice(0, 8).map(t => {
+      const od = t.due && t.due < tdy;
+      return React.createElement("div", {
+        key: t.id,
+        style: {
+          display: 'flex',
+          gap: 8,
+          alignItems: 'baseline',
+          padding: '5px 0',
+          borderTop: '1px solid var(--border)',
+          fontSize: 13
+        }
+      }, React.createElement("span", {
+        style: {
+          color: 'var(--g-666)'
+        }
+      }, "\u25CB"), React.createElement("span", {
+        style: {
+          flex: 1,
+          color: 'var(--g-ddd)',
+          fontWeight: 600
+        }
+      }, t.t), React.createElement("span", {
+        style: {
+          fontSize: 11.5,
+          color: '#9fd9c6'
+        }
+      }, AS_HZ[t.hz] || t.hz), t.due && React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: od ? 'var(--c-red)' : 'var(--g-888)'
+        }
+      }, "due ", GP_FMT(t.due)), (t.carried || 0) > 0 && React.createElement("span", {
+        style: {
+          fontSize: 12,
+          color: '#e9c08a'
+        }
+      }, "\xD7", t.carried));
+    }), aOpen.length > 8 && React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: 'var(--g-666)',
+        marginTop: 4
+      }
+    }, "+", aOpen.length - 8, " more open"), React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-888)',
+        marginTop: 8
+      }
+    }, aDone.length, " delivered all-time \xB7 ", React.createElement("span", {
+      onClick: goBoard,
+      style: {
+        cursor: 'pointer',
+        color: '#9fd9c6'
+      }
+    }, "Open the assignments board \u2192")));
+  })()), React.createElement("div", {
     style: {
       ...PCARD,
       marginBottom: 0
@@ -70641,11 +70959,802 @@ function AcademyTab({
     }
   }, "How it plays:"), " Switches are graded 1\u20135 against their standards (earned at 4+), and stages unlock as switches are earned. On the fun side, missions pay XP into the six tracks \u2014 ", AC_XPL, " XP = one level, max L", AC_MAXLV, ". Utilization and earnings live in Performance & Revenue \u2014 this system never duplicates them."))));
 }
+const AS_HZ = {
+  week: 'This week',
+  short: 'Short term',
+  ongoing: 'Ongoing',
+  project: 'Project',
+  quarter: 'Quarterly'
+};
+const AS_SRC = {
+  group: 'Group meeting',
+  '1on1': '1-on-1',
+  huddle: 'Huddle',
+  adhoc: 'Ad hoc'
+};
+function LeadAssignTab({
+  staff,
+  openProfile,
+  currentUser
+}) {
+  const GPH2 = {
+    fontFamily: "'Barlow Condensed',sans-serif",
+    fontSize: 15,
+    fontWeight: 800,
+    letterSpacing: '2.2px',
+    textTransform: 'uppercase',
+    color: '#9fd9c6'
+  };
+  const CARD = {
+    background: 'var(--surface2)',
+    border: '1px solid var(--border)',
+    borderLeft: '3px solid #2fd6a8',
+    borderRadius: 11,
+    padding: '14px 16px'
+  };
+  const load = () => {
+    try {
+      return JSON.parse(localStorage.getItem('rvgd3_assign') || '{}');
+    } catch (e) {
+      return {};
+    }
+  };
+  const [db, setDb] = useState(load);
+  useEffect(() => {
+    const f = () => setDb(load());
+    window.addEventListener('rvgd3-ch', f);
+    window.addEventListener('storage', f);
+    return () => {
+      window.removeEventListener('rvgd3-ch', f);
+      window.removeEventListener('storage', f);
+    };
+  }, []);
+  const save = next => {
+    setDb(next);
+    try {
+      localStorage.setItem('rvgd3_assign', JSON.stringify(next));
+      const m = JSON.parse(localStorage.getItem('rvgd3__ts') || '{}');
+      m['assign'] = Date.now();
+      localStorage.setItem('rvgd3__ts', JSON.stringify(m));
+      if (window.__SB && window.__GDSYNC && window.__GDSYNC.ready) window.__SB.from('gd_store').upsert({
+        id: 'assign',
+        data: {
+          v: next,
+          t: Date.now()
+        }
+      }).then(() => {}, () => {});
+    } catch (e) {}
+  };
+  const tasks = Object.values(db.tasks || {});
+  const setTask = (id, patch) => save({
+    ...db,
+    tasks: {
+      ...(db.tasks || {}),
+      [id]: {
+        ...(db.tasks || {})[id],
+        ...patch,
+        _t: Date.now()
+      }
+    }
+  });
+  const today = GD_TODAY();
+  const wkStart = dstr => {
+    const t = new Date(dstr + 'T12:00');
+    const dow = (t.getDay() + 6) % 7;
+    t.setDate(t.getDate() - dow);
+    return t.toISOString().slice(0, 10);
+  };
+  const shiftD = (dstr, days) => {
+    const t = new Date(dstr + 'T12:00');
+    t.setDate(t.getDate() + days);
+    return t.toISOString().slice(0, 10);
+  };
+  const thisWk = wkStart(today),
+    lastWk = shiftD(thisWk, -7);
+  const nameOf = id => {
+    const s = staff.find(x => x.id === id);
+    return s ? s.name : '(removed)';
+  };
+  const firstOf = id => nameOf(id).split(' ')[0];
+  const openT = tasks.filter(t => t.status === 'open');
+  const overdue = openT.filter(t => t.due && t.due < today);
+  const dueThisWk = openT.filter(t => t.due && t.due >= today && t.due <= shiftD(thisWk, 6));
+  const [avTab, setAvTab] = usePersist('as.view', 'week');
+  const [exp, setExp] = useState(null);
+  const [allHz, setAllHz] = useState('all');
+  const [allSt, setAllSt] = useState('open');
+  const [aq, setAq] = useState('');
+  const [pSel, setPSel] = useState(null);
+  const [compOpen, setCompOpen] = useState(false);
+  const [cT, setCT] = useState('');
+  const [cWho, setCWho] = useState([]);
+  const [cSrc, setCSrc] = useState('group');
+  const [cHz, setCHz] = useState('week');
+  const [cDue, setCDue] = useState('');
+  const [cN, setCN] = useState('');
+  const assign = () => {
+    if (!cT.trim() || !cWho.length) return;
+    const id = 'as_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+    save({
+      ...db,
+      tasks: {
+        ...(db.tasks || {}),
+        [id]: {
+          id,
+          t: cT.trim(),
+          n: cN.trim(),
+          who: [...cWho],
+          by: currentUser || 'Dave',
+          src: cSrc,
+          hz: cHz,
+          due: cDue || null,
+          created: today,
+          status: 'open',
+          carried: 0,
+          upd: [],
+          _t: Date.now()
+        }
+      }
+    });
+    setCT('');
+    setCN('');
+    setCDue('');
+    setCWho([]);
+  };
+  const markDone = t => {
+    setTask(t.id, {
+      status: 'done',
+      doneAt: today
+    });
+    try {
+      window.__RVFX && window.__RVFX('DELIVERED — ' + String(t.t || '').slice(0, 36).toUpperCase());
+    } catch (e) {}
+  };
+  const reopen = t => setTask(t.id, {
+    status: 'open',
+    doneAt: null
+  });
+  const carry = t => setTask(t.id, {
+    carried: (t.carried || 0) + 1,
+    due: t.due ? shiftD(t.due, 7) : null,
+    upd: [...(t.upd || []), {
+      d: today,
+      by: currentUser || 'Dave',
+      t: 'Carried to next week'
+    }]
+  });
+  const drop = t => {
+    if (window.confirm('Drop this assignment? It stays in the record as dropped.')) setTask(t.id, {
+      status: 'dropped',
+      doneAt: today
+    });
+  };
+  const HzChip = ({
+    hz
+  }) => React.createElement("span", {
+    style: {
+      fontSize: 11.5,
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontWeight: 700,
+      letterSpacing: '.8px',
+      textTransform: 'uppercase',
+      padding: '1px 8px',
+      borderRadius: 999,
+      background: 'rgba(47,214,168,.1)',
+      border: '1px solid rgba(47,214,168,.35)',
+      color: '#9fd9c6'
+    }
+  }, AS_HZ[hz] || hz);
+  const Row = (t, quick) => {
+    const od = t.status === 'open' && t.due && t.due < today;
+    return React.createElement("div", {
+      key: t.id,
+      style: {
+        borderTop: '1px solid var(--border)',
+        padding: '9px 4px'
+      }
+    }, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 10,
+        alignItems: 'flex-start'
+      }
+    }, React.createElement("button", {
+      title: t.status === 'open' ? 'Mark delivered' : 'Reopen',
+      onClick: () => t.status === 'open' ? markDone(t) : reopen(t),
+      style: {
+        width: 19,
+        height: 19,
+        minWidth: 19,
+        borderRadius: '50%',
+        cursor: 'pointer',
+        marginTop: 2,
+        padding: 0,
+        lineHeight: '17px',
+        fontSize: 12,
+        border: '1.5px solid ' + (t.status === 'done' ? '#c9f26f' : 'var(--g-666)'),
+        background: t.status === 'done' ? 'rgba(201,242,111,.15)' : 'transparent',
+        color: '#c9f26f'
+      }
+    }, t.status === 'done' ? '✓' : ''), React.createElement("div", {
+      style: {
+        flex: 1,
+        minWidth: 0
+      }
+    }, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8,
+        alignItems: 'baseline'
+      }
+    }, React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, React.createElement(RvInlineEdit, {
+      value: t.t,
+      onSave: v => setTask(t.id, {
+        t: v
+      }),
+      style: {
+        fontSize: 14.5,
+        fontWeight: 600,
+        color: t.status === 'done' ? 'var(--g-777)' : t.status === 'dropped' ? 'var(--g-555)' : 'var(--g-ddd)',
+        textDecoration: t.status === 'dropped' ? 'line-through' : 'none'
+      }
+    })), quick && t.status === 'open' && React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 5,
+        flexShrink: 0
+      }
+    }, React.createElement("button", {
+      className: "btn btn-lime btn-xs",
+      onClick: () => markDone(t)
+    }, "\u2713 Done"), React.createElement("button", {
+      className: "btn btn-ghost btn-xs",
+      onClick: () => carry(t)
+    }, "\u2192 Carry"), React.createElement("button", {
+      className: "btn btn-ghost btn-xs",
+      style: {
+        color: 'var(--g-666)'
+      },
+      onClick: () => drop(t)
+    }, "\u2717"))), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 7,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        marginTop: 4,
+        fontSize: 12.5
+      }
+    }, (t.who || []).map(id => React.createElement("span", {
+      key: id,
+      onClick: () => openProfile && openProfile(id),
+      title: "Open profile",
+      style: {
+        cursor: 'pointer',
+        padding: '1px 8px',
+        borderRadius: 999,
+        background: 'var(--surface3)',
+        border: '1px solid var(--border)',
+        color: 'var(--g-bbb)'
+      }
+    }, firstOf(id))), React.createElement(HzChip, {
+      hz: t.hz
+    }), React.createElement("span", {
+      style: {
+        color: 'var(--g-666)'
+      }
+    }, AS_SRC[t.src] || t.src, " \xB7 ", GP_FMT(t.created), " \xB7 by ", t.by), t.due && React.createElement("span", {
+      style: {
+        color: od ? 'var(--c-red)' : '#9fd9c6',
+        fontWeight: od ? 700 : 400
+      }
+    }, "due ", GP_FMT(t.due), od ? ' · OVERDUE' : ''), (t.carried || 0) > 0 && React.createElement("span", {
+      style: {
+        color: '#e9c08a'
+      }
+    }, "\u2192 carried \xD7", t.carried), t.status === 'done' && React.createElement("span", {
+      style: {
+        color: '#c9f26f'
+      }
+    }, "\u2713 delivered ", GP_FMT(t.doneAt)), t.status === 'dropped' && React.createElement("span", {
+      style: {
+        color: 'var(--g-555)'
+      }
+    }, "dropped"), React.createElement("span", {
+      onClick: () => setExp(exp === t.id ? null : t.id),
+      style: {
+        cursor: 'pointer',
+        color: 'var(--g-666)'
+      }
+    }, (t.upd || []).length > 0 ? '💬 ' + (t.upd || []).length + ' ' : '', exp === t.id ? '▴' : '▾ details')), exp === t.id && React.createElement("div", {
+      style: {
+        marginTop: 8,
+        paddingTop: 8,
+        borderTop: '1px dashed var(--border)'
+      }
+    }, React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, React.createElement("div", {
+      style: {
+        ...RV_LBL,
+        marginBottom: 3
+      }
+    }, "Notes"), React.createElement(RvInlineEdit, {
+      value: t.n || '',
+      onSave: v => setTask(t.id, {
+        n: v
+      }),
+      multi: true,
+      placeholder: "What was actually said / what done looks like\u2026",
+      style: {
+        fontSize: 13,
+        color: 'var(--g-bbb)',
+        lineHeight: 1.55
+      }
+    })), (t.upd || []).length > 0 && React.createElement("div", {
+      style: {
+        marginBottom: 8
+      }
+    }, React.createElement("div", {
+      style: {
+        ...RV_LBL,
+        marginBottom: 3
+      }
+    }, "Updates"), (t.upd || []).map((u, i) => React.createElement("div", {
+      key: i,
+      style: {
+        display: 'flex',
+        gap: 8,
+        fontSize: 12.5,
+        lineHeight: 1.8,
+        alignItems: 'baseline'
+      }
+    }, React.createElement("span", {
+      style: {
+        color: 'var(--g-666)',
+        width: 88,
+        flexShrink: 0
+      }
+    }, GP_FMT(u.d)), React.createElement("span", {
+      style: {
+        color: 'var(--g-ccc)',
+        flex: 1
+      }
+    }, u.t), React.createElement("span", {
+      style: {
+        color: 'var(--g-666)'
+      }
+    }, u.by)))), React.createElement(RvStepAdd, {
+      onAdd: v => setTask(t.id, {
+        upd: [...(t.upd || []), {
+          d: today,
+          by: currentUser || 'Dave',
+          t: v
+        }]
+      }),
+      placeholder: "\uFF0B Add an update \u2014 logged with today's date"
+    }), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8,
+        alignItems: 'center',
+        marginTop: 8,
+        flexWrap: 'wrap'
+      }
+    }, React.createElement("span", {
+      style: {
+        ...RV_LBL,
+        marginBottom: 0
+      }
+    }, "Due"), React.createElement("input", {
+      type: "date",
+      value: t.due || '',
+      onChange: e => setTask(t.id, {
+        due: e.target.value || null
+      }),
+      style: {
+        width: 150,
+        padding: '5px 9px',
+        fontSize: 12.5
+      }
+    }), React.createElement("span", {
+      style: {
+        ...RV_LBL,
+        marginBottom: 0
+      }
+    }, "Horizon"), React.createElement("select", {
+      value: t.hz,
+      onChange: e => setTask(t.id, {
+        hz: e.target.value
+      }),
+      style: {
+        width: 140,
+        padding: '5px 9px',
+        fontSize: 12.5
+      }
+    }, Object.entries(AS_HZ).map(([k, l]) => React.createElement("option", {
+      key: k,
+      value: k
+    }, l))), React.createElement("span", {
+      style: {
+        ...RV_LBL,
+        marginBottom: 0
+      }
+    }, "Owners"), staff.filter(s => !RV_IS_GE(s) || (t.who || []).includes(s.id)).sort((a, b) => a.name.localeCompare(b.name)).map(s => {
+      const on = (t.who || []).includes(s.id);
+      return React.createElement("span", {
+        key: s.id,
+        onClick: () => setTask(t.id, {
+          who: on ? (t.who || []).filter(x => x !== s.id) : [...(t.who || []), s.id]
+        }),
+        style: {
+          cursor: 'pointer',
+          fontSize: 11.5,
+          padding: '1px 7px',
+          borderRadius: 999,
+          border: '1px solid ' + (on ? '#2fd6a8' : 'var(--border)'),
+          background: on ? 'rgba(47,214,168,.12)' : 'transparent',
+          color: on ? '#9fd9c6' : 'var(--g-666)'
+        }
+      }, s.name.split(' ')[0]);
+    }), t.status === 'open' && React.createElement("span", {
+      style: {
+        marginLeft: 'auto',
+        display: 'flex',
+        gap: 6
+      }
+    }, React.createElement("button", {
+      className: "btn btn-ghost btn-xs",
+      onClick: () => carry(t)
+    }, "\u2192 Carry to next week"), React.createElement("button", {
+      className: "btn btn-ghost btn-xs",
+      style: {
+        color: 'var(--g-666)'
+      },
+      onClick: () => drop(t)
+    }, "\u2717 Drop")))))));
+  };
+  const Section = (label, list, quick) => list.length > 0 && React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, React.createElement("div", {
+    style: {
+      ...GPH2,
+      marginBottom: 2
+    }
+  }, label, " ", React.createElement("span", {
+    style: {
+      color: 'var(--g-777)',
+      letterSpacing: 0
+    }
+  }, "\xB7 ", list.length)), list.map(t => Row(t, quick)));
+  const bySoonest = (a, b) => String(a.due || '9999').localeCompare(String(b.due || '9999')) || String(a.created).localeCompare(String(b.created));
+  const renderWeek = () => {
+    const shown = new Set([...overdue, ...dueThisWk].map(t => t.id));
+    const newThisWk = openT.filter(t => t.created >= thisWk && !shown.has(t.id));
+    newThisWk.forEach(t => shown.add(t.id));
+    const longRun = openT.filter(t => !shown.has(t.id) && (t.hz === 'ongoing' || t.hz === 'project' || t.hz === 'quarter'));
+    const rest = openT.filter(t => !shown.has(t.id) && t.hz !== 'ongoing' && t.hz !== 'project' && t.hz !== 'quarter');
+    return React.createElement("div", {
+      style: CARD
+    }, openT.length === 0 && React.createElement("div", {
+      style: {
+        fontSize: 13.5,
+        color: 'var(--g-777)',
+        padding: '18px 4px'
+      }
+    }, "Nothing open. Assignments logged from your meetings land here \u2014 use \uFF0B Assign above."), Section('🔥 Overdue', overdue.sort(bySoonest), true), Section('📌 Due this week', dueThisWk.sort(bySoonest), true), Section('🗓 Assigned this week', newThisWk.sort(bySoonest)), Section('⏳ Older, still open', rest.sort(bySoonest)), Section('♾ Ongoing · projects · quarterly', longRun.sort(bySoonest)));
+  };
+  const renderReview = () => {
+    const lastEnd = shiftD(lastWk, 6);
+    const assignedLast = tasks.filter(t => t.created >= lastWk && t.created <= lastEnd);
+    const openLast = assignedLast.filter(t => t.status === 'open');
+    const doneLast = tasks.filter(t => t.status === 'done' && t.doneAt >= lastWk && t.doneAt <= lastEnd);
+    const olderOpen = openT.filter(t => t.created < lastWk);
+    return React.createElement("div", {
+      style: CARD
+    }, React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: 'var(--g-888)',
+        marginBottom: 12
+      }
+    }, "Reviewing the week of ", React.createElement("b", {
+      style: {
+        color: 'var(--g-ccc)'
+      }
+    }, GP_FMT(lastWk), " \u2013 ", GP_FMT(lastEnd)), " \u2014 walk each item: delivered, carried, or dropped. Nothing gets to quietly disappear."), Section('Assigned last week — still open', openLast.sort(bySoonest), true), Section('✓ Delivered last week', doneLast), Section('⏳ Still open from earlier weeks', olderOpen.sort(bySoonest), true), assignedLast.length === 0 && olderOpen.length === 0 && React.createElement("div", {
+      style: {
+        fontSize: 13.5,
+        color: 'var(--g-777)',
+        padding: '14px 4px'
+      }
+    }, "Nothing assigned last week and nothing older still open \u2014 clean slate."));
+  };
+  const renderAll = () => {
+    let list = tasks.filter(t => allSt === 'all' ? true : t.status === allSt);
+    if (allHz !== 'all') list = list.filter(t => t.hz === allHz);
+    if (aq.trim()) {
+      const s = aq.trim().toLowerCase();
+      list = list.filter(t => (t.t || '').toLowerCase().includes(s) || (t.n || '').toLowerCase().includes(s) || (t.who || []).some(id => nameOf(id).toLowerCase().includes(s)));
+    }
+    list.sort((a, b) => String(b.created).localeCompare(String(a.created)));
+    return React.createElement("div", {
+      style: CARD
+    }, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        marginBottom: 8
+      }
+    }, React.createElement("input", {
+      value: aq,
+      onChange: e => setAq(e.target.value),
+      placeholder: "Search tasks, notes, or a name\u2026",
+      style: {
+        maxWidth: 250,
+        padding: '6px 10px',
+        fontSize: 13
+      }
+    }), ['open', 'done', 'dropped', 'all'].map(k => React.createElement("button", {
+      key: k,
+      className: `btn btn-xs ${allSt === k ? 'btn-go' : 'btn-ghost'}`,
+      onClick: () => setAllSt(k)
+    }, k === 'all' ? 'All statuses' : k.charAt(0).toUpperCase() + k.slice(1))), React.createElement("span", {
+      style: {
+        color: 'var(--g-555)'
+      }
+    }, "|"), ['all', ...Object.keys(AS_HZ)].map(k => React.createElement("button", {
+      key: k,
+      className: `btn btn-xs ${allHz === k ? 'btn-go' : 'btn-ghost'}`,
+      onClick: () => setAllHz(k)
+    }, k === 'all' ? 'All horizons' : AS_HZ[k]))), list.length === 0 ? React.createElement("div", {
+      style: {
+        fontSize: 13.5,
+        color: 'var(--g-777)',
+        padding: '14px 4px'
+      }
+    }, "Nothing matches.") : list.slice(0, 120).map(t => Row(t)), list.length > 120 && React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-666)',
+        marginTop: 6
+      }
+    }, "showing the first 120 \u2014 narrow with search"));
+  };
+  const renderPeople = () => {
+    const withT = {};
+    tasks.forEach(t => (t.who || []).forEach(id => {
+      const o = withT[id] || (withT[id] = {
+        o: 0,
+        d: 0
+      });
+      if (t.status === 'open') o.o++;else if (t.status === 'done') o.d++;
+    }));
+    const ids = Object.keys(withT).sort((a, b) => withT[b].o - withT[a].o || nameOf(a).localeCompare(nameOf(b)));
+    const mine = pSel ? tasks.filter(t => (t.who || []).includes(pSel)) : [];
+    return React.createElement("div", {
+      style: CARD
+    }, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 7,
+        flexWrap: 'wrap',
+        marginBottom: 12
+      }
+    }, ids.length === 0 && React.createElement("div", {
+      style: {
+        fontSize: 13.5,
+        color: 'var(--g-777)'
+      }
+    }, "No one has assignments yet."), ids.map(id => React.createElement("span", {
+      key: id,
+      onClick: () => setPSel(pSel === id ? null : id),
+      style: {
+        cursor: 'pointer',
+        fontSize: 13,
+        padding: '4px 12px',
+        borderRadius: 999,
+        border: '1px solid ' + (pSel === id ? '#c9f26f' : 'var(--border)'),
+        background: pSel === id ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'var(--surface3)',
+        color: pSel === id ? '#06301f' : 'var(--g-ccc)'
+      }
+    }, nameOf(id).split(' ')[0], " ", withT[id].o > 0 && React.createElement("b", null, "\xB7 ", withT[id].o, " open"), React.createElement("span", {
+      style: {
+        opacity: .6
+      }
+    }, " \xB7 ", withT[id].d, " \u2713")))), pSel && React.createElement("div", null, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 10,
+        alignItems: 'baseline',
+        marginBottom: 4
+      }
+    }, React.createElement("div", {
+      style: GPH2
+    }, nameOf(pSel)), openProfile && React.createElement("span", {
+      onClick: () => openProfile(pSel),
+      style: {
+        cursor: 'pointer',
+        fontSize: 12.5,
+        color: '#9fd9c6'
+      }
+    }, "\uD83D\uDC64 Open profile")), Section('Open', mine.filter(t => t.status === 'open').sort(bySoonest), true), Section('✓ Delivered', mine.filter(t => t.status === 'done').sort((a, b) => String(b.doneAt || '').localeCompare(String(a.doneAt || ''))).slice(0, 15))), !pSel && ids.length > 0 && React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-666)'
+      }
+    }, "Tap a name for their full list \u2014 open first, delivered underneath."));
+  };
+  const doneThisMonth = tasks.filter(t => t.status === 'done' && String(t.doneAt || '').slice(0, 7) === today.slice(0, 7)).length;
+  return React.createElement("div", null, React.createElement("div", {
+    style: {
+      ...CARD,
+      marginBottom: 12
+    }
+  }, React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 16,
+      alignItems: 'center',
+      flexWrap: 'wrap'
+    }
+  }, React.createElement("div", {
+    style: {
+      flex: '1 1 260px'
+    }
+  }, React.createElement("div", {
+    style: GPH2
+  }, "\uD83D\uDCCB Leadership assignments"), React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-888)',
+      marginTop: 2
+    }
+  }, "What got assigned in your meetings, who owns it, and what this week owes. Next week's meeting opens on the \uD83D\uDD04 review.")), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 18,
+      flexWrap: 'wrap'
+    }
+  }, [['Open', openT.length], ['Due this week', dueThisWk.length], ['Overdue', overdue.length], ['Delivered this month', doneThisMonth]].map(([l, v]) => React.createElement("div", {
+    key: l
+  }, React.createElement("div", {
+    style: RV_LBL
+  }, l), React.createElement("div", {
+    style: {
+      fontFamily: "'Barlow Condensed',sans-serif",
+      fontSize: 24,
+      fontWeight: 800,
+      color: l === 'Overdue' && v > 0 ? 'var(--c-red)' : '#f0f8f3',
+      lineHeight: 1
+    }
+  }, v)))), React.createElement("button", {
+    className: "btn btn-lime btn-sm",
+    onClick: () => setCompOpen(!compOpen)
+  }, compOpen ? '▴ Close' : '＋ Assign')), compOpen && React.createElement("div", {
+    style: {
+      marginTop: 12,
+      paddingTop: 12,
+      borderTop: '1px solid var(--border)'
+    }
+  }, React.createElement("input", {
+    value: cT,
+    onChange: e => setCT(e.target.value),
+    placeholder: "What's the deliverable? One clear sentence\u2026",
+    style: {
+      marginBottom: 8,
+      fontSize: 14
+    }
+  }), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 7,
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      marginBottom: 8
+    }
+  }, React.createElement("span", {
+    style: {
+      ...RV_LBL,
+      marginBottom: 0
+    }
+  }, "Owners"), staff.filter(s => !RV_IS_GE(s)).sort((a, b) => a.name.localeCompare(b.name)).map(s => {
+    const on = cWho.includes(s.id);
+    return React.createElement("span", {
+      key: s.id,
+      onClick: () => setCWho(on ? cWho.filter(x => x !== s.id) : [...cWho, s.id]),
+      style: {
+        cursor: 'pointer',
+        fontSize: 12,
+        padding: '2px 9px',
+        borderRadius: 999,
+        border: '1px solid ' + (on ? '#2fd6a8' : 'var(--border)'),
+        background: on ? 'rgba(47,214,168,.14)' : 'transparent',
+        color: on ? '#9fd9c6' : 'var(--g-777)'
+      }
+    }, s.name.split(' ')[0]);
+  })), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 10,
+      flexWrap: 'wrap',
+      alignItems: 'center'
+    }
+  }, React.createElement("select", {
+    value: cSrc,
+    onChange: e => setCSrc(e.target.value),
+    style: {
+      width: 150,
+      padding: '6px 9px',
+      fontSize: 12.5
+    }
+  }, Object.entries(AS_SRC).map(([k, l]) => React.createElement("option", {
+    key: k,
+    value: k
+  }, l))), React.createElement("select", {
+    value: cHz,
+    onChange: e => setCHz(e.target.value),
+    style: {
+      width: 140,
+      padding: '6px 9px',
+      fontSize: 12.5
+    }
+  }, Object.entries(AS_HZ).map(([k, l]) => React.createElement("option", {
+    key: k,
+    value: k
+  }, l))), React.createElement("input", {
+    type: "date",
+    value: cDue,
+    onChange: e => setCDue(e.target.value),
+    title: "Due date (optional)",
+    style: {
+      width: 150,
+      padding: '6px 9px',
+      fontSize: 12.5
+    }
+  }), React.createElement("input", {
+    value: cN,
+    onChange: e => setCN(e.target.value),
+    placeholder: "Notes (optional)",
+    style: {
+      flex: '1 1 200px',
+      padding: '6px 9px',
+      fontSize: 12.5
+    }
+  }), React.createElement("button", {
+    className: "btn btn-lime btn-sm",
+    disabled: !cT.trim() || !cWho.length,
+    onClick: assign
+  }, "Assign \u2192")))), React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 8,
+      marginBottom: 12,
+      flexWrap: 'wrap'
+    }
+  }, [['week', '⚡ This week'], ['review', '🔄 Weekly review'], ['all', '📚 All assignments'], ['people', '👤 By person']].map(([k, l]) => React.createElement(RvPill, {
+    key: k,
+    on: avTab === k,
+    label: l,
+    onClick: () => setAvTab(k)
+  }))), avTab === 'review' ? renderReview() : avTab === 'all' ? renderAll() : avTab === 'people' ? renderPeople() : renderWeek());
+}
 function LeadershipPage({
   staff,
   perfData,
   evals,
-  openProfile
+  openProfile,
+  currentUser
 }) {
   const [ltData, setLtData] = useState(() => {
     try {
@@ -70811,12 +71920,18 @@ function LeadershipPage({
       color: 'var(--g-999)'
     }
   }, "Click any row to view and edit all scores \xB7 Leadership = Stability Under Weight")), React.createElement("div", {
-    className: "flex aic g6"
-  }, ['develop', 'academy', 'roster', 'heat-map', 'identity', 'risk-matrix', 'doctrine'].map(t => React.createElement("button", {
+    className: "flex aic g6",
+    style: {
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+      rowGap: 6,
+      maxWidth: 900
+    }
+  }, ['develop', 'assignments', 'academy', 'roster', 'heat-map', 'identity', 'risk-matrix', 'doctrine'].map(t => React.createElement("button", {
     key: t,
     className: `btn btn-sm ${activeTab === t ? 'btn-go' : 'btn-ghost'}`,
     onClick: () => setActiveTab(t)
-  }, t === 'develop' ? '🎯 Development' : t === 'academy' ? '🎓 Leadership Growth' : t === 'roster' ? '◎ Roster' : t === 'heat-map' ? '▣ Heat Map' : t === 'identity' ? '⬡ Identity Map' : t === 'risk-matrix' ? '⚠ Risk Matrix' : '◐ Doctrine')), React.createElement("button", {
+  }, t === 'develop' ? '🎯 Development' : t === 'assignments' ? '📋 Assignments' : t === 'academy' ? '🎓 Leadership Growth' : t === 'roster' ? '◎ Roster' : t === 'heat-map' ? '▣ Heat Map' : t === 'identity' ? '⬡ Identity Map' : t === 'risk-matrix' ? '⚠ Risk Matrix' : '◐ Doctrine')), React.createElement("button", {
     className: "btn btn-lime btn-sm",
     onClick: () => setShowAdd(true)
   }, "+ Add"), React.createElement("button", {
@@ -70829,7 +71944,7 @@ function LeadershipPage({
     onClick: () => {
       if (window.confirm('Reset to sample data?')) save(SEED_LEADERSHIP);
     }
-  }, "\u21BA"))), activeTab !== 'develop' && activeTab !== 'academy' && React.createElement("div", {
+  }, "\u21BA"))), activeTab !== 'develop' && activeTab !== 'academy' && activeTab !== 'assignments' && React.createElement("div", {
     className: "lt-grid",
     style: {
       gridTemplateColumns: 'repeat(6,1fr)'
@@ -70873,6 +71988,10 @@ function LeadershipPage({
     perfData: perfData,
     evals: evals,
     openProfile: openProfile
+  }), activeTab === 'assignments' && React.createElement(LeadAssignTab, {
+    staff: staff,
+    openProfile: openProfile,
+    currentUser: currentUser
   }), activeTab === 'academy' && React.createElement(AcademyTab, {
     staff: staff,
     openProfile: openProfile
