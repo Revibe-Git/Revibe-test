@@ -1927,7 +1927,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L215';
+window.__BUILD = 'build L216';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -2401,6 +2401,11 @@ const NAV = [{
   label: 'Performance & Revenue',
   group: 'Business'
 }, {
+  id: 'guests',
+  icon: '👥',
+  label: 'Guest Profiles',
+  group: 'Business'
+}, {
   id: 'reports',
   icon: '📄',
   label: 'Reports',
@@ -2472,6 +2477,9 @@ const PAGE_META = {
   },
   performance: {
     purpose: 'Revenue, visits and utilization by person, discipline and site — imported from Jane and read the same on every page.'
+  },
+  guests: {
+    purpose: 'Every guest\'s booking story from the Jane appointment imports — who they see, how often, when they fall off, and how each clinician keeps their people coming back.'
   },
   reports: {
     purpose: 'Weekly, monthly and quarterly reports from the same numbers. Save, print, or compare periods.'
@@ -2630,6 +2638,7 @@ const NAV_ROLES = {
   gdtracker: ['lead'],
   leadership: ['lead'],
   performance: ['lead', 'clinician'],
+  guests: ['lead'],
   reports: ['lead'],
   forms: ['lead', 'clinician', 'ge', 'staff'],
   resources: ['lead'],
@@ -4644,6 +4653,7 @@ function App() {
     mentors: MentorsPage,
     gaps: GapsPage,
     performance: PerformancePage,
+    guests: GuestsPage,
     reports: PerformancePage,
     calls: CallHistoryPage,
     community: CommunityPage,
@@ -42547,6 +42557,1570 @@ function RvPageHero({
     onClick: p.onClick,
     title: p.title
   }))), children));
+}
+function GP_PARSECSV(text) {
+  const rows = [];
+  let cur = '',
+    cells = [],
+    q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else q = false;
+      } else cur += ch;
+    } else {
+      if (ch === '"') q = true;else if (ch === ',') {
+        cells.push(cur);
+        cur = '';
+      } else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        cells.push(cur);
+        cur = '';
+        if (cells.length > 1 || (cells[0] || '') !== '') rows.push(cells);
+        cells = [];
+      } else cur += ch;
+    }
+  }
+  if (cur !== '' || cells.length) {
+    cells.push(cur);
+    rows.push(cells);
+  }
+  if (rows.length < 2) return [];
+  const hdr = rows[0].map(h => h.trim());
+  return rows.slice(1).map(cs => {
+    const r = {};
+    hdr.forEach((h, j) => r[h] = cs[j] || '');
+    return r;
+  });
+}
+function GP_MATCH(staffList, name) {
+  if (!name || typeof name !== 'string') return null;
+  const clean = s => s.toLowerCase().replace(/^(dr(\.|\s)\s*)+/, '').replace(/\bkam kei\b/, 'winson').replace(/\bvince\b/, 'vincent').replace(/\bmichael\b/, 'mike').replace(/\bjoshua\b/, 'josh').replace(/macpherson/, 'macphearson').replace(/patino/, 'pitano').replace(/[-']/g, ' ').replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
+  const n = clean(name);
+  if (!n) return null;
+  let m = staffList.find(s => clean(s.name) === n);
+  if (m) return m;
+  const np = n.split(' ').filter(Boolean);
+  m = staffList.find(s => {
+    const sp = clean(s.name).split(' ').filter(Boolean);
+    return sp[0] === np[0] && sp[sp.length - 1] === np[np.length - 1];
+  });
+  if (m) return m;
+  const last = np[np.length - 1];
+  if (last && last.length > 4) {
+    m = staffList.find(s => clean(s.name).split(' ').pop() === last);
+    if (m) return m;
+  }
+  return null;
+}
+const GP_DISC = t => {
+  const x = (t || '').toLowerCase();
+  if (x.includes('post-op') || x.includes('post op')) return 'Post-Op';
+  if (x.includes('physio')) return 'Physio';
+  if (x.includes('chiro')) return 'Chiro';
+  if (x.includes('osteo')) return 'Osteo';
+  if (x.includes('massage') || x.includes('rmt')) return 'Massage';
+  if (x.includes('naturopath')) return 'Naturo';
+  if (x.includes('plunge') || x.includes('sauna') || x.includes('recovery') || x.includes('compression')) return 'Recovery';
+  if (x.includes('performance') || x.includes('training') || x.includes('strength')) return 'Performance';
+  if (x.includes('acupuncture')) return 'Acupuncture';
+  if (x.includes('consult')) return 'Consult';
+  return 'Other';
+};
+const GP_DAY = d => Math.floor(new Date(d + 'T12:00').getTime() / 86400000);
+const GP_FMT = d => {
+  try {
+    return new Date(d + 'T12:00').toLocaleDateString('en-CA', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  } catch (e) {
+    return d;
+  }
+};
+const GP_ST_META = {
+  booked: 'Booked ahead',
+  active: 'Active',
+  cooling: 'Cooling · 31–60d quiet',
+  falling: 'Falling off · 61–90d quiet',
+  lapsed: 'Lapsed · 90d+ quiet'
+};
+function GP_BUILD(rows, staffList) {
+  const evs = [];
+  rows.forEach(r => {
+    const st = (r.state || '').toLowerCase();
+    if (st !== 'arrived' && st !== 'no_show' && st !== 'cancelled' && st !== 'booked') return;
+    const g = (r.patient_guid || '').trim();
+    if (!g) return;
+    const d = (r.start_at || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+    const fn = (r.patient_preferred_name || '').trim() || (r.patient_first_name || '').trim();
+    const nm = (fn + ' ' + (r.patient_last_name || '').trim()).trim() || 'Guest ' + ((r.patient_number || '').trim() || g.slice(0, 6));
+    evs.push({
+      d,
+      g,
+      nm,
+      num: (r.patient_number || '').trim(),
+      pr: (r.staff_member_name || '').trim(),
+      tx: (r.treatment_name || '').trim(),
+      disc: GP_DISC(r.treatment_name),
+      loc: /markham/i.test(r.location_name || '') ? 'Markham' : 'Mississauga',
+      st,
+      on: String(r.booked_online) === 'true',
+      cr: (r.cancelled_reason || '').trim()
+    });
+  });
+  evs.sort((a, b) => a.d.localeCompare(b.d));
+  const arrDates = evs.filter(e => e.st === 'arrived').map(e => e.d);
+  const dataEnd = arrDates.length ? arrDates[arrDates.length - 1] : '';
+  const endDay = dataEnd ? GP_DAY(dataEnd) : 0;
+  const byId = {};
+  evs.forEach(e => {
+    const x = byId[e.g] || (byId[e.g] = {
+      id: e.g,
+      name: e.nm,
+      num: e.num,
+      v: 0,
+      ns: 0,
+      cx: 0,
+      up: 0,
+      nextD: '',
+      dates: [],
+      prs: {},
+      txs: {},
+      discs: {},
+      locs: {},
+      online: 0,
+      months: {},
+      crs: {}
+    });
+    if (e.nm && e.nm.length > x.name.length) x.name = e.nm;
+    if (e.num && !x.num) x.num = e.num;
+    if (e.st === 'arrived') {
+      x.v++;
+      x.dates.push(e.d);
+      if (e.pr) x.prs[e.pr] = (x.prs[e.pr] || 0) + 1;
+      if (e.tx) x.txs[e.tx] = (x.txs[e.tx] || 0) + 1;
+      x.discs[e.disc] = (x.discs[e.disc] || 0) + 1;
+      x.locs[e.loc] = (x.locs[e.loc] || 0) + 1;
+      if (e.on) x.online++;
+      const mo = e.d.slice(0, 7);
+      x.months[mo] = (x.months[mo] || 0) + 1;
+    } else if (e.st === 'no_show') x.ns++;else if (e.st === 'cancelled') {
+      x.cx++;
+      if (e.cr) x.crs[e.cr] = (x.crs[e.cr] || 0) + 1;
+    } else if (e.st === 'booked' && dataEnd && e.d >= dataEnd) {
+      x.up++;
+      if (!x.nextD || e.d < x.nextD) x.nextD = e.d;
+    }
+  });
+  const guests = Object.values(byId).filter(x => x.v > 0);
+  guests.forEach(x => {
+    x.first = x.dates[0];
+    x.last = x.dates[x.dates.length - 1];
+    x.dsl = endDay - GP_DAY(x.last);
+    let gs = 0;
+    for (let i = 1; i < x.dates.length; i++) gs += GP_DAY(x.dates[i]) - GP_DAY(x.dates[i - 1]);
+    x.gap = x.dates.length > 1 ? Math.round(gs / (x.dates.length - 1)) : null;
+    x.span = GP_DAY(x.last) - GP_DAY(x.first);
+    x.nPr = Object.keys(x.prs).length;
+    x.nSvc = Object.keys(x.discs).length;
+    x.status = x.up > 0 ? 'booked' : x.dsl <= 30 ? 'active' : x.dsl <= 60 ? 'cooling' : x.dsl <= 90 ? 'falling' : 'lapsed';
+    x.oneDone = x.v === 1 && x.up === 0 && x.dsl > 30;
+  });
+  guests.sort((a, b) => b.v - a.v || a.name.localeCompare(b.name));
+  const prs = {};
+  evs.forEach(e => {
+    if (!e.pr || /relax spa|guest experience|^revibe|^ge\s/i.test(e.pr)) return;
+    if (e.st !== 'arrived' && e.st !== 'no_show') return;
+    const p = prs[e.pr] || (prs[e.pr] = {
+      name: e.pr,
+      v: 0,
+      ns: 0,
+      g: {},
+      discs: {}
+    });
+    if (e.st === 'arrived') {
+      p.v++;
+      p.g[e.g] = (p.g[e.g] || 0) + 1;
+      p.discs[e.disc] = (p.discs[e.disc] || 0) + 1;
+    } else p.ns++;
+  });
+  const prl = Object.values(prs).filter(p => p.v >= 5).map(p => {
+    const gids = Object.keys(p.g);
+    const their = gids.map(id => byId[id]).filter(x => x && x.v > 0);
+    const rep = gids.filter(id => p.g[id] >= 3).length;
+    const one = their.filter(x => p.g[x.id] === 1 && x.up === 0 && x.dsl > 30).length;
+    const shared = their.filter(x => x.nPr > 1).length;
+    const act = their.filter(x => x.status === 'active' || x.status === 'booked').length;
+    const m = GP_MATCH(staffList, p.name);
+    return {
+      name: p.name,
+      sid: m ? m.id : null,
+      gids,
+      v: p.v,
+      ng: gids.length,
+      avgV: gids.length ? Math.round(p.v / gids.length * 10) / 10 : 0,
+      rep3: gids.length ? Math.round(rep / gids.length * 100) : 0,
+      oneRate: their.length ? Math.round(one / their.length * 100) : 0,
+      sharedRate: their.length ? Math.round(shared / their.length * 100) : 0,
+      actRate: their.length ? Math.round(act / their.length * 100) : 0,
+      nsRate: p.v + p.ns ? Math.round(p.ns / (p.v + p.ns) * 100) : 0,
+      topDisc: Object.entries(p.discs).sort((a, b) => b[1] - a[1]).map(x => x[0])[0] || ''
+    };
+  }).sort((a, b) => b.ng - a.ng);
+  return {
+    evs,
+    guests,
+    byId,
+    prl,
+    dataEnd,
+    dataStart: arrDates[0] || '',
+    visits: arrDates.length
+  };
+}
+function GuestsPage({
+  staff,
+  openProfile
+}) {
+  const GPH = {
+    fontFamily: "'Barlow Condensed',sans-serif",
+    fontSize: 15,
+    fontWeight: 800,
+    letterSpacing: '2.2px',
+    textTransform: 'uppercase',
+    color: '#9fd9c6'
+  };
+  const GPC = {
+    background: 'var(--surface2)',
+    border: '1px solid var(--border)',
+    borderLeft: '3px solid #2fd6a8',
+    borderRadius: 11,
+    padding: '14px 16px'
+  };
+  const MUT = {
+    fontSize: 13,
+    color: 'var(--g-777)'
+  };
+  const [view, setView] = usePersist('gp.view', 'dir');
+  const [sel, setSel] = useState(null);
+  const [lane, setLane] = useState(null);
+  const [q, setQ] = useState('');
+  const [showAll, setShowAll] = useState(false);
+  const [clinSel, setClinSel] = useState(null);
+  const [gp, setGp] = useState(window.__gpData || null);
+  const [gpMsg, setGpMsg] = useState('');
+  useEffect(() => {
+    if (gp) return;
+    let dead = false;
+    (async () => {
+      try {
+        if (window.__GP_TEST) {
+          const b = GP_BUILD(window.__GP_TEST, staff);
+          window.__gpData = b;
+          if (!dead) setGp(b);
+          return;
+        }
+        const SB = window.__SB;
+        if (!SB) {
+          if (!dead) setGpMsg('offline');
+          return;
+        }
+        if (!dead) setGpMsg('Checking the stored Jane files…');
+        const {
+          data: list,
+          error
+        } = await SB.from('source_files').select('id,at');
+        if (error) throw new Error(error.message);
+        const names = (list || []).filter(f => /appointment|appt/i.test(f.id || '')).sort((a, b) => (a.at || '').localeCompare(b.at || ''));
+        if (!names.length) {
+          if (!dead) setGpMsg('none');
+          return;
+        }
+        const byRow = new Map();
+        let done = 0;
+        for (let i = 0; i < names.length; i += 4) {
+          const batch = names.slice(i, i + 4).map(f => f.id);
+          const {
+            data: fs,
+            error: e2
+          } = await SB.from('source_files').select('id,content,at').in('id', batch);
+          if (e2) throw new Error(e2.message);
+          (fs || []).sort((a, b) => (a.at || '').localeCompare(b.at || '')).forEach(f => {
+            GP_PARSECSV(f.content || '').forEach(r => {
+              if (r.id) byRow.set(r.id, r);
+            });
+          });
+          done += batch.length;
+          if (!dead) setGpMsg('Reading appointment files… ' + Math.min(done, names.length) + ' / ' + names.length);
+          await new Promise(r => setTimeout(r, 0));
+        }
+        const b = GP_BUILD([...byRow.values()], staff);
+        window.__gpData = b;
+        if (!dead) setGp(b);
+      } catch (e) {
+        if (!dead) setGpMsg('err:' + (e && e.message || 'load failed'));
+      }
+    })();
+    return () => {
+      dead = true;
+    };
+  }, []);
+  const roll = useMemo(() => {
+    if (!gp) return null;
+    const g = gp.guests;
+    const n = g.length || 1;
+    const st = {
+      booked: 0,
+      active: 0,
+      cooling: 0,
+      falling: 0,
+      lapsed: 0
+    };
+    let single = 0,
+      multi = 0,
+      multiSvc = 0,
+      oneDone = 0,
+      ns = 0,
+      cx = 0,
+      online = 0,
+      sumV = 0;
+    const singleV = [],
+      multiV = [];
+    g.forEach(x => {
+      st[x.status]++;
+      sumV += x.v;
+      ns += x.ns;
+      cx += x.cx;
+      online += x.online;
+      if (x.nPr > 1) {
+        multi++;
+        multiV.push(x.v);
+      } else {
+        single++;
+        singleV.push(x.v);
+      }
+      if (x.nSvc > 1) multiSvc++;
+      if (x.oneDone) oneDone++;
+    });
+    const avg = a => a.length ? Math.round(a.reduce((s, x) => s + x, 0) / a.length * 10) / 10 : 0;
+    const funnel = [1, 2, 3, 5, 8, 12].map(k => ({
+      k,
+      n: g.filter(x => x.v >= k).length
+    }));
+    const months = {};
+    g.forEach(x => {
+      Object.keys(x.months).forEach(mo => {
+        const m = months[mo] || (months[mo] = {
+          nw: 0,
+          ret: 0
+        });
+        if (x.first.slice(0, 7) === mo) m.nw++;else m.ret++;
+      });
+    });
+    const moList = Object.keys(months).sort().map(mo => ({
+      mo,
+      ...months[mo]
+    }));
+    const cohorts = moList.map(({
+      mo
+    }) => {
+      const c = g.filter(x => x.first.slice(0, 7) === mo);
+      return {
+        mo,
+        n: c.length,
+        back: c.filter(x => x.v >= 2).length
+      };
+    });
+    let comebacks = 0;
+    g.forEach(x => {
+      for (let i = 1; i < x.dates.length; i++) {
+        if (GP_DAY(x.dates[i]) - GP_DAY(x.dates[i - 1]) > 30) comebacks++;
+      }
+    });
+    const stillOut = g.filter(x => x.dsl > 30 && x.status !== 'booked').length;
+    const gaps = [];
+    g.forEach(x => {
+      for (let i = 1; i < x.dates.length; i++) gaps.push(GP_DAY(x.dates[i]) - GP_DAY(x.dates[i - 1]));
+    });
+    gaps.sort((a, b) => a - b);
+    const tx = {};
+    gp.evs.forEach(e => {
+      if (e.st === 'arrived' && e.tx) tx[e.tx] = (tx[e.tx] || 0) + 1;
+    });
+    return {
+      n: g.length,
+      visits: gp.visits,
+      avgV: Math.round(gp.visits / n * 10) / 10,
+      st,
+      single,
+      multi,
+      multiSvc,
+      oneDone,
+      singleAvg: avg(singleV),
+      multiAvg: avg(multiV),
+      funnel,
+      moList,
+      cohorts,
+      comebacks,
+      stillOut,
+      medGap: gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0,
+      nsRate: Math.round(ns / (gp.visits + ns) * 100),
+      cxRate: Math.round(cx / (gp.visits + cx) * 100),
+      onlineRate: Math.round(online / gp.visits * 100),
+      topTx: Object.entries(tx).sort((a, b) => b[1] - a[1]).slice(0, 8)
+    };
+  }, [gp]);
+  const selG = sel && gp ? gp.byId[sel] : null;
+  const openGuest = id => {
+    setSel(id);
+    setView('dir');
+  };
+  const Chip = ({
+    children,
+    hi,
+    onClick,
+    title
+  }) => React.createElement("span", {
+    onClick: onClick,
+    title: title,
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 5,
+      fontSize: 13,
+      padding: '3px 10px',
+      borderRadius: 999,
+      cursor: onClick ? 'pointer' : 'default',
+      background: hi ? 'rgba(47,214,168,.14)' : 'var(--surface3)',
+      border: '1px solid ' + (hi ? 'rgba(47,214,168,.5)' : 'var(--border)'),
+      color: hi ? '#9fd9c6' : 'var(--g-bbb)'
+    }
+  }, children);
+  const Stat = ({
+    l,
+    v,
+    sub
+  }) => React.createElement("div", null, React.createElement("div", {
+    style: RV_LBL
+  }, l), React.createElement("div", {
+    style: RV_VAL
+  }, v), sub && React.createElement("div", {
+    style: {
+      fontSize: 12.5,
+      color: 'var(--g-777)'
+    }
+  }, sub));
+  const renderGuest = x => {
+    const prsSorted = Object.entries(x.prs).sort((a, b) => b[1] - a[1]);
+    const monthsAll = [];
+    if (gp.dataStart) {
+      let d = new Date(gp.dataStart.slice(0, 7) + '-01T12:00');
+      const end = new Date(gp.dataEnd.slice(0, 7) + '-01T12:00');
+      while (d <= end) {
+        monthsAll.push(d.toISOString().slice(0, 7));
+        d.setMonth(d.getMonth() + 1);
+      }
+    }
+    const maxMo = Math.max(1, ...monthsAll.map(mo => x.months[mo] || 0));
+    const recent = gp.evs.filter(e => e.g === x.id && e.st !== 'booked').slice(-14).reverse();
+    const upcoming = gp.evs.filter(e => e.g === x.id && e.st === 'booked' && e.d >= gp.dataEnd);
+    return React.createElement("div", null, React.createElement("button", {
+      className: "btn btn-ghost btn-sm",
+      onClick: () => setSel(null),
+      style: {
+        marginBottom: 10
+      }
+    }, "\u2190 All guests"), React.createElement("div", {
+      style: {
+        ...GPC,
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'baseline',
+        gap: 12,
+        flexWrap: 'wrap'
+      }
+    }, React.createElement("div", {
+      style: {
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 24,
+        fontWeight: 800,
+        color: '#fff',
+        textTransform: 'uppercase',
+        letterSpacing: '.5px'
+      }
+    }, x.name), x.num && React.createElement("span", {
+      style: MUT
+    }, "#", x.num), React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: '#9fd9c6'
+      }
+    }, GP_ST_META[x.status], x.status === 'booked' && x.nextD ? ' · next ' + GP_FMT(x.nextD) : '')), React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))',
+        gap: '12px 16px',
+        marginTop: 12
+      }
+    }, React.createElement(Stat, {
+      l: "Visits",
+      v: x.v,
+      sub: x.span > 0 ? 'over ' + x.span + ' days' : 'single visit'
+    }), React.createElement(Stat, {
+      l: "First visit",
+      v: GP_FMT(x.first)
+    }), React.createElement(Stat, {
+      l: "Last visit",
+      v: GP_FMT(x.last),
+      sub: x.dsl + 'd ago'
+    }), React.createElement(Stat, {
+      l: "Usual rhythm",
+      v: x.gap != null ? 'every ~' + x.gap + 'd' : '—'
+    }), React.createElement(Stat, {
+      l: "No-shows / cancels",
+      v: x.ns + ' / ' + x.cx
+    }), React.createElement(Stat, {
+      l: "Books online",
+      v: x.v ? Math.round(x.online / x.v * 100) + '%' : '—'
+    }), React.createElement(Stat, {
+      l: "Location",
+      v: Object.entries(x.locs).sort((a, b) => b[1] - a[1]).map(e2 => e2[0]).join(' + ')
+    }))), React.createElement("div", {
+      className: "grid2",
+      style: {
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 10
+      }
+    }, "Practitioners they see ", React.createElement("span", {
+      style: {
+        color: 'var(--g-777)',
+        letterSpacing: 0
+      }
+    }, "\xB7 ", x.nPr)), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 6,
+        flexWrap: 'wrap'
+      }
+    }, prsSorted.map(([nm, c], i) => {
+      const m = GP_MATCH(staff, nm);
+      return React.createElement(Chip, {
+        key: nm,
+        hi: i === 0,
+        onClick: m && openProfile ? () => openProfile(m.id) : undefined,
+        title: m ? 'Open ' + m.name + "'s profile" : undefined
+      }, i === 0 && '★ ', nm, " \xD7", c, m ? ' 👤' : '');
+    })), x.nPr > 1 && React.createElement("div", {
+      style: {
+        ...MUT,
+        marginTop: 8
+      }
+    }, "\u2605 primary \u2014 the practitioner they see most")), React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 10
+      }
+    }, "Services used ", React.createElement("span", {
+      style: {
+        color: 'var(--g-777)',
+        letterSpacing: 0
+      }
+    }, "\xB7 ", x.nSvc)), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 6,
+        flexWrap: 'wrap',
+        marginBottom: 8
+      }
+    }, Object.entries(x.discs).sort((a, b) => b[1] - a[1]).map(([d, c]) => React.createElement(Chip, {
+      key: d,
+      hi: true
+    }, d, " \xD7", c))), React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-888)',
+        lineHeight: 1.7
+      }
+    }, Object.entries(x.txs).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t, c]) => React.createElement("div", {
+      key: t
+    }, t, " ", React.createElement("span", {
+      style: {
+        color: 'var(--g-666)'
+      }
+    }, "\xD7", c)))))), React.createElement("div", {
+      className: "grid2"
+    }, React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 10
+      }
+    }, "Visit history"), React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'flex-end',
+        gap: 5,
+        height: 56,
+        marginBottom: 6
+      }
+    }, monthsAll.map(mo => {
+      const c = x.months[mo] || 0;
+      return React.createElement("div", {
+        key: mo,
+        style: {
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 3
+        }
+      }, React.createElement("div", {
+        style: {
+          fontSize: 11,
+          color: c ? '#c9f26f' : 'var(--g-555)'
+        }
+      }, c || ''), React.createElement("div", {
+        style: {
+          width: '70%',
+          maxWidth: 26,
+          height: Math.max(2, c / maxMo * 36),
+          borderRadius: 2,
+          background: c ? 'linear-gradient(180deg,#2fd6a8,#c9f26f)' : 'var(--surface3)'
+        }
+      }));
+    })), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 5,
+        marginBottom: 12
+      }
+    }, monthsAll.map(mo => React.createElement("div", {
+      key: mo,
+      style: {
+        flex: 1,
+        textAlign: 'center',
+        fontSize: 10.5,
+        color: 'var(--g-666)',
+        textTransform: 'uppercase'
+      }
+    }, new Date(mo + '-01T12:00').toLocaleDateString('en-CA', {
+      month: 'short'
+    })))), upcoming.length > 0 && React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: '#9fd9c6',
+        marginBottom: 8
+      }
+    }, "\u25F7 ", upcoming.length, " upcoming booked \u2014 next ", GP_FMT(upcoming[0].d), upcoming[0].pr ? ' with ' + upcoming[0].pr : ''), React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        lineHeight: 1.9,
+        maxHeight: 220,
+        overflowY: 'auto'
+      }
+    }, recent.map((e, i) => React.createElement("div", {
+      key: i,
+      style: {
+        display: 'flex',
+        gap: 8,
+        alignItems: 'baseline'
+      }
+    }, React.createElement("span", {
+      style: {
+        color: e.st === 'arrived' ? '#c9f26f' : e.st === 'no_show' ? 'var(--c-red)' : 'var(--g-666)',
+        width: 14,
+        flexShrink: 0
+      }
+    }, e.st === 'arrived' ? '✓' : e.st === 'no_show' ? '✗' : '—'), React.createElement("span", {
+      style: {
+        color: 'var(--g-999)',
+        width: 88,
+        flexShrink: 0
+      }
+    }, GP_FMT(e.d)), React.createElement("span", {
+      style: {
+        color: 'var(--g-bbb)',
+        flex: 1
+      }
+    }, e.tx || e.disc, e.st === 'no_show' ? ' · no-show' : e.st === 'cancelled' ? ' · cancelled' : ''), React.createElement("span", {
+      style: {
+        color: 'var(--g-777)'
+      }
+    }, e.pr))))), React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 10
+      }
+    }, "Booking habits"), React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '12px 16px'
+      }
+    }, React.createElement(Stat, {
+      l: "Booked online",
+      v: x.online,
+      sub: "of arrived visits"
+    }), React.createElement(Stat, {
+      l: "Booked at the desk",
+      v: x.v - x.online
+    }), React.createElement(Stat, {
+      l: "No-show rate",
+      v: x.v + x.ns ? Math.round(x.ns / (x.v + x.ns) * 100) + '%' : '—'
+    }), React.createElement(Stat, {
+      l: "Cancel rate",
+      v: x.v + x.cx ? Math.round(x.cx / (x.v + x.cx) * 100) + '%' : '—'
+    })), Object.keys(x.crs).length > 0 && React.createElement("div", {
+      style: {
+        marginTop: 12
+      }
+    }, React.createElement("div", {
+      style: RV_LBL
+    }, "Cancel reasons"), React.createElement("div", {
+      style: {
+        fontSize: 12.5,
+        color: 'var(--g-888)',
+        lineHeight: 1.7
+      }
+    }, Object.entries(x.crs).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([r2, c]) => React.createElement("div", {
+      key: r2
+    }, r2, " \xD7", c)))))));
+  };
+  const renderDir = () => {
+    if (selG) return renderGuest(selG);
+    const lanes = [['booked', 'Booked ahead'], ['active', 'Active'], ['cooling', 'Cooling'], ['falling', 'Falling off'], ['lapsed', 'Lapsed'], ['one', 'One visit only'], ['multi', 'Sees 2+ practitioners']];
+    const engaged = !!(q.trim() || lane || showAll);
+    let list = gp.guests;
+    if (lane === 'one') list = list.filter(x => x.oneDone);else if (lane === 'multi') list = list.filter(x => x.nPr > 1);else if (lane) list = list.filter(x => x.status === lane);
+    if (q.trim()) {
+      const s = q.trim().toLowerCase();
+      list = list.filter(x => x.name.toLowerCase().includes(s) || x.num === s.replace('#', ''));
+    }
+    const laneCount = k => k === 'one' ? gp.guests.filter(x => x.oneDone).length : k === 'multi' ? gp.guests.filter(x => x.nPr > 1).length : gp.guests.filter(x => x.status === k).length;
+    return React.createElement("div", null, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 10,
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        marginBottom: 10
+      }
+    }, React.createElement("input", {
+      value: q,
+      onChange: e => setQ(e.target.value),
+      placeholder: "Search a guest by name or #number\u2026",
+      style: {
+        maxWidth: 290,
+        padding: '8px 12px',
+        fontSize: 14
+      }
+    }), React.createElement("div", {
+      style: {
+        display: 'flex'
+      }
+    }, lanes.map(([k, lb], i) => React.createElement("button", {
+      key: k,
+      onClick: () => setLane(lane === k ? null : k),
+      style: {
+        cursor: 'pointer',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontSize: 12.5,
+        fontWeight: 800,
+        letterSpacing: '1px',
+        textTransform: 'uppercase',
+        padding: '6px 11px',
+        marginRight: -1,
+        border: '1px solid ' + (lane === k ? '#c9f26f' : 'var(--border)'),
+        borderRadius: i === 0 ? '8px 0 0 8px' : i === lanes.length - 1 ? '0 8px 8px 0' : '0',
+        background: lane === k ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'var(--surface2)',
+        color: lane === k ? '#06301f' : 'var(--g-999)'
+      }
+    }, lb, " \xB7 ", laneCount(k)))), React.createElement("button", {
+      className: "btn btn-ghost btn-sm",
+      onClick: () => {
+        setShowAll(!showAll);
+      }
+    }, showAll ? 'Hide everyone' : 'Show everyone · ' + gp.guests.length)), !engaged ? React.createElement("div", {
+      style: {
+        ...GPC,
+        borderStyle: 'dashed',
+        borderLeft: '1px dashed var(--border)',
+        textAlign: 'center',
+        padding: '34px 20px'
+      }
+    }, React.createElement("div", {
+      style: {
+        fontSize: 15,
+        fontWeight: 600,
+        color: 'var(--g-bbb)',
+        marginBottom: 6
+      }
+    }, "Search a guest, or pick a lane above"), React.createElement("div", {
+      style: {
+        fontSize: 13,
+        color: 'var(--g-777)',
+        maxWidth: 560,
+        margin: '0 auto',
+        lineHeight: 1.6
+      }
+    }, gp.guests.length.toLocaleString(), " guests on record from ", GP_FMT(gp.dataStart), " to ", GP_FMT(gp.dataEnd), ". Lanes group everyone by where they stand; each guest opens into their full booking story.")) : React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8,
+        alignItems: 'baseline',
+        marginBottom: 8
+      }
+    }, React.createElement("div", {
+      style: GPH
+    }, list.length.toLocaleString(), " guest", list.length !== 1 ? 's' : ''), list.length > 200 && React.createElement("span", {
+      style: MUT
+    }, "showing the first 200 \u2014 narrow with search")), list.slice(0, 200).map(x => React.createElement("div", {
+      key: x.id,
+      onClick: () => setSel(x.id),
+      style: {
+        display: 'flex',
+        gap: 12,
+        alignItems: 'baseline',
+        padding: '7px 4px',
+        borderTop: '1px solid var(--border)',
+        cursor: 'pointer'
+      },
+      onMouseEnter: e => e.currentTarget.style.background = 'rgba(47,214,168,.05)',
+      onMouseLeave: e => e.currentTarget.style.background = 'transparent'
+    }, React.createElement("div", {
+      style: {
+        flex: '1 1 190px',
+        fontSize: 14.5,
+        fontWeight: 600,
+        color: 'var(--g-ddd)'
+      }
+    }, x.name), React.createElement("div", {
+      style: {
+        width: 70,
+        fontSize: 13,
+        color: '#9fd9c6',
+        textAlign: 'right'
+      }
+    }, x.v, " visit", x.v !== 1 ? 's' : ''), React.createElement("div", {
+      style: {
+        width: 110,
+        fontSize: 12.5,
+        color: 'var(--g-888)',
+        textAlign: 'right'
+      }
+    }, "last ", GP_FMT(x.last)), React.createElement("div", {
+      style: {
+        width: 100,
+        fontSize: 12.5,
+        color: 'var(--g-777)',
+        textAlign: 'right'
+      }
+    }, x.nPr, " practitioner", x.nPr !== 1 ? 's' : ''), React.createElement("div", {
+      style: {
+        width: 110,
+        fontSize: 12.5,
+        color: 'var(--g-777)',
+        textAlign: 'right'
+      }
+    }, GP_ST_META[x.status].split(' ·')[0])))));
+  };
+  const renderTop = () => {
+    const consistent = gp.guests.filter(x => x.v >= 8 && x.gap != null).sort((a, b) => a.gap - b.gap).slice(0, 10);
+    const cross = gp.guests.filter(x => x.nSvc >= 2).sort((a, b) => b.nSvc - a.nSvc || b.v - a.v).slice(0, 10);
+    const Row = ({
+      i,
+      x,
+      right
+    }) => React.createElement("div", {
+      onClick: () => openGuest(x.id),
+      style: {
+        display: 'flex',
+        gap: 10,
+        alignItems: 'baseline',
+        padding: '6px 4px',
+        borderTop: '1px solid var(--border)',
+        cursor: 'pointer'
+      }
+    }, React.createElement("span", {
+      style: {
+        width: 24,
+        fontFamily: "'Barlow Condensed',sans-serif",
+        fontWeight: 800,
+        fontSize: 15,
+        color: i < 3 ? '#c9f26f' : 'var(--g-666)'
+      }
+    }, i + 1), React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 14,
+        fontWeight: 600,
+        color: 'var(--g-ddd)'
+      }
+    }, x.name), React.createElement("span", {
+      style: {
+        fontSize: 12.5,
+        color: '#9fd9c6'
+      }
+    }, right));
+    return React.createElement("div", {
+      className: "grid2"
+    }, React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "Most visits"), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginBottom: 8
+      }
+    }, "the guests carrying the clinic \u2014 every one deserves to be known by name"), gp.guests.slice(0, 20).map((x, i) => React.createElement(Row, {
+      key: x.id,
+      i: i,
+      x: x,
+      right: x.v + ' visits · ' + x.nPr + ' practitioner' + (x.nPr !== 1 ? 's' : '')
+    }))), React.createElement("div", null, React.createElement("div", {
+      style: {
+        ...GPC,
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "Most consistent"), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginBottom: 8
+      }
+    }, "8+ visits on the steadiest rhythm"), consistent.map((x, i) => React.createElement(Row, {
+      key: x.id,
+      i: i,
+      x: x,
+      right: 'every ~' + x.gap + 'd · ' + x.v + ' visits'
+    }))), React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "Cross-service explorers"), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginBottom: 8
+      }
+    }, "using the most of the building \u2014 the whole-clinic guests"), cross.map((x, i) => React.createElement(Row, {
+      key: x.id,
+      i: i,
+      x: x,
+      right: x.nSvc + ' services · ' + x.v + ' visits'
+    })))));
+  };
+  const renderClin = () => {
+    const p = clinSel ? gp.prl.find(x => x.name === clinSel) : null;
+    return React.createElement("div", null, React.createElement("div", {
+      style: {
+        ...GPC,
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "How each clinician holds their guests"), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginBottom: 10
+      }
+    }, "Arrived visits only, ", GP_FMT(gp.dataStart), " \u2013 ", GP_FMT(gp.dataEnd), ". Click a row for that clinician's guest list."), React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 10,
+        padding: '0 4px 6px',
+        fontSize: 11,
+        letterSpacing: '1.2px',
+        textTransform: 'uppercase',
+        color: '#9fd9c6',
+        fontWeight: 700
+      }
+    }, React.createElement("span", {
+      style: {
+        flex: '1 1 170px'
+      }
+    }, "Clinician"), React.createElement("span", {
+      style: {
+        width: 62,
+        textAlign: 'right'
+      }
+    }, "Guests"), React.createElement("span", {
+      style: {
+        width: 56,
+        textAlign: 'right'
+      }
+    }, "Visits"), React.createElement("span", {
+      style: {
+        width: 72,
+        textAlign: 'right'
+      },
+      title: "Average arrived visits per guest"
+    }, "Avg/guest"), React.createElement("span", {
+      style: {
+        width: 74,
+        textAlign: 'right'
+      },
+      title: "Their guests still active or booked ahead"
+    }, "Active now"), React.createElement("span", {
+      style: {
+        width: 66,
+        textAlign: 'right'
+      },
+      title: "Guests with 3+ visits with them"
+    }, "3+ visits"), React.createElement("span", {
+      style: {
+        width: 82,
+        textAlign: 'right'
+      },
+      title: "Guests who came once, 30+ days ago, nothing booked"
+    }, "One-&-done"), React.createElement("span", {
+      style: {
+        width: 62,
+        textAlign: 'right'
+      },
+      title: "Their guests who also see other practitioners"
+    }, "Shared"), React.createElement("span", {
+      style: {
+        width: 66,
+        textAlign: 'right'
+      }
+    }, "No-show")), gp.prl.map(x => React.createElement("div", {
+      key: x.name,
+      onClick: () => setClinSel(clinSel === x.name ? null : x.name),
+      style: {
+        display: 'flex',
+        gap: 10,
+        alignItems: 'baseline',
+        padding: '7px 4px',
+        borderTop: '1px solid var(--border)',
+        cursor: 'pointer',
+        background: clinSel === x.name ? 'rgba(47,214,168,.07)' : 'transparent'
+      }
+    }, React.createElement("span", {
+      style: {
+        flex: '1 1 170px',
+        fontSize: 14,
+        fontWeight: 600,
+        color: 'var(--g-ddd)'
+      }
+    }, x.name, " ", React.createElement("span", {
+      style: {
+        fontSize: 11.5,
+        color: 'var(--g-666)'
+      }
+    }, x.topDisc), x.sid && openProfile && React.createElement("span", {
+      title: "Open profile",
+      onClick: e => {
+        e.stopPropagation();
+        openProfile(x.sid);
+      },
+      style: {
+        cursor: 'pointer',
+        marginLeft: 5
+      }
+    }, "\uD83D\uDC64")), React.createElement("span", {
+      style: {
+        width: 62,
+        textAlign: 'right',
+        fontSize: 14,
+        color: '#9fd9c6',
+        fontWeight: 700
+      }
+    }, x.ng), React.createElement("span", {
+      style: {
+        width: 56,
+        textAlign: 'right',
+        fontSize: 13.5,
+        color: 'var(--g-bbb)'
+      }
+    }, x.v), React.createElement("span", {
+      style: {
+        width: 72,
+        textAlign: 'right',
+        fontSize: 13.5,
+        color: 'var(--g-bbb)'
+      }
+    }, x.avgV), React.createElement("span", {
+      style: {
+        width: 74,
+        textAlign: 'right',
+        fontSize: 13.5,
+        color: 'var(--g-bbb)'
+      }
+    }, x.actRate, "%"), React.createElement("span", {
+      style: {
+        width: 66,
+        textAlign: 'right',
+        fontSize: 13.5,
+        color: 'var(--g-bbb)'
+      }
+    }, x.rep3, "%"), React.createElement("span", {
+      style: {
+        width: 82,
+        textAlign: 'right',
+        fontSize: 13.5,
+        color: 'var(--g-bbb)'
+      }
+    }, x.oneRate, "%"), React.createElement("span", {
+      style: {
+        width: 62,
+        textAlign: 'right',
+        fontSize: 13.5,
+        color: 'var(--g-bbb)'
+      }
+    }, x.sharedRate, "%"), React.createElement("span", {
+      style: {
+        width: 66,
+        textAlign: 'right',
+        fontSize: 13.5,
+        color: 'var(--g-bbb)'
+      }
+    }, x.nsRate, "%")))), p && React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 8
+      }
+    }, p.name, " \u2014 their ", p.ng, " guests"), ['booked', 'active', 'cooling', 'falling', 'lapsed'].map(stKey => {
+      const grp = p.gids.map(id => gp.byId[id]).filter(x => x && x.v > 0 && x.status === stKey).sort((a, b) => b.v - a.v);
+      if (!grp.length) return null;
+      return React.createElement("div", {
+        key: stKey,
+        style: {
+          marginBottom: 10
+        }
+      }, React.createElement("div", {
+        style: {
+          ...RV_LBL,
+          marginBottom: 6
+        }
+      }, GP_ST_META[stKey], " \xB7 ", grp.length), React.createElement("div", {
+        style: {
+          display: 'flex',
+          gap: 6,
+          flexWrap: 'wrap'
+        }
+      }, grp.map(x => React.createElement(Chip, {
+        key: x.id,
+        onClick: () => openGuest(x.id)
+      }, x.name, " \xD7", x.prs[p.name] || x.v))));
+    })));
+  };
+  const renderJourney = () => {
+    const r = roll;
+    const maxF = r.funnel[0].n || 1;
+    const insights = [];
+    insights.push(Math.round(r.oneDone / r.n * 100) + '% of guests (' + r.oneDone + ') came once and never returned — the biggest single leak in the journey. Visit two is the battle.');
+    if (r.multi && r.single) insights.push('Guests who see 2+ practitioners average ' + r.multiAvg + ' visits vs ' + r.singleAvg + ' for single-practitioner guests — cross-referrals roughly ' + (r.singleAvg ? Math.round(r.multiAvg / r.singleAvg * 10) / 10 : '—') + '× the relationship. Co-treatment is a retention engine, not a courtesy.');
+    if (r.comebacks + r.stillOut > 0) insights.push('The clinic rhythm is a visit every ~' + r.medGap + ' days. ' + r.stillOut + ' guests are 30+ days quiet right now with nothing booked; historically only ' + Math.round(r.comebacks / (r.comebacks + r.stillOut) * 100) + '% of 30-day silences have been broken (' + r.comebacks + ' comebacks vs ' + r.stillOut + ' still out) — the follow-up window is those first quiet weeks.');
+    const fal = r.st.cooling + r.st.falling;
+    if (fal) insights.push(fal + ' guests are 31–90 days quiet right now (cooling + falling off) — the recoverable middle. The ' + r.st.lapsed + ' lapsed are much harder to win back.');
+    if (r.onlineRate) insights.push(r.onlineRate + '% of visits are booked online; the desk still creates most bookings — rebooking before the guest leaves remains the strongest habit.');
+    return React.createElement("div", null, React.createElement("div", {
+      style: {
+        ...GPC,
+        marginBottom: 12,
+        borderLeft: '3px solid #c9f26f'
+      }
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 8
+      }
+    }, "\uD83D\uDCA1 What the data says"), React.createElement("div", {
+      style: {
+        fontSize: 13.5,
+        color: 'var(--g-ccc)',
+        lineHeight: 1.7
+      }
+    }, insights.map((s, i) => React.createElement("div", {
+      key: i,
+      style: {
+        display: 'flex',
+        gap: 8,
+        marginBottom: 6
+      }
+    }, React.createElement("span", {
+      style: {
+        color: '#c9f26f'
+      }
+    }, "\u25B8"), React.createElement("span", null, s))))), React.createElement("div", {
+      className: "grid2",
+      style: {
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "The retention funnel"), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginBottom: 10
+      }
+    }, "of ", r.n.toLocaleString(), " guests, how many made it to each milestone"), r.funnel.map(f => React.createElement("div", {
+      key: f.k,
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 6
+      }
+    }, React.createElement("span", {
+      style: {
+        width: 64,
+        fontSize: 12.5,
+        color: 'var(--g-999)',
+        textAlign: 'right'
+      }
+    }, f.k, "+ visit", f.k !== 1 ? 's' : ''), React.createElement("div", {
+      style: {
+        flex: 1,
+        height: 16,
+        background: 'var(--surface3)',
+        borderRadius: 3,
+        overflow: 'hidden'
+      }
+    }, React.createElement("div", {
+      style: {
+        height: '100%',
+        width: (f.n ? Math.max(2, f.n / maxF * 100) : 0) + '%',
+        background: 'linear-gradient(90deg,#2fd6a8,#c9f26f)',
+        borderRadius: 3
+      }
+    })), React.createElement("span", {
+      style: {
+        width: 104,
+        fontSize: 12.5,
+        color: 'var(--g-bbb)'
+      }
+    }, f.n.toLocaleString(), " \xB7 ", Math.round(f.n / r.n * 100), "%")))), React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "Where everyone stands"), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginBottom: 10
+      }
+    }, "by days since their last arrived visit"), React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '12px 16px'
+      }
+    }, React.createElement(Stat, {
+      l: "Booked ahead",
+      v: r.st.booked,
+      sub: "next visit already on the books"
+    }), React.createElement(Stat, {
+      l: "Active \xB7 \u226430d",
+      v: r.st.active
+    }), React.createElement(Stat, {
+      l: "Cooling \xB7 31\u201360d",
+      v: r.st.cooling
+    }), React.createElement(Stat, {
+      l: "Falling off \xB7 61\u201390d",
+      v: r.st.falling
+    }), React.createElement(Stat, {
+      l: "Lapsed \xB7 90d+",
+      v: r.st.lapsed
+    }), React.createElement(Stat, {
+      l: "One-and-done",
+      v: r.oneDone,
+      sub: "one visit, nothing since"
+    })), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginTop: 10
+      }
+    }, "Jane's export carries no discharge flag \u2014 bands are read from booking recency."))), React.createElement("div", {
+      className: "grid2",
+      style: {
+        marginBottom: 12
+      }
+    }, React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "One practitioner, or the whole building"), React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '12px 16px',
+        marginTop: 8
+      }
+    }, React.createElement(Stat, {
+      l: "See one practitioner",
+      v: r.single,
+      sub: 'avg ' + r.singleAvg + ' visits'
+    }), React.createElement(Stat, {
+      l: "See 2+ practitioners",
+      v: r.multi,
+      sub: 'avg ' + r.multiAvg + ' visits'
+    }), React.createElement(Stat, {
+      l: "Use 2+ services",
+      v: r.multiSvc,
+      sub: Math.round(r.multiSvc / r.n * 100) + '% of guests'
+    }), React.createElement(Stat, {
+      l: "Median return gap",
+      v: '~' + r.medGap + ' days'
+    }))), React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "Reliability & booking channel"), React.createElement("div", {
+      style: {
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '12px 16px',
+        marginTop: 8
+      }
+    }, React.createElement(Stat, {
+      l: "No-show rate",
+      v: r.nsRate + '%',
+      sub: "of booked outcomes"
+    }), React.createElement(Stat, {
+      l: "Cancel rate",
+      v: r.cxRate + '%'
+    }), React.createElement(Stat, {
+      l: "Booked online",
+      v: r.onlineRate + '%',
+      sub: "rest booked at the desk"
+    }), React.createElement(Stat, {
+      l: "Arrived visits",
+      v: r.visits.toLocaleString()
+    })))), React.createElement("div", {
+      className: "grid2"
+    }, React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "New vs returning, by month"), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginBottom: 10
+      }
+    }, "guests seen each month \u2014 lime = first-ever month, teal = returning"), r.moList.map(m => {
+      const tot = m.nw + m.ret || 1;
+      const coh = r.cohorts.find(c => c.mo === m.mo);
+      return React.createElement("div", {
+        key: m.mo,
+        style: {
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          marginBottom: 6
+        }
+      }, React.createElement("span", {
+        style: {
+          width: 64,
+          fontSize: 12.5,
+          color: 'var(--g-999)',
+          textAlign: 'right'
+        }
+      }, new Date(m.mo + '-01T12:00').toLocaleDateString('en-CA', {
+        month: 'short',
+        year: '2-digit'
+      })), React.createElement("div", {
+        style: {
+          flex: 1,
+          height: 16,
+          display: 'flex',
+          borderRadius: 3,
+          overflow: 'hidden',
+          background: 'var(--surface3)'
+        }
+      }, React.createElement("div", {
+        style: {
+          width: m.nw / tot * 100 + '%',
+          background: '#c9f26f'
+        },
+        title: m.nw + ' new'
+      }), React.createElement("div", {
+        style: {
+          width: m.ret / tot * 100 + '%',
+          background: '#2fd6a8',
+          opacity: .75
+        },
+        title: m.ret + ' returning'
+      })), React.createElement("span", {
+        style: {
+          width: 150,
+          fontSize: 12,
+          color: 'var(--g-bbb)'
+        }
+      }, m.nw, " new \xB7 ", m.ret, " returning", coh && coh.n ? ' · ' + Math.round(coh.back / coh.n * 100) + '% of new returned' : ''));
+    })), React.createElement("div", {
+      style: GPC
+    }, React.createElement("div", {
+      style: {
+        ...GPH,
+        marginBottom: 4
+      }
+    }, "What guests come in for"), React.createElement("div", {
+      style: {
+        ...MUT,
+        marginBottom: 10
+      }
+    }, "top treatments by arrived visits"), r.topTx.map(([t, c]) => React.createElement("div", {
+      key: t,
+      style: {
+        display: 'flex',
+        gap: 10,
+        alignItems: 'baseline',
+        padding: '4px 0',
+        borderTop: '1px solid var(--border)'
+      }
+    }, React.createElement("span", {
+      style: {
+        flex: 1,
+        fontSize: 13,
+        color: 'var(--g-ccc)'
+      }
+    }, t), React.createElement("span", {
+      style: {
+        fontSize: 13,
+        color: '#9fd9c6'
+      }
+    }, c.toLocaleString()))))));
+  };
+  const tiles = gp && roll ? [{
+    lbl: 'Guests',
+    val: roll.n,
+    hue: '#c9f26f',
+    fill: true
+  }, {
+    lbl: 'Arrived visits',
+    val: roll.visits
+  }, {
+    lbl: 'Avg visits / guest',
+    val: roll.avgV
+  }, {
+    lbl: 'Active or booked',
+    val: roll.st.active + roll.st.booked,
+    sub: 'of ' + roll.n
+  }] : [];
+  return React.createElement("div", null, React.createElement(RvPageHero, {
+    eyebrow: "Revibe \xB7 Guest Journey",
+    title: "Guest Profiles",
+    sub: gp ? 'Rebuilt from the stored Jane appointment files — ' + GP_FMT(gp.dataStart) + ' to ' + GP_FMT(gp.dataEnd) + ' · read-only, refreshed as new weeks are imported on Performance & Revenue.' : 'Rebuilt from the stored Jane appointment files.',
+    tiles: tiles,
+    pills: gp ? [{
+      k: 'dir',
+      label: '📇 Guest directory',
+      on: view === 'dir',
+      onClick: () => {
+        setView('dir');
+      }
+    }, {
+      k: 'top',
+      label: '⭐ Top guests',
+      on: view === 'top',
+      onClick: () => {
+        setView('top');
+        setSel(null);
+      }
+    }, {
+      k: 'clin',
+      label: '🧑‍⚕️ Clinician lens',
+      on: view === 'clin',
+      onClick: () => {
+        setView('clin');
+        setSel(null);
+      }
+    }, {
+      k: 'journey',
+      label: '🧭 Journey insights',
+      on: view === 'journey',
+      onClick: () => {
+        setView('journey');
+        setSel(null);
+      }
+    }] : []
+  }), !gp ? React.createElement("div", {
+    style: {
+      ...GPC,
+      textAlign: 'center',
+      padding: '40px 20px'
+    }
+  }, gpMsg === 'offline' ? React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: 'var(--g-999)'
+    }
+  }, "Guest profiles read the stored Jane appointment files from the cloud \u2014 the database isn't reachable on this device right now.") : gpMsg === 'none' ? React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: 'var(--g-999)'
+    }
+  }, "No appointment files stored yet. Import an Appointments CSV on ", React.createElement("b", null, "Performance & Revenue \u2192 Jane Import"), " and guest profiles build themselves from it.") : gpMsg.startsWith('err:') ? React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: 'var(--c-org)'
+    }
+  }, "Couldn't load the appointment files: ", gpMsg.slice(4)) : React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: 'var(--g-999)'
+    }
+  }, gpMsg || 'Loading…', React.createElement("div", {
+    style: {
+      ...MUT,
+      marginTop: 6
+    }
+  }, "first open reads every stored appointment file \u2014 after that it's instant for the session"))) : view === 'top' ? renderTop() : view === 'clin' ? renderClin() : view === 'journey' ? renderJourney() : renderDir());
 }
 function RvProfileHero({
   staff,
