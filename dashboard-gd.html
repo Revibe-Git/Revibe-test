@@ -1927,7 +1927,7 @@ const isSportName = x => {
   const lx = String(x).toLowerCase();
   return SPORT_NAMES.some(s => s.toLowerCase() === lx) || /box|badminton|rugby|gymnast|netball|lacrosse|powerlift|kickbox|muay/.test(lx);
 };
-window.__BUILD = 'build L216';
+window.__BUILD = 'build L217';
 try {
   if (!sessionStorage.getItem('rvgd3_vchk')) {
     sessionStorage.setItem('rvgd3_vchk', '1');
@@ -42650,31 +42650,7 @@ const GP_ST_META = {
   falling: 'Falling off · 61–90d quiet',
   lapsed: 'Lapsed · 90d+ quiet'
 };
-function GP_BUILD(rows, staffList) {
-  const evs = [];
-  rows.forEach(r => {
-    const st = (r.state || '').toLowerCase();
-    if (st !== 'arrived' && st !== 'no_show' && st !== 'cancelled' && st !== 'booked') return;
-    const g = (r.patient_guid || '').trim();
-    if (!g) return;
-    const d = (r.start_at || '').slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
-    const fn = (r.patient_preferred_name || '').trim() || (r.patient_first_name || '').trim();
-    const nm = (fn + ' ' + (r.patient_last_name || '').trim()).trim() || 'Guest ' + ((r.patient_number || '').trim() || g.slice(0, 6));
-    evs.push({
-      d,
-      g,
-      nm,
-      num: (r.patient_number || '').trim(),
-      pr: (r.staff_member_name || '').trim(),
-      tx: (r.treatment_name || '').trim(),
-      disc: GP_DISC(r.treatment_name),
-      loc: /markham/i.test(r.location_name || '') ? 'Markham' : 'Mississauga',
-      st,
-      on: String(r.booked_online) === 'true',
-      cr: (r.cancelled_reason || '').trim()
-    });
-  });
+function GP_AGG(evs, staffList) {
   evs.sort((a, b) => a.d.localeCompare(b.d));
   const arrDates = evs.filter(e => e.st === 'arrived').map(e => e.d);
   const dataEnd = arrDates.length ? arrDates[arrDates.length - 1] : '';
@@ -42784,6 +42760,44 @@ function GP_BUILD(rows, staffList) {
     visits: arrDates.length
   };
 }
+function GP_BUILD(rows, staffList) {
+  const _geCache = {};
+  const geDrop = pr => {
+    if (!(pr in _geCache)) {
+      const m = GP_MATCH(staffList, pr);
+      _geCache[pr] = !!(m && RV_IS_GE(m));
+    }
+    return _geCache[pr];
+  };
+  const evs = [];
+  rows.forEach(r => {
+    const st = (r.state || '').toLowerCase();
+    if (st !== 'arrived' && st !== 'no_show' && st !== 'cancelled' && st !== 'booked') return;
+    const g = (r.patient_guid || '').trim();
+    if (!g) return;
+    const d = (r.start_at || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+    const pr0 = (r.staff_member_name || '').trim();
+    if (pr0 && geDrop(pr0)) return;
+    const fn = (r.patient_preferred_name || '').trim() || (r.patient_first_name || '').trim();
+    const nm = (fn + ' ' + (r.patient_last_name || '').trim()).trim() || 'Guest ' + ((r.patient_number || '').trim() || g.slice(0, 6));
+    evs.push({
+      d,
+      g,
+      nm,
+      num: (r.patient_number || '').trim(),
+      pr: (r.staff_member_name || '').trim(),
+      tx: (r.treatment_name || '').trim(),
+      disc: GP_DISC(r.treatment_name),
+      loc: /markham/i.test(r.location_name || '') ? 'Markham' : 'Mississauga',
+      st,
+      on: String(r.booked_online) === 'true',
+      cr: (r.cancelled_reason || '').trim()
+    });
+  });
+  evs.sort((a, b) => a.d.localeCompare(b.d));
+  return GP_AGG(evs, staffList);
+}
 function GuestsPage({
   staff,
   openProfile
@@ -42813,17 +42827,19 @@ function GuestsPage({
   const [q, setQ] = useState('');
   const [showAll, setShowAll] = useState(false);
   const [clinSel, setClinSel] = useState(null);
-  const [gp, setGp] = useState(window.__gpData || null);
+  const [gpFull, setGpFull] = useState(window.__gpData || null);
   const [gpMsg, setGpMsg] = useState('');
+  const [gFrom, setGFrom] = usePersist('gp.from', '');
+  const [gTo, setGTo] = usePersist('gp.to', '');
   useEffect(() => {
-    if (gp) return;
+    if (gpFull) return;
     let dead = false;
     (async () => {
       try {
         if (window.__GP_TEST) {
           const b = GP_BUILD(window.__GP_TEST, staff);
           window.__gpData = b;
-          if (!dead) setGp(b);
+          if (!dead) setGpFull(b);
           return;
         }
         const SB = window.__SB;
@@ -42862,7 +42878,7 @@ function GuestsPage({
         }
         const b = GP_BUILD([...byRow.values()], staff);
         window.__gpData = b;
-        if (!dead) setGp(b);
+        if (!dead) setGpFull(b);
       } catch (e) {
         if (!dead) setGpMsg('err:' + (e && e.message || 'load failed'));
       }
@@ -42871,6 +42887,12 @@ function GuestsPage({
       dead = true;
     };
   }, []);
+  const windowed = !!(gFrom || gTo);
+  const gp = useMemo(() => {
+    if (!gpFull) return null;
+    if (!windowed) return gpFull;
+    return GP_AGG(gpFull.evs.filter(e => (!gFrom || e.d >= gFrom) && (!gTo || e.d <= gTo)), staff);
+  }, [gpFull, gFrom, gTo]);
   const roll = useMemo(() => {
     if (!gp) return null;
     const g = gp.guests;
@@ -42970,9 +42992,9 @@ function GuestsPage({
       comebacks,
       stillOut,
       medGap: gaps.length ? gaps[Math.floor(gaps.length / 2)] : 0,
-      nsRate: Math.round(ns / (gp.visits + ns) * 100),
-      cxRate: Math.round(cx / (gp.visits + cx) * 100),
-      onlineRate: Math.round(online / gp.visits * 100),
+      nsRate: Math.round(ns / (gp.visits + ns || 1) * 100),
+      cxRate: Math.round(cx / (gp.visits + cx || 1) * 100),
+      onlineRate: Math.round(online / (gp.visits || 1) * 100),
       topTx: Object.entries(tx).sort((a, b) => b[1] - a[1]).slice(0, 8)
     };
   }, [gp]);
@@ -43559,7 +43581,7 @@ function GuestsPage({
         ...MUT,
         marginBottom: 10
       }
-    }, "Arrived visits only, ", GP_FMT(gp.dataStart), " \u2013 ", GP_FMT(gp.dataEnd), ". Click a row for that clinician's guest list."), React.createElement("div", {
+    }, "Arrived visits only, ", GP_FMT(gp.dataStart), " \u2013 ", GP_FMT(gp.dataEnd), ". Click a row for that clinician's guest list. GE staff are left out \u2014 their Jane entries are shift logs, not treatments."), React.createElement("div", {
       style: {
         display: 'flex',
         gap: 10,
@@ -44089,7 +44111,82 @@ function GuestsPage({
         setSel(null);
       }
     }] : []
-  }), !gp ? React.createElement("div", {
+  }), gpFull && (() => {
+    const de = gpFull.dataEnd;
+    const shift = days => {
+      const t = new Date(de + 'T12:00');
+      t.setDate(t.getDate() - days);
+      return t.toISOString().slice(0, 10);
+    };
+    const presets = [['All data', '', ''], ['Last 30d', shift(29), de], ['Last 60d', shift(59), de], ['Last 90d', shift(89), de]];
+    return React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8,
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        margin: '0 0 12px'
+      }
+    }, React.createElement("span", {
+      style: {
+        ...RV_LBL,
+        marginBottom: 0
+      }
+    }, "Window"), React.createElement("input", {
+      type: "date",
+      value: gFrom,
+      min: gpFull.dataStart,
+      max: gpFull.dataEnd,
+      onChange: e => setGFrom(e.target.value),
+      style: {
+        width: 150,
+        padding: '6px 10px',
+        fontSize: 13
+      }
+    }), React.createElement("span", {
+      style: {
+        color: 'var(--g-666)'
+      }
+    }, "\u2192"), React.createElement("input", {
+      type: "date",
+      value: gTo,
+      min: gpFull.dataStart,
+      max: gpFull.dataEnd,
+      onChange: e => setGTo(e.target.value),
+      style: {
+        width: 150,
+        padding: '6px 10px',
+        fontSize: 13
+      }
+    }), presets.map(([lb, f, t]) => {
+      const on = gFrom === f && gTo === t;
+      return React.createElement("button", {
+        key: lb,
+        onClick: () => {
+          setGFrom(f);
+          setGTo(t);
+        },
+        style: {
+          cursor: 'pointer',
+          fontFamily: "'Barlow Condensed',sans-serif",
+          fontSize: 12.5,
+          fontWeight: 800,
+          letterSpacing: '1px',
+          textTransform: 'uppercase',
+          padding: '6px 12px',
+          borderRadius: 8,
+          border: '1px solid ' + (on ? '#c9f26f' : 'var(--border)'),
+          background: on ? 'linear-gradient(135deg,#2fd6a8,#c9f26f)' : 'var(--surface2)',
+          color: on ? '#06301f' : 'var(--g-999)'
+        }
+      }, lb);
+    }), windowed && gp && React.createElement("span", {
+      style: {
+        fontSize: 12.5,
+        color: '#9fd9c6'
+      }
+    }, "windowed \u2014 every view below reads only ", GP_FMT(gFrom || gp.dataStart), " \u2192 ", GP_FMT(gTo || gp.dataEnd), ", statuses as of the window's end"));
+  })(), !gp ? React.createElement("div", {
     style: {
       ...GPC,
       textAlign: 'center',
@@ -44120,7 +44217,18 @@ function GuestsPage({
       ...MUT,
       marginTop: 6
     }
-  }, "first open reads every stored appointment file \u2014 after that it's instant for the session"))) : view === 'top' ? renderTop() : view === 'clin' ? renderClin() : view === 'journey' ? renderJourney() : renderDir());
+  }, "first open reads every stored appointment file \u2014 after that it's instant for the session"))) : gp.guests.length === 0 ? React.createElement("div", {
+    style: {
+      ...GPC,
+      textAlign: 'center',
+      padding: '40px 20px'
+    }
+  }, React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: 'var(--g-999)'
+    }
+  }, "No arrived visits in this window", windowed ? ' — widen the dates above or tap All data' : '', ".")) : view === 'top' ? renderTop() : view === 'clin' ? renderClin() : view === 'journey' ? renderJourney() : renderDir());
 }
 function RvProfileHero({
   staff,
