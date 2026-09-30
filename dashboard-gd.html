@@ -29466,6 +29466,7 @@ function PerformancePage({
   };
   const storeSourceFile = (name, text, month) => {
     if (!name || !text) return;
+    window.__gpData = null;
     const rec = {
       id: name,
       name,
@@ -43001,70 +43002,6 @@ function GuestsPage({
   const [gpMsg, setGpMsg] = useState('');
   const [gFrom, setGFrom] = usePersist('gp.from', '');
   const [gTo, setGTo] = usePersist('gp.to', '');
-  const [gpLoad, setGpLoad] = useState(0);
-  const [upMsg, setUpMsg] = useState(null);
-  const [upBusy, setUpBusy] = useState(false);
-  const addFiles = async fileList => {
-    const files = [...(fileList || [])];
-    if (!files.length) return;
-    setUpBusy(true);
-    let rows = 0,
-      parts = 0,
-      first = '',
-      last = '';
-    for (const f of files) {
-      setUpMsg({
-        ok: true,
-        t: 'Reading ' + f.name + '…'
-      });
-      const text = await f.text();
-      const head = (text.split(/\r?\n/, 1)[0] || '').toLowerCase();
-      if (!/patient_guid/.test(head) || !/start_at/.test(head)) {
-        setUpMsg({
-          ok: false,
-          t: f.name + ' isn\'t a Jane Appointments export (no patient_guid / start_at columns). Jane → Reports → Appointments → export CSV.'
-        });
-        setUpBusy(false);
-        return;
-      }
-      const parsed = GP_PARSECSV(text);
-      rows += parsed.length;
-      parsed.forEach(r => {
-        const d = (r.start_at || '').slice(0, 10);
-        if (d.length === 10) {
-          if (!first || d < first) first = d;
-          if (!last || d > last) last = d;
-        }
-      });
-      setUpMsg({
-        ok: true,
-        t: 'Saving ' + f.name + ' (' + parsed.length.toLocaleString() + ' appointments)…'
-      });
-      const {
-        recs,
-        err
-      } = await GP_STORE_FILE(f.name, text, '');
-      parts += recs.length;
-      if (err) {
-        setUpMsg({
-          ok: false,
-          t: 'Couldn\'t save ' + f.name + ': ' + err + ' — nothing was lost, try again.'
-        });
-        setUpBusy(false);
-        return;
-      }
-    }
-    setUpBusy(false);
-    setUpMsg({
-      ok: true,
-      t: '✓ Saved ' + rows.toLocaleString() + ' appointments' + (first ? ' (' + GP_FMT(first) + ' to ' + GP_FMT(last) + ')' : '') + (parts > files.length ? ' in ' + parts + ' parts' : '') + '. Rebuilding every guest history…'
-    });
-    window.__gpData = null;
-    setGpFull(null);
-    setGFrom('');
-    setGTo('');
-    setGpLoad(n => n + 1);
-  };
   useEffect(() => {
     if (gpFull) return;
     let dead = false;
@@ -43120,7 +43057,7 @@ function GuestsPage({
     return () => {
       dead = true;
     };
-  }, [gpLoad]);
+  }, []);
   const windowed = !!(gFrom || gTo);
   const gp = useMemo(() => {
     if (!gpFull) return null;
@@ -44601,50 +44538,7 @@ function GuestsPage({
         color: '#9fd9c6'
       }
     }, "windowed \u2014 every view below reads only ", GP_FMT(gFrom || gp.dataStart), " \u2192 ", GP_FMT(gTo || gp.dataEnd), ", statuses as of the window's end"));
-  })(), (gpFull || gpMsg === 'none') && React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 10,
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      margin: '0 0 14px'
-    }
-  }, React.createElement("span", {
-    style: {
-      fontSize: 13,
-      color: 'var(--g-888)'
-    }
-  }, gpFull ? 'Guest histories start ' + GP_FMT(gpFull.dataStart) + '. Need earlier years?' : 'Start the guest histories:'), React.createElement("label", {
-    className: "btn btn-ghost btn-sm",
-    style: {
-      cursor: upBusy ? 'wait' : 'pointer',
-      opacity: upBusy ? .6 : 1
-    }
-  }, "\u2B06 Add older Jane Appointments files", React.createElement("input", {
-    type: "file",
-    accept: ".csv",
-    multiple: true,
-    disabled: upBusy,
-    style: {
-      display: 'none'
-    },
-    onChange: e => {
-      addFiles(e.target.files);
-      e.target.value = '';
-    }
-  })), React.createElement("span", {
-    style: {
-      fontSize: 12,
-      color: 'var(--g-666)'
-    }
-  }, "Jane \u2192 Reports \u2192 Appointments \u2192 any date range \u2192 export CSV \xB7 overlaps are fine, duplicates are skipped"), upMsg && React.createElement("div", {
-    style: {
-      flexBasis: '100%',
-      fontSize: 13,
-      fontWeight: 600,
-      color: upMsg.ok ? '#c9f26f' : 'var(--c-amb)'
-    }
-  }, upMsg.t)), !gp ? React.createElement("div", {
+  })(), !gp ? React.createElement("div", {
     style: {
       ...GPC,
       textAlign: 'center',
@@ -71706,7 +71600,86 @@ function LeadAssignTab({
         color: 'var(--g-777)',
         padding: '18px 4px'
       }
-    }, "Nothing open. Assignments logged from your meetings land here \u2014 use \uFF0B Assign above."), Section('🔥 Overdue', overdue.sort(bySoonest), true), Section('📌 Due this week', dueThisWk.sort(bySoonest), true), Section('🗓 Due this month', inHz('month').sort(bySoonest)), Section('📆 Due this quarter', inHz('quarter').sort(bySoonest)), Section('🧭 Longer term — this year and beyond', inHz('year').sort(bySoonest)), Section('No due date yet — open ▾ details to set one', inHz('none').sort(bySoonest)));
+    }, "Nothing open. Assignments logged from your meetings land here \u2014 use \uFF0B Assign above."), Section('🔥 Overdue', overdue.sort(bySoonest), true), Section('📌 Due this week', dueThisWk.sort(bySoonest), true), Section('🗓 Due this month', inHz('month').sort(bySoonest)), Section('📆 Due this quarter', inHz('quarter').sort(bySoonest)), Section('🧭 Longer term — this year and beyond', inHz('year').sort(bySoonest)), Section('No due date yet — open ▾ details to set one', inHz('none').sort(bySoonest)), (() => {
+      const since = shiftD(today, -14);
+      const rec = tasks.filter(t => t.status === 'done' && (t.doneAt || '') >= since).sort((a, b) => String(b.doneAt || '').localeCompare(String(a.doneAt || '')));
+      return rec.length > 0 && React.createElement("div", {
+        style: {
+          marginTop: 6,
+          opacity: .85
+        }
+      }, Section('✓ Delivered — last 14 days', rec), React.createElement("span", {
+        onClick: () => setAvTab('history'),
+        style: {
+          cursor: 'pointer',
+          fontSize: 12.5,
+          color: '#9fd9c6'
+        }
+      }, "See the full history \u2192"));
+    })());
+  };
+  const [hq, setHq] = useState('');
+  const [hSt, setHSt] = useState('done');
+  const renderHistory = () => {
+    let list = tasks.filter(t => hSt === 'all' ? t.status !== 'open' : t.status === hSt);
+    if (hq.trim()) {
+      const q = hq.trim().toLowerCase();
+      list = list.filter(t => (t.t || '').toLowerCase().includes(q) || (t.n || '').toLowerCase().includes(q) || (t.who || []).some(id => nameOf(id).toLowerCase().includes(q)));
+    }
+    list.sort((a, b) => String(b.doneAt || b.created || '').localeCompare(String(a.doneAt || a.created || '')));
+    const byMo = {};
+    list.forEach(t => {
+      const m = String(t.doneAt || t.created || '').slice(0, 7) || '—';
+      (byMo[m] = byMo[m] || []).push(t);
+    });
+    const moLbl = m => m === '—' ? 'Undated' : new Date(m + '-15T12:00').toLocaleDateString('en-CA', {
+      month: 'long',
+      year: 'numeric'
+    });
+    const onTime = list.filter(t => t.status === 'done' && t.due && t.doneAt && t.doneAt <= t.due).length,
+      dated = list.filter(t => t.status === 'done' && t.due && t.doneAt).length;
+    return React.createElement("div", {
+      style: CARD
+    }, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 8,
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        marginBottom: 10
+      }
+    }, React.createElement("input", {
+      value: hq,
+      onChange: e => setHq(e.target.value),
+      placeholder: "Search delivered work, notes, or a name\u2026",
+      style: {
+        maxWidth: 270,
+        padding: '6px 10px',
+        fontSize: 13
+      }
+    }), [['done', '✓ Delivered'], ['dropped', 'Dropped'], ['all', 'Both']].map(([k, l]) => React.createElement("button", {
+      key: k,
+      className: `btn btn-xs ${hSt === k ? 'btn-go' : 'btn-ghost'}`,
+      onClick: () => setHSt(k)
+    }, l)), dated > 0 && React.createElement("span", {
+      style: {
+        marginLeft: 'auto',
+        fontSize: 12.5,
+        color: 'var(--g-888)'
+      }
+    }, onTime, " of ", dated, " delivered on or before the due date")), list.length === 0 ? React.createElement("div", {
+      style: {
+        fontSize: 13.5,
+        color: 'var(--g-777)',
+        padding: '14px 4px'
+      }
+    }, "Nothing here yet \u2014 tick \u2713 Done on an assignment and it's kept here for good.") : Object.keys(byMo).sort().reverse().map(m => Section(moLbl(m), byMo[m])), React.createElement("div", {
+      style: {
+        fontSize: 12,
+        color: 'var(--g-666)',
+        marginTop: 6
+      }
+    }, "Tap the \u2713 circle on any item to reopen it."));
   };
   const renderReview = () => {
     const lastEnd = shiftD(lastWk, 6);
@@ -72013,12 +71986,12 @@ function LeadAssignTab({
       marginBottom: 12,
       flexWrap: 'wrap'
     }
-  }, [['week', '⚡ This week'], ['review', '🔄 Weekly review'], ['all', '📚 All assignments'], ['people', '👤 By person']].map(([k, l]) => React.createElement(RvPill, {
+  }, [['week', '⚡ This week'], ['review', '🔄 Weekly review'], ['history', '✓ History'], ['all', '📚 All assignments'], ['people', '👤 By person']].map(([k, l]) => React.createElement(RvPill, {
     key: k,
     on: avTab === k,
     label: l,
     onClick: () => setAvTab(k)
-  }))), avTab === 'review' ? renderReview() : avTab === 'all' ? renderAll() : avTab === 'people' ? renderPeople() : renderWeek());
+  }))), avTab === 'review' ? renderReview() : avTab === 'history' ? renderHistory() : avTab === 'all' ? renderAll() : avTab === 'people' ? renderPeople() : renderWeek());
 }
 function LeadershipPage({
   staff,
