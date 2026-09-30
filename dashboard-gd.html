@@ -42797,7 +42797,7 @@ const GP_ST_META = {
   falling: 'Falling off · 61–90d quiet',
   lapsed: 'Lapsed · 90d+ quiet'
 };
-function GP_AGG(evs, staffList) {
+function GP_AGG(evs, staffList, full, fromD) {
   const isRec = e => e.disc === 'Recovery';
   evs.sort((a, b) => a.d.localeCompare(b.d));
   const arrDates = evs.filter(e => e.st === 'arrived').map(e => e.d);
@@ -42874,6 +42874,12 @@ function GP_AGG(evs, staffList) {
     x.both = x.v > 0 && x.vr > 0;
     x.status = x.up > 0 ? 'booked' : x.dsl <= 30 ? 'active' : x.dsl <= 60 ? 'cooling' : x.dsl <= 90 ? 'falling' : 'lapsed';
     x.oneDone = x.v === 1 && x.up === 0 && x.dsl > 30;
+    const F = full && full.byId[x.id];
+    x.fe = F ? F.v > 0 ? F.dates[0] : '' : x.v > 0 ? x.dates[0] : '';
+    x.feV = F ? F.v : x.v;
+    if (F && fromD) {
+      x.oneDone = F.oneDone && x.fe >= fromD;
+    }
   });
   guests.sort((a, b) => b.v - a.v || b.vr - a.vr || a.name.localeCompare(b.name));
   const prs = {};
@@ -42969,6 +42975,310 @@ function GP_BUILD(rows, staffList) {
   evs.sort((a, b) => a.d.localeCompare(b.d));
   return GP_AGG(evs, staffList);
 }
+function GP_JourneyViz({
+  evs,
+  dataEnd,
+  from,
+  to
+}) {
+  if (!evs || !evs.length) return null;
+  const W = 1000,
+    L = 170,
+    R = 24,
+    TOP = 86,
+    LH = 30;
+  const isClin = e => e.disc !== 'Recovery';
+  const last = evs[evs.length - 1].d;
+  const endD = dataEnd && dataEnd > last ? dataEnd : last;
+  const D0 = GP_DAY(evs[0].d) - 4,
+    D1 = GP_DAY(endD) + 4;
+  const X = d => L + (GP_DAY(d) - D0) / (D1 - D0 || 1) * (W - L - R);
+  const laneKey = e => isClin(e) ? e.pr || 'Unassigned' : 'Recovery';
+  const lanes = [];
+  const cnt = {};
+  evs.forEach(e => {
+    const k = laneKey(e);
+    if (!(k in cnt)) {
+      cnt[k] = 0;
+      if (k !== 'Recovery') lanes.push(k);
+    }
+    if (e.st === 'arrived') cnt[k]++;
+  });
+  if ('Recovery' in cnt) lanes.push('Recovery');
+  const Y = k => TOP + lanes.indexOf(k) * LH + LH / 2;
+  const H = TOP + lanes.length * LH + 46;
+  const ca = evs.filter(e => e.st === 'arrived' && isClin(e));
+  const gaps = [];
+  for (let i = 1; i < ca.length; i++) {
+    const n = GP_DAY(ca[i].d) - GP_DAY(ca[i - 1].d);
+    if (n > 30) gaps.push({
+      a: ca[i - 1].d,
+      b: ca[i].d,
+      n,
+      back: true
+    });
+  }
+  const booked = evs.some(e => e.st === 'booked' && e.d >= (dataEnd || ''));
+  const lastC = ca.length ? ca[ca.length - 1].d : null;
+  const quiet = lastC && dataEnd ? GP_DAY(dataEnd) - GP_DAY(lastC) : 0;
+  if (lastC && quiet > 30 && !booked) gaps.push({
+    a: lastC,
+    b: dataEnd,
+    n: quiet,
+    back: false
+  });
+  const ms = [];
+  const seenPr = {};
+  let recStarted = false;
+  ca.forEach((e, i) => {
+    if (i === 0) ms.push({
+      d: e.d,
+      t: 'First visit' + (e.pr ? ' · ' + e.pr.split(' ')[0] : '')
+    });else if (e.pr && !seenPr[e.pr]) ms.push({
+      d: e.d,
+      t: 'Added ' + e.pr.split(' ')[0]
+    });
+    if (e.pr) seenPr[e.pr] = 1;
+  });
+  evs.forEach(e => {
+    if (!recStarted && e.st === 'arrived' && !isClin(e)) {
+      recStarted = true;
+      ms.push({
+        d: e.d,
+        t: 'Started recovery'
+      });
+    }
+  });
+  gaps.filter(g => g.back).forEach(g => ms.push({
+    d: g.b,
+    t: 'Back after ' + g.n + 'd'
+  }));
+  ms.sort((a, b) => a.d.localeCompare(b.d));
+  const rowEnd = [-1e9, -1e9, -1e9];
+  const placed = [];
+  ms.forEach(m => {
+    const x = X(m.d),
+      w = m.t.length * 6.6 + 10;
+    for (let r = 0; r < 3; r++) {
+      if (x - 4 > rowEnd[r]) {
+        placed.push({
+          ...m,
+          x,
+          r
+        });
+        rowEnd[r] = x + w;
+        return;
+      }
+    }
+    placed.push({
+      ...m,
+      x,
+      r: -1
+    });
+  });
+  const ticks = [];
+  {
+    let d = new Date(evs[0].d.slice(0, 7) + '-01T12:00');
+    const e = new Date(endD.slice(0, 7) + '-01T12:00');
+    const tot = [];
+    while (d <= e) {
+      tot.push(d.toISOString().slice(0, 7));
+      d.setMonth(d.getMonth() + 1);
+    }
+    const step = tot.length > 30 ? 6 : tot.length > 15 ? 3 : tot.length > 8 ? 2 : 1;
+    let yPrev = '';
+    tot.forEach((mo, i) => {
+      const dd = mo + '-01';
+      if (GP_DAY(dd) >= D0) {
+        const lbl = i % step === 0;
+        const yr = lbl && mo.slice(0, 4) !== yPrev;
+        if (lbl) yPrev = mo.slice(0, 4);
+        ticks.push({
+          mo,
+          x: X(dd),
+          lbl,
+          yr
+        });
+      }
+    });
+  }
+  const axisY = TOP + lanes.length * LH + 8;
+  const winA = from || '',
+    winB = to || '';
+  const tip = e => GP_FMT(e.d) + ' · ' + (e.tx || e.disc) + (e.pr ? ' · ' + e.pr : '') + ' · ' + (e.st === 'arrived' ? 'arrived' : e.st === 'no_show' ? 'no-show' : e.st === 'cancelled' ? 'cancelled' + (e.cr ? ' (' + e.cr + ')' : '') : 'booked');
+  return React.createElement("svg", {
+    viewBox: '0 0 ' + W + ' ' + H,
+    style: {
+      width: '100%',
+      height: 'auto',
+      display: 'block'
+    },
+    role: "img",
+    "aria-label": "Guest journey timeline"
+  }, (winA || winB) && (() => {
+    const a = X(winA && winA > evs[0].d ? winA : evs[0].d),
+      b = X(winB && winB < endD ? winB : endD);
+    return React.createElement("g", null, React.createElement("rect", {
+      x: a,
+      y: TOP - 6,
+      width: Math.max(2, b - a),
+      height: lanes.length * LH + 12,
+      rx: "4",
+      style: {
+        fill: 'rgba(47,214,168,.06)',
+        stroke: 'rgba(47,214,168,.25)',
+        strokeDasharray: '3 4'
+      }
+    }), React.createElement("text", {
+      x: b - 4,
+      y: TOP + lanes.length * LH + 2,
+      textAnchor: "end",
+      style: {
+        fill: '#6fbfa6',
+        fontSize: 10.5,
+        letterSpacing: '.8px'
+      }
+    }, "YOUR WINDOW"));
+  })(), gaps.map((g, i) => {
+    const a = X(g.a),
+      b = X(g.b);
+    return React.createElement("g", {
+      key: 'g' + i
+    }, React.createElement("rect", {
+      x: a + 6,
+      y: TOP - 6,
+      width: Math.max(0, b - a - 12),
+      height: lanes.length * LH + 12,
+      rx: "4",
+      style: {
+        fill: g.back ? 'rgba(233,192,138,.07)' : 'rgba(233,192,138,.12)'
+      }
+    }), b - a > 46 && React.createElement("text", {
+      x: (a + b) / 2,
+      y: axisY + 30,
+      textAnchor: "middle",
+      style: {
+        fill: '#e9c08a',
+        fontSize: 11
+      }
+    }, g.back ? g.n + 'd clinical break' : g.n + 'd quiet · nothing booked'));
+  }), lanes.map(k => React.createElement("g", {
+    key: k
+  }, React.createElement("line", {
+    x1: L,
+    x2: W - R,
+    y1: Y(k),
+    y2: Y(k),
+    style: {
+      stroke: 'rgba(255,255,255,.07)'
+    }
+  }), React.createElement("text", {
+    x: L - 12,
+    y: Y(k) + 4,
+    textAnchor: "end",
+    style: {
+      fill: k === 'Recovery' ? '#c9f26f' : '#9fd9c6',
+      fontSize: 12.5,
+      fontWeight: 600
+    }
+  }, k.length > 17 ? k.slice(0, 16) + '…' : k, React.createElement("tspan", {
+    style: {
+      fill: 'var(--g-777)',
+      fontWeight: 400
+    }
+  }, ' ×' + cnt[k])))), placed.map((m, i) => React.createElement("g", {
+    key: 'm' + i
+  }, React.createElement("line", {
+    x1: m.x,
+    x2: m.x,
+    y1: m.r >= 0 ? 22 + m.r * 18 : TOP - 14,
+    y2: TOP - 8,
+    style: {
+      stroke: 'rgba(201,242,111,.45)'
+    }
+  }), m.r >= 0 && React.createElement("text", {
+    x: m.x + 4,
+    y: 18 + m.r * 18,
+    style: {
+      fill: '#dfeee8',
+      fontSize: 11.5
+    }
+  }, m.t), m.r < 0 && React.createElement("title", null, m.t))), evs.map((e, i) => {
+    const x = X(e.d),
+      y = Y(laneKey(e));
+    if (e.st === 'arrived') return React.createElement("circle", {
+      key: i,
+      cx: x,
+      cy: y,
+      r: "5.5",
+      style: {
+        fill: isClin(e) ? '#2fd6a8' : '#c9f26f',
+        stroke: '#0c1512',
+        strokeWidth: 1.2
+      }
+    }, React.createElement("title", null, tip(e)));
+    if (e.st === 'no_show') return React.createElement("g", {
+      key: i
+    }, React.createElement("path", {
+      d: `M${x - 4},${y - 4}L${x + 4},${y + 4}M${x + 4},${y - 4}L${x - 4},${y + 4}`,
+      style: {
+        stroke: '#ff7a7a',
+        strokeWidth: 1.8
+      }
+    }), React.createElement("title", null, tip(e)));
+    if (e.st === 'cancelled') return React.createElement("circle", {
+      key: i,
+      cx: x,
+      cy: y,
+      r: "4",
+      style: {
+        fill: 'none',
+        stroke: 'var(--g-777)',
+        strokeWidth: 1.3
+      }
+    }, React.createElement("title", null, tip(e)));
+    return React.createElement("circle", {
+      key: i,
+      cx: x,
+      cy: y,
+      r: "5",
+      style: {
+        fill: 'none',
+        stroke: '#2fd6a8',
+        strokeWidth: 1.4,
+        strokeDasharray: '2 2'
+      }
+    }, React.createElement("title", null, tip(e)));
+  }), React.createElement("line", {
+    x1: L,
+    x2: W - R,
+    y1: axisY,
+    y2: axisY,
+    style: {
+      stroke: 'rgba(255,255,255,.12)'
+    }
+  }), ticks.map(t => React.createElement("g", {
+    key: t.mo
+  }, React.createElement("line", {
+    x1: t.x,
+    x2: t.x,
+    y1: axisY,
+    y2: axisY + (t.lbl ? 5 : 3),
+    style: {
+      stroke: 'rgba(255,255,255,.2)'
+    }
+  }), t.lbl && React.createElement("text", {
+    x: t.x,
+    y: axisY + 17,
+    textAnchor: "middle",
+    style: {
+      fill: 'var(--g-777)',
+      fontSize: 10.5
+    }
+  }, new Date(t.mo + '-01T12:00').toLocaleDateString('en-CA', {
+    month: 'short'
+  }) + (t.yr ? " '" + t.mo.slice(2, 4) : '')))));
+}
 function GuestsPage({
   staff,
   openProfile
@@ -43002,6 +43312,26 @@ function GuestsPage({
   const [gpMsg, setGpMsg] = useState('');
   const [gFrom, setGFrom] = usePersist('gp.from', '');
   const [gTo, setGTo] = usePersist('gp.to', '');
+  const [gpLoad, setGpLoad] = useState(0);
+  useEffect(() => {
+    if (!gpFull || window.__GP_TEST || !window.__SB || !window.__gpStamp) return;
+    let dead = false;
+    window.__SB.from('source_files').select('id,at').then(({
+      data
+    }) => {
+      if (dead || !data) return;
+      const a = data.filter(f => /appointment|appt/i.test(f.id || ''));
+      const mx = a.reduce((m, f) => (f.at || '') > m ? f.at || '' : m, '');
+      if (a.length !== window.__gpStamp.n || mx !== window.__gpStamp.at) {
+        window.__gpData = null;
+        setGpFull(null);
+        setGpLoad(n => n + 1);
+      }
+    }, () => {});
+    return () => {
+      dead = true;
+    };
+  }, []);
   useEffect(() => {
     if (gpFull) return;
     let dead = false;
@@ -43048,6 +43378,11 @@ function GuestsPage({
           await new Promise(r => setTimeout(r, 0));
         }
         const b = GP_BUILD([...byRow.values()], staff);
+        window.__gpStamp = {
+          n: names.length,
+          at: names.reduce((m, f) => (f.at || '') > m ? f.at || '' : m, ''),
+          read: new Date().toISOString()
+        };
         window.__gpData = b;
         if (!dead) setGpFull(b);
       } catch (e) {
@@ -43057,12 +43392,12 @@ function GuestsPage({
     return () => {
       dead = true;
     };
-  }, []);
+  }, [gpLoad]);
   const windowed = !!(gFrom || gTo);
   const gp = useMemo(() => {
     if (!gpFull) return null;
     if (!windowed) return gpFull;
-    return GP_AGG(gpFull.evs.filter(e => (!gFrom || e.d >= gFrom) && (!gTo || e.d <= gTo)), staff);
+    return GP_AGG(gpFull.evs.filter(e => (!gFrom || e.d >= gFrom) && (!gTo || e.d <= gTo)), staff, gpFull, gFrom || gpFull.dataStart);
   }, [gpFull, gFrom, gTo]);
   const roll = useMemo(() => {
     if (!gp) return null;
@@ -43115,7 +43450,7 @@ function GuestsPage({
           nw: 0,
           ret: 0
         });
-        if (x.dates[0].slice(0, 7) === mo) m.nw++;else m.ret++;
+        if ((x.fe || '').slice(0, 7) === mo) m.nw++;else m.ret++;
       });
     });
     const moList = Object.keys(months).sort().map(mo => ({
@@ -43125,13 +43460,14 @@ function GuestsPage({
     const cohorts = moList.map(({
       mo
     }) => {
-      const c = g.filter(x => x.dates[0].slice(0, 7) === mo);
+      const c = g.filter(x => (x.fe || '').slice(0, 7) === mo);
       return {
         mo,
         n: c.length,
-        back: c.filter(x => x.v >= 2).length
+        back: c.filter(x => x.feV >= 2).length
       };
     });
+    const newN = g.filter(x => x.fe && x.fe >= gp.dataStart).length;
     let comebacks = 0;
     g.forEach(x => {
       for (let i = 1; i < x.dates.length; i++) {
@@ -43202,7 +43538,8 @@ function GuestsPage({
       topTx: Object.entries(tx).sort((a, b) => b[1] - a[1]).slice(0, 8),
       rec,
       cross,
-      totalGuests: all.length
+      totalGuests: all.length,
+      newN
     };
   }, [gp]);
   const selG = sel && gp ? gp.byId[sel] : null;
@@ -43328,7 +43665,83 @@ function GuestsPage({
     }), React.createElement(Stat, {
       l: "Location",
       v: Object.entries(x.locs).sort((a, b) => b[1] - a[1]).map(e2 => e2[0]).join(' + ')
-    }))), React.createElement("div", {
+    }))), (() => {
+      const all = gpFull.evs.filter(e => e.g === x.id);
+      const F = gpFull.byId[x.id] || x;
+      const clinPr = Object.keys(F.prsClin || {}).length;
+      const brk = (() => {
+        let n = 0;
+        for (let i = 1; i < (F.dates || []).length; i++) if (GP_DAY(F.dates[i]) - GP_DAY(F.dates[i - 1]) > 30) n++;
+        return n;
+      })();
+      return React.createElement("div", {
+        style: {
+          ...GPC,
+          marginBottom: 12
+        }
+      }, React.createElement("div", {
+        style: {
+          display: 'flex',
+          gap: 10,
+          alignItems: 'baseline',
+          flexWrap: 'wrap',
+          marginBottom: 2
+        }
+      }, React.createElement("div", {
+        style: GPH
+      }, "Their journey"), React.createElement("span", {
+        style: MUT
+      }, GP_FMT(F.first), " \u2192 ", GP_ST_META[F.status].split(' ·')[0].toLowerCase(), " \xB7 ", F.v, " clinical visit", F.v !== 1 ? 's' : '', " with ", clinPr, " practitioner", clinPr !== 1 ? 's' : '', F.vr ? ' · ' + F.vr + ' recovery' : '', brk ? ' · ' + brk + ' break' + (brk !== 1 ? 's' : '') + ' of 30+ days' : ' · no 30+ day breaks')), React.createElement("div", {
+        style: {
+          ...MUT,
+          fontSize: 12,
+          marginBottom: 6
+        }
+      }, "full history across every stored file", windowed ? ' — the numbers above read your window, shaded here' : '', " \xB7 hover any mark for the date and treatment"), React.createElement(GP_JourneyViz, {
+        evs: all,
+        dataEnd: gpFull.dataEnd,
+        from: gFrom,
+        to: gTo
+      }), React.createElement("div", {
+        style: {
+          display: 'flex',
+          gap: 16,
+          flexWrap: 'wrap',
+          fontSize: 12,
+          color: 'var(--g-888)',
+          marginTop: 4
+        }
+      }, React.createElement("span", null, React.createElement("span", {
+        style: {
+          color: '#2fd6a8'
+        }
+      }, "\u25CF"), " clinical visit"), F.vr > 0 && React.createElement("span", null, React.createElement("span", {
+        style: {
+          color: '#c9f26f'
+        }
+      }, "\u25CF"), " recovery visit"), React.createElement("span", null, React.createElement("span", {
+        style: {
+          color: 'var(--g-777)'
+        }
+      }, "\u25CB"), " cancelled"), React.createElement("span", null, React.createElement("span", {
+        style: {
+          color: '#ff7a7a'
+        }
+      }, "\u2715"), " no-show"), React.createElement("span", null, React.createElement("span", {
+        style: {
+          color: '#2fd6a8'
+        }
+      }, "\u25CC"), " booked ahead"), React.createElement("span", null, React.createElement("span", {
+        style: {
+          display: 'inline-block',
+          width: 14,
+          height: 9,
+          background: 'rgba(233,192,138,.35)',
+          borderRadius: 2,
+          verticalAlign: 'middle'
+        }
+      }), " break of 30+ days")));
+    })(), React.createElement("div", {
       className: "grid2",
       style: {
         marginBottom: 12
@@ -44015,6 +44428,29 @@ function GuestsPage({
     if (fal) insights.push(fal + ' clinical guests are 31–90 days quiet right now (cooling + falling off) — the recoverable middle. The ' + r.st.lapsed + ' lapsed are much harder to win back.');
     if (r.onlineRate) insights.push(r.onlineRate + '% of visits are booked online; the desk still creates most bookings — rebooking before the guest leaves remains the strongest habit.');
     return React.createElement("div", null, React.createElement("div", {
+      style: {
+        display: 'flex',
+        gap: 10,
+        flexWrap: 'wrap',
+        alignItems: 'baseline',
+        margin: '0 0 10px',
+        fontSize: 13,
+        color: 'var(--g-888)'
+      }
+    }, React.createElement("span", {
+      style: {
+        ...RV_LBL,
+        marginBottom: 0
+      }
+    }, "Reading"), React.createElement("b", {
+      style: {
+        color: '#9fd9c6'
+      }
+    }, GP_FMT(gp.dataStart), " \u2192 ", GP_FMT(gp.dataEnd)), React.createElement("span", null, "\xB7 ", r.n.toLocaleString(), " clinical guests \u2014 ", r.newN.toLocaleString(), " new to Revibe in these dates, ", (r.n - r.newN).toLocaleString(), " returning from before"), !windowed && React.createElement("span", {
+      style: {
+        color: 'var(--g-666)'
+      }
+    }, "\xB7 all stored files")), React.createElement("div", {
       style: {
         ...GPC,
         marginBottom: 12,
