@@ -42981,18 +42981,33 @@ function GP_JourneyViz({
   from,
   to
 }) {
+  const wrap = useRef(null);
+  const [w, setW] = useState(900);
+  useEffect(() => {
+    const el = wrap.current;
+    if (!el) return;
+    const f = () => setW(Math.max(560, Math.round(el.getBoundingClientRect().width)));
+    f();
+    let ro = null;
+    try {
+      ro = new ResizeObserver(f);
+      ro.observe(el);
+    } catch (e) {
+      window.addEventListener('resize', f);
+    }
+    return () => {
+      if (ro) ro.disconnect();else window.removeEventListener('resize', f);
+    };
+  }, []);
   if (!evs || !evs.length) return null;
-  const W = 1000,
-    L = 170,
-    R = 24,
-    TOP = 86,
-    LH = 30;
   const isClin = e => e.disc !== 'Recovery';
   const last = evs[evs.length - 1].d;
   const endD = dataEnd && dataEnd > last ? dataEnd : last;
-  const D0 = GP_DAY(evs[0].d) - 4,
-    D1 = GP_DAY(endD) + 4;
-  const X = d => L + (GP_DAY(d) - D0) / (D1 - D0 || 1) * (W - L - R);
+  const D0 = GP_DAY(evs[0].d) - 6,
+    D1 = GP_DAY(endD) + 6;
+  const L = Math.min(200, Math.max(150, w * 0.17)),
+    R = 36;
+  const X = d => L + (GP_DAY(d) - D0) / (D1 - D0 || 1) * (w - L - R);
   const laneKey = e => isClin(e) ? e.pr || 'Unassigned' : 'Recovery';
   const lanes = [];
   const cnt = {};
@@ -43005,8 +43020,6 @@ function GP_JourneyViz({
     if (e.st === 'arrived') cnt[k]++;
   });
   if ('Recovery' in cnt) lanes.push('Recovery');
-  const Y = k => TOP + lanes.indexOf(k) * LH + LH / 2;
-  const H = TOP + lanes.length * LH + 46;
   const ca = evs.filter(e => e.st === 'arrived' && isClin(e));
   const gaps = [];
   for (let i = 1; i < ca.length; i++) {
@@ -43018,10 +43031,10 @@ function GP_JourneyViz({
       back: true
     });
   }
-  const booked = evs.some(e => e.st === 'booked' && e.d >= (dataEnd || ''));
+  const booked = evs.filter(e => e.st === 'booked' && e.d >= (dataEnd || ''));
   const lastC = ca.length ? ca[ca.length - 1].d : null;
   const quiet = lastC && dataEnd ? GP_DAY(dataEnd) - GP_DAY(lastC) : 0;
-  if (lastC && quiet > 30 && !booked) gaps.push({
+  if (lastC && quiet > 30 && !booked.length) gaps.push({
     a: lastC,
     b: dataEnd,
     n: quiet,
@@ -43029,235 +43042,292 @@ function GP_JourneyViz({
   });
   const ms = [];
   const seenPr = {};
-  let recStarted = false;
   ca.forEach((e, i) => {
     if (i === 0) ms.push({
       d: e.d,
-      t: 'First visit' + (e.pr ? ' · ' + e.pr.split(' ')[0] : '')
+      t: 'First visit' + (e.pr ? ' · ' + e.pr : '')
     });else if (e.pr && !seenPr[e.pr]) ms.push({
       d: e.d,
-      t: 'Added ' + e.pr.split(' ')[0]
+      t: 'Added ' + e.pr
     });
     if (e.pr) seenPr[e.pr] = 1;
   });
-  evs.forEach(e => {
-    if (!recStarted && e.st === 'arrived' && !isClin(e)) {
-      recStarted = true;
-      ms.push({
-        d: e.d,
-        t: 'Started recovery'
-      });
-    }
+  const fr = evs.find(e => e.st === 'arrived' && !isClin(e));
+  if (fr) ms.push({
+    d: fr.d,
+    t: 'Started recovery'
   });
   gaps.filter(g => g.back).forEach(g => ms.push({
     d: g.b,
-    t: 'Back after ' + g.n + 'd'
+    t: 'Back after ' + g.n + ' days'
   }));
   ms.sort((a, b) => a.d.localeCompare(b.d));
-  const rowEnd = [-1e9, -1e9, -1e9];
+  const ROWS = 3,
+    RH = 22;
+  const rowEnd = Array(ROWS).fill(-1e9);
   const placed = [];
   ms.forEach(m => {
     const x = X(m.d),
-      w = m.t.length * 6.6 + 10;
-    for (let r = 0; r < 3; r++) {
-      if (x - 4 > rowEnd[r]) {
-        placed.push({
-          ...m,
-          x,
-          r
-        });
-        rowEnd[r] = x + w;
-        return;
+      wd = m.t.length * 6.9 + 14;
+    let best = 0;
+    for (let r = 0; r < ROWS; r++) {
+      if (x - 6 > rowEnd[r]) {
+        best = r;
+        break;
       }
+      if (rowEnd[r] < rowEnd[best]) best = r;
     }
+    const tx = Math.max(x + 7, rowEnd[best] + 10);
     placed.push({
       ...m,
       x,
-      r: -1
+      r: best,
+      tx
     });
+    rowEnd[best] = tx + wd;
   });
+  const usedRows = Math.max(1, ...placed.map(p => p.r + 1));
+  const TOP = 18 + usedRows * RH + 18,
+    LH = 42;
+  const Y = k => TOP + lanes.indexOf(k) * LH + LH / 2;
+  const axisY = TOP + lanes.length * LH + 4;
+  const H = axisY + 48;
   const ticks = [];
   {
     let d = new Date(evs[0].d.slice(0, 7) + '-01T12:00');
     const e = new Date(endD.slice(0, 7) + '-01T12:00');
-    const tot = [];
+    const mos = [];
     while (d <= e) {
-      tot.push(d.toISOString().slice(0, 7));
+      mos.push(d.toISOString().slice(0, 7));
       d.setMonth(d.getMonth() + 1);
     }
-    const step = tot.length > 30 ? 6 : tot.length > 15 ? 3 : tot.length > 8 ? 2 : 1;
+    const px = (w - L - R) / Math.max(1, mos.length);
+    const step = px >= 60 ? 1 : px >= 32 ? 2 : px >= 20 ? 3 : 6;
     let yPrev = '';
-    tot.forEach((mo, i) => {
+    mos.forEach((mo, i) => {
       const dd = mo + '-01';
-      if (GP_DAY(dd) >= D0) {
-        const lbl = i % step === 0;
-        const yr = lbl && mo.slice(0, 4) !== yPrev;
-        if (lbl) yPrev = mo.slice(0, 4);
-        ticks.push({
-          mo,
-          x: X(dd),
-          lbl,
-          yr
-        });
-      }
+      if (GP_DAY(dd) < D0) return;
+      const lbl = i % step === 0;
+      const yr = lbl && mo.slice(0, 4) !== yPrev;
+      if (lbl) yPrev = mo.slice(0, 4);
+      ticks.push({
+        mo,
+        x: X(dd),
+        lbl,
+        yr
+      });
     });
   }
-  const axisY = TOP + lanes.length * LH + 8;
-  const winA = from || '',
-    winB = to || '';
-  const tip = e => GP_FMT(e.d) + ' · ' + (e.tx || e.disc) + (e.pr ? ' · ' + e.pr : '') + ' · ' + (e.st === 'arrived' ? 'arrived' : e.st === 'no_show' ? 'no-show' : e.st === 'cancelled' ? 'cancelled' + (e.cr ? ' (' + e.cr + ')' : '') : 'booked');
-  return React.createElement("svg", {
-    viewBox: '0 0 ' + W + ' ' + H,
+  const fmtS = d => new Date(d + 'T12:00').toLocaleDateString('en-CA', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  });
+  const tip = e => fmtS(e.d) + ' · ' + (e.tx || e.disc) + (e.pr ? ' · ' + e.pr : '') + ' · ' + (e.st === 'arrived' ? 'arrived' : e.st === 'no_show' ? 'no-show' : e.st === 'cancelled' ? 'cancelled' + (e.cr ? ' (' + e.cr + ')' : '') : 'booked');
+  const clustersOf = arr => {
+    const out = [];
+    arr.forEach(e => {
+      const x = X(e.d);
+      const c = out[out.length - 1];
+      if (c && x - c.x1 < 13) {
+        c.x1 = x;
+        c.list.push(e);
+      } else out.push({
+        x0: x,
+        x1: x,
+        list: [e]
+      });
+    });
+    return out;
+  };
+  return React.createElement("div", {
+    ref: wrap
+  }, React.createElement("svg", {
+    width: w,
+    height: H,
     style: {
-      width: '100%',
-      height: 'auto',
       display: 'block'
     },
     role: "img",
     "aria-label": "Guest journey timeline"
-  }, (winA || winB) && (() => {
-    const a = X(winA && winA > evs[0].d ? winA : evs[0].d),
-      b = X(winB && winB < endD ? winB : endD);
-    return React.createElement("g", null, React.createElement("rect", {
-      x: a,
-      y: TOP - 6,
-      width: Math.max(2, b - a),
-      height: lanes.length * LH + 12,
-      rx: "4",
-      style: {
-        fill: 'rgba(47,214,168,.06)',
-        stroke: 'rgba(47,214,168,.25)',
-        strokeDasharray: '3 4'
-      }
-    }), React.createElement("text", {
-      x: b - 4,
-      y: TOP + lanes.length * LH + 2,
-      textAnchor: "end",
-      style: {
-        fill: '#6fbfa6',
-        fontSize: 10.5,
-        letterSpacing: '.8px'
-      }
-    }, "YOUR WINDOW"));
-  })(), gaps.map((g, i) => {
-    const a = X(g.a),
-      b = X(g.b);
+  }, gaps.map((g, i) => {
+    const a = X(g.a) + 9,
+      b = X(g.b) - 9;
+    if (b - a < 10) return null;
     return React.createElement("g", {
       key: 'g' + i
     }, React.createElement("rect", {
-      x: a + 6,
-      y: TOP - 6,
-      width: Math.max(0, b - a - 12),
-      height: lanes.length * LH + 12,
-      rx: "4",
+      x: a,
+      y: TOP - 4,
+      width: b - a,
+      height: lanes.length * LH + 8,
+      rx: "8",
       style: {
-        fill: g.back ? 'rgba(233,192,138,.07)' : 'rgba(233,192,138,.12)'
+        fill: g.back ? 'rgba(233,192,138,.05)' : 'rgba(233,192,138,.07)'
       }
-    }), b - a > 46 && React.createElement("text", {
+    }), b - a > 70 && React.createElement("text", {
       x: (a + b) / 2,
-      y: axisY + 30,
+      y: axisY + 38,
       textAnchor: "middle",
       style: {
         fill: '#e9c08a',
-        fontSize: 11
+        fontSize: 11.5
       }
-    }, g.back ? g.n + 'd clinical break' : g.n + 'd quiet · nothing booked'));
-  }), lanes.map(k => React.createElement("g", {
-    key: k
-  }, React.createElement("line", {
-    x1: L,
-    x2: W - R,
-    y1: Y(k),
-    y2: Y(k),
-    style: {
-      stroke: 'rgba(255,255,255,.07)'
-    }
-  }), React.createElement("text", {
-    x: L - 12,
-    y: Y(k) + 4,
-    textAnchor: "end",
-    style: {
-      fill: k === 'Recovery' ? '#c9f26f' : '#9fd9c6',
-      fontSize: 12.5,
-      fontWeight: 600
-    }
-  }, k.length > 17 ? k.slice(0, 16) + '…' : k, React.createElement("tspan", {
-    style: {
-      fill: 'var(--g-777)',
-      fontWeight: 400
-    }
-  }, ' ×' + cnt[k])))), placed.map((m, i) => React.createElement("g", {
-    key: 'm' + i
-  }, React.createElement("line", {
-    x1: m.x,
-    x2: m.x,
-    y1: m.r >= 0 ? 22 + m.r * 18 : TOP - 14,
-    y2: TOP - 8,
-    style: {
-      stroke: 'rgba(201,242,111,.45)'
-    }
-  }), m.r >= 0 && React.createElement("text", {
-    x: m.x + 4,
-    y: 18 + m.r * 18,
-    style: {
-      fill: '#dfeee8',
-      fontSize: 11.5
-    }
-  }, m.t), m.r < 0 && React.createElement("title", null, m.t))), evs.map((e, i) => {
-    const x = X(e.d),
-      y = Y(laneKey(e));
-    if (e.st === 'arrived') return React.createElement("circle", {
-      key: i,
-      cx: x,
-      cy: y,
-      r: "5.5",
-      style: {
-        fill: isClin(e) ? '#2fd6a8' : '#c9f26f',
-        stroke: '#0c1512',
-        strokeWidth: 1.2
-      }
-    }, React.createElement("title", null, tip(e)));
-    if (e.st === 'no_show') return React.createElement("g", {
-      key: i
+    }, g.back ? g.n + '-day break' : g.n + ' days quiet · nothing booked'));
+  }), placed.map((m, i) => {
+    const ty = 18 + m.r * RH + 10;
+    const moved = m.tx > m.x + 7;
+    const dx = moved ? m.tx - 7 : m.x;
+    return React.createElement("g", {
+      key: 'm' + i
     }, React.createElement("path", {
-      d: `M${x - 4},${y - 4}L${x + 4},${y + 4}M${x + 4},${y - 4}L${x - 4},${y + 4}`,
-      style: {
-        stroke: '#ff7a7a',
-        strokeWidth: 1.8
-      }
-    }), React.createElement("title", null, tip(e)));
-    if (e.st === 'cancelled') return React.createElement("circle", {
-      key: i,
-      cx: x,
-      cy: y,
-      r: "4",
+      d: moved ? `M${dx},${ty + 5}L${dx},${TOP - 14}L${m.x},${TOP - 5}` : `M${dx},${ty + 5}L${dx},${TOP - 5}`,
       style: {
         fill: 'none',
-        stroke: 'var(--g-777)',
-        strokeWidth: 1.3
+        stroke: 'rgba(201,242,111,.32)'
       }
-    }, React.createElement("title", null, tip(e)));
-    return React.createElement("circle", {
-      key: i,
-      cx: x,
-      cy: y,
-      r: "5",
+    }), React.createElement("circle", {
+      cx: dx,
+      cy: ty + 5,
+      r: "2.2",
       style: {
-        fill: 'none',
-        stroke: '#2fd6a8',
-        strokeWidth: 1.4,
-        strokeDasharray: '2 2'
+        fill: '#c9f26f'
       }
-    }, React.createElement("title", null, tip(e)));
+    }), React.createElement("text", {
+      x: m.tx,
+      y: ty + 9,
+      style: {
+        fill: '#e6f1ec',
+        fontSize: 12.5
+      }
+    }, m.t));
+  }), lanes.map(k => {
+    const y = Y(k),
+      hue = k === 'Recovery' ? '#c9f26f' : '#2fd6a8';
+    const le = evs.filter(e => laneKey(e) === k);
+    const cl = clustersOf(le.filter(e => e.st === 'arrived'));
+    return React.createElement("g", {
+      key: k
+    }, React.createElement("line", {
+      x1: L,
+      x2: w - R,
+      y1: y,
+      y2: y,
+      style: {
+        stroke: 'rgba(255,255,255,.06)'
+      }
+    }), React.createElement("text", {
+      x: L - 16,
+      y: y + 4.5,
+      textAnchor: "end",
+      style: {
+        fill: k === 'Recovery' ? '#c9f26f' : '#cfe9df',
+        fontSize: 13.5,
+        fontWeight: 600
+      }
+    }, k.length > 20 ? k.slice(0, 19) + '…' : k, React.createElement("tspan", {
+      dx: "6",
+      style: {
+        fill: 'var(--g-666)',
+        fontWeight: 400,
+        fontSize: 12
+      }
+    }, cnt[k])), cl.map((c, i) => c.list.length === 1 ? React.createElement("circle", {
+      key: i,
+      cx: c.x0,
+      cy: y,
+      r: "6",
+      style: {
+        fill: hue
+      }
+    }, React.createElement("title", null, tip(c.list[0]))) : React.createElement("g", {
+      key: i
+    }, React.createElement("rect", {
+      x: c.x0 - 7,
+      y: y - 7,
+      width: c.x1 - c.x0 + 14,
+      height: 14,
+      rx: 7,
+      style: {
+        fill: hue,
+        opacity: .9
+      }
+    }), c.x1 - c.x0 + 14 >= 24 && React.createElement("text", {
+      x: (c.x0 + c.x1) / 2,
+      y: y + 3.8,
+      textAnchor: "middle",
+      style: {
+        fill: '#06261c',
+        fontSize: 10.5,
+        fontWeight: 800
+      }
+    }, c.list.length), React.createElement("title", null, c.list.length + ' visits · ' + fmtS(c.list[0].d) + ' – ' + fmtS(c.list[c.list.length - 1].d)))), le.filter(e => e.st !== 'arrived').map((e, i) => {
+      const x = X(e.d);
+      if (e.st === 'no_show') return React.createElement("g", {
+        key: 'n' + i
+      }, React.createElement("path", {
+        d: `M${x - 3.5},${y + 11}L${x + 3.5},${y + 18}M${x + 3.5},${y + 11}L${x - 3.5},${y + 18}`,
+        style: {
+          stroke: '#ff8a8a',
+          strokeWidth: 1.6,
+          strokeLinecap: 'round'
+        }
+      }), React.createElement("title", null, tip(e)));
+      if (e.st === 'cancelled') return React.createElement("circle", {
+        key: 'c' + i,
+        cx: x,
+        cy: y + 14.5,
+        r: "3",
+        style: {
+          fill: 'none',
+          stroke: '#8a9a94',
+          strokeWidth: 1.3
+        }
+      }, React.createElement("title", null, tip(e)));
+      return React.createElement("circle", {
+        key: 'b' + i,
+        cx: x,
+        cy: y,
+        r: "6",
+        style: {
+          fill: 'none',
+          stroke: hue,
+          strokeWidth: 1.5,
+          strokeDasharray: '2.5 2'
+        }
+      }, React.createElement("title", null, tip(e)));
+    }));
   }), React.createElement("line", {
     x1: L,
-    x2: W - R,
+    x2: w - R,
     y1: axisY,
     y2: axisY,
     style: {
-      stroke: 'rgba(255,255,255,.12)'
+      stroke: 'rgba(255,255,255,.14)'
     }
-  }), ticks.map(t => React.createElement("g", {
+  }), (from || to) && (() => {
+    const a = X(from && from > evs[0].d ? from : evs[0].d),
+      b = X(to && to < endD ? to : endD);
+    return React.createElement("g", null, React.createElement("rect", {
+      x: a,
+      y: axisY - 1.5,
+      width: Math.max(2, b - a),
+      height: 3,
+      rx: 1.5,
+      style: {
+        fill: 'rgba(47,214,168,.6)'
+      }
+    }), React.createElement("text", {
+      x: b,
+      y: axisY - 6,
+      textAnchor: "end",
+      style: {
+        fill: '#6fbfa6',
+        fontSize: 10,
+        letterSpacing: '1px'
+      }
+    }, "YOUR WINDOW"));
+  })(), ticks.map(t => React.createElement("g", {
     key: t.mo
   }, React.createElement("line", {
     x1: t.x,
@@ -43269,15 +43339,117 @@ function GP_JourneyViz({
     }
   }), t.lbl && React.createElement("text", {
     x: t.x,
-    y: axisY + 17,
+    y: axisY + 20,
     textAnchor: "middle",
     style: {
       fill: 'var(--g-777)',
-      fontSize: 10.5
+      fontSize: 11.5
     }
   }, new Date(t.mo + '-01T12:00').toLocaleDateString('en-CA', {
     month: 'short'
-  }) + (t.yr ? " '" + t.mo.slice(2, 4) : '')))));
+  }) + (t.yr ? " '" + t.mo.slice(2, 4) : ''))))), booked.length > 0 && React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: '#9fd9c6',
+      marginTop: 4
+    }
+  }, "Next booked ", fmtS(booked[0].d), booked[0].pr ? ' with ' + booked[0].pr : ''));
+}
+function GP_JourneyKey({
+  rec
+}) {
+  const sw = (el, lb) => React.createElement("span", {
+    style: {
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 7
+    }
+  }, React.createElement("svg", {
+    width: "26",
+    height: "16",
+    style: {
+      display: 'block'
+    }
+  }, el), React.createElement("span", null, lb));
+  return React.createElement("div", {
+    style: {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '8px 22px',
+      fontSize: 12.5,
+      color: 'var(--g-888)',
+      marginTop: 12,
+      paddingTop: 12,
+      borderTop: '1px solid var(--border)'
+    }
+  }, sw(React.createElement("circle", {
+    cx: "13",
+    cy: "8",
+    r: "5.5",
+    style: {
+      fill: '#2fd6a8'
+    }
+  }), 'Clinical visit'), rec && sw(React.createElement("circle", {
+    cx: "13",
+    cy: "8",
+    r: "5.5",
+    style: {
+      fill: '#c9f26f'
+    }
+  }), 'Recovery visit'), sw(React.createElement("g", null, React.createElement("rect", {
+    x: "1",
+    y: "2",
+    width: "24",
+    height: "12",
+    rx: "6",
+    style: {
+      fill: '#2fd6a8'
+    }
+  }), React.createElement("text", {
+    x: "13",
+    y: "11.3",
+    textAnchor: "middle",
+    style: {
+      fill: '#06261c',
+      fontSize: 9,
+      fontWeight: 800
+    }
+  }, "6")), 'Visits close together (count)'), sw(React.createElement("circle", {
+    cx: "13",
+    cy: "8",
+    r: "5.5",
+    style: {
+      fill: 'none',
+      stroke: '#2fd6a8',
+      strokeWidth: 1.5,
+      strokeDasharray: '2.5 2'
+    }
+  }), 'Booked ahead'), sw(React.createElement("circle", {
+    cx: "13",
+    cy: "8",
+    r: "3",
+    style: {
+      fill: 'none',
+      stroke: '#8a9a94',
+      strokeWidth: 1.3
+    }
+  }), 'Cancelled'), sw(React.createElement("path", {
+    d: "M9.5,4.5L16.5,11.5M16.5,4.5L9.5,11.5",
+    style: {
+      stroke: '#ff8a8a',
+      strokeWidth: 1.6,
+      strokeLinecap: 'round'
+    }
+  }), 'No-show'), sw(React.createElement("rect", {
+    x: "1",
+    y: "2",
+    width: "24",
+    height: "12",
+    rx: "4",
+    style: {
+      fill: 'rgba(233,192,138,.22)'
+    }
+  }), 'Break of 30+ days'));
 }
 function GuestsPage({
   staff,
@@ -43697,50 +43869,14 @@ function GuestsPage({
           fontSize: 12,
           marginBottom: 6
         }
-      }, "full history across every stored file", windowed ? ' — the numbers above read your window, shaded here' : '', " \xB7 hover any mark for the date and treatment"), React.createElement(GP_JourneyViz, {
+      }, "full history across every stored file", windowed ? ' — the numbers above read your window, marked on the timeline' : '', " \xB7 hover any mark for details"), React.createElement(GP_JourneyViz, {
         evs: all,
         dataEnd: gpFull.dataEnd,
         from: gFrom,
         to: gTo
-      }), React.createElement("div", {
-        style: {
-          display: 'flex',
-          gap: 16,
-          flexWrap: 'wrap',
-          fontSize: 12,
-          color: 'var(--g-888)',
-          marginTop: 4
-        }
-      }, React.createElement("span", null, React.createElement("span", {
-        style: {
-          color: '#2fd6a8'
-        }
-      }, "\u25CF"), " clinical visit"), F.vr > 0 && React.createElement("span", null, React.createElement("span", {
-        style: {
-          color: '#c9f26f'
-        }
-      }, "\u25CF"), " recovery visit"), React.createElement("span", null, React.createElement("span", {
-        style: {
-          color: 'var(--g-777)'
-        }
-      }, "\u25CB"), " cancelled"), React.createElement("span", null, React.createElement("span", {
-        style: {
-          color: '#ff7a7a'
-        }
-      }, "\u2715"), " no-show"), React.createElement("span", null, React.createElement("span", {
-        style: {
-          color: '#2fd6a8'
-        }
-      }, "\u25CC"), " booked ahead"), React.createElement("span", null, React.createElement("span", {
-        style: {
-          display: 'inline-block',
-          width: 14,
-          height: 9,
-          background: 'rgba(233,192,138,.35)',
-          borderRadius: 2,
-          verticalAlign: 'middle'
-        }
-      }), " break of 30+ days")));
+      }), React.createElement(GP_JourneyKey, {
+        rec: F.vr > 0
+      }));
     })(), React.createElement("div", {
       className: "grid2",
       style: {
